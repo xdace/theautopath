@@ -77,6 +77,23 @@ namespace Betaknight.Overworld.UI
         /// <summary>«Tafel bearbeiten» aus der Auswertung: schliesst die Arena und öffnet den Tafel-Editor.</summary>
         public System.Action OnEditBoard;
 
+        /// <summary>Zusätzlicher Tempo-Faktor auf die gewählte Wiedergabe-Geschwindigkeit (Testspieler mit -speed).</summary>
+        public float SpeedFactor { get; set; } = 1f;
+
+        /// <summary>Der aktuelle Kampf ist fertig abgespielt; die Auswertung wartet auf «Weiter».</summary>
+        public bool IsFinished => _playback != null && _playback.IsFinished;
+
+        /// <summary>Fortschritt der Wiedergabe in Ticks, -1 ohne Kampf (für die Hänger-Erkennung des Testspielers).</summary>
+        public int PlaybackTick => _playback?.Tick ?? -1;
+
+        /// <summary>Wie «Weiter» nach der Auswertung: nächster Kampf aus der Warteschlange oder Arena schliessen.</summary>
+        public bool Continue()
+        {
+            if (_playback == null || !_playback.IsFinished) return false;
+            OpenNext();
+            return true;
+        }
+
         public void Initialize(OverworldSession session)
         {
             if (_session != null) _session.CombatFinished -= OnCombatFinished;
@@ -124,7 +141,7 @@ namespace Betaknight.Overworld.UI
             if (_playback == null) return;
             _popups.RemoveAll(p => Time.unscaledTime - p.Start > PopupSeconds);
             if (_paused || _playback.IsFinished) return;
-            _tickBuffer += Time.unscaledDeltaTime * Ticks.PerSecond * Speeds[_speedIndex];
+            _tickBuffer += Time.unscaledDeltaTime * Ticks.PerSecond * Speeds[_speedIndex] * Mathf.Max(0.01f, SpeedFactor);
             int ticks = Mathf.FloorToInt(_tickBuffer);
             if (ticks <= 0) return;
             _tickBuffer -= ticks;
@@ -136,7 +153,7 @@ namespace Betaknight.Overworld.UI
         private void TrackHighlights()
         {
             float now = Time.unscaledTime;
-            float gameSeconds = BattlePlayback.RowHighlightTicks / (float)Ticks.PerSecond / Speeds[_speedIndex];
+            float gameSeconds = BattlePlayback.RowHighlightTicks / (float)Ticks.PerSecond / (Speeds[_speedIndex] * Mathf.Max(0.01f, SpeedFactor));
             if (_playback.LastPlayerRowTick != _seenRowTick)
             {
                 _seenRowTick = _playback.LastPlayerRowTick;

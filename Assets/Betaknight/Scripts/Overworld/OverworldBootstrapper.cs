@@ -1,8 +1,10 @@
 using Betaknight.Core;
+using Betaknight.Core.Autoplay;
 using Betaknight.Core.Hex;
 using Betaknight.Core.Map;
 using Betaknight.Core.Run;
 using Betaknight.Core.Runes;
+using Betaknight.Overworld.Autoplay;
 using Betaknight.Overworld.Config;
 using Betaknight.Overworld.Controllers;
 using Betaknight.Overworld.Persistence;
@@ -39,9 +41,21 @@ namespace Betaknight.Overworld
         private InventoryFullWindow _inventoryFullWindow;
         private MapGenerationConfig _config;
         private KnightKit _kit;
+        private OverworldController _controller;
+        private AutoplayRunner _autoplay;
         private readonly PlayerPrefsRecipeBookStore _recipeStore = new PlayerPrefsRecipeBookStore();
 
         public OverworldSession Session { get; private set; }
+
+        // Zugriff für den Testspieler (-autoplay): er bedient dieselben Fenster wie ein Mensch.
+        internal KitSelectionWindow KitWindow => _kitWindow;
+        internal ArenaWindow Arena => _arenaWindow;
+        internal BuildWindow BuildWin => _buildWindow;
+        internal InventoryWindow InventoryWin => _inventoryWindow;
+        internal OverworldController Controller => _controller;
+
+        /// <summary>Seed für den nächsten Run statt Einstellung oder Zufall (Testspieler mit -seed).</summary>
+        internal int? SeedOverride { get; set; }
 
         private void Awake()
         {
@@ -79,9 +93,40 @@ namespace Betaknight.Overworld
                 _buildWindow.Open();
             };
             _hud.OnOpenInventory = ToggleInventory;
+
+            AutoplayOptions autoplay = AutoplayOptions.Parse(System.Environment.GetCommandLineArgs());
+            if (autoplay.Enabled)
+            {
+                _autoplay = gameObject.AddComponent<AutoplayRunner>();
+                _autoplay.Initialize(this, autoplay);
+            }
         }
 
-        private void Start() => StartNewRun();
+        private void Start()
+        {
+            if (_autoplay != null) _autoplay.Begin();
+            else StartNewRun();
+        }
+
+        /// <summary>Öffnet «Build» (schliesst «Inventar»), wie Taste B bei geschlossenem Fenster.</summary>
+        internal void OpenBuild()
+        {
+            _inventoryWindow.Close();
+            _buildWindow.Open();
+        }
+
+        /// <summary>Öffnet «Inventar» (schliesst «Build»), wie Taste I bei geschlossenem Fenster.</summary>
+        internal void OpenInventory()
+        {
+            _buildWindow.Close();
+            _inventoryWindow.Open();
+        }
+
+        internal void CloseLoadoutWindows()
+        {
+            _buildWindow.Close();
+            _inventoryWindow.Close();
+        }
 
         private void ToggleBuild()
         {
@@ -118,6 +163,7 @@ namespace Betaknight.Overworld
             if (_root != null) Destroy(_root);
             _root = null;
             Session = null;
+            _controller = null;
             _hud.Initialize(null, null, null, null);
             _arenaWindow.Initialize(null);
             _buildWindow.Initialize(null);
@@ -136,7 +182,7 @@ namespace Betaknight.Overworld
         /// <summary>Erzeugt eine komplett neue Karte mit dem gewählten Kit (Akt 1).</summary>
         public void BuildWorld()
         {
-            int seed = settings.seed != 0 ? settings.seed : Random.Range(1, int.MaxValue);
+            int seed = SeedOverride ?? (settings.seed != 0 ? settings.seed : Random.Range(1, int.MaxValue));
             _config = settings.ToGenerationConfig(seed);
             BuildWorld(OverworldSession.Create(_config, settings.sightRadius, _kit));
         }
@@ -173,6 +219,7 @@ namespace Betaknight.Overworld
             OverworldController controller = _root.AddComponent<OverworldController>();
             controller.Initialize(Session, grid, player, cam);
             controller.InputBlocked = () => _arenaWindow.IsOpen || _buildWindow.IsOpen || _inventoryWindow.IsOpen;
+            _controller = controller;
 
             _hud.Initialize(Session, controller, _config.Encounters, StartNewRun);
             _encounterWindow.Initialize(Session, keepMessages: Session.Act > 1);

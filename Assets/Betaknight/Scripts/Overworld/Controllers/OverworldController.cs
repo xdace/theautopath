@@ -61,6 +61,17 @@ namespace Betaknight.Overworld.Controllers
             }
         }
 
+        /// <summary>
+        /// Läuft eine Route ab wie nach einem Klick (Animation, Schritt für Schritt über die Session). Für den
+        /// Testspieler; false, wenn gerade gelaufen wird oder die Route leer ist.
+        /// </summary>
+        public bool TravelTo(List<HexCoord> route)
+        {
+            if (IsTravelling || route == null || route.Count == 0 || _session == null) return false;
+            _travel = StartCoroutine(Travel(new List<HexCoord>(route)));
+            return true;
+        }
+
         private void UpdateHover()
         {
             if (!PointerInput.TryGetScreenPosition(out Vector2 screen) || OverworldHud.ContainsScreenPoint(screen))

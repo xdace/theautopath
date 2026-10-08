@@ -17,6 +17,20 @@ namespace Betaknight.Overworld.UI
 
         public bool IsOpen => _kits != null;
 
+        /// <summary>Die angebotenen Kits, leer bei geschlossenem Fenster (für den Testspieler).</summary>
+        public IReadOnlyList<KnightKit> Kits => _kits ?? Array.Empty<KnightKit>();
+
+        /// <summary>Wählt ein Kit wie ein Klick auf seinen Knopf.</summary>
+        public bool Choose(KnightKit kit)
+        {
+            if (_kits == null || kit == null) return false;
+            Action<KnightKit> callback = _onChosen;
+            _kits = null;
+            _onChosen = null;
+            callback?.Invoke(kit);
+            return true;
+        }
+
         public void Open(IReadOnlyList<KnightKit> kits, RuneCatalog runes, Action<KnightKit> onChosen)
         {
             _kits = kits;
@@ -47,10 +61,7 @@ namespace Betaknight.Overworld.UI
 
                 if (GUILayout.Button(label, _kitStyle, GUILayout.Height(88f)))
                 {
-                    Action<KnightKit> callback = _onChosen;
-                    _kits = null;
-                    _onChosen = null;
-                    callback?.Invoke(kit);
+                    Choose(kit);
                     break;
                 }
             }
