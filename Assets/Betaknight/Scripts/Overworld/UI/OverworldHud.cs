@@ -115,7 +115,11 @@ namespace Betaknight.Overworld.UI
             {
                 RuneSlot row = _session.Runes.Rows[i];
                 string skill = row.Skill == null ? "<color=#888888>—</color>" : row.Skill.IsBasicAttack ? "Basisangriff" : row.Skill.NameFrom(Skills);
-                lines.Add($"{i + 1}. [{row.Name}] → {skill}");
+                int modules = row.Modules.Count + (row.Skill?.Modules.Count ?? 0);
+                string marks = modules > 0 ? $" <color=#ffd75e>◆{modules}</color>" : string.Empty;
+                foreach (OverworldSession.TriggerLink link in _session.TriggerLinks())
+                    if (link.From == i) marks += $" <color=#ffae42>↪{link.To + 1}</color>";
+                lines.Add($"{i + 1}. [{row.Name}] → {skill}{marks}");
             }
             lines.Add("↓ [Immer] → Basisangriff");
             return string.Join("\n", lines);

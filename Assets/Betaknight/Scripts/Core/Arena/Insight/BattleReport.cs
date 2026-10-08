@@ -10,8 +10,31 @@ namespace Betaknight.Core.Arena
         public string Skill { get; }
         public bool IsFallback { get; }
 
-        /// <summary>Wie oft die Zeile eine Aktion gestartet hat.</summary>
+        /// <summary>Wie oft die Zeile eine Aktion gestartet hat (inklusive ausgelöster und wiederholter).</summary>
         public int Fired { get; internal set; }
+
+        /// <summary>Davon durch Auslöser gestartet.</summary>
+        public int Triggered { get; internal set; }
+
+        /// <summary>Davon Wiederholungen (Echo, Modul «Mehrfach»).</summary>
+        public int Repeated { get; internal set; }
+
+        /// <summary>Auslöser auf diese Zeile, die verfallen sind (Skill nicht bereit).</summary>
+        public int TriggersExpired { get; internal set; }
+
+        /// <summary>Welche Zeilen diese ausgelöst haben (Index, Anzahl), für die Kette in der Auswertung.</summary>
+        internal readonly SortedDictionary<int, int> TriggeredBy = new SortedDictionary<int, int>();
+
+        /// <summary>«Zeile 1 ×3, Zeile 2 ×1» oder leer.</summary>
+        public string TriggeredByText
+        {
+            get
+            {
+                var parts = new List<string>();
+                foreach (KeyValuePair<int, int> p in TriggeredBy) parts.Add($"Zeile {p.Key + 1} ×{p.Value}");
+                return string.Join(", ", parts);
+            }
+        }
 
         /// <summary>Schaden an Gegnern aus Aktionen dieser Zeile (inklusive Brennen, das sie gesetzt hat).</summary>
         public int Damage { get; internal set; }
@@ -87,7 +110,17 @@ namespace Betaknight.Core.Arena
                 switch (e.Kind)
                 {
                     case BattleEventKind.ActionStarted:
-                        if (row != null) row.Fired++;
+                        if (row == null) break;
+                        row.Fired++;
+                        if (e.IsRepeat) row.Repeated++;
+                        if (e.IsTriggered)
+                        {
+                            row.Triggered++;
+                            row.TriggeredBy[e.CauseRow] = (row.TriggeredBy.TryGetValue(e.CauseRow, out int n) ? n : 0) + 1;
+                        }
+                        break;
+                    case BattleEventKind.TriggerExpired:
+                        if (row != null) row.TriggersExpired++;
                         break;
                     case BattleEventKind.Damage:
                         if (e.Target == null || e.Target.Side == player.Side) break;
@@ -149,6 +182,14 @@ namespace Betaknight.Core.Arena
                 if (row.Fired == 0 || row.Skipped < 3) continue;
                 if (row.MainReason == RowCheckState.ActionRunning && row.SkipCount(RowCheckState.ActionRunning) * 2 >= row.Skipped)
                     _hints.Add($"{row.Name} war {row.SkipCount(RowCheckState.ActionRunning)}× bereit, während eine andere Aktion lief. Kürzere Aktionen darunter helfen.");
+            }
+
+            // Auslöser-Ketten: wer löst wen aus, und wie viele verfallen, weil das Ziel nicht bereit war.
+            foreach (RowReport row in _rows)
+            {
+                if (row.Triggered > 0) _hints.Add($"{row.Name} ({row.Skill}) wurde {row.Triggered}× ausgelöst, von {row.TriggeredByText}.");
+                if (row.TriggersExpired > 0)
+                    _hints.Add($"{row.TriggersExpired} Auslöser auf {row.Name} verfielen: der Skill war nicht bereit (Cooldown oder Aktion lief).");
             }
 
             if (OtherDamage > 0) _hints.Add($"{OtherDamage} Schaden kam ohne Zeile (Set-Boni, Rückschlag).");

@@ -103,6 +103,16 @@ namespace Betaknight.Overworld.UI
                 GUILayout.EndVertical();
             }
 
+            IReadOnlyList<string> modules = shop.Inventory.ModuleIds;
+            for (int i = 0; i < modules.Count; i++)
+            {
+                int index = i;
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label(ModuleText.Describe(_session, modules[i], $"  – {prices.Module} Gold"), _plainStyle);
+                ModuleText.DrawChoice(_session, modules[i], _session.CanBuyShopModule(i), "Modul kaufen", choice => _session.BuyShopModule(index, choice));
+                GUILayout.EndVertical();
+            }
+
             DrawSell(prices);
 
             GUILayout.Space(8f);

@@ -92,6 +92,82 @@ namespace Betaknight.Core
             return target.Value.Kind == ModuleTargetKind.Skill ? $"{slot.Skill.NameFrom(SkillCatalog)} (Zeile {row + 1})" : $"Zeile {row + 1}";
         }
 
+        /// <summary>Freie Module, die an diesen Ort passen (für die Auswahl im Tafel-Editor).</summary>
+        public List<ModuleInstance> FreeModulesFor(IModuleHolder holder) =>
+            Modules.Free.Where(m => holder != null && ModuleCollection.Fits(ModuleDefinitionOf(m), holder, m)).ToList();
+
+        /// <summary>«Skill Bohrstoß (Zeile 2)», «Baustein Zeile 1» oder «frei».</summary>
+        public string ModuleWhere(ModuleInstance module)
+        {
+            switch (module?.Holder)
+            {
+                case RuneSlot row: return $"Baustein Zeile {Runes.IndexOfRow(row) + 1}";
+                case SkillInstance skill:
+                    int at = skill.Holder is RuneSlot slot ? Runes.IndexOfRow(slot) : -1;
+                    return at >= 0 ? $"Skill {skill.NameFrom(SkillCatalog)} (Zeile {at + 1})" : $"Skill {skill.NameFrom(SkillCatalog)} (frei)";
+                default: return "frei";
+            }
+        }
+
+        /// <summary>«Nach Ausführung → Bohrstoß (Zeile 3)» bzw. «Wenn erfüllt → Zeile 2». Nur für Auslöser.</summary>
+        public string DescribeTrigger(ModuleInstance module)
+        {
+            if (module == null || module.ModuleId != ModuleIds.Trigger) return string.Empty;
+            string when = module.Holder is RuneSlot ? "Wenn erfüllt" : "Nach Ausführung";
+            return $"{when} → {DescribeTarget(module.Target)}";
+        }
+
+        /// <summary>Wählt das nächste mögliche Ziel eines Auslösers (Reihenfolge der Zeilen, danach «kein Ziel»).</summary>
+        public bool CycleTriggerTarget(int moduleId, int step = 1)
+        {
+            ModuleInstance module = Modules.Get(moduleId);
+            if (module == null || module.ModuleId != ModuleIds.Trigger) return false;
+            var targets = TriggerTargets().Select(t => (ModuleTarget?)t.target).ToList();
+            targets.Add(null);
+            int current = targets.FindIndex(t => t.HasValue == module.Target.HasValue
+                && (!t.HasValue || (t.Value.Kind == module.Target.Value.Kind && t.Value.Id == module.Target.Value.Id)));
+            if (current < 0) current = targets.Count - 1;
+            int next = ((current + step) % targets.Count + targets.Count) % targets.Count;
+            return SetTriggerTarget(moduleId, targets[next]);
+        }
+
+        /// <summary>Eine Auslöser-Verbindung an der Tafel, z. B. zum Zeichnen als Linie.</summary>
+        public readonly struct TriggerLink
+        {
+            public readonly int From;
+            public readonly int To;
+
+            /// <summary>Vom Baustein («wenn erfüllt») statt vom Skill («nach Ausführung»).</summary>
+            public readonly bool FromBlock;
+
+            public TriggerLink(int from, int to, bool fromBlock)
+            {
+                From = from;
+                To = to;
+                FromBlock = fromBlock;
+            }
+        }
+
+        /// <summary>Alle Auslöser der Tafel mit gültigem Ziel, als Verbindungen zwischen Zeilen (auch Kreise und auf sich selbst).</summary>
+        public List<TriggerLink> TriggerLinks()
+        {
+            var links = new List<TriggerLink>();
+            for (int i = 0; i < Runes.Rows.Count; i++)
+            {
+                RuneSlot row = Runes.Rows[i];
+                foreach (ModuleInstance m in row.Modules) AddLink(links, m, i, true);
+                if (row.Skill != null) foreach (ModuleInstance m in row.Skill.Modules) AddLink(links, m, i, false);
+            }
+            return links;
+        }
+
+        private void AddLink(List<TriggerLink> links, ModuleInstance m, int from, bool fromBlock)
+        {
+            if (m.ModuleId != ModuleIds.Trigger) return;
+            int to = Betaknight.Core.Gear.RuneLoadoutBoard.TargetRow(Runes, m.Target);
+            if (to >= 0) links.Add(new TriggerLink(from, to, fromBlock));
+        }
+
         // ------------------------------------------------------------------ Erhalt
 
         /// <summary>Ein Modul kommt dazu; ein vorhandenes steigt (Upgrade) oder ein weiteres Exemplar entsteht.</summary>
@@ -104,7 +180,7 @@ namespace Betaknight.Core
                 if (target != null)
                 {
                     string old = target.NameFrom(ModuleCatalog);
-                    Modules.Upgrade(target, ModuleRules.MaxLevel);
+                    Modules.Upgrade(target, MaxModuleLevel(moduleId));
                     BuildImproved?.Invoke($"Modul {old} → {target.NameFrom(ModuleCatalog)}");
                     return target;
                 }
@@ -117,9 +193,14 @@ namespace Betaknight.Core
         /// <summary>Welches Exemplar bei «Stufe erhöhen» steigt: zuerst ein eingesetztes, dann irgendeines.</summary>
         public ModuleInstance ModuleUpgradeTarget(string moduleId)
         {
-            List<ModuleInstance> owned = Modules.OfModule(moduleId).Where(m => m.Level < ModuleRules.MaxLevel).ToList();
+            int max = MaxModuleLevel(moduleId);
+            List<ModuleInstance> owned = Modules.OfModule(moduleId).Where(m => m.Level < max).ToList();
             return owned.FirstOrDefault(m => !m.IsFree) ?? owned.FirstOrDefault();
         }
+
+        /// <summary>Höchste Stufe eines Moduls: so viele Stufen, wie es Beschreibungen hat (Umkehren und Auslöser haben keine).</summary>
+        public int MaxModuleLevel(string moduleId) =>
+            ModuleCatalog.TryGet(moduleId, out ModuleDefinition d) ? System.Math.Min(ModuleRules.MaxLevel, d.Descriptions.Count - 1) : 0;
 
         public bool CanTakeModule(int index) =>
             PendingRuneOffer != null && index >= 0 && index < PendingRuneOffer.ModuleIds.Count && ModuleCatalog.Contains(PendingRuneOffer.ModuleIds[index]);

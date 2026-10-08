@@ -164,6 +164,10 @@ namespace Betaknight.Core.Arena
         public int ActionStartTick { get; internal set; }
         public int ActionWindupTicks { get; internal set; }
 
+        /// <summary>Warum die laufende Aktion startete: Tafel, Wiederholung oder Auslöser (dann <see cref="ActionCauseRow"/>).</summary>
+        public ActionCause ActionCause { get; internal set; }
+        public int ActionCauseRow { get; internal set; } = -1;
+
         /// <summary>Tick, an dem zuletzt eine Wirkung eintraf (für Treffer-Blitze).</summary>
         public int LastHitTick { get; internal set; } = -1000;
 
@@ -351,6 +355,8 @@ namespace Betaknight.Core.Arena
                     source.ActionRow = e.RowIndex;
                     source.ActionStartTick = e.Tick;
                     source.ActionWindupTicks = e.Amount;
+                    source.ActionCause = e.Cause;
+                    source.ActionCauseRow = e.CauseRow;
                     if (source.Info.Side == Side.Player)
                     {
                         LastPlayerRow = e.RowIndex;
@@ -362,6 +368,10 @@ namespace Betaknight.Core.Arena
 
                 case BattleEventKind.ActionExecuted:
                     if (source != null) source.ActionWindupTicks = 0;
+                    break;
+
+                case BattleEventKind.TriggerExpired:
+                    Log(e, LogCategory.None);
                     break;
 
                 case BattleEventKind.ActionInterrupted:

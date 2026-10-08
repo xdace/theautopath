@@ -8,7 +8,7 @@ using UnityEngine;
 namespace Betaknight.Overworld.UI
 {
     /// <summary>
-    /// Fenster für eine Belohnung: eine Rune, ein Teil oder einen Skill nehmen oder verzichten. Ein doppelter Skill
+    /// Fenster für eine Belohnung: eine Rune, ein Teil, einen Skill oder ein Modul nehmen oder verzichten. Ein doppelter Skill
     /// steigt eine Stufe oder bleibt als zweites Exemplar. Teile werden angelegt oder kommen
     /// ins Inventar; bei voller Tafel kommt eine Rune ins Runen-Inventar oder tauscht eine Zeile (die alte Rune wandert
     /// ins Inventar). Nichts geht verloren.
@@ -122,6 +122,16 @@ namespace Betaknight.Overworld.UI
                 GUILayout.Label(SkillText.Describe(_session, offer.SkillIds[i]), _plainStyle);
                 SkillText.DrawChoice(_session, offer.SkillIds[i], _session.CanTakeSkill(i), "Skill nehmen (frei in die Sammlung)",
                     choice => _session.TakeSkill(index, choice));
+                GUILayout.EndVertical();
+            }
+
+            for (int i = 0; i < offer.ModuleIds.Count; i++)
+            {
+                int index = i;
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label(ModuleText.Describe(_session, offer.ModuleIds[i], "  <color=#ffd75e>selten</color>"), _plainStyle);
+                ModuleText.DrawChoice(_session, offer.ModuleIds[i], _session.CanTakeModule(i), "Modul nehmen (frei in die Sammlung)",
+                    choice => _session.TakeModule(index, choice));
                 GUILayout.EndVertical();
             }
 

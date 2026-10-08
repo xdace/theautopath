@@ -291,6 +291,21 @@ namespace Betaknight.Tests.EditMode
             if (expired.Count > 0) StringAssert.Contains("Auslöser von Zeile 1 verfällt", BattleLogText.Describe(expired[0], r));
         }
 
+        [Test]
+        public void TheReportShowsTheChain()
+        {
+            SkillDefinition stab = Skills.Get(SkillIds.ShockStab).WithBonus(0, -Ticks.FromSeconds(100), 0);
+            BattleSetup setup = Duel(Fighter("A", 1000, 0, 20, board: TriggerBoard(stab, Skills.Get(SkillIds.Drill))), Fighter("B", 100000, 0, 1000));
+            BattleReport report = BattleReport.Create(Run(setup));
+
+            RowReport drill = report.Rows[1];
+            Assert.Greater(drill.Triggered, 0);
+            Assert.AreEqual(drill.Fired, drill.Triggered, "Die Zeile startet nur über den Auslöser");
+            Assert.Greater(drill.TriggersExpired, 0);
+            Assert.AreEqual($"Zeile 1 ×{drill.Triggered}", drill.TriggeredByText);
+            Assert.IsTrue(report.Hints.Any(h => h.StartsWith("Zeile 2 (") && h.Contains("ausgelöst, von Zeile 1 ×")));
+        }
+
         // ------------------------------------------------------------------ Sammlung und Tafel
 
         private static OverworldSession NewSession() =>
@@ -351,6 +366,34 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
+        public void TriggerTargetsCanBeCycledAndShowAsLinks()
+        {
+            OverworldSession s = NewSession();
+            s.Runes.TryAdd(s.RuneCatalog.Get("always"), s.Skills.Add(SkillIds.Repair));
+            ModuleInstance after = s.GainModule(ModuleIds.Trigger);
+            ModuleInstance when = s.GainModule(ModuleIds.Trigger, SkillDuplicateChoice.KeepCopy);
+            Assert.IsTrue(s.PlaceModuleOnSkill(after.InstanceId, s.Runes.Rows[0].Skill.InstanceId));
+            Assert.IsTrue(s.PlaceModuleOnRow(when.InstanceId, 1));
+            Assert.AreEqual("Nach Ausführung → kein Ziel", s.DescribeTrigger(after));
+            Assert.IsEmpty(s.TriggerLinks());
+
+            Assert.IsTrue(s.CycleTriggerTarget(after.InstanceId));
+            Assert.AreEqual(0, RuneLoadoutBoard.TargetRow(s.Runes, after.Target), "Erstes Ziel: Zeile 1 (auch sich selbst)");
+            Assert.IsTrue(s.CycleTriggerTarget(after.InstanceId));
+            Assert.AreEqual(1, RuneLoadoutBoard.TargetRow(s.Runes, after.Target));
+            Assert.IsTrue(s.CycleTriggerTarget(when.InstanceId));
+            StringAssert.StartsWith("Wenn erfüllt → ", s.DescribeTrigger(when));
+
+            var links = s.TriggerLinks();
+            Assert.AreEqual(2, links.Count, "Kreis Zeile 1 ↔ Zeile 2");
+            Assert.IsTrue(links.Any(l => l.From == 0 && l.To == 1 && !l.FromBlock));
+            Assert.IsTrue(links.Any(l => l.From == 1 && l.To == 0 && l.FromBlock));
+
+            for (int i = 0; i < s.Runes.Rows.Count - 1; i++) s.CycleTriggerTarget(after.InstanceId);
+            Assert.IsNull(after.Target, "Nach dem letzten Ziel kommt «kein Ziel»");
+        }
+
+        [Test]
         public void ModulesOfARemovedRowBecomeFree()
         {
             OverworldSession s = NewSession();
@@ -375,6 +418,10 @@ namespace Betaknight.Tests.EditMode
             ModuleInstance b = s.GainModule(ModuleIds.Chain);
             Assert.AreNotSame(a, b, "Auf Maximalstufe kommt ein weiteres Exemplar");
             Assert.AreEqual(2, s.Modules.OfModule(ModuleIds.Chain).Count);
+
+            ModuleInstance invert = s.GainModule(ModuleIds.Invert);
+            Assert.AreNotSame(invert, s.GainModule(ModuleIds.Invert), "Umkehren hat keine Stufen: gleich ein weiteres Exemplar");
+            Assert.AreEqual(0, invert.Level);
         }
 
         [Test]

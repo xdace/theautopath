@@ -3,13 +3,14 @@ using Betaknight.Core;
 using Betaknight.Core.Arena;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Modules;
 using Betaknight.Core.Skills;
 using UnityEngine;
 
 namespace Betaknight.Overworld.UI
 {
     /// <summary>
-    /// Inventar per IMGUI: links die 7 Ausrüstungsplätze, rechts das Inventar, darunter Runentafel, Runen-Inventar und Skills.
+    /// Inventar per IMGUI: links die 7 Ausrüstungsplätze, rechts das Inventar, darunter Runentafel, Runen-Inventar, Skills und Module.
     /// Ein Klick auf ein Teil zeigt Werte, passive Effekte und Set und vergleicht mit dem angelegten Teil.
     /// Alle Änderungen laufen über die Fassade und sind im Kampf und bei offenen Fenstern gesperrt.
     /// </summary>
@@ -76,6 +77,8 @@ namespace Betaknight.Overworld.UI
             DrawRunes();
             GUILayout.Space(8f);
             DrawSkills();
+            GUILayout.Space(8f);
+            DrawModules();
             GUILayout.Space(8f);
             DrawTags();
             GUILayout.EndScrollView();
@@ -310,6 +313,29 @@ namespace Betaknight.Overworld.UI
             }
             if (_session.Skills.Free.Count > 0)
                 GUILayout.Label("<size=11>Freie Skills setzt du im Tafel-Editor an eine Zeile.</size>", _small);
+            GUILayout.EndVertical();
+        }
+
+        // ------------------------------------------------------------------ Module
+
+        /// <summary>Alle Modul-Exemplare mit Stufe, Art, Ort und (bei Auslösern) Ziel. Einsetzen geht im Tafel-Editor.</summary>
+        private void DrawModules()
+        {
+            IReadOnlyList<ModuleInstance> all = _session.Modules.All;
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label($"<b>Module</b> ({all.Count}, davon {_session.Modules.Free.Count} frei)", _text);
+            if (all.Count == 0) GUILayout.Label("<color=#666666>keine – selten aus Elite, Truhen, Boss-Flucht und Shop</color>", _small);
+            foreach (ModuleInstance m in all)
+            {
+                ModuleDefinition d = _session.ModuleDefinitionOf(m);
+                string where = m.IsFree ? "<color=#7ddc6f>frei</color>" : _session.ModuleWhere(m);
+                string trigger = m.ModuleId == ModuleIds.Trigger && !m.IsFree ? $"  {_session.DescribeTrigger(m)}" : string.Empty;
+                string text = $"<b>{m.NameFrom(_session.ModuleCatalog)}</b>  Stufe {m.Level}/{_session.MaxModuleLevel(m.ModuleId)}"
+                    + $"  [{(d != null ? ModuleText.KindName(d.Kind) : "?")}]  {where}{trigger}\n<size=11>{d?.DescriptionAt(m.Level)}</size>";
+                GUILayout.Label(text, _small);
+            }
+            if (_session.Modules.Free.Count > 0)
+                GUILayout.Label("<size=11>Freie Module setzt du im Tafel-Editor an einen Skill oder Baustein.</size>", _small);
             GUILayout.EndVertical();
         }
 

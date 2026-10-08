@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
 using Betaknight.Core.Gear;
+using Betaknight.Core.Modules;
 using Betaknight.Core.Runes;
 using Betaknight.Core.Skills;
 using UnityEngine;
@@ -12,6 +13,7 @@ namespace Betaknight.Overworld.UI
     /// Tafel-Editor per IMGUI: Zeilen nach oben/unten schieben (Priorität), Rune und Skill pro Zeile getrennt wählen.
     /// Runen kommen aus dem Runen-Inventar, Skills aus der Skill-Sammlung (jedes Exemplar sitzt an genau einer Zeile).
     /// Unter jedem Skill stehen seine Kennzahlen (aus den Effekten abgeleitet, siehe SkillInfo).
+    /// Module sitzen an Baustein (Zeile) oder Skill; Auslöser zeigen ihr Ziel und werden als Linie zwischen den Zeilen gezeichnet.
     /// Ändert nur die Session, gerechnet wird erst im nächsten Kampf.
     /// </summary>
     public sealed class BoardEditorWindow : MonoBehaviour
@@ -22,6 +24,7 @@ namespace Betaknight.Overworld.UI
         private GUIStyle _info;
         private GUIStyle _tooltip;
         private Vector2 _scroll;
+        private readonly List<Rect> _rowRects = new List<Rect>();
 
         // Werte des Ritters (Waffe, Stats, Set-Boni) einmal pro Frame, nicht pro OnGUI-Aufruf.
         private SkillUserStats _stats;
@@ -53,7 +56,7 @@ namespace Betaknight.Overworld.UI
             }
 
             const float width = 700f;
-            float content = 112f * (_session.Runes.Rows.Count + 1) + 90f * _session.WornSets().Count + 44f * (_session.RuneInventory.Count + 1)
+            float content = 142f * (_session.Runes.Rows.Count + 1) + 44f * (_session.Modules.Count + 1) + 90f * _session.WornSets().Count + 44f * (_session.RuneInventory.Count + 1)
                 + 44f * (_session.Skills.Count + 1);
             float height = Mathf.Min(Screen.height - 40f, 150f + content);
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
@@ -68,6 +71,7 @@ namespace Betaknight.Overworld.UI
             _scroll = GUILayout.BeginScrollView(_scroll);
             IReadOnlyList<RuneSlot> rows = _session.Runes.Rows;
             for (int i = 0; i < rows.Count; i++) DrawRow(i, rows[i], rows.Count);
+            DrawTriggerLinks(rows.Count);
 
             GUILayout.BeginVertical(GUI.skin.box);
             GUILayout.Label("↓  [Immer] → <b>Basisangriff</b> (fest, ganz unten)", _text);
@@ -75,6 +79,7 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndVertical();
 
             DrawSkillCollection(rows.Count);
+            DrawModuleCollection();
             DrawRuneInventory(rows.Count);
             DrawSets();
             GUILayout.EndScrollView();
@@ -116,7 +121,129 @@ namespace Betaknight.Overworld.UI
 
             GUILayout.EndHorizontal();
             DrawSkillInfo(row.Skill);
+            DrawModuleSlots("Baustein", row);
+            if (row.Skill != null && !row.Skill.IsBasicAttack) DrawModuleSlots("Skill", row.Skill);
             GUILayout.EndVertical();
+
+            if (Event.current.type == EventType.Repaint)
+            {
+                while (_rowRects.Count <= index) _rowRects.Add(Rect.zero);
+                _rowRects[index] = GUILayoutUtility.GetLastRect();
+            }
+        }
+
+        /// <summary>
+        /// Modul-Plätze eines Orts: eingesetzte Module (× nimmt ab, Auslöser: Klick wählt das nächste Ziel),
+        /// bei freiem Platz Knöpfe für passende freie Module aus der Sammlung.
+        /// </summary>
+        private void DrawModuleSlots(string label, IModuleHolder holder)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"<size=12>{label}-Module {holder.Modules.Count}/{holder.ModuleSlots}:</size>", _info, GUILayout.Width(130f));
+            GUI.enabled = _session.CanEditModules;
+            foreach (ModuleInstance m in holder.Modules)
+            {
+                GUIContent chip = ModuleText.Chip(_session, m);
+                if (m.ModuleId == ModuleIds.Trigger)
+                {
+                    chip.tooltip = $"{chip.tooltip}\nKlick: nächstes Ziel wählen";
+                    if (GUILayout.Button(chip, GUILayout.MaxWidth(280f))) _session.CycleTriggerTarget(m.InstanceId);
+                }
+                else
+                {
+                    GUILayout.Label(chip, _info, GUILayout.ExpandWidth(false));
+                }
+                if (GUILayout.Button(new GUIContent("×", "Modul abnehmen (zurück in die Sammlung)"), GUILayout.Width(22f)))
+                {
+                    _session.TakeOffModule(m.InstanceId);
+                    break;
+                }
+            }
+
+            if (holder.Modules.Count < holder.ModuleSlots)
+            {
+                var shown = new HashSet<string>();
+                foreach (ModuleInstance m in _session.FreeModulesFor(holder))
+                {
+                    if (!shown.Add($"{m.ModuleId}+{m.Level}")) continue;
+                    ModuleDefinition d = _session.ModuleDefinitionOf(m);
+                    if (!GUILayout.Button(new GUIContent($"+ {m.NameFrom(_session.ModuleCatalog)}", d?.DescriptionAt(m.Level)), GUILayout.ExpandWidth(false))) continue;
+                    if (holder is RuneSlot row) _session.PlaceModuleOnRow(m.InstanceId, _session.Runes.IndexOfRow(row));
+                    else if (holder is SkillInstance skill) _session.PlaceModuleOnSkill(m.InstanceId, skill.InstanceId);
+                    break;
+                }
+                if (shown.Count == 0) GUILayout.Label("<size=12><color=#888888>leer</color></size>", _info);
+            }
+            GUI.enabled = true;
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+        }
+
+        /// <summary>
+        /// Auslöser als Linien rechts an den Zeilen: vom Skill (orange) bzw. Baustein (türkis) zur Zielzeile, Pfeil am Ziel.
+        /// Jede Verbindung bekommt eine eigene Spur, so bleiben auch Kreise (A→B, B→A) und Selbst-Auslöser sichtbar.
+        /// </summary>
+        private void DrawTriggerLinks(int rowCount)
+        {
+            if (Event.current.type != EventType.Repaint || _rowRects.Count < rowCount) return;
+            List<OverworldSession.TriggerLink> links = _session.TriggerLinks();
+            Color old = GUI.color;
+            for (int k = 0; k < links.Count; k++)
+            {
+                OverworldSession.TriggerLink link = links[k];
+                Rect from = _rowRects[link.From];
+                Rect to = _rowRects[link.To];
+                float lane = from.xMax - 10f - 9f * k;
+                float start = lane - 26f;
+                float y1 = from.y + from.height * (link.FromBlock ? 0.25f : 0.5f);
+                float y2 = to.y + to.height * 0.75f;
+                if (link.From == link.To) y2 = from.y + from.height * 0.8f;
+
+                GUI.color = link.FromBlock ? new Color(0.45f, 0.9f, 0.95f, 0.9f) : new Color(1f, 0.65f, 0.25f, 0.9f);
+                Line(start, y1, lane, y1);
+                Line(lane, Mathf.Min(y1, y2), lane, Mathf.Max(y1, y2));
+                Line(start, y2, lane, y2);
+                GUI.Label(new Rect(start - 14f, y2 - 10f, 16f, 20f), "◀", _info);
+            }
+            GUI.color = old;
+        }
+
+        private static void Line(float x1, float y1, float x2, float y2)
+        {
+            const float thickness = 2f;
+            var rect = Mathf.Approximately(y1, y2)
+                ? new Rect(Mathf.Min(x1, x2), y1 - thickness * 0.5f, Mathf.Abs(x2 - x1) + thickness, thickness)
+                : new Rect(x1 - thickness * 0.5f, Mathf.Min(y1, y2), thickness, Mathf.Abs(y2 - y1));
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        }
+
+        /// <summary>Alle Modul-Exemplare mit Stufe, Art und Ort; eingesetzte lassen sich hier abnehmen.</summary>
+        private void DrawModuleCollection()
+        {
+            IReadOnlyList<ModuleInstance> all = _session.Modules.All;
+            GUILayout.Space(4f);
+            GUILayout.Label($"<b>Module</b> ({all.Count}, davon {_session.Modules.Free.Count} frei)"
+                + (all.Count == 0 ? "  <color=#888888>noch keine – selten aus Elite, Truhen, Boss-Flucht und Shop</color>" : string.Empty), _text);
+
+            foreach (ModuleInstance m in all)
+            {
+                ModuleDefinition d = _session.ModuleDefinitionOf(m);
+                string where = m.IsFree ? "<color=#7ddc6f>frei</color>" : _session.ModuleWhere(m);
+                string trigger = m.ModuleId == ModuleIds.Trigger && !m.IsFree ? $" · {_session.DescribeTrigger(m)}" : string.Empty;
+                GUILayout.BeginHorizontal(GUI.skin.box);
+                GUILayout.Label($"<b>{m.NameFrom(_session.ModuleCatalog)}</b>  <size=12>[{(d != null ? ModuleText.KindName(d.Kind) : "?")}] {where}{trigger}"
+                    + $"\n{d?.DescriptionAt(m.Level)}</size>", _info);
+                GUI.enabled = _session.CanEditModules && !m.IsFree;
+                if (GUILayout.Button(new GUIContent("ab", "Modul abnehmen"), GUILayout.Width(32f)))
+                {
+                    _session.TakeOffModule(m.InstanceId);
+                    GUI.enabled = true;
+                    GUILayout.EndHorizontal();
+                    return;
+                }
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
+            }
         }
 
         /// <summary>Infozeile unter dem Skill: Wirkung, Schaden (Prozent und konkret), CD, Ausholen, Erholung. Tooltip mit allen Details.</summary>

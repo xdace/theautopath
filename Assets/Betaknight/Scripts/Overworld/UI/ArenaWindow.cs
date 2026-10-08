@@ -258,6 +258,8 @@ namespace Betaknight.Overworld.UI
                     Fill(new Rect(bar.x, bar.y, bar.width * f.WindupProgress(_playback.Tick), bar.height),
                         charging ? new Color(1f, 0.55f, 0.15f) : new Color(0.7f, 0.7f, 0.75f));
                     string cast = $"Cast {SkillInfo.Seconds(f.ActionWindupTicks)}";
+                    if (f.ActionCause == ActionCause.Trigger) cast += $", <color=#ffae42>↪ von Zeile {f.ActionCauseRow + 1}</color>";
+                    else if (f.ActionCause == ActionCause.Repeat) cast += ", <color=#9fc7ff>↻ Wiederholung</color>";
                     string label = charging ? $"<color=#ffae42>lädt auf: {BattleLogText.SkillName(f.ActionSkill)} ({cast})</color>"
                         : $"{BattleLogText.SkillName(f.ActionSkill)} ({cast})";
                     GUI.Label(new Rect(bar.x - 30f, bar.yMax, bar.width + 60f, 20f), label, _small);
@@ -406,7 +408,7 @@ namespace Betaknight.Overworld.UI
             {
                 string prefix = row.IsFallback ? "↓" : $"{row.Index + 1}.";
                 string reason = row.MainReason.HasValue ? RowStateText.Reason(row.MainReason.Value) : "–";
-                ReportRow(cols, RowColorFor(row.Index), $"{prefix} [{row.Label}] → {row.Skill}", $"{row.Fired}×", row.Damage.ToString(),
+                ReportRow(cols, RowColorFor(row.Index), $"{prefix} [{row.Label}] → {row.Skill}", FiredText(row), row.Damage.ToString(),
                     row.Healing.ToString(), SkillInfo.Percent(row.DamageShareBp), row.Skipped > 0 ? $"{row.Skipped}×" : "–", reason);
             }
             if (_report.OtherDamage > 0)
@@ -416,6 +418,15 @@ namespace Betaknight.Overworld.UI
             foreach (string hint in _report.Hints) GUILayout.Label($"• {hint}", _row);
             GUILayout.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        /// <summary>«5×», mit Anteil ausgelöster (↪) und wiederholter (↻) Starts.</summary>
+        private static string FiredText(RowReport row)
+        {
+            string text = $"{row.Fired}×";
+            if (row.Triggered > 0) text += $" <color=#ffae42>↪{row.Triggered}</color>";
+            if (row.Repeated > 0) text += $" <color=#9fc7ff>↻{row.Repeated}</color>";
+            return text;
         }
 
         private void ReportRow(float[] cols, Color color, params string[] cells)

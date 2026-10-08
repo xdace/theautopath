@@ -49,6 +49,7 @@ Eine Reise stoppt automatisch auf feindlichen Feldern (Gegner, Boss), auf neu en
 | Ausrüstung | Sieg (50 %), Truhe, Shop | Anlegen oder ins Inventar; schon vorhandenes Teil: +1 Stufe (bis +3), jede Stufe +50 % der Grundwerte |
 | Skill | Sieg (35 %), Elite (60 %), Truhe (50 %), Mine (35 %), Runensplitter (30 %), Shop (1 Skill, 14 Gold) | Neues Exemplar frei in die Sammlung. Schon vorhanden: «Stufe erhöhen» (bis +3; jede Stufe +15 % Waffenschaden, +10 % Brennen pro Sekunde, +5 % Heilung) oder «Zweites Exemplar» für eine weitere Zeile |
 | Tafel-Erweiterung: +1 Zeile | Garantiert bei jeder Boss-Flucht und beim Akt-Wechsel, als Wahl bei Elite-Siegen (50 %) und seltenen Truhen (10 %), Shop-Platz (20, 35, 50 … Gold pro Run, einer pro Shop) | Bis höchstens 8 Zeilen |
+| Modul (selten) | Elite (35 %), Truhe (15 %), garantiert bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 30 Gold) | Neues Exemplar frei in die Sammlung; schon vorhanden: «Stufe erhöhen» (+1, wo das Modul Stufen hat) oder «Weiteres Exemplar» |
 | Gold, Splitter | Kämpfe, Events, Minen, Boss-Flucht | Elite-Siege geben +4 Gold |
 
 Kampfbelohnungen bieten bevorzugt Verbesserungen an: Stufe für einen eigenen Skill, Stufe für ein getragenes Teil, ein fehlendes Set-Teil, Stufe für eine vorhandene Rune oder eine Rune zu einem vorhandenen Tag. Mindestens eine Option ist immer eine Verbesserung. Skill-Angebote bevorzugen Skills, deren Art zum Build passt (×3 Gewicht): Arten eigener Skills, Ziele der passiven Effekte der Ausrüstung und die Runen (Klinge → Angriff, Schild → Schild, Funke → Schock, Glut → Feuer und Heilung, Phantom → Bewegung). Gegner skalieren weiter über Ring und Akt, die Schutzregeln (eine Aktion pro Tick, Überhitzung ab 90 s) bleiben. Alle Werte stehen in `Core/Run/ProgressionConfig.cs`.
@@ -103,6 +104,28 @@ Anzeige: Das HUD zeigt die Zähler («Ladung 3/4», erreichte Schwellen gelb) un
 
 Konzept: `/mnt/project-files/design/kampfsystem-konzept.md` im Projekt.
 
+#### Module und Auslöser
+
+Module sind wie Skills eigene Exemplare (`Core/Modules/`: `ModuleInstance`, `ModuleCollection`, Katalog und Regeln) mit Stufe und Sammlung, die durch die Akte mitwandert. Skill-Exemplare und Logikbausteine (Tafel-Zeilen) haben je **1 Modul-Platz**; ein Modul sitzt an genau einem Ort (`IModuleHolder`). Der Basisangriff hat keinen Platz. Verschwindet ein Ort (Zeile abgelegt), wird sein Modul wieder frei.
+
+| Modul | Art | Wirkung (Stufe 0 / +1) |
+|---|---|---|
+| Mehrfach | Skill | Wirkung wird nach erneuter Cast-Zeit wiederholt (×2 / ×3), ohne weiteren Cooldown |
+| Fläche | Skill | Schaden trifft alle Gegner mit 70 % / 85 % |
+| Kette | Skill | Zielgerichtete Wirkungen treffen 1 / 2 weitere Gegner |
+| Blutzoll | Skill | Kostet 5 % / 4 % Max-HP statt Cooldown |
+| Schnellcast | Skill | −30 % / −40 % Cast-Zeit, +30 % Cooldown |
+| Umkehren | Baustein | NICHT: die Zeile gilt, wenn die Bedingung nicht erfüllt ist |
+| Verlängern | Baustein | Die Bedingung gilt 1 s / 1,5 s länger |
+| Schwelle | Baustein | +10 / +15 Prozentpunkte bei Runen mit Prozent-Schwelle («HP unter 30 %» → 40 %), höchstens 100 % |
+| Auslöser | beides | Am Skill «nach Ausführung», am Baustein «wenn erfüllt» (beim Wechsel von nicht erfüllt zu erfüllt): löst ein Ziel aus |
+
+**Auslöser** zielen per stabiler Id auf ein Skill-Exemplar oder eine Zeile, nicht auf eine Zeilennummer: Zeilen umsortieren oder den Skill umsetzen nimmt das Ziel mit. Ein Skill-Ziel, das gerade nicht an der Tafel sitzt, löst nichts aus. Das ausgelöste Ziel überspringt seine Bedingung, castet aber ganz normal mit Cast-Zeit und setzt seinen Cooldown. Ist es nicht bereit (Cooldown, verwaist, betäubt), verfällt der Auslöser. Läuft gerade eine Aktion, wartet der Auslöser dahinter (höchstens 4 wartende Aktionen, weitere verfallen). **Kreise sind erlaubt**, das sind die Loops; begrenzt werden sie nur durch Cast-Zeiten und Cooldowns.
+
+Datenmodell: Die Tafel im Kampf ist ein Graph (`Arena/Graph/LogicGraph.cs`): Knoten sind Baustein und Skill jeder Zeile, Kanten sind Auslöser (`GraphEdgeKind.Trigger`; UND/ODER können später als weitere Kantenarten dazukommen). Der Kampf bleibt deterministisch: gleiche Seeds ergeben dieselben Kämpfe, auch mit Kreisen.
+
+Tafel-Editor: Unter jeder Zeile stehen die Modul-Plätze von Baustein und Skill. «+ Name» setzt ein freies passendes Modul ein, «×» nimmt es ab. Ein Klick auf einen Auslöser wählt das nächste Ziel (alle Zeilen, dann «kein Ziel»). Rechts an den Zeilen sind Auslöser als Linien gezeichnet (orange vom Skill, türkis vom Baustein, Pfeil am Ziel), jede Verbindung auf eigener Spur, sodass Kreise sichtbar bleiben. Das HUD zeigt pro Zeile ◆ (Module) und ↪ (Auslöser-Ziel), das Inventar alle Module mit Ort und Ziel.
+
 ### Die Arena lesen
 
 Die Arena zeigt nicht nur, *welche* Zeile feuert, sondern auch *warum* die anderen nicht.
@@ -112,6 +135,7 @@ Die Arena zeigt nicht nur, *welche* Zeile feuert, sondern auch *warum* die ander
 - **Kämpfer:** Unter dem Lebensbalken stehen Ressourcen als Balken (Hitze, Ladung, Tempo-Stapel …) und aktive Zustände als kleine Kästchen (Brand, Betäubt, R.-Bruch, Schild …) mit Restdauer, Restzeit-Balken und Stapeln (×2). Tooltip mit vollem Namen.
 - **Schwebende Zahlen am Ziel:** Schaden weiss, Krit gelb und grösser, Heilung grün, «Block» und «Ausgewichen» als Wort. Kommt die Wirkung von einer Tafel-Zeile, liegt die Zahl auf einem Feld in der Farbe dieser Zeile. Auch Brennen zählt zur Zeile, die es gesetzt hat.
 - **Auswertung nach dem Kampf** (vor «Weiter»): Tabelle pro Zeile mit «gefeuert», Schaden und Heilung gesamt, Anteil am Gesamtschaden, wie oft übersprungen und häufigster Grund. Dazu Hinweise wie «Zeile 3 hat nie gefeuert: Bedingung nie erfüllt» oder «Zeile 2 (Bohrstoß) macht 64 % des Schadens». «Tafel bearbeiten» öffnet direkt den Tafel-Editor.
+- **Auslöser und Wiederholungen:** Der Cast-Balken zeigt «↪ von Zeile 1» bei ausgelösten und «↻ Wiederholung» bei wiederholten Aktionen. Im Protokoll steht beim Start «↪ ausgelöst von Zeile n» und verfallene Auslöser als «Auslöser von Zeile 1 verfällt, Zeile 2 (Bohrstoß) nicht bereit», so lässt sich jede Kette verfolgen. Die Auswertung zählt in «gefeuert» ausgelöste (↪) und wiederholte (↻) Starts mit und gibt Hinweise wie «Zeile 2 (Bohrstoß) wurde 4× ausgelöst, von Zeile 1 ×4» oder «3 Auslöser auf Zeile 2 verfielen».
 - **Protokoll-Filter:** «Alles», «Meine Aktionen» oder «Nur Schaden». Einträge einer Zeile tragen deren Farbstreifen.
 - **Bei 4×:** Hervorhebungen (feuernde Zeile, Treffer-Blitz) bleiben mindestens 0,35 s Echtzeit sichtbar, schwebende Zahlen gut 1 s.
 
@@ -172,9 +196,11 @@ Assets/Betaknight/
 │   │   ├── OverworldSession.cs              Fassade: Bewegung, kleine/mittlere Events, Runenwahl
 │   │   ├── OverworldSession.MajorEvents.cs  Fassade: Kampf, Truhe, Goldmine, Shop
 │   │   ├── Skills/        SkillInstance (Exemplar), ISkillHolder (Ort), SkillCollection (Sammlung)
+│   │   ├── Modules/       ModuleDefinition + ModuleCatalog, ModuleInstance (Exemplar, Ziel), IModuleHolder (Ort), ModuleCollection, ModuleRules
 │   │   ├── OverworldSession.Gear.cs         Fassade: Ausrüstung, Skill-Kennzahlen mit passiven Boni, Tafel umsortieren
 │   │   ├── OverworldSession.Synergies.cs    Fassade: Tag-Zähler, aktive Duos, Rezeptbuch, Vorschau für Angebote
 │   │   ├── OverworldSession.Skills.cs       Fassade: Skill-Sammlung, Einsetzen/Tauschen, Erhalt, Stufe oder zweites Exemplar, Angebote
+│   │   ├── OverworldSession.Modules.cs      Fassade: Modul-Sammlung, Einsetzen/Abnehmen, Auslöser-Ziele, seltener Erhalt
 │   │   ├── OverworldSession.Inventory.cs    Fassade: Inventar, anlegen/ablegen/tauschen, verwerfen, verkaufen
 │   │   ├── OverworldSession.Progression.cs  Fassade: Tafel-Erweiterung, Stufen, Angebote mit Verbesserung
 │   │   ├── OverworldSession.Mines.cs        Fassade: Goldminen-Raids und Verteidigung
@@ -227,6 +253,7 @@ Falls der Test Runner fehlt, im Package Manager das Paket **Test Framework** ins
 | Neues Ausrüstungsteil | Eintrag in `EquipmentCatalog` |
 | Neues Set | Teile mit Set-Id + `SetBonusRegistry.Register(id, name, teile => new …Set())` (ein `BattleModifier`) |
 | Neuer Synergie-Tag oder Duo | Eintrag in `SynergyRegistry.CreateDefault` (Text, passive Effekte, `BattleModifier`-Fabrik je Schwelle); Teile bekommen die Tag-Id über `tags:` |
+| Neues Modul | Eintrag in `ModuleCatalog.CreateDefault` (Name, Art, Text je Stufe) und Regel in `ModuleRules` (`ApplyToSkill` bzw. `ApplyToCondition`) |
 | Neuer Gegner | Eintrag in `EnemyCatalog` mit Stufenbereich und fester Tafel |
 | Inverter-Rune | `NotCondition` / `condition.Not()` existiert bereits |
 | Akt-spezifische Karten/Gegner | `OverworldSession.CreateNextAct(config, previous)` bekommt die Karten-Konfiguration; `TierAt` und `ActTierBonus` regeln die Stärke pro Akt |
