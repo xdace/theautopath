@@ -42,6 +42,8 @@ Eine Reise stoppt automatisch auf feindlichen Feldern (Gegner, Boss), auf neu en
 
 Kämpfe laufen automatisch in festen Ticks (20 pro Sekunde). Jede Rune ist eine Zeile der Tafel: **Rune = Wann** (Bedingung), **Skill = Was** (kommt aus der Ausrüstung). Von oben nach unten feuert die erste Zeile, deren Bedingung erfüllt und deren Skill bereit ist. Ganz unten steht fest `[Immer] → Basisangriff`. Fehlt der Skill einer Zeile (Teil abgelegt), wird sie grau und übersprungen.
 
+- **Skill-Kennzahlen im Tafel-Editor:** Unter jedem Skill (auch beim Durchblättern mit ◀▶ und beim festen Basisangriff) steht eine Infozeile: Wirkung, Schaden, CD, Ausholen und Erholung. Schaden steht doppelt, als Prozent vom Waffenschaden und als Wert mit der aktuellen Ausrüstung samt aktiver Set-Boni, gegen ein Ziel ohne Rüstung, ohne Block und Krit (z. B. «120 % Waffenschaden ≈ 10 an allen Gegnern», «Brennen 50 % Waffenschaden/s ≈ 3/s, 15 über 5 s», «20 % Chance: betäubt 1 s»). Skills ohne Schaden zeigen «kein Schaden». Mit der Maus über der Zeile erscheinen alle Details als Tooltip, bei vielen Zeilen scrollt das Fenster.
+  Die Werte stehen nicht in der UI, sondern kommen aus den Effekten: Jede `ISkillEffect` meldet über `Describe(SkillInfoBuilder)` ihre Kennzahlen mit denselben Formeln wie `Apply`. `SkillInfo.Create(skill, stats)` fasst sie zusammen, `OverworldSession.SkillUserStats()` liefert die Werte des Ritters zu Kampfbeginn. Neue Effekte müssen `Describe` umsetzen und erscheinen dann automatisch richtig.
 - 7 Ausrüstungsplätze (Helm, Handschuhe, Brust, Beinschienen, Waffe, Schild, Stiefel). Zweihandwaffen sperren den Schild.
 - 4 Sets mit Boni ab 2 und 3 Teilen: Überlast-Protokoll, Aegis-Firewall, Schrott-Ernter, Phantom-Signal.
 - Schutzregeln statt Balance-Bremsen: höchstens eine Aktion pro Tick, Reaktionen erst im nächsten Tick, ab 90 s Überhitzung. Kaputte Builds sind erlaubt, die Engine bleibt stabil.
@@ -151,7 +153,7 @@ Falls der Test Runner fehlt, im Package Manager das Paket **Test Framework** ins
 | Konzept-Feature | Andockpunkt |
 |---|---|
 | Neue Rune | Eintrag in `RuneCatalog` + `ConditionRegistry.Register(id, parameter => new …Condition())` |
-| Neuer Skill | Eintrag in `SkillCatalog` aus `ISkillEffect`-Bausteinen; neue Wirkung = neue `ISkillEffect`-Klasse |
+| Neuer Skill | Eintrag in `SkillCatalog` aus `ISkillEffect`-Bausteinen; neue Wirkung = neue `ISkillEffect`-Klasse mit `Apply` und `Describe` (Kennzahlen für den Tafel-Editor) |
 | Neues Ausrüstungsteil | Eintrag in `EquipmentCatalog` |
 | Neues Set | Teile mit Set-Id + `SetBonusRegistry.Register(id, name, teile => new …Set())` (ein `BattleModifier`) |
 | Neuer Gegner | Eintrag in `EnemyCatalog` mit Stufenbereich und fester Tafel |
