@@ -9,9 +9,10 @@ namespace Betaknight.Overworld.UI
 {
     /// <summary>
     /// Arena-Ansicht per IMGUI: spielt das Protokoll eines Kampfs in 2D-Seitenansicht ab (Ritter links, Gegner rechts).
-    /// Die Logik-Tafel zeigt live, welche Zeile bereit ist, warum andere übersprungen werden (Hovern) und welche feuert;
-    /// Zustände, Ressourcen und schwebende Zahlen in der Farbe der auslösenden Zeile zeigen die Wirkung.
-    /// Nach dem Kampf folgt eine Auswertung pro Zeile. Platzhalter-Grafik aus Rechtecken, gerechnet wird nichts.
+    /// Die Platine (A-19) zeigt live, welches Relais auslöst (leuchtet), welche Komponenten warten, welche feuert und welche
+    /// eingefroren, unversorgt oder zu gross sind (Hovern erklärt den Grund); darunter die Warteschlange. Zustände, Ressourcen
+    /// und schwebende Zahlen in der Farbe der auslösenden Komponente zeigen die Wirkung. Gegner-Platinen stehen im Tooltip
+    /// des Gegners. Nach dem Kampf folgt eine Auswertung pro Komponente. Platzhalter-Grafik aus Rechtecken, gerechnet wird nichts.
     /// </summary>
     public sealed class ArenaWindow : MonoBehaviour
     {
@@ -21,7 +22,7 @@ namespace Betaknight.Overworld.UI
         private const float MinHighlightSeconds = 0.35f;
         private const float PopupSeconds = 1.1f;
 
-        /// <summary>Farbe je Tafel-Zeile; die Fallback-Zeile (Basisangriff) ist grau.</summary>
+        /// <summary>Farbe je Komponente (Lesereihenfolge); der Basisangriff ist grau.</summary>
         private static readonly Color[] RowColors =
         {
             new Color(0.35f, 0.85f, 1.00f),
@@ -57,6 +58,7 @@ namespace Betaknight.Overworld.UI
         private readonly Dictionary<int, Rect> _bodies = new Dictionary<int, Rect>();
         private readonly Dictionary<int, int> _seenHitTick = new Dictionary<int, int>();
         private readonly Dictionary<int, float> _flashUntil = new Dictionary<int, float>();
+        private readonly Dictionary<int, string> _enemyTips = new Dictionary<int, string>();
         private int _seenRowTick = -1000;
         private float _rowHighlightUntil;
         private Dictionary<char, string> _glyphs;
@@ -74,7 +76,7 @@ namespace Betaknight.Overworld.UI
         /// <summary>Solange die Arena offen ist, warten Oberwelt und andere Fenster.</summary>
         public bool IsOpen => _playback != null;
 
-        /// <summary>«Tafel bearbeiten» aus der Auswertung: schliesst die Arena und öffnet den Tafel-Editor.</summary>
+        /// <summary>«Open Build» aus der Auswertung: schliesst die Arena und öffnet das Build-Fenster.</summary>
         public System.Action OnEditBoard;
 
         /// <summary>Zusätzlicher Tempo-Faktor auf die gewählte Wiedergabe-Geschwindigkeit (Testspieler mit -speed).</summary>
@@ -132,6 +134,7 @@ namespace Betaknight.Overworld.UI
             _popups.Clear();
             _seenHitTick.Clear();
             _flashUntil.Clear();
+            _enemyTips.Clear();
             _seenRowTick = -1000;
             _rowHighlightUntil = 0f;
         }
@@ -190,7 +193,7 @@ namespace Betaknight.Overworld.UI
             Fill(screen, new Color(0.04f, 0.05f, 0.07f, 1f));
 
             const float pad = 16f;
-            float boardWidth = Mathf.Min(360f, Screen.width * 0.33f);
+            float boardWidth = Mathf.Min(420f, Screen.width * 0.36f);
             var stage = new Rect(pad, 56f, Screen.width - boardWidth - pad * 3, Screen.height * 0.52f);
             var board = new Rect(stage.xMax + pad, 56f, boardWidth, stage.height);
             var log = new Rect(pad, stage.yMax + pad, Screen.width - pad * 2, Screen.height - stage.yMax - pad * 2 - 44f);
@@ -258,6 +261,8 @@ namespace Betaknight.Overworld.UI
                 Color c = f.Alive ? color : new Color(0.25f, 0.25f, 0.28f);
                 if (_flashUntil.TryGetValue(index, out float flash) && Time.unscaledTime < flash) c = Color.Lerp(c, Color.white, 0.6f);
                 Fill(body, c);
+                // Gegner: Maus darüber zeigt seine Platine.
+                if (f.Info.Side != Side.Player) GUI.Label(body, new GUIContent(string.Empty, EnemyTooltip(index)));
 
                 float barX = body.x - 30f;
                 float barW = body.width + 60f;
@@ -276,7 +281,7 @@ namespace Betaknight.Overworld.UI
                     Fill(new Rect(bar.x, bar.y, bar.width * f.WindupProgress(_playback.Tick), bar.height),
                         charging ? new Color(1f, 0.55f, 0.15f) : new Color(0.7f, 0.7f, 0.75f));
                     string cast = UiTexts.Arena.Cast(SkillInfo.Seconds(f.ActionWindupTicks));
-                    if (f.ActionCause == ActionCause.Trigger) cast += $", <color=#ffae42>{UiTexts.Arena.FromRow(f.ActionCauseRow + 1)}</color>";
+                    if (f.ActionCause == ActionCause.Trigger) cast += $", <color=#ffae42>{UiTexts.Arena.FromComponent(f.ActionCauseRow + 1)}</color>";
                     else if (f.ActionCause == ActionCause.Repeat) cast += $", <color=#9fc7ff>{UiTexts.Arena.Repeat}</color>";
                     string label = charging ? $"<color=#ffae42>{UiTexts.Arena.Charging(BattleLogText.SkillName(f.ActionSkill), cast)}</color>"
                         : $"{BattleLogText.SkillName(f.ActionSkill)} ({cast})";
@@ -340,7 +345,7 @@ namespace Betaknight.Overworld.UI
                 text.a = 1f - t * t;
                 if (p.Row >= 0)
                 {
-                    // Die Zahl trägt die Farbe der auslösenden Zeile als Unterlage, passend zum Streifen auf der Tafel.
+                    // Die Zahl trägt die Farbe der auslösenden Komponente als Unterlage, passend zum Streifen auf der Platine.
                     Color row = RowColorFor(p.Row);
                     row.a = 0.55f * (1f - t * t);
                     var chip = new Rect(rect.center.x - 26f, rect.y + 2f, 52f, rect.height - 4f);
@@ -352,20 +357,108 @@ namespace Betaknight.Overworld.UI
             }
         }
 
-        // ------------------------------------------------------------------ Logik-Tafel
+        // ------------------------------------------------------------------ Platine
 
         private void DrawBoard(Rect area)
         {
             GUILayout.BeginArea(area, GUI.skin.box);
             GUILayout.Label(new GUIContent($"{UiTexts.Arena.BoardTitle}  <size=13><color=#9aa4b2>{UiTexts.Arena.BoardLegend}</color></size>", QueueRule), _text);
             BattleResult r = _playback.Result;
-            for (int i = 0; i < r.PlayerRowLabels.Count; i++)
+            LogicBoard board = r.PlayerBoard;
+            if (board?.Layout != null && board.Rows.All(x => x.Rect.HasValue) && board.Relays.All(x => x.Rect.HasValue))
+                DrawCircuit(board, area.width - 16f, area.height * 0.5f);
+            else
+                DrawRowList(r);
+
+            // Basisangriff unter der Platine: leuchtet, wenn er gerade feuert.
+            int fallback = r.PlayerRowLabels.Count - 1;
+            if (fallback >= 0)
             {
-                bool fallback = i == r.PlayerRowLabels.Count - 1;
-                string skill = i < r.PlayerRowSkills.Count ? r.PlayerRowSkills[i] : "?";
-                string prefix = fallback ? "↓" : $"{i + 1}.";
+                bool lit = IsRowLit(fallback) || _playback.RowStateAt(fallback) == RowDisplay.Firing;
+                string text = $"↓ {UiTexts.FallbackLine}";
+                GUILayout.Label(lit ? $"<size=13><color=#ffd75e><b>{text}</b></color></size>" : $"<size=13><color=#9aa4b2>{text}</color></size>", _row);
+            }
+
+            // A-13: Warteschlange direkt unter der Platine.
+            string queue = _playback.QueueText(Glyph('⏳', "…"));
+            GUILayout.Label(new GUIContent(queue.Length > 0 ? $"<size=13><color=#7fd7ff>{queue}</color></size>" : $"<size=13><color=#666b75>{UiTexts.Arena.QueueEmpty}</color></size>",
+                QueueRule), _row);
+            GUILayout.FlexibleSpace();
+            DrawEnemyBoards();
+            GUILayout.Label($"<size=12>{StateGlyph(RowDisplay.Firing)} {UiTexts.Arena.StateFiring}   {StateGlyph(RowDisplay.Queued)} {UiTexts.Arena.StateQueued}   "
+                + $"{StateGlyph(RowDisplay.Frozen)} {UiTexts.Arena.StateFrozen}   {StateGlyph(RowDisplay.TooLarge)} {UiTexts.Arena.StateTooLarge}   "
+                + $"{StateGlyph(RowDisplay.Unpowered)} {UiTexts.Arena.StateUnpowered}</size>", _row);
+            GUILayout.EndArea();
+        }
+
+        /// <summary>Die Platine als Raster: Relais leuchten beim Auslösen, die feuernde Komponente ist hervorgehoben.</summary>
+        private void DrawCircuit(LogicBoard board, float maxWidth, float maxHeight)
+        {
+            BoardLayout layout = board.Layout;
+            float size = CircuitGrid.CellSize(layout.Width, layout.Height, maxWidth, maxHeight, 70f, 22f);
+            Rect area = GUILayoutUtility.GetRect(maxWidth, layout.Height * size + 4f);
+            var grid = new Rect(area.x + (area.width - layout.Width * size) * 0.5f, area.y + 2f, layout.Width * size, layout.Height * size);
+            GUIStyle style = size < 56f ? CircuitGrid.Tiny : CircuitGrid.Label;
+
+            CircuitGrid.DrawBackground(grid, size, layout.Width, layout.Height);
+
+            // Leiterbahnen: Relais → versorgte (türkis, hell beim Auslösen) und zu grosse Komponenten (orange).
+            for (int i = 0; i < board.Relays.Count; i++)
+            {
+                LogicRelay relay = board.Relays[i];
+                Rect from = CircuitGrid.RectOf(grid, size, relay.Rect.Value);
+                Color trace = _playback.IsRelayLit(i) ? CircuitGrid.RelayLit : CircuitGrid.TraceColor;
+                foreach (int row in relay.Powered)
+                    if (row >= 0 && row < board.Rows.Count) CircuitGrid.DrawTrace(from, CircuitGrid.RectOf(grid, size, board.Rows[row].Rect.Value), trace);
+                foreach (int row in relay.TooLarge)
+                    if (row >= 0 && row < board.Rows.Count) CircuitGrid.DrawTrace(from, CircuitGrid.RectOf(grid, size, board.Rows[row].Rect.Value), CircuitGrid.TooLargeBorder);
+            }
+
+            if (layout.Core.HasValue)
+            {
+                Rect core = CircuitGrid.RectOf(grid, size, layout.Core.Value.X, layout.Core.Value.Y);
+                foreach (LogicRow row in board.Rows)
+                    if (row.TouchesCore) CircuitGrid.DrawTrace(core, CircuitGrid.RectOf(grid, size, row.Rect.Value), CircuitGrid.CoreColor);
+                CircuitGrid.DrawCore(core, UiTexts.Build.CoreName, UiTexts.Build.CoreTip(Betaknight.Core.Circuit.CircuitConfig.Default.CoreBonusPercent), style);
+            }
+
+            for (int i = 0; i < board.Relays.Count; i++)
+            {
+                LogicRelay relay = board.Relays[i];
+                Rect rect = CircuitGrid.RectOf(grid, size, relay.Rect.Value);
+                bool lit = _playback.IsRelayLit(i);
+                Color fill = lit ? CircuitGrid.RelayLit : CircuitGrid.RelayColor;
+                string label = lit ? $"<color=#0b1a1c><b>{relay.Label}</b></color>" : relay.Label;
+                string text = $"{RuneText.Difficulty(relay.Difficulty)}\n{label}\n<color={(lit ? "#0b1a1c" : "#9aa4b2")}>×{_playback.RelayCount(i)}</color>";
+                CircuitGrid.DrawChip(rect, fill, lit ? Color.white : CircuitGrid.RelayLit, lit ? 3f : 1f, text, RelayTooltip(board, i), style);
+            }
+
+            for (int i = 0; i < board.Rows.Count; i++)
+            {
+                LogicRow row = board.Rows[i];
+                Rect rect = CircuitGrid.RectOf(grid, size, row.Rect.Value);
                 RowDisplay state = _playback.RowStateAt(i);
-                bool lit = IsRowLit(i);
+                bool lit = IsRowLit(i) || state == RowDisplay.Firing;
+                Color fill = lit ? new Color(0.45f, 0.38f, 0.12f) : state == RowDisplay.Queued ? new Color(0.13f, 0.27f, 0.36f)
+                    : state == RowDisplay.Frozen ? new Color(0.20f, 0.30f, 0.42f) : CircuitGrid.ComponentColor;
+                Color border = lit ? UiTheme.Accent : StateColor(state);
+                string skill = i < _playback.Result.PlayerRowSkills.Count ? _playback.Result.PlayerRowSkills[i] : row.Skill?.Name ?? "—";
+                string stateText = state == RowDisplay.Frozen ? $"{UiTexts.Arena.StateFrozen} {RowStateText.Seconds(_playback.FrozenLeft(i))}" : StateName(state);
+                string text = $"<b>#{i + 1} {skill}</b>\n<color={UiTheme.Hex(StateColor(state))}>{StateGlyph(state)} {stateText}</color>";
+                if (lit) text = $"<color=#ffd75e>{text}</color>";
+                CircuitGrid.DrawChip(rect, fill, border, lit ? 3f : 2f, text, RowTooltip(i, state), style);
+                Fill(new Rect(rect.x + 2f, rect.y + 2f, 4f, rect.height - 4f), RowColorFor(i));
+            }
+        }
+
+        /// <summary>Ersatz ohne Raster (Platinen ohne Lage, z. B. aus Tests): eine Zeile pro Komponente.</summary>
+        private void DrawRowList(BattleResult r)
+        {
+            for (int i = 0; i < r.PlayerRowLabels.Count - 1; i++)
+            {
+                string skill = i < r.PlayerRowSkills.Count ? r.PlayerRowSkills[i] : "?";
+                RowDisplay state = _playback.RowStateAt(i);
+                bool lit = IsRowLit(i) || state == RowDisplay.Firing;
 
                 Rect line = GUILayoutUtility.GetRect(new GUIContent(" "), _row, GUILayout.MinHeight(30f));
                 if (lit) Fill(line, new Color(1f, 0.84f, 0.37f, 0.22f));
@@ -375,53 +468,77 @@ namespace Betaknight.Overworld.UI
                 Fill(badge, StateColor(state) * new Color(1f, 1f, 1f, 0.35f));
                 GUI.Label(badge, $"<b>{StateGlyph(state)}</b>", _popupSmall);
 
-                string text = $"{prefix} [{r.PlayerRowLabels[i]}] → {skill}";
+                string text = $"#{i + 1} [{r.PlayerRowLabels[i]}] → {skill}";
                 if (lit) text = $"<color=#ffd75e><b>{text}</b></color>";
-                else if (state == RowDisplay.Orphaned || skill == "—") text = $"<color=#777777>{text}</color>";
+                else if (state == RowDisplay.Orphaned || state == RowDisplay.Unpowered || state == RowDisplay.TooLarge) text = $"<color=#777777>{text}</color>";
                 else if (state == RowDisplay.Queued) text = $"<color=#7fd7ff>{text}</color>";
                 GUI.Label(new Rect(badge.xMax + 6f, line.y, line.width - badge.width - 16f, line.height), new GUIContent(text, RowTooltip(i, state)), _row);
-
-                if (state == RowDisplay.Cooldown || (state == RowDisplay.Queued && _playback.CooldownLeft(i) > 0))
-                {
-                    float frac = _playback.CooldownFraction(i);
-                    var bar = new Rect(badge.xMax + 6f, line.yMax - 4f, (line.width - badge.width - 16f), 3f);
-                    Fill(bar, new Color(0.2f, 0.2f, 0.22f));
-                    Fill(new Rect(bar.x, bar.y, bar.width * frac, bar.height), new Color(1f, 0.7f, 0.25f));
-                }
             }
-            // A-13: Warteschlange direkt unter der Tafel.
-            string queue = _playback.QueueText(Glyph('⏳', "…"));
-            GUILayout.Space(4f);
-            GUILayout.Label(new GUIContent(queue.Length > 0 ? $"<size=13><color=#7fd7ff>{queue}</color></size>" : $"<size=13><color=#666b75>{UiTexts.Arena.QueueEmpty}</color></size>",
-                QueueRule), _row);
-            GUILayout.FlexibleSpace();
-            GUILayout.Label($"<size=13>{StateGlyph(RowDisplay.Ready)} {UiTexts.Arena.StateReady}   {StateGlyph(RowDisplay.ConditionFalse)} {UiTexts.Arena.StateConditionFalse}   "
-                + $"{StateGlyph(RowDisplay.Cooldown)} {UiTexts.Arena.StateCooldown}   {StateGlyph(RowDisplay.Queued)} {UiTexts.Arena.StateQueued}   "
-                + $"{StateGlyph(RowDisplay.Orphaned)} {UiTexts.Arena.StateOrphaned}</size>", _row);
-            GUILayout.EndArea();
+        }
+
+        /// <summary>Gegner-Platinen: Name mit Tooltip, der die Platine Zeile für Zeile zeigt.</summary>
+        private void DrawEnemyBoards()
+        {
+            var names = new List<string>();
+            string tip = null;
+            for (int i = 0; i < _playback.Fighters.Count; i++)
+            {
+                FighterView f = _playback.Fighters[i];
+                if (f.Info.Side == Side.Player) continue;
+                names.Add(f.Info.Name);
+                tip = tip == null ? EnemyTooltip(i) : $"{tip}\n\n{EnemyTooltip(i)}";
+            }
+            if (names.Count == 0) return;
+            GUILayout.Label(new GUIContent($"<size=13>{UiTexts.Arena.EnemyBoardTitle}: {string.Join(", ", names)}  <color=#9aa4b2>({UiTexts.Arena.EnemyBoardHint})</color></size>", tip), _row);
+        }
+
+        /// <summary>Platine eines Gegners als Tooltip-Text («Every 7 s → Ram (2×1): …»), einmal pro Kampf gebaut.</summary>
+        private string EnemyTooltip(int fighter)
+        {
+            if (_enemyTips.TryGetValue(fighter, out string cached)) return cached;
+            FighterView f = _playback.Fighters[fighter];
+            LogicBoard board = f.Info.Combatant?.Board ?? LogicBoard.FallbackOnly;
+            string text = UiTexts.Arena.EnemyTip(f.Info.Name, string.Join("\n", EnemyBoard.Lines(board).Select(l => $"• {l}")));
+            _enemyTips[fighter] = text;
+            return text;
         }
 
         /// <summary>Die Regel der Warteschlange in einem Satz (A-13).</summary>
-        private const string QueueRule = RowQueueConfig.RuleText;
+        private const string QueueRule = QueueConfig.RuleText;
+
+        private string RelayTooltip(LogicBoard board, int relay)
+        {
+            LogicRelay r = board.Relays[relay];
+            string powers = r.Powered.Count > 0 ? UiTexts.Arena.Powers(string.Join(", ", r.Powered.Select(i => $"#{i + 1}"))) : UiTexts.Arena.PowersNothing;
+            if (r.TooLarge.Count > 0) powers += $" · {UiTexts.Build.TooLargeHere(string.Join(", ", r.TooLarge.Select(i => $"#{i + 1}")))}";
+            return $"{UiTexts.Arena.RelayTip(r.Label, _playback.RelayCount(relay), powers)}\n{DifficultyText.Tooltip(r.Difficulty)}";
+        }
 
         private string RowTooltip(int row, RowDisplay state)
         {
             string now;
             switch (state)
             {
-                case RowDisplay.Ready: now = UiTexts.Arena.NowReady; break;
-                case RowDisplay.ConditionFalse: now = UiTexts.Arena.NowConditionFalse; break;
-                case RowDisplay.Cooldown: now = UiTexts.Arena.NowCooldown(RowStateText.Seconds(_playback.CooldownLeft(row))); break;
+                case RowDisplay.Queued: now = UiTexts.Arena.NowQueued; break;
+                case RowDisplay.Firing: now = UiTexts.Arena.NowFiring; break;
+                case RowDisplay.Frozen: now = UiTexts.Arena.NowFrozen(RowStateText.Seconds(_playback.FrozenLeft(row))); break;
+                case RowDisplay.Unpowered: now = UiTexts.Arena.NowUnpowered; break;
+                case RowDisplay.TooLarge: now = UiTexts.Arena.NowTooLarge; break;
                 case RowDisplay.Orphaned: now = UiTexts.Arena.NowOrphaned; break;
-                case RowDisplay.Queued:
-                    int left = _playback.CooldownLeft(row);
-                    now = left > 0 ? UiTexts.Arena.NowQueuedCooldown(RowStateText.Seconds(left)) : UiTexts.Arena.NowQueuedWaiting;
-                    break;
-                default: now = UiTexts.Arena.NowUndecided; break;
+                default: now = UiTexts.Arena.NowIdle; break;
+            }
+            LogicBoard board = _playback.Result.PlayerBoard;
+            string head = string.Empty;
+            if (board != null && row >= 0 && row < board.Rows.Count)
+            {
+                LogicRow r = board.Rows[row];
+                string relays = r.Relays.Count > 0 ? UiTexts.Arena.PoweredBy(string.Join(", ", r.Relays.Select(x => x.Label)))
+                    : r.TooLargeFor.Count > 0 ? UiTexts.NotPoweredTooLarge : UiTexts.NotPowered;
+                head = UiTexts.Arena.ComponentHead($"#{row + 1} {r.Skill?.Name ?? "—"}", r.Rect?.Shape.ToString() ?? r.Skill?.Shape.ToString() ?? "?", relays) + "\n";
             }
             string skipped = _playback.LastSkipReason(row);
             string text = skipped != null ? UiTexts.Arena.NowAndLast(now, skipped) : UiTexts.Arena.Now(now);
-            return $"{text}\n{QueueRule}";
+            return $"{head}{text}\n{QueueRule}";
         }
 
         // ------------------------------------------------------------------ Auswertung nach dem Kampf
@@ -441,14 +558,15 @@ namespace Betaknight.Overworld.UI
 
             _reportScroll = GUILayout.BeginScrollView(_reportScroll);
             float w = area.width - 40f;
-            // H-04: «Missed Trigger» statt «übersprungen»; die Grund-Spalte nur, wenn es andere Gründe gibt (z. B. verwaist).
-            bool reasons = _report.HasOtherReasons;
+            // Pro Komponente: Versorgung, Feuern, Auslösen, Schaden, Anteil, Bonus, Warteschlange, Missed Triggers und ihr Hauptgrund.
+            bool reasons = _report.HasMissedTriggers;
             float[] cols = reasons
-                ? new[] { w * 0.23f, w * 0.08f, w * 0.07f, w * 0.07f, w * 0.06f, w * 0.06f, w * 0.10f, w * 0.11f, w * 0.09f, w * 0.13f }
-                : new[] { w * 0.27f, w * 0.09f, w * 0.08f, w * 0.08f, w * 0.07f, w * 0.07f, w * 0.12f, w * 0.12f, w * 0.10f };
+                ? new[] { w * 0.20f, w * 0.07f, w * 0.07f, w * 0.07f, w * 0.07f, w * 0.06f, w * 0.06f, w * 0.10f, w * 0.10f, w * 0.07f, w * 0.13f }
+                : new[] { w * 0.24f, w * 0.08f, w * 0.08f, w * 0.08f, w * 0.08f, w * 0.07f, w * 0.07f, w * 0.12f, w * 0.10f, w * 0.08f };
             var header = new List<GUIContent>
             {
                 new GUIContent(UiTexts.Arena.HeaderRow),
+                new GUIContent(UiTexts.Arena.HeaderPower, UiTexts.Arena.HeaderPowerTip),
                 new GUIContent(UiTexts.Arena.HeaderFired, UiTexts.Arena.HeaderFiredTip),
                 new GUIContent(UiTexts.Arena.HeaderTriggered, UiTexts.Arena.HeaderTriggeredTip),
                 new GUIContent(UiTexts.Arena.HeaderDamage),
@@ -462,18 +580,21 @@ namespace Betaknight.Overworld.UI
             ReportRow(cols, Color.clear, header.ToArray());
             foreach (RowReport row in _report.Rows)
             {
-                string prefix = row.IsFallback ? "↓" : $"{row.Index + 1}. {RuneText.Difficulty(row.Difficulty)}";
-                string met = row.IsFallback || row.ConditionMet < 0 ? "–" : $"{row.ConditionMet}×";
-                var cells = new List<string>
+                string name = row.IsFallback ? $"↓ {row.Name}" : $"{row.Name} {RuneText.Difficulty(row.Difficulty)} <color=#9aa4b2>[{row.Label}]</color>";
+                var cells = new List<GUIContent>
                 {
-                    $"{prefix} [{row.Label}] → {row.Skill}", FiredText(row), met, row.Damage.ToString(), row.Healing.ToString(),
-                    SkillInfo.Percent(row.DamageShareBp), BonusText(row), QueueCell(row), row.MissedTrigger > 0 ? $"{row.MissedTrigger}×" : "–",
+                    new GUIContent(name, row.DifficultyText), PowerCell(row), new GUIContent(FiredText(row)),
+                    new GUIContent(row.IsFallback ? "–" : $"{row.Triggered}×"), new GUIContent(row.Damage.ToString()), new GUIContent(row.Healing.ToString()),
+                    new GUIContent(SkillInfo.Percent(row.DamageShareBp)), new GUIContent(BonusText(row)), new GUIContent(QueueCell(row)),
+                    new GUIContent(row.Missed > 0 ? $"{row.Missed}×" : "–"),
                 };
-                if (reasons) cells.Add(row.OtherReason.HasValue ? $"{RowStateText.Reason(row.OtherReason.Value)} ({row.SkipCount(row.OtherReason.Value)}×)" : "–");
+                if (reasons)
+                    cells.Add(new GUIContent(row.MainMissReason.HasValue
+                        ? $"{RowStateText.Reason(row.MainMissReason.Value)} ({row.MissCount(row.MainMissReason.Value)}×)" : "–"));
                 ReportRow(cols, RowColorFor(row.Index), cells.ToArray());
             }
             if (_report.OtherDamage > 0)
-                ReportRow(cols, Color.clear, $"<color=#9aa4b2>{UiTexts.Arena.NoRowDamage}</color>", "", "", _report.OtherDamage.ToString());
+                ReportRow(cols, Color.clear, $"<color=#9aa4b2>{UiTexts.Arena.NoRowDamage}</color>", "", "", "", _report.OtherDamage.ToString());
 
             GUILayout.Space(8f);
             foreach (string hint in _report.Hints) GUILayout.Label($"• {hint}", _row);
@@ -481,14 +602,24 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndArea();
         }
 
-        /// <summary>Was der Schwierigkeits-Bonus ausgemacht hat: «+140 · −6 s CD», «–» ohne Bonus.</summary>
+        /// <summary>Versorgung einer Komponente im Kampf: ✔ versorgt, «too large» (orange) oder «not powered» (rot).</summary>
+        private GUIContent PowerCell(RowReport row)
+        {
+            if (row.IsFallback) return new GUIContent("–");
+            if (row.IsPowered) return new GUIContent($"<color={UiTheme.Hex(CircuitGrid.PoweredBorder)}>✔</color>", UiTexts.Powered);
+            if (row.IsTooLargeSomewhere)
+                return new GUIContent($"<color={UiTheme.Hex(CircuitGrid.TooLargeBorder)}>{UiTexts.Arena.StateTooLarge}</color>", UiTexts.NotPoweredTooLarge);
+            return new GUIContent($"<color={UiTheme.Hex(CircuitGrid.UnpoweredBorder)}>✖</color>", UiTexts.NotPowered);
+        }
+
+        /// <summary>Was der Schwierigkeits-Bonus ausgemacht hat: «+140 · −1.5 s cast», «–» ohne Bonus.</summary>
         private static string BonusText(RowReport row)
         {
             if (row.BonusExecutions == 0) return "–";
             var parts = new List<string>();
             if (row.BonusDamage > 0) parts.Add($"+{row.BonusDamage}");
             if (row.BonusHealing > 0) parts.Add($"+{row.BonusHealing} HP");
-            if (row.CooldownSavedTicks > 0) parts.Add($"−{SkillInfo.Seconds(row.CooldownSavedTicks)} CD");
+            if (row.CastSavedTicks > 0) parts.Add(UiTexts.Arena.CastSaved(SkillInfo.Seconds(row.CastSavedTicks)));
             return $"<color=#ffae42>{(parts.Count > 0 ? string.Join(" · ", parts) : $"{row.BonusExecutions}×")}</color>";
         }
 
@@ -645,11 +776,27 @@ namespace Betaknight.Overworld.UI
         {
             switch (state)
             {
-                case RowDisplay.Ready: return new Color(0.4f, 0.95f, 0.5f);
-                case RowDisplay.ConditionFalse: return new Color(1f, 0.4f, 0.35f);
-                case RowDisplay.Cooldown: return new Color(1f, 0.7f, 0.25f);
+                case RowDisplay.Firing: return UiTheme.Accent;
                 case RowDisplay.Queued: return new Color(0.5f, 0.85f, 1f);
-                default: return new Color(0.5f, 0.5f, 0.55f);
+                case RowDisplay.Frozen: return new Color(0.65f, 0.85f, 1f);
+                case RowDisplay.TooLarge: return CircuitGrid.TooLargeBorder;
+                case RowDisplay.Unpowered: return CircuitGrid.UnpoweredBorder;
+                case RowDisplay.Orphaned: return new Color(0.5f, 0.5f, 0.55f);
+                default: return CircuitGrid.PoweredBorder;
+            }
+        }
+
+        private static string StateName(RowDisplay state)
+        {
+            switch (state)
+            {
+                case RowDisplay.Firing: return UiTexts.Arena.StateFiring;
+                case RowDisplay.Queued: return UiTexts.Arena.StateQueued;
+                case RowDisplay.Frozen: return UiTexts.Arena.StateFrozen;
+                case RowDisplay.TooLarge: return UiTexts.Arena.StateTooLarge;
+                case RowDisplay.Unpowered: return UiTexts.Arena.StateUnpowered;
+                case RowDisplay.Orphaned: return UiTexts.Arena.StateOrphaned;
+                default: return UiTexts.Arena.StateIdle;
             }
         }
 
@@ -692,16 +839,17 @@ namespace Betaknight.Overworld.UI
             }
         }
 
-        /// <summary>✔ ✖ ⏳ ⌀, mit Ersatzzeichen, falls die Schrift ein Zeichen nicht kennt.</summary>
+        /// <summary>▶ ⧗ ❄ ⚠ ✖ ⌀, mit Ersatzzeichen, falls die Schrift ein Zeichen nicht kennt.</summary>
         private string StateGlyph(RowDisplay state)
         {
             switch (state)
             {
-                case RowDisplay.Ready: return Glyph('✔', "+");
-                case RowDisplay.ConditionFalse: return Glyph('✖', "×");
-                case RowDisplay.Cooldown: return Glyph('⏳', "…");
-                case RowDisplay.Orphaned: return Glyph('⌀', "Ø");
+                case RowDisplay.Firing: return Glyph('▶', ">");
                 case RowDisplay.Queued: return Glyph('⧗', "»");
+                case RowDisplay.Frozen: return Glyph('❄', "*");
+                case RowDisplay.TooLarge: return Glyph('⚠', "!");
+                case RowDisplay.Unpowered: return Glyph('✖', "×");
+                case RowDisplay.Orphaned: return Glyph('⌀', "Ø");
                 default: return "·";
             }
         }

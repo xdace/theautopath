@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace Betaknight.Overworld.UI
 {
-    /// <summary>Texte und Auswahl für Module in Tafel-Editor, Inventar, Belohnungs- und Shop-Fenstern.</summary>
+    /// <summary>Texte und Auswahl für Module im Build-Fenster, Inventar, Belohnungs- und Shop-Fenstern.</summary>
     public static class ModuleText
     {
         public static string KindName(ModuleKind kind)
@@ -32,7 +32,7 @@ namespace Betaknight.Overworld.UI
             return text + "</size>";
         }
 
-        /// <summary>«Kette +1 (Skill Bohrstoß (Zeile 2)), Kette (frei)» oder leer.</summary>
+        /// <summary>«Chain +1 (Drill Strike), Chain (free)» oder leer.</summary>
         public static string Owned(OverworldSession session, string moduleId)
         {
             var parts = new List<string>();

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
 using UnityEngine;
@@ -10,8 +11,8 @@ namespace Betaknight.Overworld.UI
     /// <summary>
     /// Fenster für eine Belohnung: eine Rune, ein Teil, einen Skill oder ein Modul nehmen oder verzichten. Ein doppelter Skill
     /// steigt eine Stufe oder bleibt als zweites Exemplar. Teile werden angelegt oder kommen
-    /// ins Inventar; bei voller Tafel kommt eine Rune ins Runen-Inventar oder tauscht eine Zeile (die alte Rune wandert
-    /// ins Inventar). Nichts geht verloren.
+    /// ins Inventar; eine neue Rune kommt als Relais auf eine freie Zelle der Platine, bei voller Platine ins Runen-Inventar oder
+    /// sie tauscht die Rune eines Relais (die alte Rune wandert ins Inventar). Nichts geht verloren.
     /// </summary>
     public sealed class RuneOfferWindow : MonoBehaviour
     {
@@ -64,7 +65,7 @@ namespace Betaknight.Overworld.UI
         private void DrawOptions(RuneOffer offer)
         {
             GUILayout.Label(UiTexts.Offer.Title(offer.Source), _titleStyle);
-            GUILayout.Label(UiTexts.Offer.Status(_session.Runes.Runes.Count, _session.Runes.Slots, _session.Inventory.Count, _session.Inventory.Capacity,
+            GUILayout.Label(UiTexts.Offer.Status(_session.BoardSize, _session.Board.Relays.Count, _session.Inventory.Count, _session.Inventory.Capacity,
                 _session.RuneInventory.Count, _session.RuneInventory.Capacity), _textStyle);
             GUILayout.Space(6f);
 
@@ -83,12 +84,12 @@ namespace Betaknight.Overworld.UI
                     continue;
                 }
 
-                bool synergy = _session.Runes.HasTag(rune.Tag);
+                bool synergy = _session.Board.HasTag(rune.Tag);
                 string runeHints = SkillText.EvolutionHints(_session.EvolutionHintsForRune(rune.Id));
                 string label = $"{RuneText.DifficultyBadge(rune)}  <b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]{(synergy ? "  ★" : string.Empty)}\n{rune.Description}{runeHints}";
                 if (GUILayout.Button(new GUIContent(label, RuneText.DifficultyTip(rune)), _nameStyle, GUILayout.Height(RuneHeight(runeHints))))
                 {
-                    if (_session.Runes.IsFull) _choiceAwaitingSlot = i;
+                    if (_session.Board.IsFull) _choiceAwaitingSlot = i;
                     else _session.TakeRune(i);
                 }
             }
@@ -143,7 +144,9 @@ namespace Betaknight.Overworld.UI
             if (offer.BoardExpansion)
             {
                 GUI.enabled = _session.CanExpandBoard;
-                string text = UiTexts.Offer.BoardExpansion(_session.Runes.Slots, _session.Runes.Slots + 1, _session.Progression.MaxBoardRows);
+                string next = _session.Board.Config.SizeAt(_session.Board.Step + 1).ToString();
+                string text = _session.CanExpandBoard ? UiTexts.Offer.BoardExpansion(_session.BoardSize, next, _session.MaxBoardSize)
+                    : UiTexts.Offer.BoardMaxed(_session.MaxBoardSize);
                 if (GUILayout.Button(text, _nameStyle, GUILayout.Height(44f))) _session.TakeBoardExpansion();
                 GUI.enabled = true;
             }
@@ -160,8 +163,8 @@ namespace Betaknight.Overworld.UI
 
         private string RuneLevelText(RuneDefinition rune)
         {
-            int row = _session.Runes.IndexOf(rune);
-            int level = row >= 0 ? _session.Runes.Rows[row].Level : _session.RuneInventory[_session.RuneInventory.IndexOf(rune)].Level;
+            int relay = _session.Board.IndexOf(rune);
+            int level = relay >= 0 ? _session.Board.Relays[relay].Level : _session.RuneInventory[_session.RuneInventory.IndexOf(rune)].Level;
             return level < rune.MaxLevel ? $"{rune.NameAt(level)} → {rune.NameAt(level + 1)}" : UiTexts.Offer.MaxLevel(rune.NameAt(level));
         }
 
@@ -184,14 +187,13 @@ namespace Betaknight.Overworld.UI
                 _choiceAwaitingSlot = -1;
                 return;
             }
-            GUILayout.Label(UiTexts.SwapRowHint, _plainStyle);
+            GUILayout.Label(UiTexts.SwapRelayHint, _plainStyle);
 
-            IReadOnlyList<RuneDefinition> equipped = _session.Runes.Runes;
-            for (int slot = 0; slot < equipped.Count; slot++)
+            IReadOnlyList<RelayChip> relays = _session.Board.Relays;
+            for (int slot = 0; slot < relays.Count; slot++)
             {
-                RuneDefinition rune = equipped[slot];
-                RuneSlot row = _session.Runes.Rows[slot];
-                if (GUILayout.Button($"{UiTexts.Offer.Instead(row.Name)}  [{rune.Tag.DisplayName()}]\n{row.Description}", _nameStyle, GUILayout.Height(56f)))
+                RelayChip relay = relays[slot];
+                if (GUILayout.Button($"{UiTexts.Offer.Instead(relay.Name)}  [{relay.Rune.Tag.DisplayName()}]\n{relay.Description}", _nameStyle, GUILayout.Height(56f)))
                 {
                     _session.TakeRune(_choiceAwaitingSlot, slot);
                     _choiceAwaitingSlot = -1;

@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Betaknight.Core;
+using Betaknight.Core.Circuit;
+using Betaknight.Core.Hex;
 using Betaknight.Core.Encounters;
 using Betaknight.Core.Map;
 using Betaknight.Core.Arena;
@@ -73,7 +76,7 @@ namespace Betaknight.Overworld.UI
             string bossText = boss <= 3 ? $"<color=#ff7a6b>{UiTexts.Hud.BossIn(boss)}</color>" : UiTexts.Hud.BossIn(boss);
             GUILayout.Label(UiTexts.Hud.Turn(_session.Turns.CurrentTurn, bossText), _style);
             GUILayout.Label(UiTexts.Hud.Resources(_session.Stats.Hp, _session.Stats.MaxHp, _session.Stats.Gold, _session.Stats.Shards), _style);
-            GUILayout.Label(UiTexts.Hud.Board(_session.Runes.Rows.Count, _session.Runes.Slots, _session.Progression.MaxBoardRows, BoardList()), _style);
+            GUILayout.Label(UiTexts.Hud.Board(_session.BoardSize, _session.MaxBoardSize, _session.Board.Relays.Count, _session.Board.Components.Count, BoardList()), _style);
             GUILayout.Label($"<size=13>{BuildSummary()}</size>", _style);
             GUILayout.Label(UiTexts.Hud.Gear(GearList()), _style);
             string sets = SetList();
@@ -99,7 +102,9 @@ namespace Betaknight.Overworld.UI
                 && _session.Map.TryGetCell(_controller.HoveredCoord.Value, out HexCell hovered))
             {
                 string info = hovered.IsContentKnown ? Describe(hovered) : UiTexts.Hud.Unknown;
+                string enemies = hovered.IsContentKnown && !hovered.IsResolved ? EnemyBoards(hovered.Coord) : string.Empty;
                 GUILayout.Label(UiTexts.Hud.Pointer(hovered.Coord.ToString(), info), _style);
+                if (enemies.Length > 0) GUILayout.Label($"<size=13>{enemies}</size>", _style);
             }
 
             GUILayout.EndScrollView();
@@ -129,23 +134,45 @@ namespace Betaknight.Overworld.UI
 
         private static readonly SkillCatalog Skills = SkillCatalog.CreateDefault();
 
+        /// <summary>Komponenten der Platine in Lesereihenfolge: «#1 ◆ Shock Stab 1×1 ← On Hit», unversorgte rot.</summary>
         private string BoardList()
         {
             var lines = new List<string>();
-            for (int i = 0; i < _session.Runes.Rows.Count; i++)
+            List<OverworldSession.TriggerLink> links = _session.TriggerLinks();
+            for (int i = 0; i < _session.Board.Components.Count; i++)
             {
-                RuneSlot row = _session.Runes.Rows[i];
-                string skill = row.Skill == null ? "<color=#888888>—</color>" : row.Skill.IsBasicAttack ? UiTexts.BasicAttack : row.Skill.NameFrom(Skills);
-                int modules = row.Modules.Count + (row.Skill?.Modules.Count ?? 0);
+                ComponentSlot c = _session.Board.Components[i];
+                string skill = c.Skill.NameFrom(Skills);
+                int modules = c.Skill.Modules.Count;
                 string marks = modules > 0 ? $" <color=#ffd75e>◆{modules}</color>" : string.Empty;
-                foreach (OverworldSession.TriggerLink link in _session.TriggerLinks())
-                    if (link.From == i) marks += $" <color=#ffae42>↪{link.To + 1}</color>";
-                if (_session.IsEvolutionReady(row)) marks += " <color=#d29bff>✦</color>";
-                string block = row.Growth > 0 ? $"{row.Name} +{row.Growth}" : row.Name;
-                lines.Add($"{i + 1}. {RuneText.Difficulty(_session.RowDifficulty(row))}[{block}]{RuneText.LevelBadge(row.Rune, row.Level)} → {skill}{marks}");
+                foreach (OverworldSession.TriggerLink link in links)
+                    if (!link.FromBlock && link.From == i) marks += $" <color=#ffae42>↪{link.To + 1}</color>";
+                if (_session.Board.TouchesCore(c)) marks += $" <color=#b18cff>+{_session.Board.Config.CoreBonusPercent} %</color>";
+                if (_session.IsEvolutionReady(c.Skill)) marks += " <color=#d29bff>✦</color>";
+                List<RelayChip> powering = _session.PoweringRelays(c);
+                string power = powering.Count > 0
+                    ? $"{RuneText.Difficulty(_session.ComponentDifficulty(c))} ← {string.Join(", ", powering.Select(r => r.Growth > 0 ? $"{r.Name} +{r.Growth}" : r.Name))}"
+                    : _session.IsTooLarge(c) ? $"<color=#ff9e38>{UiTexts.NotPoweredTooLarge}</color>" : $"<color=#ff6b61>{UiTexts.NotPowered}</color>";
+                lines.Add($"#{i + 1} {skill} {c.Shape}{marks}  {power}");
             }
-            lines.Add(UiTexts.FallbackRow);
+            if (lines.Count == 0) lines.Add(UiTexts.Hud.NoComponents);
+            lines.Add($"↓ {UiTexts.FallbackLine}");
             return string.Join("\n", lines);
+        }
+
+        private HexCoord? _enemyCoord;
+        private string _enemyText = string.Empty;
+
+        /// <summary>Mögliche Gegner eines Feldes mit ihren Platinen (A-19: auf der Karte lesbar), pro Feld einmal gebaut.</summary>
+        private string EnemyBoards(HexCoord coord)
+        {
+            if (_enemyCoord == coord) return _enemyText;
+            _enemyCoord = coord;
+            var blocks = new List<string>();
+            foreach (EnemyBoardPreview enemy in _session.EnemyBoardsAt(coord))
+                blocks.Add(UiTexts.Hud.EnemyBoard(enemy.Name, string.Join("\n", enemy.Lines.Select(l => $"• {l}"))));
+            _enemyText = blocks.Count > 0 ? $"{UiTexts.Hud.PossibleEnemies}\n{string.Join("\n", blocks)}" : string.Empty;
+            return _enemyText;
         }
 
         /// <summary>
@@ -193,7 +220,7 @@ namespace Betaknight.Overworld.UI
             int itemLevels = 0;
             foreach (EquipmentDefinition item in _session.Gear.Items) itemLevels += item.Level;
             int runeLevels = 0;
-            foreach (RuneSlot row in _session.Runes.Rows) runeLevels += row.Level;
+            foreach (RelayChip relay in _session.Board.Relays) runeLevels += relay.Level;
             if (_weaponFrame != Time.frameCount)
             {
                 _weapon = _session.SkillUserStats().WeaponDamage;

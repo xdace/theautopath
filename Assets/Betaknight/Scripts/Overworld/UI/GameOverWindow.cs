@@ -38,7 +38,7 @@ namespace Betaknight.Overworld.UI
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUILayout.BeginArea(rect, GUI.skin.box);
             GUILayout.Label(UiTexts.GameOver.Title, _titleStyle);
-            GUILayout.Label(UiTexts.GameOver.Summary(_session.Act, _session.Turns.CurrentTurn, _session.Runes.Runes.Count, _session.Stats.Gold), _textStyle);
+            GUILayout.Label(UiTexts.GameOver.Summary(_session.Act, _session.Turns.CurrentTurn, _session.BoardSize, _session.Board.Relays.Count, _session.Stats.Gold), _textStyle);
             GUILayout.FlexibleSpace();
             if (GUILayout.Button(UiTexts.GameOver.NewRun, GUILayout.Height(36f))) _onNewRun?.Invoke();
             GUILayout.EndArea();

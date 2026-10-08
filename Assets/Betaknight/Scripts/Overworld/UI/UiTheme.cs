@@ -41,7 +41,7 @@ namespace Betaknight.Overworld.UI
         /// <summary>Bereich mit Rahmen (Spalten, Abschnitte).</summary>
         public static GUIStyle Section { get; private set; }
 
-        /// <summary>Ziehbare Zelle (Skill, Rune, Modul, Gegenstand, Tafel-Zeile).</summary>
+        /// <summary>Ziehbare Zelle (Skill, Rune, Modul, Gegenstand, Teil der Platine).</summary>
         public static GUIStyle Cell { get; private set; }
 
         /// <summary>Ausgewählte Zelle.</summary>

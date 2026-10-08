@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Growth;
 using Betaknight.Core.Runes;
 using Betaknight.Core.Skills;
@@ -37,7 +38,7 @@ namespace Betaknight.Overworld.UI
             return text;
         }
 
-        /// <summary>«Schildstoss +1 (Zeile 2), Schildstoss (frei)» oder leer.</summary>
+        /// <summary>«Shield Bash +1 (#2 on board), Shield Bash (free)» oder leer.</summary>
         public static string Owned(OverworldSession session, string skillId)
         {
             var parts = new List<string>();
@@ -47,7 +48,7 @@ namespace Betaknight.Overworld.UI
 
         public static string Where(OverworldSession session, SkillInstance skill)
         {
-            if (skill.Holder is RuneSlot row) return UiTexts.Row(session.Runes.IndexOfRow(row) + 1);
+            if (skill.Holder is ComponentSlot component) return UiTexts.OnBoard(session.Board.IndexOf(component) + 1);
             return skill.Holder != null ? skill.Holder.HolderName : UiTexts.Free;
         }
 

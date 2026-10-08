@@ -10,17 +10,11 @@ namespace Betaknight.Overworld.UI
         /// <summary>Skill-Exemplar aus dem Skill-Inventar (A = Instanz-Id).</summary>
         Skill,
 
-        /// <summary>Der Basisangriff (kein Exemplar).</summary>
-        BasicAttack,
+        /// <summary>Komponente auf der Platine (A = Index in Lesereihenfolge).</summary>
+        Component,
 
-        /// <summary>Skill einer Tafel-Zeile (A = Zeile).</summary>
-        RowSkill,
-
-        /// <summary>Rune einer Tafel-Zeile (A = Zeile).</summary>
-        RowRune,
-
-        /// <summary>Ganze Tafel-Zeile zum Umsortieren (A = Zeile).</summary>
-        Row,
+        /// <summary>Relais-Chip auf der Platine (A = Index in Lesereihenfolge).</summary>
+        Relay,
 
         /// <summary>Rune aus dem Runen-Inventar (A = Index).</summary>
         Rune,

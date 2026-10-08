@@ -14,12 +14,15 @@ namespace Betaknight.Overworld.UI
         public const string Close = "✕";
         public const string BasicAttack = "Basic Attack";
         public const string ReadOnly = "Read only: fight or open decision";
-        public const string Always = "Always";
-        public const string FallbackRow = "↓ [" + Always + "] → " + BasicAttack;
-        public const string SwapRowHint = "… or swap a row (the old rune goes to the inventory with its level, the skill stays):";
+        public const string FallbackLine = BasicAttack + " fills the gaps when nothing is queued";
+        public const string SwapRelayHint = "… or swap the rune of a relay (the old rune goes to the inventory with its level; position and modules stay):";
+        public const string NotPowered = "not powered";
+        public const string NotPoweredTooLarge = "not powered (too large)";
+        public const string Powered = "powered";
 
-        public static string Row(int number) => $"Row {number}";
-        public static string BoardFull(string name) => $"<b>{name}</b>: board is full";
+        public static string OnBoard(int number) => $"#{number} on board";
+        public static string BoardFull(string name) => $"<b>{name}</b>: no free cell on the board";
+        public static string Cells(int cells) => cells == 1 ? "1 cell" : $"{cells} cells";
         public static string Owned(string list) => $"Owned: {list}";
         public static string Grows(string rule) => $"Grows: {rule}";
         public static string PriceTag(int price) => $"  – {price} Gold";
@@ -32,7 +35,9 @@ namespace Betaknight.Overworld.UI
             public const string Nothing = "nothing";
             public const string MineLost = "lost";
             public const string BuildButton = "Build (B)";
-            public const string BuildTip = "Logic Board, skills, modules and runes";
+            public const string BuildTip = "Circuit Board, skills, modules and runes";
+            public const string PossibleEnemies = "Possible enemies (rolled when you enter):";
+            public const string NoComponents = "<color=#888888>no components</color>";
             public const string InventoryTip = "Gear and items";
             public const string OpenShop = "Open Shop";
             public const string NewRun = "New Run";
@@ -42,7 +47,9 @@ namespace Betaknight.Overworld.UI
             public static string BossIn(int turns) => $"Boss in {turns} turns";
             public static string Turn(int turn, string boss) => $"Turn: {turn}   {boss}";
             public static string Resources(int hp, int maxHp, int gold, int shards) => $"HP: {hp}/{maxHp}   Gold: {gold}   Shards: {shards}";
-            public static string Board(int runes, int rows, int maxRows, string list) => $"Logic Board: {runes} runes, rows {rows}/{maxRows}\n{list}";
+            public static string Board(string size, string max, int relays, int components, string list) =>
+                $"Circuit Board {size} (max {max}): {relays} relays, {components} components\n{list}";
+            public static string EnemyBoard(string name, string lines) => $"<b>{name}</b>\n{lines}";
             public static string Gear(string list) => $"Gear: {list}";
             public static string Sets(string list) => $"Sets: {list}";
             public static string Tags(string list) => $"Tags: {list}";
@@ -101,16 +108,18 @@ namespace Betaknight.Overworld.UI
             public const string Title = "<b>The knight has fallen</b>";
             public const string NewRun = "New Run";
 
-            public static string Summary(int act, int turn, int runes, int gold) => $"Act {act}, Turn {turn}, {runes} runes, {gold} Gold";
+            public static string Summary(int act, int turn, string boardSize, int relays, int gold) =>
+                $"Act {act}, Turn {turn}, board {boardSize} with {relays} relays, {gold} Gold";
         }
 
         public static class Kit
         {
             public const string Title = "<b>Choose your knight</b>";
             public const string NoRune = "none";
+            public const string NoSkill = "no skill";
 
-            public static string Label(string name, string tag, int maxHp, int gold, string description, string rune) =>
-                $"<b>{name}</b>  [{tag}]   {maxHp} HP, {gold} Gold\n{description}\nStarting Rune {rune}";
+            public static string Label(string name, string tag, int maxHp, int gold, string description, string rune, string skill) =>
+                $"<b>{name}</b>  [{tag}]   {maxHp} HP, {gold} Gold\n{description}\nStart: relay {rune} → {skill} (next to the Core)";
         }
 
         // ------------------------------------------------------------------ Inventar voll
@@ -154,7 +163,7 @@ namespace Betaknight.Overworld.UI
         public static class Skill
         {
             public const string SecondCopy = "Second Copy";
-            public const string SecondCopyTip = "Another copy with growth 0, e.g. for a second row";
+            public const string SecondCopyTip = "Another copy with growth 0, e.g. as a second component";
 
             public static string Title(string name) => $"<b>Skill: {name}</b>";
             public static string Growth(int amount, string from, int grown) => $"▲ Growth +{amount} ({from} → +{grown})";
@@ -221,14 +230,15 @@ namespace Betaknight.Overworld.UI
             public const string BuyToRuneInventory = "Buy, to Rune Inventory";
             public const string Leave = "Leave Shop";
 
-            public static string Status(int gold, int hp, int maxHp, int runes, int slots) => $"Gold: {gold}   HP: {hp}/{maxHp}   Runes: {runes}/{slots}";
+            public static string Status(int gold, int hp, int maxHp, string size, int relays) => $"Gold: {gold}   HP: {hp}/{maxHp}   Board: {size}, {relays} relays";
             public static string RuneLabel(string badge, string name, string tag, int price, string description, string hints) =>
                 $"{badge}  <b>{name}</b>  [{tag}]  – {price} Gold\n{description}{hints}";
             public static string ItemHead(string name, string slot, int price, string set) => $"<b>{name}</b>  [{slot}]  – {price} Gold{set}";
             public static string BuyAndEquipSwap(string worn) => $"Buy and Equip ({worn} to inventory)";
             public static string Heal(int amount, int price) => $"Heal (+{amount} HP) – {price} Gold";
-            public static string RuneSlot(int price) => $"Extra Rune Slot – {price} Gold";
-            public static string BoardFull(int rows) => $"Board full ({rows} rows)";
+            public static string BoardExpansion(string from, string to, int price) => $"Board Expansion {from} → {to} – {price} Gold";
+            public static string BoardMaxed(string max) => $"Board at maximum size ({max})";
+            public const string BoardExpansionSold = "Board Expansion sold out here";
             public static string Reroll(int price) => $"Reroll Offer – {price} Gold";
             public static string SellTitle(int item, int rune) => $"<b>Sell</b> (half price: item {item} Gold, rune {rune} Gold)";
             public static string SellItem(string name, string slot, int price) => $"Sell {name} [{slot}]  +{price} Gold";
@@ -251,12 +261,13 @@ namespace Betaknight.Overworld.UI
             public const string ToRuneInventory = "Put in Rune Inventory";
 
             public static string Title(string source) => $"<b>Choose a Reward</b> – {source}";
-            public static string Status(int runes, int slots, int items, int itemCapacity, int stored, int runeCapacity) =>
-                $"Board: {runes}/{slots}   Inventory: {items}/{itemCapacity} items, {stored}/{runeCapacity} runes";
+            public static string Status(string size, int relays, int items, int itemCapacity, int stored, int runeCapacity) =>
+                $"Board: {size}, {relays} relays   Inventory: {items}/{itemCapacity} items, {stored}/{runeCapacity} runes";
             public static string UpgradeLevel(int level) => $"Level +{level}";
             public static string EquipSwap(string worn) => $"Equip ({worn} to inventory)";
-            public static string BoardExpansion(int from, int to, int max) =>
-                $"<color=#7ddc6f>▲ Board Expansion: +1 row</color>  ({from} → {to} of {max})";
+            public static string BoardExpansion(string from, string to, string max) =>
+                $"<color=#7ddc6f>▲ Board Expansion</color>  ({from} → {to}, max {max})";
+            public static string BoardMaxed(string max) => $"Board Expansion (board already at its maximum {max})";
             public static string Skip(int gold) => $"Skip (+{gold} Gold)";
             public static string MaxLevel(string name) => $"{name} (max level)";
             public static string Instead(string name) => $"instead of <b>{name}</b>";
@@ -291,55 +302,75 @@ namespace Betaknight.Overworld.UI
             public static string DuoActive(string name, string text) => $"<b>Duo {name}</b> active: {text}";
         }
 
-        // ------------------------------------------------------------------ Build (Tafel-Editor)
+        // ------------------------------------------------------------------ Build (Platinen-Editor)
 
         public static class Build
         {
             public const string TitleName = "Build";
-            public const string FiresRule = "topmost met row with a ready skill fires";
+            public const string FiresRule = "a relay that triggers queues the components it powers";
             public const string CloseTip = "Close (B or Esc)";
-            public const string HoverHint = "Hover a skill, rune or module to see its short stats here.";
+            public const string HoverHint = "Hover a component, relay, skill, rune or module to see its short stats here.";
             public const string SkillsTitle = "<b>Skills</b>";
             public const string NoSkills = "no skills yet";
-            public const string AlwaysAvailable = "always available";
-            public const string BasicAttackTip = "Drag the basic attack onto a row. No copy needed.";
+            public const string AlwaysAvailable = "fills the gaps";
+            public const string BasicAttackTip = "The basic attack is not placed on the board: it fires whenever nothing is queued.";
             public const string SkillsKeepBar = "– skills do not change the stats in the bar";
-            public const string BoardTitle = "<b>Logic Board</b>";
-            public const string BoardLegend = "Rune (When) → Skill (What) · drag ≡ to reorder · hover for details";
-            public const string EmptyRow = "— empty: drag a skill here (row paused)";
+            public const string BoardTitle = "<b>Circuit Board</b>";
+            public const string BoardLegend = "drag to move · right-click rotates · R rotates while dragging";
+            public const string CoreName = "CORE";
+            public const string EmptyCellTip = "Free cell: drop a skill (component) or a rune (relay) here.";
+            public const string ComponentsTitle = "<b>Components</b>";
+            public const string RelaysTitle = "<b>Relays</b>";
+            public const string NoComponents = "no components yet – drag a skill from the left onto the board";
+            public const string NoRelays = "no relays – drag a rune from the chip inventory onto a free cell";
+            public const string PowersNothing = "powers nothing yet – place a component next to it (edge, not corner)";
+            public const string NotPoweredTip = "No relay touches this component at an edge, so it never fires. Put a relay next to it.";
             public const string EvolvesTip = "Evolves after the next boss";
-            public const string FallbackLegend = "fixed, always last";
             public const string TriggerClick = "\nClick: choose next target";
-            public const string FreeRuneModuleSlot = "Free module slot on the rune: drag a rune module here";
-            public const string FreeSkillModuleSlot = "Free module slot on the skill: drag a skill module here";
-            public const string ModulesAndRunes = "Modules and Runes";
+            public const string FreeRuneModuleSlot = "Free module slot on the relay: drag a relay module here";
+            public const string FreeSkillModuleSlot = "Free module slot on the component: drag a skill module here";
+            public const string ModulesAndRunes = "Modules and Chips";
             public const string RecipeBook = "Recipe Book";
             public const string ModulesTitle = "<b>Modules</b>";
             public const string NoModules = "none yet – rare from elites, chests, boss escape and shop";
-            public const string RuneInventoryTitle = "<b>Rune Inventory</b>";
-            public const string RuneInventoryEmpty = "empty – drag a row here to unequip its rune";
+            public const string RuneInventoryTitle = "<b>Chips</b> (rune inventory)";
+            public const string RuneInventoryEmpty = "empty – drag a relay here to take it off the board";
             public const string RecipeBookTitle = "<b>Recipe Book</b>";
             public const string RecipeBookLegend = "kept across runs, knowledge only";
             public const string UnknownDuo = "<b>Duo ???</b>";
             public const string NoEffect = "no effect";
-            public const string NoCooldown = " · no CD";
-            public const string RowDragHint = "Drag onto the rune inventory = unequip · right-click = unequip";
-            public const string Hint = "Drag: skill onto row = place/swap, row onto row = reorder, rune onto row = swap, "
-                + "rune onto free slot = new row, module onto ◇ = place, back into a list = remove. Double-/right-click: into row / out of row.";
+            public const string RelayDragHint = "Drag to move · onto the chip inventory = take off · right-click = take off";
+            public const string ComponentDragHint = "Drag to move · right-click = rotate · onto the skill list = remove";
+            public const string RuneDropHint = "Drag onto a free cell = new relay, onto a relay = swap · double-click = best free cell";
+            public const string Hint = "Drag: skill onto the board = place, component or relay = move (R rotates while dragging), right-click a component = rotate, "
+                + "rune onto a free cell = new relay, rune onto a relay = swap, module onto a part or ◇ = place, back into a list = remove. "
+                + "Double-click: place on the best cell / take off.";
 
-            public static string Rows(int rows, int slots, int max) => $"Board {rows}/{slots} rows (max. {max})";
+            public static string BoardSize(string size, string max, bool canGrow) =>
+                canGrow ? $"{size} (grows to {max} via Board Expansions)" : $"{size} (maximum)";
             public static string Dragging(string label) => $"Dragging: {label}";
+            public static string DraggingRotated(string label) => $"Dragging: {label} (rotated)";
             public static string FreeOf(int free, int all) => $"{free} free of {all}";
-            public static string BoardRule(string rule) =>
-                $"<b>Logic Board</b>: From top to bottom, the first row whose condition is met and whose skill is ready fires. {rule}";
-            public static string RowLabel(int number, string name) => $"Row {number}: {name}";
-            public static string FreeSlot(int number) => $"{number}.  + free slot – drag a rune from the rune inventory here";
+            public static string BoardRule(string limits, int corePercent, string rule) =>
+                "<b>Circuit Board</b>: A relay powers every component it touches at an edge (not a corner), up to its size limit "
+                + $"({limits}). Bigger ones are not powered (too large); unpowered components never fire. When a relay triggers, "
+                + $"its powered components are queued and fire with their cast time. No cooldowns. Components touching the Core get +{corePercent} % effect. {rule}";
+            public static string Limit(string symbol, int cells) => $"{symbol} {Cells(cells)}";
+            public static string CoreTip(int percent) => $"<b>Core</b>: components touching it get +{percent} % effect. Nothing can be placed here.";
+            public static string CoreBonus(int percent) => $"Core +{percent} %";
+            public static string PoweredBy(string relays) => $"powered by {relays}";
+            public static string TooLargeTip(int cells, int limit) =>
+                $"{Cells(cells)}, but the touching relays power only up to {Cells(limit)}. Use a harder relay (◆ 2 cells, ◆◆ 4, ◆◆◆ 6) or a smaller skill.";
+            public static string Powers(string components) => $"powers {components}";
+            public static string TooLargeHere(string components) => $"too large here: {components}";
+            public static string RelayLimit(int cells) => $"powers up to {Cells(cells)}";
+            public static string MaxCells(int cells) => $"≤{cells}";
+            public static string TriggersTo(int number) => $"↪#{number}";
             public static string Evolution(string name) => $"<b>Evolution {name}</b>";
             public static string Duo(string name, string effect) => $"<b>Duo {name}</b>: {effect}";
-            public static string Cooldown(string seconds) => $" · CD {seconds}";
             public static string GrowsNow(string rule, string effect, string milestone) =>
                 $"Grows: {rule}{(effect.Length > 0 ? $" · now {effect}" : string.Empty)} ({milestone})";
-            public static string GrowsRow(string rule, string effect, string milestone) =>
+            public static string GrowsRelay(string rule, string effect, string milestone) =>
                 $"Grows: {rule}{(effect.Length > 0 ? $" · {effect}" : string.Empty)} ({milestone})";
             public static string ModuleSlots(int used, int slots) => $"Module slots {used}/{slots}";
         }
@@ -351,43 +382,50 @@ namespace Betaknight.Overworld.UI
             public const string Enemy = "Enemy";
             public const string PortalOpen = "Portal open";
             public const string Repeat = "↻ Repeat";
-            public const string BoardTitle = "<b>Logic Board</b>";
-            public const string BoardLegend = "hover a row for the reason";
+            public const string BoardTitle = "<b>Circuit Board</b>";
+            public const string BoardLegend = "relays light up when they trigger · hover a part";
             public const string QueueEmpty = "Waiting: –";
+            public const string EnemyBoardTitle = "<b>Enemy board</b>";
+            public const string EnemyBoardHint = "hover an enemy to read its board";
 
-            public const string StateReady = "ready";
-            public const string StateConditionFalse = "condition false";
-            public const string StateCooldown = "Cooldown";
+            public const string StateIdle = "idle";
             public const string StateQueued = "queued";
-            public const string StateOrphaned = "orphaned";
+            public const string StateFiring = "firing";
+            public const string StateFrozen = "frozen";
+            public const string StateUnpowered = "not powered";
+            public const string StateTooLarge = "too large";
+            public const string StateOrphaned = "no skill";
 
-            public const string NowReady = "condition met, skill ready";
-            public const string NowConditionFalse = "condition not met";
-            public const string NowOrphaned = "skipped (no skill)";
-            public const string NowQueuedWaiting = "queued, waiting (action running)";
-            public const string NowUndecided = "no decision yet";
+            public const string NowIdle = "waiting for its relay to trigger";
+            public const string NowQueued = "queued, waiting for its turn (reading order)";
+            public const string NowFiring = "firing";
+            public const string NowUnpowered = "not powered: no relay touches it, it never fires";
+            public const string NowTooLarge = "not powered (too large): every touching relay is too easy for its size";
+            public const string NowOrphaned = "no skill";
 
             public const string ReportTitle = "<b>Report</b>";
             public const string SplitTip = "Share of damage: basic attack vs skills. Goal with 3 or more damage skills: basic attack at most about 30 %.";
-            public const string NoRowDamage = "without a row (set bonuses, recoil)";
+            public const string NoRowDamage = "without a component (set bonuses, recoil)";
 
-            public const string HeaderRow = "<b>Row</b>";
+            public const string HeaderRow = "<b>Component</b>";
+            public const string HeaderPower = "<b>Power</b>";
+            public const string HeaderPowerTip = "Is a relay powering this component? Unpowered or too large components never fire.";
             public const string HeaderFired = "<b>Fired</b>";
-            public const string HeaderFiredTip = "How often this row started an action (↪ by a trigger, ↻ repeated).";
+            public const string HeaderFiredTip = "How often this component started an action (↪ by a trigger module, ↻ repeated).";
             public const string HeaderTriggered = "<b>Triggered</b>";
-            public const string HeaderTriggeredTip = "How often this row's condition was met. Hard blocks need easers or a build that makes them happen.";
+            public const string HeaderTriggeredTip = "How often a relay or trigger reached this component (queued or missed). Hard relays need easers or a build that makes them happen.";
             public const string HeaderDamage = "<b>Damage</b>";
             public const string HeaderHealing = "<b>Healing</b>";
             public const string HeaderShare = "<b>Share</b>";
             public const string HeaderShareTip = "Share of total damage.";
             public const string HeaderBonus = "<b>Bonus</b>";
-            public const string HeaderBonusTip = "Extra damage, healing and saved cooldown from the block's difficulty bonus.";
+            public const string HeaderBonusTip = "Extra damage, healing and saved cast time from the relay's difficulty bonus.";
             public const string HeaderQueued = "<b>Queued</b>";
-            public const string HeaderQueuedTip = "How often this row was queued, and the average wait until it started.";
+            public const string HeaderQueuedTip = "How often this component was queued, and the average wait until it started.";
             public const string HeaderMissed = "<b>Missed Trigger</b>";
-            public const string HeaderMissedTip = "How often this row's condition was not met while a lower row or the basic attack fired.";
-            public const string HeaderOther = "<b>Other reason</b>";
-            public const string HeaderOtherTip = "Most common reason besides a missed trigger, e.g. no skill (orphaned) or another action running.";
+            public const string HeaderMissedTip = "Triggers that did nothing: the component was already queued, too large for the relay, frozen, or had no skill.";
+            public const string HeaderOther = "<b>Main reason</b>";
+            public const string HeaderOtherTip = "Most common reason for the missed triggers.";
 
             public const string LogTitle = "<b>Log</b>";
             public const string FilterAll = "All";
@@ -411,17 +449,24 @@ namespace Betaknight.Overworld.UI
                 $"<b>Arena</b> – Knight vs {enemy}   <color=#9aa4b2>{time}</color>{portal}";
             public static string PortalOpensIn(string time) => $"Portal opens in {time}";
             public static string Cast(string seconds) => $"Cast {seconds}";
-            public static string FromRow(int number) => $"↪ from row {number}";
+            public static string FromComponent(int number) => $"↪ from #{number}";
             public static string Charging(string skill, string cast) => $"charging: {skill} ({cast})";
             public static string StatusTip(string name, string left, int stacks) =>
                 $"{name}: {left} left{(stacks > 1 ? $", {stacks} stacks" : string.Empty)}";
-            public static string NowCooldown(string left) => $"skill on cooldown ({left} left)";
-            public static string NowQueuedCooldown(string left) => $"queued, waiting for cooldown ({left} left)";
+            public static string NowFrozen(string left) => $"frozen ({left} left)";
+            public static string RelayTip(string name, int count, string powers) =>
+                $"<b>{name}</b>: triggered {count}× so far\n{powers}";
+            public static string Powers(string components) => $"powers {components}";
+            public const string PowersNothing = "powers nothing";
+            public static string ComponentHead(string name, string shape, string relays) => $"<b>{name}</b> ({shape})\n{relays}";
+            public static string PoweredBy(string relays) => $"powered by {relays}";
+            public static string EnemyTip(string name, string lines) => $"<b>{name}</b> – board:\n{lines}";
             public static string Now(string now) => $"Now: {now}";
             public static string NowAndLast(string now, string last) => $"Now: {now}\nLast: {last}";
             public static string Report(string outcome, string time, int damage, int healing) =>
                 $"<b>Report</b>   {outcome}, {time}, total damage {damage}, healing {healing}";
             public static string QueueAverage(int queued, string wait) => $"{queued}× · avg {wait}";
+            public static string CastSaved(string time) => $"−{time} cast";
         }
     }
 }

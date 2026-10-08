@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Evolution;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Growth;
@@ -13,34 +14,48 @@ using UnityEngine;
 namespace Betaknight.Overworld.UI
 {
     /// <summary>
-    /// Fenster «Build» (Taste B): in der Mitte die Logik-Tafel (eine Zeile pro Rune + Skill), links das Skill-Inventar,
-    /// rechts Module und Runen-Inventar (oder das Rezeptbuch), oben die Stat-Leiste. Zusammengesteckt wird per Drag &amp; Drop,
-    /// Doppel- oder Rechtsklick ist der Kurzweg für «in Zeile / aus Zeile». Jede Aktion ruft eine Methode der Session;
-    /// während Kampf und offenen Entscheidungen ist das Fenster nur lesbar. Ausrüstung steht im Fenster «Inventar».
+    /// Fenster «Build» (Taste B), A-19: in der Mitte die Platine als Raster (Kern, Relais-Chips, Komponenten in ihrer Form),
+    /// darunter die Liste aller Komponenten und Relais mit Grösse, Cast-Zeit, Wirkung, Versorgung und Modul-Plätzen. Links das
+    /// Skill-Inventar, rechts Module und Chips (Runen-Inventar) oder das Rezeptbuch, oben die Stat-Leiste.
+    /// Zusammengesteckt wird per Drag &amp; Drop: Skill auf eine Zelle = legen, Komponente oder Relais ziehen = verschieben
+    /// (R dreht beim Ziehen), Rechtsklick auf eine Komponente = drehen, zurück in eine Liste = abnehmen. Jede Aktion ruft eine
+    /// Methode der Session; während Kampf und offenen Entscheidungen ist das Fenster nur lesbar.
     /// </summary>
     public sealed class BuildWindow : MonoBehaviour
     {
-        private const float RowHeight = 30f;
         private const float SideWidth = 290f;
+        private const float LineHeight = 40f;
+
+        private static readonly Color SelectedColor = UiTheme.Accent;
 
         private OverworldSession _session;
         private readonly DragDrop _drag = new DragDrop();
         private readonly StatBar _statBar = new StatBar();
-        private readonly List<Rect> _rowRects = new List<Rect>();
-        private Vector2 _skillScroll, _boardScroll, _moduleScroll, _runeScroll, _recipeScroll;
+        private Vector2 _skillScroll, _partsScroll, _moduleScroll, _runeScroll, _recipeScroll;
         private bool _showRecipes;
         private SkillUserStats _skillStats;
         private int _skillStatsFrame = -1;
+        private readonly Dictionary<ComponentSlot, SkillInfo> _infos = new Dictionary<ComponentSlot, SkillInfo>();
 
         // Was die Maus gerade überfährt (für die Vorschau), im Repaint gesammelt und im nächsten Frame gezeigt.
         private string _hover;
         private string _hoverNext;
+        private object _hoverPart;
+        private object _hoverPartNext;
+
+        // Ausgewähltes Teil (Komponente oder Relais), hervorgehoben in Raster und Liste.
+        private object _selected;
+
+        // Ziehen auf der Platine: welche Zelle der Komponente gepackt wurde, und ob beim Ziehen gedreht wird (Taste R).
+        private int _grabX, _grabY;
+        private bool _dragRotated;
 
         public bool IsOpen { get; private set; }
 
         public void Initialize(OverworldSession session)
         {
             _session = session;
+            _selected = null;
             Close();
         }
 
@@ -54,34 +69,53 @@ namespace Betaknight.Overworld.UI
         {
             IsOpen = _session != null;
             _hover = null;
+            _hoverPart = null;
         }
 
         public void Close()
         {
             IsOpen = false;
             _drag.Cancel();
+            _dragRotated = false;
         }
+
+        private CircuitBoard Board => _session.Board;
 
         private void OnGUI()
         {
             if (!IsOpen || _session == null) return;
             UiTheme.Apply();
             GUI.depth = -5;
-            if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
+            Event e = Event.current;
+            if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape)
             {
                 Close();
-                Event.current.Use();
+                e.Use();
                 return;
+            }
+            if (!_drag.IsDragging) _dragRotated = false;
+            else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.R)
+            {
+                _dragRotated = !_dragRotated;
+                e.Use();
             }
 
             _drag.Enabled = _session.CanChangeLoadout;
-            // Werte des Ritters einmal pro Frame, nicht pro OnGUI-Ereignis.
+            // Werte des Ritters und der Komponenten einmal pro Frame, nicht pro OnGUI-Ereignis.
             if (_skillStatsFrame != Time.frameCount || _skillStats == null)
             {
                 _skillStats = _session.SkillUserStats();
                 _skillStatsFrame = Time.frameCount;
+                _infos.Clear();
+                foreach (ComponentSlot c in Board.Components) _infos[c] = _session.DescribeComponentSkill(c, _skillStats);
+                if (_selected is ComponentSlot sc && Board.IndexOf(sc) < 0) _selected = null;
+                if (_selected is RelayChip sr && Board.IndexOf(sr) < 0) _selected = null;
             }
-            if (Event.current.type == EventType.Repaint) _hoverNext = null;
+            if (e.type == EventType.Repaint)
+            {
+                _hoverNext = null;
+                _hoverPartNext = null;
+            }
 
             float width = Mathf.Min(Screen.width - 24f, 1560f);
             float height = Mathf.Min(Screen.height - 24f, 880f);
@@ -99,11 +133,14 @@ namespace Betaknight.Overworld.UI
             DrawRightColumn(columns);
             GUILayout.EndHorizontal();
 
-            GUILayout.Label($"<color=#9aa4b2>{UiTexts.Build.Hint}</color>",
-                UiTheme.Small);
+            GUILayout.Label($"<color=#9aa4b2>{UiTexts.Build.Hint}</color>", UiTheme.Small);
             GUILayout.EndArea();
 
-            if (Event.current.type == EventType.Repaint) _hover = _hoverNext;
+            if (e.type == EventType.Repaint)
+            {
+                _hover = _hoverNext;
+                _hoverPart = _hoverPartNext;
+            }
             if (!_drag.IsDragging) UiTheme.DrawTooltip();
             _drag.Finish();
         }
@@ -113,8 +150,8 @@ namespace Betaknight.Overworld.UI
         private void DrawHeader()
         {
             GUILayout.BeginHorizontal();
-            string rows = UiTexts.Build.Rows(_session.Runes.Rows.Count, _session.Runes.Slots, _session.Progression.MaxBoardRows);
-            GUILayout.Label($"{UiTexts.Build.TitleName}  <size={UiTheme.SmallSize}><color=#9aa4b2>{rows} · {UiTexts.Build.FiresRule}</color></size>", UiTheme.Title);
+            string size = UiTexts.Build.BoardSize(_session.BoardSize, _session.MaxBoardSize, _session.CanExpandBoard);
+            GUILayout.Label($"{UiTexts.Build.TitleName}  <size={UiTheme.SmallSize}><color=#9aa4b2>{size} · {UiTexts.Build.FiresRule}</color></size>", UiTheme.Title);
             GUILayout.FlexibleSpace();
             if (!_session.CanChangeLoadout)
                 GUILayout.Label($"<color={UiTheme.Hex(UiTheme.Bad)}>{UiTexts.ReadOnly}</color>", UiTheme.Small, GUILayout.ExpandWidth(false));
@@ -124,14 +161,21 @@ namespace Betaknight.Overworld.UI
 
         private void DrawPreviewLine()
         {
-            string text = _drag.IsDragging ? UiTexts.Build.Dragging(_drag.Dragging.Value.Label) : _hover;
+            string text = _hover;
+            if (_drag.IsDragging)
+            {
+                string label = _drag.Dragging.Value.Label;
+                text = _dragRotated ? UiTexts.Build.DraggingRotated(label) : UiTexts.Build.Dragging(label);
+            }
             GUILayout.Label(string.IsNullOrEmpty(text) ? $"<color=#666c78>{UiTexts.Build.HoverHint}</color>" : text,
                 UiTheme.SmallLine, GUILayout.Height(20f));
         }
 
-        private void Hover(Rect rect, string text)
+        private void Hover(Rect rect, string text, object part = null)
         {
-            if (Event.current.type == EventType.Repaint && rect.Contains(Event.current.mousePosition)) _hoverNext = text;
+            if (Event.current.type != EventType.Repaint || !rect.Contains(Event.current.mousePosition)) return;
+            _hoverNext = text;
+            if (part != null) _hoverPartNext = part;
         }
 
         // ------------------------------------------------------------------ Skill-Inventar
@@ -150,163 +194,414 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
 
-            // Skill aus einer Zeile hierher = herausnehmen.
+            // Komponente hierher = von der Platine nehmen.
             Rect column = GUILayoutUtility.GetLastRect();
-            _drag.Target(column, d => d.Kind == DragKind.RowSkill && RowSkill(d.A) != null, d => _session.RemoveSkill(d.A));
+            _drag.Target(column, d => d.Kind == DragKind.Component && d.A >= 0 && d.A < Board.Components.Count, d => _session.RemoveComponent(d.A));
         }
 
         private void DrawBasicAttackCard()
         {
             const string label = UiTexts.BasicAttack;
+            SkillInfo info = _session.DescribeSkill(SkillInstance.BasicAttack(), _skillStats);
             GUILayout.Box(new GUIContent($"<b>{label}</b>  <color=#9aa4b2>{UiTexts.Build.AlwaysAvailable}</color>", UiTexts.Build.BasicAttackTip),
-                UiTheme.Cell, GUILayout.Height(26f));
+                UiTheme.EmptyCell, GUILayout.Height(26f));
             Rect r = GUILayoutUtility.GetLastRect();
-            _drag.Source(r, new DragItem(DragKind.BasicAttack, 0, label));
-            Hover(r, $"<b>{label}</b>: {ShortStats(_session.DescribeSkill(SkillInstance.BasicAttack(), _skillStats))}");
+            Hover(r, $"<b>{label}</b>: {Effect(info)} · {info?.TimingText}");
         }
 
         private void DrawSkillCard(SkillInstance skill)
         {
-            SkillInfo info = _session.DescribeSkill(skill, _skillStats);
+            ComponentSlot slot = Board.ComponentOf(skill);
+            SkillInfo info = slot != null && _infos.TryGetValue(slot, out SkillInfo placed) ? placed : _session.DescribeSkill(skill, _skillStats);
             string name = skill.NameFrom(_session.SkillCatalog);
-            int row = skill.Holder is RuneSlot slot ? _session.Runes.IndexOfRow(slot) : -1;
-            string where = row >= 0 ? $"<color=#9aa4b2>{UiTexts.Row(row + 1)}</color>" : $"<color={UiTheme.Hex(UiTheme.Good)}>{UiTexts.Free}</color>";
+            string where = slot != null
+                ? $"<color={StateHex(slot)}>{UiTexts.OnBoard(Board.IndexOf(slot) + 1)}</color>"
+                : skill.IsFree ? $"<color={UiTheme.Hex(UiTheme.Good)}>{UiTexts.Free}</color>" : $"<color=#9aa4b2>{skill.Holder.HolderName}</color>";
             string modules = skill.Modules.Count > 0 ? $" <color=#ffd75e>◆{skill.Modules.Count}</color>" : string.Empty;
             string text = $"<b>{name}</b>{modules}  {where}\n<color=#ffd75e>{ShortStats(info)}</color>";
-            GUILayout.Box(new GUIContent(text, SkillTip(skill, info)), skill.IsFree ? UiTheme.Cell : UiTheme.EmptyCell, GUILayout.Height(42f));
+            GUIStyle style = slot != null && slot == _selected ? UiTheme.CellSelected : skill.IsFree ? UiTheme.Cell : UiTheme.EmptyCell;
+            GUILayout.Box(new GUIContent(text, SkillTip(skill, info, slot)), style, GUILayout.Height(42f));
             Rect r = GUILayoutUtility.GetLastRect();
-            _drag.Source(r, new DragItem(DragKind.Skill, skill.InstanceId, name), shortcut: () => SkillShortcut(skill));
-            Hover(r, $"<b>{name}</b>: {ShortStats(info)} · {info?.TimingText} <color=#9aa4b2>{UiTexts.Build.SkillsKeepBar}</color>");
+            int id = skill.InstanceId;
+            if (Event.current.type == EventType.MouseDown && r.Contains(Event.current.mousePosition)) _grabX = _grabY = 0;
+            _drag.Source(r, new DragItem(DragKind.Skill, id, name), click: () => _selected = Board.ComponentOf(_session.Skills.Get(id)),
+                shortcut: () => SkillShortcut(id));
+            Hover(r, $"<b>{name}</b>: {Effect(info)} · {info?.TimingText} <color=#9aa4b2>{UiTexts.Build.SkillsKeepBar}</color>", slot);
         }
 
-        /// <summary>Kurzweg: freier Skill in die erste Zeile ohne Skill (sonst die erste mit Basisangriff), eingesetzter heraus.</summary>
-        private void SkillShortcut(SkillInstance skill)
+        /// <summary>Kurzweg: freier Skill auf die beste freie Lage (an einem passenden Relais), gelegter zurück in die Sammlung.</summary>
+        private void SkillShortcut(int instanceId)
         {
-            if (skill.Holder is RuneSlot slot)
+            SkillInstance skill = _session.Skills.Get(instanceId);
+            if (skill == null) return;
+            ComponentSlot slot = Board.ComponentOf(skill);
+            if (slot != null)
             {
-                _session.RemoveSkill(_session.Runes.IndexOfRow(slot));
+                _session.RemoveComponent(Board.IndexOf(slot));
                 return;
             }
-            IReadOnlyList<RuneSlot> rows = _session.Runes.Rows;
-            int target = rows.ToList().FindIndex(r => r.Skill == null);
-            if (target < 0) target = rows.ToList().FindIndex(r => r.Skill.IsBasicAttack);
-            if (target >= 0) _session.PlaceSkill(skill.InstanceId, target);
+            if (_session.BestSpotFor(skill, out Cell origin, out bool rotated)) _session.PlaceSkill(instanceId, origin, rotated);
         }
 
-        // ------------------------------------------------------------------ Logik-Tafel
+        // ------------------------------------------------------------------ Platine
 
         private void DrawBoardColumn(float width, float height)
         {
             GUILayout.BeginVertical(UiTheme.Section, GUILayout.Width(width), GUILayout.Height(height));
-            GUILayout.Label($"{UiTexts.Build.BoardTitle}  <color=#9aa4b2>{UiTexts.Build.BoardLegend}</color>", UiTheme.Text);
-            Hover(GUILayoutUtility.GetLastRect(), UiTexts.Build.BoardRule(RowQueueConfig.RuleText));
-            _boardScroll = GUILayout.BeginScrollView(_boardScroll);
+            GUILayout.Label($"{UiTexts.Build.BoardTitle}  <color=#9aa4b2>{_session.BoardSize} · {UiTexts.Build.BoardLegend}</color>", UiTheme.Text);
+            Hover(GUILayoutUtility.GetLastRect(), BoardRule());
 
-            IReadOnlyList<RuneSlot> rows = _session.Runes.Rows;
-            List<OverworldSession.TriggerLink> links = _session.TriggerLinks();
-            for (int i = 0; i < rows.Count; i++) DrawRow(i, rows[i], links.Count);
-            for (int i = rows.Count; i < _session.Runes.Slots; i++) DrawFreeSlot(i);
-            DrawTriggerLinks(links, rows.Count);
+            float inner = width - 24f;
+            float size = CircuitGrid.CellSize(Board.Width, Board.Height, inner, Mathf.Max(150f, height * 0.56f));
+            Rect area = GUILayoutUtility.GetRect(inner, Board.Height * size + 4f, GUILayout.ExpandWidth(true));
+            var grid = new Rect(area.x + (area.width - Board.Width * size) * 0.5f, area.y + 2f, Board.Width * size, Board.Height * size);
+            DrawGrid(grid, size);
 
-            GUILayout.Box($"↓  [{UiTexts.Always}] → <b>{UiTexts.BasicAttack}</b>  <color=#9aa4b2>{UiTexts.Build.FallbackLegend} · {ShortStats(_session.DescribeSkill(SkillInstance.BasicAttack(), _skillStats))}</color>",
-                UiTheme.EmptyCell, GUILayout.Height(RowHeight));
+            SkillInfo basic = _session.DescribeSkill(SkillInstance.BasicAttack(), _skillStats);
+            GUILayout.Label($"<color=#9aa4b2>↓ {UiTexts.FallbackLine} · {Effect(basic)}</color>", UiTheme.SmallLine);
 
+            _partsScroll = GUILayout.BeginScrollView(_partsScroll);
+            DrawComponentList();
+            DrawRelayList();
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
         }
 
-        private void DrawRow(int index, RuneSlot row, int linkCount)
+        private string BoardRule()
         {
-            GUILayout.BeginHorizontal(UiTheme.Cell, GUILayout.Height(RowHeight));
-
-            // Griff: ganze Zeile ziehen.
-            GUILayout.Label($"<color=#9aa4b2>≡ {index + 1}.</color>", UiTheme.SmallLine, GUILayout.Width(40f), GUILayout.Height(RowHeight - 6f));
-            Rect handle = GUILayoutUtility.GetLastRect();
-            _drag.Source(handle, new DragItem(DragKind.Row, index, UiTexts.Build.RowLabel(index + 1, row.Name)));
-
-            // Rune (Wann) mit Stufen-Abzeichen und Wachstum.
-            string growth = row.Growth > 0 ? $" <color=#b5e48c>+{row.Growth}</color>" : string.Empty;
-            string rune = $"{RuneText.Difficulty(_session.RowDifficulty(row))} <b>{row.Name}</b>{RuneText.LevelBadge(row.Rune, row.Level)}{growth}";
-            GUILayout.Label(new GUIContent(rune, RowTip(row)), UiTheme.SmallLine, GUILayout.Width(250f), GUILayout.Height(RowHeight - 6f));
-            Rect runeRect = GUILayoutUtility.GetLastRect();
-            _drag.Source(runeRect, new DragItem(DragKind.RowRune, index, row.Name), shortcut: () => _session.UnequipRune(index));
-            Hover(runeRect, $"<b>{row.Name}</b>: {row.Description} {row.Rune.LevelText(row.Level)} · {DifficultyText.Tooltip(_session.RowDifficulty(row))}");
-
-            DrawModuleSlots(row, index);
-            GUILayout.Label("→", UiTheme.SmallLine, GUILayout.Width(16f));
-
-            // Skill (Was) mit Kurzwerten.
-            SkillInstance skill = row.Skill;
-            // Werte so, wie sie von dieser Zeile aus wirken: inklusive Schwierigkeits-Bonus des Bausteins.
-            SkillInfo info = skill != null ? _session.DescribeRowSkill(row, _skillStats) : null;
-            string skillName = skill == null ? null : skill.IsBasicAttack ? UiTexts.BasicAttack : skill.NameFrom(_session.SkillCatalog);
-            string skillText = skill == null
-                ? $"<color=#888888>{UiTexts.Build.EmptyRow}</color>"
-                : $"<b>{skillName}</b>  <color=#ffd75e>{ShortStats(info)}</color>";
-            GUILayout.Label(new GUIContent(skillText, skill != null ? SkillTip(skill, info) : null), UiTheme.SmallLine, GUILayout.MinWidth(180f), GUILayout.Height(RowHeight - 6f));
-            Rect skillRect = GUILayoutUtility.GetLastRect();
-            if (skill != null)
-            {
-                _drag.Source(skillRect, new DragItem(DragKind.RowSkill, index, skillName), shortcut: () => _session.RemoveSkill(index));
-                Hover(skillRect, $"<b>{skillName}</b>: {ShortStats(info)} · {info?.TimingText}");
-            }
-
-            if (skill != null && !skill.IsBasicAttack) DrawModuleSlots(skill, index);
-
-            string marks = _session.IsEvolutionReady(row) ? $" <color=#d29bff>✦</color>" : string.Empty;
-            GUILayout.Label(new GUIContent(marks, marks.Length > 0 ? UiTexts.Build.EvolvesTip : null), UiTheme.SmallLine, GUILayout.Width(18f));
-            GUILayout.Space(16f + 9f * linkCount);
-            GUILayout.EndHorizontal();
-
-            Rect rowRect = GUILayoutUtility.GetLastRect();
-            if (Event.current.type == EventType.Repaint)
-            {
-                while (_rowRects.Count <= index) _rowRects.Add(Rect.zero);
-                _rowRects[index] = rowRect;
-            }
-
-            _drag.Target(rowRect, d => AcceptsOnRow(d, index), d => DropOnRow(d, index));
+            var limits = new List<string>();
+            for (int tier = 0; tier <= 3; tier++)
+                limits.Add(UiTexts.Build.Limit(DifficultyText.Symbol(tier), _session.DifficultyBonus.MaxCells(tier)));
+            return UiTexts.Build.BoardRule(string.Join(", ", limits), Board.Config.CoreBonusPercent, QueueConfig.RuleText);
         }
 
-        private bool AcceptsOnRow(DragItem d, int row)
+        private void DrawGrid(Rect grid, float size)
         {
+            Event e = Event.current;
+            CircuitGrid.DrawBackground(grid, size, Board.Width, Board.Height);
+
+            // Leiterbahnen: Relais → berührte Komponenten (türkis versorgt, orange zu gross), Kern → berührte Komponenten (violett).
+            foreach (RelayChip relay in Board.Relays)
+            {
+                Rect from = CircuitGrid.RectOf(grid, size, relay.Rect);
+                int max = _session.RelayMaxCells(relay);
+                foreach (ComponentSlot c in Board.ComponentsTouching(relay))
+                    CircuitGrid.DrawTrace(from, CircuitGrid.RectOf(grid, size, c.Rect), c.Cells <= max ? CircuitGrid.TraceColor : CircuitGrid.TooLargeBorder);
+            }
+            Rect core = CircuitGrid.RectOf(grid, size, Board.CoreRect);
+            foreach (ComponentSlot c in Board.Components)
+                if (Board.TouchesCore(c)) CircuitGrid.DrawTrace(core, CircuitGrid.RectOf(grid, size, c.Rect), CircuitGrid.CoreColor);
+
+            int percent = Board.Config.CoreBonusPercent;
+            CircuitGrid.DrawCore(core, $"{UiTexts.Build.CoreName}\n+{percent} %", UiTexts.Build.CoreTip(percent));
+            Hover(core, UiTexts.Build.CoreTip(percent));
+
+            List<OverworldSession.TriggerLink> links = _session.TriggerLinks();
+            for (int i = 0; i < Board.Components.Count; i++) DrawComponentChip(grid, size, i, links);
+            for (int i = 0; i < Board.Relays.Count; i++) DrawRelayChip(grid, size, i, links);
+
+            // Vorschau beim Ziehen: Fussabdruck an der Maus (grün passt, rot nicht).
+            if (_drag.IsDragging && e.type == EventType.Repaint
+                && CircuitGrid.CellAt(grid, size, Board.Width, Board.Height, e.mousePosition, out Cell over)
+                && Footprint(_drag.Dragging.Value, over, out CellRect footprint, out bool fits))
+            {
+                Rect r = CircuitGrid.RectOf(grid, size, footprint);
+                Color c = fits ? UiTheme.Good : UiTheme.Bad;
+                UiTheme.Fill(r, new Color(c.r, c.g, c.b, 0.25f));
+                UiTheme.Outline(r, c, 2f);
+            }
+
+            // Ziele: jede Zelle.
+            for (int y = 0; y < Board.Height; y++)
+                for (int x = 0; x < Board.Width; x++)
+                {
+                    var cell = new Cell(x, y);
+                    _drag.Target(CircuitGrid.SlotOf(grid, size, x, y), d => AcceptsAt(d, cell), d => DropAt(d, cell));
+                }
+
+            // Freie Zellen: Hinweis beim Überfahren.
+            if (e.type == EventType.Repaint && CircuitGrid.CellAt(grid, size, Board.Width, Board.Height, e.mousePosition, out Cell hovered)
+                && Board.At(hovered) == null && !Board.IsCore(hovered))
+                _hoverNext = UiTexts.Build.EmptyCellTip;
+        }
+
+        private void DrawComponentChip(Rect grid, float size, int index, List<OverworldSession.TriggerLink> links)
+        {
+            ComponentSlot c = Board.Components[index];
+            Rect rect = CircuitGrid.RectOf(grid, size, c.Rect);
+            _infos.TryGetValue(c, out SkillInfo info);
+            string name = ComponentName(c);
+            bool focus = c == _selected || c == _hoverPart;
+
+            var marks = new List<string>();
+            if (Board.TouchesCore(c)) marks.Add($"<color=#b18cff>+{Board.Config.CoreBonusPercent} %</color>");
+            if (c.Skill.Modules.Count > 0) marks.Add($"<color=#ffd75e>◆{c.Skill.Modules.Count}</color>");
+            foreach (OverworldSession.TriggerLink link in links)
+                if (!link.FromBlock && link.From == index) marks.Add($"<color=#ffae42>{UiTexts.Build.TriggersTo(link.To + 1)}</color>");
+            if (_session.IsEvolutionReady(c.Skill)) marks.Add("<color=#d29bff>✦</color>");
+
+            string cast = info != null ? SkillInfo.Seconds(info.WindupTicks) : "?";
+            string text = $"<b>#{index + 1} {name}</b>\n{c.Shape} · {cast}\n<color={StateHex(c)}>{StateShort(c)}</color>";
+            if (marks.Count > 0) text += "\n" + string.Join(" ", marks);
+            Color fill = focus ? Color.Lerp(CircuitGrid.ComponentColor, UiTheme.CellHover, 0.8f) : CircuitGrid.ComponentColor;
+            Color border = c == _selected ? SelectedColor : StateColor(c);
+            CircuitGrid.DrawChip(rect, fill, border, focus ? 3f : 2f, text, ComponentTip(c, index, info), size < 60f ? CircuitGrid.Tiny : CircuitGrid.Label);
+
+            // Gepackte Zelle merken, damit die Komponente beim Verschieben unter der Maus bleibt.
+            Event e = Event.current;
+            if (e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition)
+                && CircuitGrid.CellAt(grid, size, Board.Width, Board.Height, e.mousePosition, out Cell grabbed))
+            {
+                _grabX = grabbed.X - c.Origin.X;
+                _grabY = grabbed.Y - c.Origin.Y;
+            }
+            _drag.Source(rect, new DragItem(DragKind.Component, index, $"#{index + 1} {name}"),
+                click: () => _selected = c, shortcut: () => _session.RotateComponent(Board.IndexOf(c)));
+            Hover(rect, $"<b>#{index + 1} {name}</b>: {ShortStats(info)} · <color={StateHex(c)}>{StateLong(c)}</color>", c);
+        }
+
+        private void DrawRelayChip(Rect grid, float size, int index, List<OverworldSession.TriggerLink> links)
+        {
+            RelayChip relay = Board.Relays[index];
+            Rect rect = CircuitGrid.RectOf(grid, size, relay.Rect);
+            bool focus = relay == _selected || relay == _hoverPart;
+            int max = _session.RelayMaxCells(relay);
+            int difficulty = _session.RelayDifficulty(relay);
+
+            string text = $"{RuneText.Difficulty(difficulty)}\n<b>{relay.Name}</b>\n<color=#9aa4b2>{UiTexts.Build.MaxCells(max)}</color>";
+            var marks = new List<string>();
+            if (relay.Modules.Count > 0) marks.Add($"<color=#ffd75e>◆{relay.Modules.Count}</color>");
+            foreach (OverworldSession.TriggerLink link in links)
+                if (link.FromBlock && link.From == index) marks.Add($"<color=#45e6f2>{UiTexts.Build.TriggersTo(link.To + 1)}</color>");
+            if (_session.IsEvolutionReady(relay)) marks.Add("<color=#d29bff>✦</color>");
+            if (marks.Count > 0) text += " " + string.Join(" ", marks);
+
+            Color fill = focus ? Color.Lerp(CircuitGrid.RelayColor, CircuitGrid.RelayLit, 0.25f) : CircuitGrid.RelayColor;
+            Color border = relay == _selected ? SelectedColor : CircuitGrid.RelayLit;
+            CircuitGrid.DrawChip(rect, fill, border, focus ? 3f : 1f, text, RelayTip(relay, index), size < 60f ? CircuitGrid.Tiny : CircuitGrid.Label);
+
+            _drag.Source(rect, new DragItem(DragKind.Relay, index, relay.Name),
+                click: () => _selected = relay, shortcut: () => _session.UnequipRune(Board.IndexOf(relay)));
+            Hover(rect, $"<b>{relay.Name}</b>: {relay.Description} · {UiTexts.Build.RelayLimit(max)} · {PowersText(relay)}", relay);
+        }
+
+        // ------------------------------------------------------------------ Drag & Drop auf die Platine
+
+        /// <summary>Wo das Gezogene landen würde, wenn es über <paramref name="cell"/> losgelassen wird.</summary>
+        private bool Footprint(DragItem d, Cell cell, out CellRect rect, out bool fits)
+        {
+            rect = default;
+            fits = false;
             switch (d.Kind)
             {
-                case DragKind.Skill: return _session.Skills.Get(d.A) != null && _session.Skills.Get(d.A) != RowSkill(row);
-                case DragKind.BasicAttack: return RowSkill(row)?.IsBasicAttack != true;
-                case DragKind.RowSkill: return d.A != row;
-                case DragKind.Row: return d.A != row;
-                case DragKind.Rune: return true;
-                default: return false;
+                case DragKind.Skill:
+                {
+                    SkillInstance skill = _session.Skills.Get(d.A);
+                    if (skill == null) return false;
+                    bool rotated = PlacementFor(skill, cell, out bool ok);
+                    rect = new CellRect(cell, Board.ShapeOfSkill(skill.SkillId).Turned(rotated));
+                    fits = ok;
+                    return true;
+                }
+                case DragKind.Component:
+                {
+                    if (d.A < 0 || d.A >= Board.Components.Count) return false;
+                    ComponentSlot c = Board.Components[d.A];
+                    Cell origin = GrabOrigin(cell);
+                    bool rotated = MoveFor(c, origin, out bool ok);
+                    rect = new CellRect(origin, c.BaseShape.Turned(rotated));
+                    fits = ok;
+                    return true;
+                }
+                case DragKind.Relay:
+                case DragKind.Rune:
+                    rect = new CellRect(cell, Shape.One);
+                    fits = AcceptsAt(d, cell);
+                    return true;
+                default:
+                    return false;
             }
         }
 
-        private void DropOnRow(DragItem d, int row)
+        private Cell GrabOrigin(Cell cell) => new Cell(cell.X - _grabX, cell.Y - _grabY);
+
+        /// <summary>Drehung für einen Skill an dieser Zelle: die gewünschte, sonst die andere, wenn nur sie passt.</summary>
+        private bool PlacementFor(SkillInstance skill, Cell at, out bool ok)
+        {
+            bool wanted = _dragRotated;
+            if (_session.CanPlaceSkill(skill.InstanceId, at, wanted))
+            {
+                ok = true;
+                return wanted;
+            }
+            ok = _session.CanPlaceSkill(skill.InstanceId, at, !wanted);
+            return ok ? !wanted : wanted;
+        }
+
+        /// <summary>Drehung für eine verschobene Komponente: die bisherige (mit R umgedreht), sonst die andere, wenn nur sie passt.</summary>
+        private bool MoveFor(ComponentSlot c, Cell origin, out bool ok)
+        {
+            bool wanted = c.Rotated ^ _dragRotated;
+            if (!_session.CanEditSkills)
+            {
+                ok = false;
+                return wanted;
+            }
+            if (Board.CanPlace(c.Skill.SkillId, origin, wanted, c))
+            {
+                ok = true;
+                return wanted;
+            }
+            ok = Board.CanPlace(c.Skill.SkillId, origin, !wanted, c);
+            return ok ? !wanted : wanted;
+        }
+
+        private IModuleHolder HolderAt(Cell cell)
+        {
+            object part = Board.At(cell);
+            if (part is RelayChip relay) return relay;
+            if (part is ComponentSlot c) return c.Skill;
+            return null;
+        }
+
+        private bool AcceptsAt(DragItem d, Cell cell)
         {
             switch (d.Kind)
             {
                 case DragKind.Skill:
+                {
                     SkillInstance skill = _session.Skills.Get(d.A);
-                    int from = skill?.Holder is RuneSlot slot ? _session.Runes.IndexOfRow(slot) : -1;
-                    if (from >= 0) _session.SwapSkills(from, row);
-                    else _session.PlaceSkill(d.A, row);
-                    break;
-                case DragKind.BasicAttack: _session.PlaceBasicAttack(row); break;
-                case DragKind.RowSkill: _session.SwapSkills(d.A, row); break;
-                case DragKind.Row: _session.MoveRow(d.A, row); break;
-                case DragKind.Rune: _session.SwapRune(row, d.A); break;
+                    if (skill == null) return false;
+                    PlacementFor(skill, cell, out bool ok);
+                    return ok;
+                }
+                case DragKind.Component:
+                {
+                    if (d.A < 0 || d.A >= Board.Components.Count) return false;
+                    MoveFor(Board.Components[d.A], GrabOrigin(cell), out bool ok);
+                    return ok;
+                }
+                case DragKind.Relay:
+                    return d.A >= 0 && d.A < Board.Relays.Count && !Board.IsCore(cell)
+                        && Board.IsFree(new CellRect(cell, Shape.One), Board.Relays[d.A]);
+                case DragKind.Rune:
+                    if (d.A < 0 || d.A >= _session.RuneInventory.Count || Board.IsCore(cell)) return false;
+                    return Board.At(cell) is RelayChip || Board.IsFree(new CellRect(cell, Shape.One));
+                case DragKind.Module:
+                {
+                    IModuleHolder holder = HolderAt(cell);
+                    return holder != null && _session.CanPlaceModule(_session.Modules.Get(d.A), holder);
+                }
+                default:
+                    return false;
             }
         }
 
-        private void DrawFreeSlot(int index)
+        private void DropAt(DragItem d, Cell cell)
         {
-            GUILayout.Box(UiTexts.Build.FreeSlot(index + 1), UiTheme.EmptyCell, GUILayout.Height(RowHeight));
-            Rect r = GUILayoutUtility.GetLastRect();
-            _drag.Target(r, d => d.Kind == DragKind.Rune && !_session.Runes.IsFull, d => _session.EquipRuneFromInventory(d.A, index));
+            switch (d.Kind)
+            {
+                case DragKind.Skill:
+                {
+                    SkillInstance skill = _session.Skills.Get(d.A);
+                    if (skill == null) return;
+                    bool rotated = PlacementFor(skill, cell, out bool ok);
+                    if (ok && _session.PlaceSkill(d.A, cell, rotated)) _selected = Board.ComponentOf(skill);
+                    break;
+                }
+                case DragKind.Component:
+                {
+                    if (d.A < 0 || d.A >= Board.Components.Count) return;
+                    ComponentSlot c = Board.Components[d.A];
+                    Cell origin = GrabOrigin(cell);
+                    bool rotated = MoveFor(c, origin, out bool ok);
+                    if (ok && _session.MoveComponent(d.A, origin, rotated)) _selected = c;
+                    break;
+                }
+                case DragKind.Relay:
+                    if (d.A >= 0 && d.A < Board.Relays.Count)
+                    {
+                        RelayChip relay = Board.Relays[d.A];
+                        if (_session.MoveRelay(d.A, cell)) _selected = relay;
+                    }
+                    break;
+                case DragKind.Rune:
+                    if (Board.At(cell) is RelayChip target) _session.SwapRune(Board.IndexOf(target), d.A);
+                    else _session.EquipRuneFromInventory(d.A, cell);
+                    break;
+                case DragKind.Module:
+                    object part = Board.At(cell);
+                    if (part is RelayChip r) _session.PlaceModuleOnRelay(d.A, Board.IndexOf(r));
+                    else if (part is ComponentSlot comp) _session.PlaceModuleOnSkill(d.A, comp.Skill.InstanceId);
+                    break;
+            }
         }
 
-        /// <summary>Modul-Plätze eines Bausteins oder Skills: ◆ besetzt (ziehbar, Auslöser: Klick wählt das Ziel), ◇ frei (Ziel).</summary>
-        private void DrawModuleSlots(IModuleHolder holder, int row)
+        // ------------------------------------------------------------------ Liste der Teile (unter dem Raster)
+
+        private void DrawComponentList()
+        {
+            GUILayout.Label(UiTexts.Build.ComponentsTitle, UiTheme.Text);
+            if (Board.Components.Count == 0) GUILayout.Label($"<color=#888888>{UiTexts.Build.NoComponents}</color>", UiTheme.Small);
+            for (int i = 0; i < Board.Components.Count; i++)
+            {
+                ComponentSlot c = Board.Components[i];
+                _infos.TryGetValue(c, out SkillInfo info);
+                bool focus = c == _selected || c == _hoverPart;
+                GUILayout.BeginHorizontal(focus ? UiTheme.CellSelected : UiTheme.Cell, GUILayout.MinHeight(LineHeight));
+
+                string name = ComponentName(c);
+                string core = Board.TouchesCore(c) ? $"  <color=#b18cff>{UiTexts.Build.CoreBonus(Board.Config.CoreBonusPercent)}</color>" : string.Empty;
+                string evolves = _session.IsEvolutionReady(c.Skill) ? " <color=#d29bff>✦</color>" : string.Empty;
+                string text = $"<b>#{i + 1} {name}</b>{evolves}  <color=#ffd75e>{ShortStats(info)}</color>\n"
+                    + $"<color={StateHex(c)}>{StateLong(c)}</color>{core}";
+                GUILayout.Label(new GUIContent(text, ComponentTip(c, i, info)), UiTheme.Small, GUILayout.MinWidth(200f));
+                Rect line = GUILayoutUtility.GetLastRect();
+                int index = i;
+                if (Event.current.type == EventType.MouseDown && line.Contains(Event.current.mousePosition)) _grabX = _grabY = 0;
+                _drag.Source(line, new DragItem(DragKind.Component, index, $"#{index + 1} {name}"),
+                    click: () => _selected = c, shortcut: () => _session.RotateComponent(Board.IndexOf(c)));
+                Hover(line, $"<b>#{i + 1} {name}</b>: {info?.TimingText}", c);
+
+                DrawModuleSlots(c.Skill, id => _session.PlaceModuleOnSkill(id, c.Skill.InstanceId));
+                GUILayout.EndHorizontal();
+            }
+        }
+
+        private void DrawRelayList()
+        {
+            GUILayout.Space(4f);
+            GUILayout.Label(UiTexts.Build.RelaysTitle, UiTheme.Text);
+            if (Board.Relays.Count == 0) GUILayout.Label($"<color=#888888>{UiTexts.Build.NoRelays}</color>", UiTheme.Small);
+            for (int i = 0; i < Board.Relays.Count; i++)
+            {
+                RelayChip relay = Board.Relays[i];
+                bool focus = relay == _selected || relay == _hoverPart;
+                GUILayout.BeginHorizontal(focus ? UiTheme.CellSelected : UiTheme.Cell, GUILayout.MinHeight(LineHeight));
+
+                int difficulty = _session.RelayDifficulty(relay);
+                string growth = relay.Growth > 0 ? $" <color=#b5e48c>+{relay.Growth}</color>" : string.Empty;
+                string evolves = _session.IsEvolutionReady(relay) ? " <color=#d29bff>✦</color>" : string.Empty;
+                string text = $"{RuneText.Difficulty(difficulty)} <b>{ArenaTexts.RelayName(i, relay.Name)}</b>{RuneText.LevelBadge(relay.Rune, relay.Level)}{growth}{evolves}\n"
+                    + $"<color=#9aa4b2>{UiTexts.Build.RelayLimit(_session.RelayMaxCells(relay))} · {PowersText(relay)}</color>";
+                GUILayout.Label(new GUIContent(text, RelayTip(relay, i)), UiTheme.Small, GUILayout.MinWidth(200f));
+                Rect line = GUILayoutUtility.GetLastRect();
+                int index = i;
+                _drag.Source(line, new DragItem(DragKind.Relay, index, relay.Name),
+                    click: () => _selected = relay, shortcut: () => _session.UnequipRune(Board.IndexOf(relay)));
+                Hover(line, $"<b>{relay.Name}</b>: {relay.Description} {relay.Rune.LevelText(relay.Level)} · {DifficultyText.Tooltip(difficulty)}", relay);
+
+                DrawModuleSlots(relay, id => _session.PlaceModuleOnRelay(id, Board.IndexOf(relay)));
+                GUILayout.EndHorizontal();
+
+                // Rune aus dem Inventar auf die Zeile = Rune tauschen (nur beim Ziehen einer Rune, sonst würde es die ◇-Ziele abdecken).
+                if (_drag.IsDragging && _drag.Dragging.Value.Kind == DragKind.Rune)
+                    _drag.Target(GUILayoutUtility.GetLastRect(), d => d.Kind == DragKind.Rune, d => _session.SwapRune(index, d.A));
+            }
+        }
+
+        /// <summary>Modul-Plätze eines Relais oder einer Komponente: ◆ besetzt (ziehbar, Auslöser: Klick wählt das Ziel), ◇ frei (Ziel).</summary>
+        private void DrawModuleSlots(IModuleHolder holder, System.Action<int> place)
         {
             foreach (ModuleInstance m in holder.Modules)
             {
@@ -314,7 +609,7 @@ namespace Betaknight.Overworld.UI
                 bool trigger = m.ModuleId == ModuleIds.Trigger;
                 if (trigger) chip.tooltip = chip.tooltip + UiTexts.Build.TriggerClick;
                 chip.text = $"<color=#ffd75e>◆</color>{Shorten(chip.text, trigger ? 14 : 9)}";
-                GUILayout.Label(chip, UiTheme.SmallLine, GUILayout.Width(trigger ? 112f : 76f), GUILayout.Height(RowHeight - 6f));
+                GUILayout.Label(chip, UiTheme.SmallLine, GUILayout.Width(trigger ? 112f : 76f), GUILayout.Height(LineHeight - 8f));
                 Rect r = GUILayoutUtility.GetLastRect();
                 int id = m.InstanceId;
                 _drag.Source(r, new DragItem(DragKind.Module, id, m.NameFrom(_session.ModuleCatalog)),
@@ -325,43 +620,14 @@ namespace Betaknight.Overworld.UI
 
             for (int i = holder.Modules.Count; i < holder.ModuleSlots; i++)
             {
-                string tip = holder is RuneSlot ? UiTexts.Build.FreeRuneModuleSlot : UiTexts.Build.FreeSkillModuleSlot;
-                GUILayout.Label(new GUIContent("<color=#666c78>◇</color>", tip), UiTheme.SmallLine, GUILayout.Width(20f), GUILayout.Height(RowHeight - 6f));
+                string tip = holder is RelayChip ? UiTexts.Build.FreeRuneModuleSlot : UiTexts.Build.FreeSkillModuleSlot;
+                GUILayout.Label(new GUIContent("<color=#666c78>◇</color>", tip), UiTheme.SmallLine, GUILayout.Width(20f), GUILayout.Height(LineHeight - 8f));
                 Rect r = GUILayoutUtility.GetLastRect();
-                _drag.Target(r, d => d.Kind == DragKind.Module && _session.CanPlaceModule(_session.Modules.Get(d.A), holder), d => PlaceModule(d.A, holder, row));
+                _drag.Target(r, d => d.Kind == DragKind.Module && _session.CanPlaceModule(_session.Modules.Get(d.A), holder), d => place(d.A));
             }
         }
 
-        private void PlaceModule(int moduleId, IModuleHolder holder, int row)
-        {
-            if (holder is RuneSlot) _session.PlaceModuleOnRow(moduleId, row);
-            else if (holder is SkillInstance skill) _session.PlaceModuleOnSkill(moduleId, skill.InstanceId);
-        }
-
-        /// <summary>Auslöser als Linien rechts an den Zeilen (orange vom Skill, türkis vom Baustein), jede auf eigener Spur.</summary>
-        private void DrawTriggerLinks(List<OverworldSession.TriggerLink> links, int rowCount)
-        {
-            if (Event.current.type != EventType.Repaint || _rowRects.Count < rowCount) return;
-            for (int k = 0; k < links.Count; k++)
-            {
-                OverworldSession.TriggerLink link = links[k];
-                if (link.From >= rowCount || link.To >= rowCount) continue;
-                Rect from = _rowRects[link.From];
-                Rect to = _rowRects[link.To];
-                float lane = from.xMax - 8f - 9f * k;
-                float start = lane - 12f;
-                float y1 = from.y + from.height * (link.FromBlock ? 0.3f : 0.6f);
-                float y2 = to.y + to.height * 0.8f;
-                if (link.From == link.To) y2 = from.y + from.height * 0.85f;
-                Color color = link.FromBlock ? new Color(0.45f, 0.9f, 0.95f, 1f) : new Color(1f, 0.65f, 0.25f, 1f);
-                UiTheme.Fill(new Rect(start, y1 - 1f, lane - start + 2f, 2f), color);
-                UiTheme.Fill(new Rect(lane, Mathf.Min(y1, y2), 2f, Mathf.Abs(y2 - y1)), color);
-                UiTheme.Fill(new Rect(start, y2 - 1f, lane - start + 2f, 2f), color);
-                UiTheme.Fill(new Rect(start - 4f, y2 - 3f, 4f, 6f), color);
-            }
-        }
-
-        // ------------------------------------------------------------------ Module, Runen, Rezeptbuch
+        // ------------------------------------------------------------------ Module, Chips, Rezeptbuch
 
         private void DrawRightColumn(float height)
         {
@@ -410,7 +676,7 @@ namespace Betaknight.Overworld.UI
             _drag.Target(column, d => d.Kind == DragKind.Module && _session.Modules.Get(d.A)?.IsFree == false, d => _session.TakeOffModule(d.A));
         }
 
-        /// <summary>Kurzweg: eingesetztes Modul abnehmen, freies auf den ersten passenden freien Platz (Baustein vor Skill, oben zuerst).</summary>
+        /// <summary>Kurzweg: eingesetztes Modul abnehmen, freies auf den ersten passenden freien Platz (Relais vor Komponenten, Lesereihenfolge).</summary>
         private void ModuleShortcut(int moduleId)
         {
             ModuleInstance m = _session.Modules.Get(moduleId);
@@ -420,13 +686,10 @@ namespace Betaknight.Overworld.UI
                 _session.TakeOffModule(moduleId);
                 return;
             }
-            IReadOnlyList<RuneSlot> rows = _session.Runes.Rows;
-            for (int i = 0; i < rows.Count; i++)
-            {
-                if (_session.CanPlaceModule(m, rows[i])) { _session.PlaceModuleOnRow(moduleId, i); return; }
-                SkillInstance skill = rows[i].Skill;
-                if (skill != null && !skill.IsBasicAttack && _session.CanPlaceModule(m, skill)) { _session.PlaceModuleOnSkill(moduleId, skill.InstanceId); return; }
-            }
+            for (int i = 0; i < Board.Relays.Count; i++)
+                if (_session.CanPlaceModule(m, Board.Relays[i])) { _session.PlaceModuleOnRelay(moduleId, i); return; }
+            foreach (ComponentSlot c in Board.Components)
+                if (_session.CanPlaceModule(m, c.Skill)) { _session.PlaceModuleOnSkill(moduleId, c.Skill.InstanceId); return; }
         }
 
         private void DrawRuneColumn(float height)
@@ -440,8 +703,9 @@ namespace Betaknight.Overworld.UI
             {
                 StoredRune rune = stored[i];
                 string growth = rune.Growth > 0 ? $" <color=#b5e48c>+{rune.Growth}</color>" : string.Empty;
-                GUILayout.Box(new GUIContent($"{RuneText.Difficulty(rune.Rune.Difficulty)} <b>{rune.Name}</b>{RuneText.LevelBadge(rune.Rune, rune.Level)}{growth}",
-                    $"{rune.Description}\n{RuneText.DifficultyTip(rune.Rune)}"), UiTheme.Cell, GUILayout.Height(26f));
+                int max = _session.DifficultyBonus.MaxCells(rune.Rune.Difficulty);
+                GUILayout.Box(new GUIContent($"{RuneText.Difficulty(rune.Rune.Difficulty)} <b>{rune.Name}</b>{RuneText.LevelBadge(rune.Rune, rune.Level)}{growth}  <color=#9aa4b2>{UiTexts.Build.MaxCells(max)}</color>",
+                    $"{rune.Description}\n{RuneText.DifficultyTip(rune.Rune)}\n{UiTexts.Build.RelayLimit(max)}\n{UiTexts.Build.RuneDropHint}"), UiTheme.Cell, GUILayout.Height(26f));
                 Rect r = GUILayoutUtility.GetLastRect();
                 int index = i;
                 _drag.Source(r, new DragItem(DragKind.Rune, index, rune.Name), shortcut: () => _session.EquipRuneFromInventory(index));
@@ -451,7 +715,7 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndVertical();
 
             Rect column = GUILayoutUtility.GetLastRect();
-            _drag.Target(column, d => d.Kind == DragKind.RowRune && !_session.RuneInventory.IsFull, d => _session.UnequipRune(d.A));
+            _drag.Target(column, d => d.Kind == DragKind.Relay && !_session.RuneInventory.IsFull, d => _session.UnequipRune(d.A));
         }
 
         /// <summary>Rezeptbuch: Duos und Evolutionen, unentdeckte als Silhouette «???» mit Hinweis, entdeckte mit Rezept.</summary>
@@ -481,23 +745,62 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndVertical();
         }
 
-        // ------------------------------------------------------------------ Texte
+        // ------------------------------------------------------------------ Zustand und Texte
 
-        private SkillInstance RowSkill(int row) => row >= 0 && row < _session.Runes.Rows.Count ? _session.Runes.Rows[row].Skill : null;
+        private string ComponentName(ComponentSlot c) => c.Skill.NameFrom(_session.SkillCatalog);
 
-        /// <summary>Kurzwerte für eine Zeile: erste Wirkung und Cooldown, z. B. «120 % ≈ 4 · CD 4 s».</summary>
+        private Color StateColor(ComponentSlot c) =>
+            _session.IsPowered(c) ? CircuitGrid.PoweredBorder : _session.IsTooLarge(c) ? CircuitGrid.TooLargeBorder : CircuitGrid.UnpoweredBorder;
+
+        private string StateHex(ComponentSlot c) => UiTheme.Hex(StateColor(c));
+
+        /// <summary>Kurz für den Chip: «✔ ◆» (versorgt, Schwierigkeit), «✖ too large» oder «✖ not powered».</summary>
+        private string StateShort(ComponentSlot c)
+        {
+            if (_session.IsPowered(c)) return $"✔ {DifficultyText.Symbol(_session.ComponentDifficulty(c))}";
+            return _session.IsTooLarge(c) ? $"✖ {UiTexts.Arena.StateTooLarge}" : $"✖ {UiTexts.NotPowered}";
+        }
+
+        /// <summary>«powered by Relay 1 (On Hit), Relay 2 (Clock 2 s)», «not powered (too large)» oder «not powered».</summary>
+        private string StateLong(ComponentSlot c)
+        {
+            List<RelayChip> powering = _session.PoweringRelays(c);
+            if (powering.Count > 0)
+                return UiTexts.Build.PoweredBy(string.Join(", ", powering.Select(r => ArenaTexts.RelayName(Board.IndexOf(r), r.Name))));
+            return _session.IsTooLarge(c) ? UiTexts.NotPoweredTooLarge : UiTexts.NotPowered;
+        }
+
+        /// <summary>«powers #1, #2 · too large here: #3» oder der Hinweis, dass es nichts versorgt.</summary>
+        private string PowersText(RelayChip relay)
+        {
+            int max = _session.RelayMaxCells(relay);
+            IReadOnlyList<ComponentSlot> touching = Board.ComponentsTouching(relay);
+            List<string> powered = touching.Where(c => c.Cells <= max).Select(c => $"#{Board.IndexOf(c) + 1}").ToList();
+            List<string> large = touching.Where(c => c.Cells > max).Select(c => $"#{Board.IndexOf(c) + 1}").ToList();
+            var parts = new List<string> { powered.Count > 0 ? UiTexts.Build.Powers(string.Join(", ", powered)) : UiTexts.Build.PowersNothing };
+            if (large.Count > 0) parts.Add($"<color={UiTheme.Hex(CircuitGrid.TooLargeBorder)}>{UiTexts.Build.TooLargeHere(string.Join(", ", large))}</color>");
+            return string.Join(" · ", parts);
+        }
+
+        /// <summary>Erste Wirkung, z. B. «60 % ≈ 6».</summary>
+        private static string Effect(SkillInfo info)
+        {
+            if (info == null) return string.Empty;
+            return info.Effects.Count > 0 ? info.Effects[0].Text : UiTexts.Build.NoEffect;
+        }
+
+        /// <summary>Kurzwerte: Form, erste Wirkung und Cast-Zeit, z. B. «2×1 · 150 % ≈ 15 · Cast 0.8 s».</summary>
         private static string ShortStats(SkillInfo info)
         {
             if (info == null) return string.Empty;
-            string effect = info.Effects.Count > 0 ? info.Effects[0].Text : UiTexts.Build.NoEffect;
-            string cd = info.Skill.IsBasicAttack ? string.Empty : info.CooldownTicks > 0 ? UiTexts.Build.Cooldown(SkillInfo.Seconds(info.CooldownTicks)) : UiTexts.Build.NoCooldown;
-            return effect + cd;
+            return $"{info.Skill.Shape} · {Effect(info)} · {info.CastText}";
         }
 
-        private string SkillTip(SkillInstance skill, SkillInfo info)
+        private string SkillTip(SkillInstance skill, SkillInfo info, ComponentSlot slot)
         {
             var lines = new List<string>();
             if (info != null) lines.Add(info.Details);
+            if (slot != null) lines.Add($"<color={StateHex(slot)}>{UiTexts.OnBoard(Board.IndexOf(slot) + 1)}: {StateLong(slot)}</color>");
             GrowthRule rule = _session.SkillGrowthRule(skill);
             if (rule != null)
             {
@@ -509,21 +812,50 @@ namespace Betaknight.Overworld.UI
             return string.Join("\n", lines);
         }
 
-        private string RowTip(RuneSlot row)
+        private string ComponentTip(ComponentSlot c, int index, SkillInfo info)
         {
-            var lines = new List<string> { $"{row.Name}: {row.Description}" };
-            string level = row.Rune.LevelText(row.Level);
-            if (level.Length > 0) lines.Add(level);
-            GrowthRule rule = _session.RowGrowthRule(row);
+            var lines = new List<string>();
+            if (info != null) lines.Add(info.Details);
+            lines.Add($"<color={StateHex(c)}>{StateLong(c)}</color>");
+            if (_session.IsTooLarge(c))
+            {
+                int limit = Board.RelaysTouching(c).Select(r => _session.RelayMaxCells(r)).DefaultIfEmpty(0).Max();
+                lines.Add(UiTexts.Build.TooLargeTip(c.Cells, limit));
+            }
+            else if (!_session.IsPowered(c))
+            {
+                lines.Add(UiTexts.Build.NotPoweredTip);
+            }
+            if (Board.TouchesCore(c)) lines.Add($"<color=#b18cff>{UiTexts.Build.CoreTip(Board.Config.CoreBonusPercent)}</color>");
+            GrowthRule rule = _session.SkillGrowthRule(c.Skill);
             if (rule != null)
             {
-                string effect = _session.GrowthEffectText(rule, row.Growth, row);
-                lines.Add(UiTexts.Build.GrowsRow(rule.Text, effect, _session.MilestoneText(row.Growth, false)));
+                string effect = _session.GrowthEffectText(rule, c.Skill.Growth);
+                lines.Add(UiTexts.Build.GrowsNow(rule.Text, effect, _session.MilestoneText(c.Skill.Growth, true)));
             }
-            lines.Add(RuneText.DifficultyTip(row.Rune, _session.RowDifficulty(row) != row.Rune.Difficulty));
-            lines.Add(UiTexts.Build.ModuleSlots(row.Modules.Count, row.ModuleSlots));
-            lines.AddRange(_session.EvolutionProgressFor(row));
-            lines.Add(UiTexts.Build.RowDragHint);
+            lines.Add(UiTexts.Build.ModuleSlots(c.Skill.Modules.Count, c.Skill.ModuleSlots));
+            lines.AddRange(_session.EvolutionProgressFor(c.Skill));
+            lines.Add(UiTexts.Build.ComponentDragHint);
+            return string.Join("\n", lines);
+        }
+
+        private string RelayTip(RelayChip relay, int index)
+        {
+            var lines = new List<string> { $"{ArenaTexts.RelayName(index, relay.Name)}: {relay.Description}" };
+            string level = relay.Rune.LevelText(relay.Level);
+            if (level.Length > 0) lines.Add(level);
+            GrowthRule rule = _session.RelayGrowthRule(relay);
+            if (rule != null)
+            {
+                string effect = _session.GrowthEffectText(rule, relay.Growth, relay);
+                lines.Add(UiTexts.Build.GrowsRelay(rule.Text, effect, _session.MilestoneText(relay.Growth, false)));
+            }
+            lines.Add(RuneText.DifficultyTip(relay.Rune, _session.RelayDifficulty(relay) != relay.Rune.Difficulty));
+            lines.Add(UiTexts.Build.RelayLimit(_session.RelayMaxCells(relay)));
+            lines.Add(PowersText(relay));
+            lines.Add(UiTexts.Build.ModuleSlots(relay.Modules.Count, relay.ModuleSlots));
+            lines.AddRange(_session.EvolutionProgressFor(relay));
+            lines.Add(UiTexts.Build.RelayDragHint);
             return string.Join("\n", lines);
         }
 

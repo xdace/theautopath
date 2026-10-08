@@ -21,7 +21,7 @@ namespace Betaknight.Overworld.UI
         private GUIStyle _textStyle;
         private GUIStyle _messageStyle;
 
-        /// <param name="keepMessages">Beim Akt-Wechsel bleiben die letzten Meldungen stehen (z. B. «Tafel 4 → 5 Zeilen»).</param>
+        /// <param name="keepMessages">Beim Akt-Wechsel bleiben die letzten Meldungen stehen (z. B. «Board 4×3 → 4×4»).</param>
         public void Initialize(OverworldSession session, bool keepMessages = false)
         {
             Unsubscribe();

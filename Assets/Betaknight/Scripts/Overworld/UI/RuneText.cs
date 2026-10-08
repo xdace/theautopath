@@ -15,7 +15,7 @@ namespace Betaknight.Overworld.UI
         public static string Difficulty(int tier) =>
             $"<color={DifficultyColors[DifficultyBonusConfig.Clamp(tier)]}>{DifficultyText.Symbol(tier)}</color>";
 
-        /// <summary>«Schwierigkeit ◆◆ Schwer: −30 % Cooldown, +25 % Wirkung» (mit Umkehrung, wenn sie eine andere Stufe hat).</summary>
+        /// <summary>«Difficulty ◆◆ Hard: +30 % power, −20 % Cast Time · powers up to 4 cells» (mit Umkehrung, wenn sie eine andere Stufe hat).</summary>
         public static string DifficultyTip(RuneDefinition rune, bool inverted = false)
         {
             if (rune == null) return string.Empty;

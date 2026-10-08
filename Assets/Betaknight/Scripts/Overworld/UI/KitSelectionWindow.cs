@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Betaknight.Core.Arena;
 using Betaknight.Core.Run;
 using Betaknight.Core.Runes;
 using UnityEngine;
@@ -9,6 +10,8 @@ namespace Betaknight.Overworld.UI
     /// <summary>Startbildschirm eines Runs: der Spieler wählt sein Ritter-Kit.</summary>
     public sealed class KitSelectionWindow : MonoBehaviour
     {
+        private static readonly SkillCatalog Skills = SkillCatalog.CreateDefault();
+
         private IReadOnlyList<KnightKit> _kits;
         private RuneCatalog _runes;
         private Action<KnightKit> _onChosen;
@@ -57,7 +60,10 @@ namespace Betaknight.Overworld.UI
                 string rune = _runes != null && _runes.TryGet(kit.StartRuneId, out RuneDefinition r)
                     ? $"{r.Name}: {r.Description}"
                     : UiTexts.Kit.NoRune;
-                string label = UiTexts.Kit.Label(kit.Name, kit.Tag.DisplayName(), kit.MaxHp, kit.Gold, kit.Description, rune);
+                string skill = kit.StartSkillId != null && Skills.TryGet(kit.StartSkillId, out SkillDefinition s)
+                    ? $"{s.Name} ({s.Shape})"
+                    : UiTexts.Kit.NoSkill;
+                string label = UiTexts.Kit.Label(kit.Name, kit.Tag.DisplayName(), kit.MaxHp, kit.Gold, kit.Description, rune, skill);
 
                 if (GUILayout.Button(label, _kitStyle, GUILayout.Height(88f)))
                 {

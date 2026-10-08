@@ -27,7 +27,7 @@ namespace Betaknight.Overworld.Controllers
 
         public bool IsTravelling => _travel != null;
 
-        /// <summary>Zusätzliche Sperre von aussen, z. B. Arena oder Tafel-Editor offen.</summary>
+        /// <summary>Zusätzliche Sperre von aussen, z. B. Arena oder Build-Fenster offen.</summary>
         public System.Func<bool> InputBlocked;
 
         /// <summary>Für HUD und Debugging: das Feld unter dem Mauszeiger.</summary>

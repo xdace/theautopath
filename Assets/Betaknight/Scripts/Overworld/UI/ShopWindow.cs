@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Betaknight.Core;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
 using Betaknight.Core.Shop;
@@ -7,7 +8,7 @@ using UnityEngine;
 
 namespace Betaknight.Overworld.UI
 {
-    /// <summary>Shop-Fenster: Runen und Teile kaufen (anlegen oder ins Inventar), Inventar verkaufen, heilen, Runenplatz, neu würfeln.</summary>
+    /// <summary>Shop-Fenster: Runen und Teile kaufen (anlegen oder ins Inventar), Inventar verkaufen, heilen, Platinen-Erweiterung, neu würfeln.</summary>
     public sealed class ShopWindow : MonoBehaviour
     {
         private OverworldSession _session;
@@ -57,7 +58,7 @@ namespace Betaknight.Overworld.UI
             ShopPrices prices = _session.ShopPrices;
 
             GUILayout.Label(UiTexts.Shop.Title, _titleStyle);
-            GUILayout.Label(UiTexts.Shop.Status(_session.Stats.Gold, _session.Stats.Hp, _session.Stats.MaxHp, _session.Runes.Runes.Count, _session.Runes.Slots), _textStyle);
+            GUILayout.Label(UiTexts.Shop.Status(_session.Stats.Gold, _session.Stats.Hp, _session.Stats.MaxHp, _session.BoardSize, _session.Board.Relays.Count), _textStyle);
             GUILayout.Space(6f);
             _scroll = GUILayout.BeginScrollView(_scroll);
 
@@ -72,7 +73,7 @@ namespace Betaknight.Overworld.UI
                 string label = UiTexts.Shop.RuneLabel(RuneText.DifficultyBadge(rune), rune.Name, rune.Tag.DisplayName(), prices.Rune, rune.Description, hints);
                 if (GUILayout.Button(new GUIContent(label, RuneText.DifficultyTip(rune)), _itemStyle, GUILayout.Height(58f + 18f * (hints.Split('\n').Length - 1))))
                 {
-                    if (_session.Runes.IsFull) _runeAwaitingSlot = i;
+                    if (_session.Board.IsFull) _runeAwaitingSlot = i;
                     else _session.BuyShopRune(i);
                 }
             }
@@ -123,10 +124,11 @@ namespace Betaknight.Overworld.UI
             GUI.enabled = _session.CanBuyHeal;
             if (GUILayout.Button(UiTexts.Shop.Heal(prices.HealAmount, prices.Heal), GUILayout.Height(30f))) _session.BuyHeal();
 
-            GUI.enabled = _session.CanBuyRuneSlot;
-            string slot = _session.CanExpandBoard ? UiTexts.Shop.RuneSlot(_session.RuneSlotPrice)
-                : UiTexts.Shop.BoardFull(_session.Progression.MaxBoardRows);
-            if (GUILayout.Button(slot, GUILayout.Height(30f))) _session.BuyRuneSlot();
+            GUI.enabled = _session.CanBuyBoardExpansion;
+            string expansion = !_session.CanExpandBoard ? UiTexts.Shop.BoardMaxed(_session.MaxBoardSize)
+                : shop.Inventory.SlotSold ? UiTexts.Shop.BoardExpansionSold
+                : UiTexts.Shop.BoardExpansion(_session.BoardSize, NextBoardSize(), _session.BoardExpansionPrice);
+            if (GUILayout.Button(expansion, GUILayout.Height(30f))) _session.BuyBoardExpansion();
 
             GUI.enabled = _session.CanRerollShop;
             if (GUILayout.Button(UiTexts.Shop.Reroll(prices.Reroll), GUILayout.Height(30f))) _session.RerollShop();
@@ -135,6 +137,9 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndScrollView();
             if (GUILayout.Button(UiTexts.Shop.Leave, GUILayout.Height(32f))) _session.LeaveShop();
         }
+
+        /// <summary>«4×4»: Grösse nach der nächsten Erweiterung.</summary>
+        private string NextBoardSize() => _session.Board.Config.SizeAt(_session.Board.Step + 1).ToString();
 
         /// <summary>Verkauf aus dem Inventar für den halben Preis. Angelegtes muss erst abgelegt werden.</summary>
         private void DrawSell(ShopPrices prices)
@@ -183,13 +188,13 @@ namespace Betaknight.Overworld.UI
                 _runeAwaitingSlot = -1;
                 return;
             }
-            GUILayout.Label(UiTexts.SwapRowHint, _plainStyle);
+            GUILayout.Label(UiTexts.SwapRelayHint, _plainStyle);
 
-            IReadOnlyList<RuneDefinition> equipped = _session.Runes.Runes;
-            for (int slot = 0; slot < equipped.Count; slot++)
+            IReadOnlyList<RelayChip> relays = _session.Board.Relays;
+            for (int slot = 0; slot < relays.Count; slot++)
             {
-                RuneDefinition rune = equipped[slot];
-                if (GUILayout.Button($"<b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]\n{rune.Description}", _itemStyle, GUILayout.Height(52f)))
+                RelayChip relay = relays[slot];
+                if (GUILayout.Button($"{UiTexts.Offer.Instead(relay.Name)}  [{relay.Rune.Tag.DisplayName()}]\n{relay.Description}", _itemStyle, GUILayout.Height(52f)))
                 {
                     _session.BuyShopRune(_runeAwaitingSlot, slot);
                     _runeAwaitingSlot = -1;
