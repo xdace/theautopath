@@ -56,7 +56,7 @@ namespace Betaknight.Core.Encounters
             // Mittlere Events: eine Entscheidung.
             Medium("campfire", "Lagerfeuer", "F", 20, 0, "Ein verlassenes Lagerfeuer glimmt noch.",
                 new EncounterOption("Ausruhen (+10 HP)", E.Heal(10)),
-                new EncounterOption("Rüstung flicken (+3 Max-HP)", E.MaxHp(3))),
+                new EncounterOption("Rune verstärken (eine Stufe)", E.UpgradeRune())),
             Medium("wanderer", "Wanderer", "W", 20, 0, "Ein Wanderer bietet dir einen Handel an.",
                 new EncounterOption("Runensplitter kaufen (5 Gold)", 5, E.Shards(1)),
                 new EncounterOption("Nach dem Weg fragen", E.ScoutAround(3))),

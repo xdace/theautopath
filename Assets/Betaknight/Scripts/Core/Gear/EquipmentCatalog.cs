@@ -50,13 +50,13 @@ namespace Betaknight.Core.Gear
         public static EquipmentCatalog CreateDefault() => new EquipmentCatalog(new[]
         {
             // Startausrüstung der Kits (nie angeboten).
-            new EquipmentDefinition("short_blade", "Kurzklinge", EquipmentSlot.Weapon, S((StatKind.Damage, 1)),
+            new EquipmentDefinition("short_blade", "Kurzklinge", EquipmentSlot.Weapon, S((StatKind.Damage, 2), (StatKind.AttackInterval, -2)),
                 Skills(SkillIds.ArmorBreak), weight: 0, description: "Leichte Klinge des Klingenritters."),
             new EquipmentDefinition("short_sword", "Kurzschwert", EquipmentSlot.Weapon, S((StatKind.Damage, 1)),
                 weight: 0, description: "Solides Schwert ohne Kniffe."),
             new EquipmentDefinition("round_shield", "Rundschild", EquipmentSlot.Shield, S((StatKind.Armor, 2), (StatKind.Block, BasisPoints.Percent(10))),
                 Skills(SkillIds.ShieldBash), weight: 0, description: "Jeder Schild kann zuschlagen."),
-            new EquipmentDefinition("spark_staff", "Funkenstab", EquipmentSlot.Weapon, S((StatKind.Damage, 0)),
+            new EquipmentDefinition("spark_staff", "Funkenstab", EquipmentSlot.Weapon, S((StatKind.Damage, 1), (StatKind.AttackInterval, -2)),
                 Skills(SkillIds.Ignite), weight: 0, description: "Zündet Gegner an."),
 
             // Einzelteile.

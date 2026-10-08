@@ -11,10 +11,24 @@ namespace Betaknight.Core.Runes
         public string Source { get; }
         public IReadOnlyList<RuneDefinition> Options { get; }
 
-        public RuneOffer(string source, IReadOnlyList<RuneDefinition> options)
+        /// <summary>Ausrüstung, die statt einer Rune gewählt werden kann (gemischte Belohnung). Ids aus dem Ausrüstungs-Katalog.</summary>
+        public IReadOnlyList<string> ItemIds { get; }
+
+        public int Count => Options.Count + ItemIds.Count;
+
+        public RuneOffer(string source, IReadOnlyList<RuneDefinition> options, IReadOnlyList<string> itemIds = null)
         {
             Source = source ?? string.Empty;
             Options = options ?? throw new ArgumentNullException(nameof(options));
+            ItemIds = itemIds ?? Array.Empty<string>();
+        }
+
+        /// <summary>Dasselbe Angebot mit Ausrüstung anstelle der letzten Runen.</summary>
+        public RuneOffer WithItems(IReadOnlyList<string> itemIds)
+        {
+            if (itemIds == null || itemIds.Count == 0) return this;
+            int keep = Math.Max(1, Options.Count - itemIds.Count);
+            return new RuneOffer(Source, Options.Take(keep).ToList(), itemIds);
         }
 
         /// <summary>

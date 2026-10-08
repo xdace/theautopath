@@ -55,3 +55,26 @@ namespace Betaknight.Core.Arena
         }
     }
 }
+
+namespace Betaknight.Core.Arena
+{
+    /// <summary>Kehrt eine Bedingung um (Grundlage für eine spätere Inverter-Rune). Ziel ist der Standardgegner.</summary>
+    public sealed class NotCondition : ICondition
+    {
+        public ICondition Inner { get; }
+
+        public NotCondition(ICondition inner) => Inner = inner ?? throw new System.ArgumentNullException(nameof(inner));
+
+        public bool IsMet(in ConditionContext context, out Combatant target)
+        {
+            bool met = Inner.IsMet(context, out _);
+            target = null;
+            return !met;
+        }
+    }
+
+    public static class ConditionExtensions
+    {
+        public static ICondition Not(this ICondition condition) => new NotCondition(condition);
+    }
+}

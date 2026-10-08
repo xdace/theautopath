@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Betaknight.Core.Arena;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Hex;
 using Betaknight.Core.Map;
@@ -53,6 +54,12 @@ namespace Betaknight.Core
         /// <summary>Geöffneter Shop. Solange gesetzt, ist Bewegung gesperrt.</summary>
         public ShopVisit PendingShop { get; private set; }
 
+        /// <summary>Letzter Kampf mit Protokoll, für die Arena-Wiedergabe.</summary>
+        public CombatResult? LastCombat { get; private set; }
+
+        /// <summary>Ein Kampf wurde simuliert, bevor sein Ergebnis angewendet wird.</summary>
+        public event Action<CombatResult> CombatFinished;
+
         public int ClaimedMines { get; private set; }
 
         public bool IsGameOver => Stats.IsDead;
@@ -95,9 +102,13 @@ namespace Betaknight.Core
         private void Fight(HexCell cell)
         {
             int tier = cell.Coord.DistanceTo(Map.Center);
-            CombatResult result = _combat.Resolve(new CombatRequest(cell.Content, tier, Stats, Runes), _random);
+            var context = new BattleContext { VsBoss = cell.Content == CellContent.Boss, Turn = Turns.CurrentTurn };
+            CombatResult result = _combat.Resolve(new CombatRequest(cell.Content, tier, Stats, Runes, Gear, context), _random);
+            LastCombat = result;
+            CombatFinished?.Invoke(result);
 
             var lines = new List<string>();
+            if (!string.IsNullOrEmpty(result.EnemyName)) lines.Add(result.EnemyName);
             int dealt = Stats.Damage(result.DamageTaken);
             if (dealt > 0) lines.Add($"-{dealt} HP");
 
@@ -174,7 +185,7 @@ namespace Betaknight.Core
             if (!CanBuyShopRune(index)) return false;
 
             RuneDefinition rune = PendingShop.Inventory.Runes[index];
-            bool ok = Runes.IsFull ? Runes.TryReplace(replaceSlot, rune) : Runes.TryAdd(rune);
+            bool ok = Runes.IsFull ? Runes.TryReplace(replaceSlot, rune) : Runes.TryAdd(rune, DefaultSkillForNewRow());
             if (!ok) return false;
 
             Stats.TrySpendGold(ShopPrices.Rune);

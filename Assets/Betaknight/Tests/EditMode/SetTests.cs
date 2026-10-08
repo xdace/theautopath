@@ -57,7 +57,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void ReferenceKnightWithoutSetsLoses()
         {
-            BattleResult r = Fight(Knight(Wear("short_blade")));
+            BattleResult r = Fight(Knight(Wear("short_sword")));
             Assert.AreEqual(BattleOutcome.Defeat, r.Outcome, "Der Golem ist ohne Build ein echter Prüfstein.");
         }
 

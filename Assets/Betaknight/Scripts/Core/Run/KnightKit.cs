@@ -43,13 +43,13 @@ namespace Betaknight.Core.Run
 
         public static IReadOnlyList<KnightKit> Defaults { get; } = new[]
         {
-            new KnightKit("blade", "Klingenritter", RuneTag.Blade, "on_hit", 28, 5,
+            new KnightKit("blade", "Klingenritter", RuneTag.Blade, "on_hit", 32, 5,
                 "Setzt auf Druck: seine Zeilen feuern, wenn Angriffe treffen.",
                 new[] { "short_blade" }, "armor_break"),
             new KnightKit("shield", "Schildritter", RuneTag.Shield, "when_hit", 36, 3,
                 "Hält viel aus und reagiert, wenn er getroffen wird.",
                 new[] { "short_sword", "round_shield" }, "shield_bash"),
-            new KnightKit("spark", "Funkenritter", RuneTag.Spark, "every_3rd", 26, 8,
+            new KnightKit("spark", "Funkenritter", RuneTag.Spark, "every_3rd", 30, 8,
                 "Zählt Angriffe und löst im Takt aus.",
                 new[] { "spark_staff" }, "ignite"),
         };
