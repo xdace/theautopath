@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Betaknight.Core.Runes
 {
@@ -18,6 +19,31 @@ namespace Betaknight.Core.Runes
 
         /// <summary>Notfall, Feuer und Risiko.</summary>
         Ember = 3,
+
+        /// <summary>Bewegung und Ausweichen.</summary>
+        Phantom = 4,
+    }
+
+    /// <summary>Wie sich eine Bedingung verhält. Bestimmt nur Beschreibung und Anzeige, die Logik steckt in der Bedingung.</summary>
+    public enum ConditionKind
+    {
+        /// <summary>Wahr, solange ein Zustand gilt.</summary>
+        State,
+
+        /// <summary>Wahr für ein kurzes Fenster nach einem Ereignis.</summary>
+        Event,
+
+        /// <summary>Wird nach einer Zeit fällig und bleibt fällig, bis die Zeile feuert.</summary>
+        Clock,
+
+        /// <summary>Wird nach N Ereignissen fällig und bleibt fällig, bis die Zeile feuert.</summary>
+        Counter,
+
+        /// <summary>Liest einen Zähler wie Ladung oder Tempo-Stapel.</summary>
+        Resource,
+
+        /// <summary>Hängt von der Oberwelt ab (Goldmine, Boss) und gilt für den ganzen Kampf.</summary>
+        Context,
     }
 
     public static class RuneTagExtensions
@@ -30,6 +56,7 @@ namespace Betaknight.Core.Runes
                 case RuneTag.Shield: return "Schild";
                 case RuneTag.Spark: return "Funke";
                 case RuneTag.Ember: return "Glut";
+                case RuneTag.Phantom: return "Phantom";
                 default: return tag.ToString();
             }
         }
@@ -37,28 +64,58 @@ namespace Betaknight.Core.Runes
 
     /// <summary>
     /// Eine Logik-Rune als reine Daten: eine Bedingung ("Wann") für eine Zeile der Logik-Tafel.
-    /// Was dann passiert, kommt aus der Ausrüstung. Die Auswertung folgt mit der Kampfarena.
+    /// Was dann passiert, kommt aus der Ausrüstung. Die Bedingung selbst baut die
+    /// ConditionRegistry der Arena aus Id und Parameter der aktuellen Stufe.
     /// </summary>
     public sealed class RuneDefinition
     {
+        private readonly int[] _levels;
+
         public string Id { get; }
-        public string Name { get; }
-        public string Description { get; }
+
+        /// <summary>Name, darf "{0}" für den Parameter enthalten (z. B. "HP unter {0} %").</summary>
+        public string NameTemplate { get; }
+        public string DescriptionTemplate { get; }
         public RuneTag Tag { get; }
+        public ConditionKind Kind { get; }
 
         /// <summary>Relative Häufigkeit in Angeboten.</summary>
         public int Weight { get; }
 
-        public RuneDefinition(string id, string name, RuneTag tag, string description, int weight = 10)
+        /// <summary>Kommt nie in Angeboten vor, nur über Set-Boni o. Ä.</summary>
+        public bool IsExclusive { get; }
+
+        /// <summary>Set, das diese exklusive Rune freischaltet (ab 2 Teilen), oder null.</summary>
+        public string UnlockSetId { get; }
+
+        /// <summary>Parameter pro Stufe (Prozent, Sekunden, Anzahl). Stufe 0 ist der Startwert, höhere Stufen sind Verstärkungen.</summary>
+        public IReadOnlyList<int> Levels => _levels;
+        public int MaxLevel => Math.Max(0, _levels.Length - 1);
+
+        public RuneDefinition(string id, string name, RuneTag tag, ConditionKind kind, string description,
+            int[] levels = null, int weight = 10, bool exclusive = false, string unlockSetId = null)
         {
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("Id fehlt.", nameof(id));
             if (weight < 0) throw new ArgumentOutOfRangeException(nameof(weight));
             Id = id;
-            Name = name ?? id;
+            NameTemplate = name ?? id;
+            DescriptionTemplate = description ?? string.Empty;
             Tag = tag;
-            Description = description ?? string.Empty;
+            Kind = kind;
+            _levels = levels != null && levels.Length > 0 ? (int[])levels.Clone() : new[] { 0 };
             Weight = weight;
+            IsExclusive = exclusive;
+            UnlockSetId = unlockSetId;
         }
+
+        public int ParameterAt(int level) => _levels[Math.Max(0, Math.Min(level, MaxLevel))];
+
+        public string NameAt(int level) => string.Format(NameTemplate, ParameterAt(level));
+        public string DescriptionAt(int level) => string.Format(DescriptionTemplate, ParameterAt(level));
+
+        /// <summary>Name auf Stufe 0.</summary>
+        public string Name => NameAt(0);
+        public string Description => DescriptionAt(0);
 
         public override string ToString() => $"{Name} [{Tag.DisplayName()}]";
     }

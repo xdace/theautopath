@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using Betaknight.Core;
+using Betaknight.Core.Arena;
+using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
 using UnityEngine;
 
@@ -25,8 +27,12 @@ namespace Betaknight.Overworld.UI
             _choiceAwaitingSlot = -1;
         }
 
+        /// <summary>Solange true, bleibt das Fenster verborgen (z. B. während die Arena läuft).</summary>
+        public System.Func<bool> Hidden;
+
         private void OnGUI()
         {
+            if (Hidden != null && Hidden()) return;
             if (_session == null) return;
 
             RuneOffer offer = _session.PendingRuneOffer;
@@ -40,7 +46,7 @@ namespace Betaknight.Overworld.UI
             EnsureStyles();
 
             const float width = 520f;
-            const float height = 420f;
+            const float height = 480f;
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUILayout.BeginArea(rect, GUI.skin.box);
 
@@ -67,6 +73,18 @@ namespace Betaknight.Overworld.UI
                     if (_session.Runes.IsFull) _choiceAwaitingSlot = i;
                     else _session.TakeRune(i);
                 }
+            }
+
+            for (int i = 0; i < offer.ItemIds.Count; i++)
+            {
+                if (!_session.Items.TryGet(offer.ItemIds[i], out EquipmentDefinition item)) continue;
+                EquipmentDefinition worn = _session.Gear.Get(item.Slot);
+                string replaces = worn != null ? $"  (ersetzt {worn.Name})" : string.Empty;
+                string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)} ({_session.Gear.SetPieces(item.SetId)}/3)" : string.Empty;
+                string label = $"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}{replaces}\n{ItemText.Describe(item)}";
+                GUI.enabled = _session.CanTakeItem(i);
+                if (GUILayout.Button(label, _nameStyle, GUILayout.Height(64f))) _session.TakeItem(i);
+                GUI.enabled = true;
             }
 
             GUILayout.FlexibleSpace();

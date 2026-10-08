@@ -4,6 +4,7 @@ using Betaknight.Core.Exploration;
 using Betaknight.Core.Hex;
 using Betaknight.Core.Map;
 using Betaknight.Core.Run;
+using Betaknight.Core.Runes;
 
 namespace Betaknight.Core.Encounters
 {
@@ -14,9 +15,11 @@ namespace Betaknight.Core.Encounters
         private readonly ExplorationService _exploration;
         private readonly PlayerStats _stats;
         private readonly Random _random;
+        private readonly RuneLoadout _runes;
 
-        public EncounterResolver(HexMap map, ExplorationService exploration, PlayerStats stats, Random random)
+        public EncounterResolver(HexMap map, ExplorationService exploration, PlayerStats stats, Random random, RuneLoadout runes = null)
         {
+            _runes = runes;
             _map = map ?? throw new ArgumentNullException(nameof(map));
             _exploration = exploration ?? throw new ArgumentNullException(nameof(exploration));
             _stats = stats ?? throw new ArgumentNullException(nameof(stats));
@@ -76,9 +79,20 @@ namespace Betaknight.Core.Encounters
                 case EffectKind.ScoutNearest:
                     return ScoutNearest(effect.Target, origin);
 
+                case EffectKind.UpgradeRune:
+                    return UpgradeRune();
+
                 default:
                     return null;
             }
+        }
+
+        private string UpgradeRune()
+        {
+            int index = _runes?.BestUpgradeTarget() ?? -1;
+            if (index < 0) return "Keine Rune lässt sich verstärken";
+            _runes.Upgrade(index);
+            return $"Rune verstärkt: {_runes.Rows[index].Name}";
         }
 
         private string ScoutNearest(CellContent target, HexCoord origin)

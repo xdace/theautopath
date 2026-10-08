@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using Betaknight.Core;
 using Betaknight.Core.Encounters;
 using Betaknight.Core.Map;
+using Betaknight.Core.Arena;
+using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
 using Betaknight.Overworld.Controllers;
 using UnityEngine;
@@ -21,6 +23,9 @@ namespace Betaknight.Overworld.UI
         private Action _onNewMap;
         private GUIStyle _style;
 
+        /// <summary>Öffnet den Tafel-Editor. Ohne Zuweisung gibt es keinen Knopf.</summary>
+        public Action OnEditBoard;
+
         public void Initialize(OverworldSession session, OverworldController controller, EncounterCatalog encounters, Action onNewMap)
         {
             _session = session;
@@ -29,7 +34,7 @@ namespace Betaknight.Overworld.UI
             _onNewMap = onNewMap;
         }
 
-        private static readonly Rect PanelRect = new Rect(12, 12, 360, 360);
+        private static readonly Rect PanelRect = new Rect(12, 12, 380, 470);
 
         /// <summary>Liegt ein Bildschirmpunkt (Ursprung unten links) über dem HUD? Dann ignoriert die Karte den Klick.</summary>
         public static bool ContainsScreenPoint(Vector2 screen)
@@ -49,10 +54,20 @@ namespace Betaknight.Overworld.UI
 
             GUILayout.BeginArea(PanelRect, GUI.skin.box);
             string kit = _session.Kit != null ? $" – {_session.Kit.Name}" : string.Empty;
-            GUILayout.Label($"<b>Betaknight{kit}</b>", _style);
-            GUILayout.Label($"Zug: {_session.Turns.CurrentTurn}", _style);
+            GUILayout.Label($"<b>Betaknight{kit}</b>   Akt {_session.Act}", _style);
+            int boss = _session.TurnsUntilBoss;
+            string bossText = boss <= 3 ? $"<color=#ff7a6b>Boss in {boss} Zügen</color>" : $"Boss in {boss} Zügen";
+            GUILayout.Label($"Zug: {_session.Turns.CurrentTurn}   {bossText}", _style);
             GUILayout.Label($"HP: {_session.Stats.Hp}/{_session.Stats.MaxHp}   Gold: {_session.Stats.Gold}   Splitter: {_session.Stats.Shards}", _style);
-            GUILayout.Label($"Runen ({_session.Runes.Runes.Count}/{_session.Runes.Slots}): {RuneList()}", _style);
+            GUILayout.Label($"Logik-Tafel ({_session.Runes.Rows.Count}/{_session.Runes.Slots}):\n{BoardList()}", _style);
+            GUILayout.Label($"Ausrüstung: {GearList()}", _style);
+            string sets = SetList();
+            if (sets.Length > 0) GUILayout.Label($"Sets: {sets}", _style);
+            foreach (MineRaid raid in _session.Raids)
+            {
+                string state = raid.IsLost ? "verloren" : $"angegriffen, noch {raid.TurnsLeft(_session.Turns.CurrentTurn)} Züge";
+                GUILayout.Label($"<color=#ff7a6b>Mine {raid.Coord}: {state}</color>", _style);
+            }
             GUILayout.Label($"Position: {_session.Player.Position}", _style);
             GUILayout.Label($"Feld: {Describe(_session.CurrentCell)}", _style);
             GUILayout.Label($"Seed: {_session.Map.Seed}", _style);
@@ -65,6 +80,10 @@ namespace Betaknight.Overworld.UI
             }
 
             GUILayout.FlexibleSpace();
+            if (OnEditBoard != null && !_session.IsBusy && !_session.IsGameOver && GUILayout.Button("Tafel bearbeiten"))
+            {
+                OnEditBoard();
+            }
             if (_session.CanOpenShop && GUILayout.Button("Shop öffnen"))
             {
                 _session.OpenShop();
@@ -76,11 +95,41 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndArea();
         }
 
-        private string RuneList()
+        private static readonly SkillCatalog Skills = SkillCatalog.CreateDefault();
+
+        private string BoardList()
         {
-            if (_session.Runes.Runes.Count == 0) return "keine";
+            var lines = new List<string>();
+            for (int i = 0; i < _session.Runes.Rows.Count; i++)
+            {
+                RuneSlot row = _session.Runes.Rows[i];
+                bool orphaned = !_session.Gear.ProvidesSkill(row.SkillId);
+                string skill = orphaned ? "<color=#888888>—</color>" : SkillName(row.SkillId);
+                lines.Add($"{i + 1}. [{row.Name}] → {skill}");
+            }
+            lines.Add("↓ [Immer] → Basisangriff");
+            return string.Join("\n", lines);
+        }
+
+        private static string SkillName(string id) => Skills.TryGet(id, out SkillDefinition skill) ? skill.Name : id;
+
+        /// <summary>Getragene Sets mit Teilezahl; aktive Boni (ab 2 Teilen) hervorgehoben.</summary>
+        private string SetList()
+        {
+            var parts = new List<string>();
+            foreach ((SetDefinition set, int pieces) in _session.WornSets())
+            {
+                string text = $"{set.Name} {pieces}/{set.MaxPieces}";
+                parts.Add(pieces >= SetDefinition.FirstBonusPieces ? $"<color=#ffd75e>{text}</color>" : text);
+            }
+            return string.Join(", ", parts);
+        }
+
+        private string GearList()
+        {
+            if (_session.Gear.Items.Count == 0) return "nichts";
             var names = new List<string>();
-            foreach (RuneDefinition rune in _session.Runes.Runes) names.Add(rune.Name);
+            foreach (EquipmentDefinition item in _session.Gear.Items) names.Add(item.Name);
             return string.Join(", ", names);
         }
 

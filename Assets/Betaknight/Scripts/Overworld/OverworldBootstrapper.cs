@@ -31,6 +31,10 @@ namespace Betaknight.Overworld
         private ShopWindow _shopWindow;
         private GameOverWindow _gameOverWindow;
         private KitSelectionWindow _kitWindow;
+        private ArenaWindow _arenaWindow;
+        private BoardEditorWindow _boardWindow;
+        private PortalWindow _portalWindow;
+        private MapGenerationConfig _config;
         private KnightKit _kit;
 
         public OverworldSession Session { get; private set; }
@@ -49,6 +53,18 @@ namespace Betaknight.Overworld
             _shopWindow = gameObject.AddComponent<ShopWindow>();
             _gameOverWindow = gameObject.AddComponent<GameOverWindow>();
             _kitWindow = gameObject.AddComponent<KitSelectionWindow>();
+            _arenaWindow = gameObject.AddComponent<ArenaWindow>();
+            _boardWindow = gameObject.AddComponent<BoardEditorWindow>();
+            _portalWindow = gameObject.AddComponent<PortalWindow>();
+
+            // Die Arena spielt zuerst ab; Runenwahl, Events, Shop und Game Over warten so lange.
+            System.Func<bool> arenaOpen = () => _arenaWindow.IsOpen;
+            _encounterWindow.Hidden = arenaOpen;
+            _runeWindow.Hidden = arenaOpen;
+            _shopWindow.Hidden = arenaOpen;
+            _gameOverWindow.Hidden = arenaOpen;
+            _portalWindow.Hidden = arenaOpen;
+            _hud.OnEditBoard = () => _boardWindow.Toggle();
         }
 
         private void Start() => StartNewRun();
@@ -60,6 +76,9 @@ namespace Betaknight.Overworld
             _root = null;
             Session = null;
             _hud.Initialize(null, null, null, null);
+            _arenaWindow.Initialize(null);
+            _boardWindow.Initialize(null);
+            _portalWindow.Initialize(null);
             SetRunWindowsEnabled(false);
 
             _kitWindow.Open(KnightKit.Defaults, RuneCatalog.CreateDefault(), kit =>
@@ -69,23 +88,37 @@ namespace Betaknight.Overworld
             });
         }
 
-        /// <summary>Erzeugt eine komplett neue Karte mit dem gewählten Kit.</summary>
+        /// <summary>Erzeugt eine komplett neue Karte mit dem gewählten Kit (Akt 1).</summary>
         public void BuildWorld()
+        {
+            int seed = settings.seed != 0 ? settings.seed : Random.Range(1, int.MaxValue);
+            _config = settings.ToGenerationConfig(seed);
+            BuildWorld(OverworldSession.Create(_config, settings.sightRadius, _kit));
+        }
+
+        /// <summary>Das Fluchtportal wurde betreten: neue Karte für den nächsten Akt, der Ritter kommt mit.</summary>
+        private void OnActCompleted(OverworldSession previous)
+        {
+            previous.ActCompleted -= OnActCompleted;
+            BuildWorld(OverworldSession.CreateNextAct(_config, previous));
+        }
+
+        /// <summary>Baut die Darstellung für eine fertige Session und verdrahtet alle Fenster.</summary>
+        private void BuildWorld(OverworldSession session)
         {
             if (_root != null) Destroy(_root);
             SetRunWindowsEnabled(true);
 
-            int seed = settings.seed != 0 ? settings.seed : Random.Range(1, int.MaxValue);
-            MapGenerationConfig config = settings.ToGenerationConfig(seed);
-            Session = OverworldSession.Create(config, settings.sightRadius, _kit);
+            Session = session;
+            Session.ActCompleted += OnActCompleted;
 
-            _root = new GameObject("Overworld");
+            _root = new GameObject($"Overworld (Akt {Session.Act})");
             var layout = new HexLayout(settings.hexSize);
 
             var gridGo = new GameObject("Grid");
             gridGo.transform.SetParent(_root.transform, false);
             HexGridView grid = gridGo.AddComponent<HexGridView>();
-            grid.Initialize(Session.Map, layout, settings, config.Encounters);
+            grid.Initialize(Session.Map, layout, settings, _config.Encounters);
 
             PlayerView player = PlayerView.Create(_root.transform, grid.ToWorld(Session.Player.Position), settings);
 
@@ -93,14 +126,18 @@ namespace Betaknight.Overworld
 
             OverworldController controller = _root.AddComponent<OverworldController>();
             controller.Initialize(Session, grid, player, cam);
+            controller.InputBlocked = () => _arenaWindow.IsOpen || _boardWindow.IsOpen;
 
-            _hud.Initialize(Session, controller, config.Encounters, StartNewRun);
+            _hud.Initialize(Session, controller, _config.Encounters, StartNewRun);
             _encounterWindow.Initialize(Session);
             _runeWindow.Initialize(Session);
             _shopWindow.Initialize(Session);
             _gameOverWindow.Initialize(Session, StartNewRun);
+            _arenaWindow.Initialize(Session);
+            _boardWindow.Initialize(Session);
+            _portalWindow.Initialize(Session);
 
-            Debug.Log($"[Betaknight] Oberwelt erzeugt: {Session.Map.Count} Felder, Seed {seed}, Kit {_kit?.Name ?? "keins"}.");
+            Debug.Log($"[Betaknight] Akt {Session.Act}: {Session.Map.Count} Felder, Seed {Session.Map.Seed}, Kit {_kit?.Name ?? "keins"}.");
         }
 
         private void SetRunWindowsEnabled(bool enabled)
@@ -109,6 +146,7 @@ namespace Betaknight.Overworld
             _runeWindow.enabled = enabled;
             _shopWindow.enabled = enabled;
             _gameOverWindow.enabled = enabled;
+            _portalWindow.enabled = enabled;
         }
 
         private Camera SetupCamera(Transform followTarget)

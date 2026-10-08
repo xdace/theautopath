@@ -18,8 +18,12 @@ namespace Betaknight.Overworld.UI
             _onNewRun = onNewRun;
         }
 
+        /// <summary>Solange true, bleibt das Fenster verborgen (z. B. während die Arena läuft).</summary>
+        public System.Func<bool> Hidden;
+
         private void OnGUI()
         {
+            if (Hidden != null && Hidden()) return;
             if (_session == null || !_session.IsGameOver) return;
 
             if (_titleStyle == null)
@@ -33,7 +37,7 @@ namespace Betaknight.Overworld.UI
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUILayout.BeginArea(rect, GUI.skin.box);
             GUILayout.Label("<b>Der Ritter ist gefallen</b>", _titleStyle);
-            GUILayout.Label($"Überlebt bis Zug {_session.Turns.CurrentTurn}, {_session.Runes.Runes.Count} Runen, {_session.Stats.Gold} Gold", _textStyle);
+            GUILayout.Label($"Akt {_session.Act}, Zug {_session.Turns.CurrentTurn}, {_session.Runes.Runes.Count} Runen, {_session.Stats.Gold} Gold", _textStyle);
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Neuer Run", GUILayout.Height(36f))) _onNewRun?.Invoke();
             GUILayout.EndArea();

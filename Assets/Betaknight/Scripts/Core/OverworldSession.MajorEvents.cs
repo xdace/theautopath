@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Betaknight.Core.Arena;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Hex;
 using Betaknight.Core.Map;
@@ -53,7 +54,14 @@ namespace Betaknight.Core
         /// <summary>Geöffneter Shop. Solange gesetzt, ist Bewegung gesperrt.</summary>
         public ShopVisit PendingShop { get; private set; }
 
-        public int ClaimedMines { get; private set; }
+        /// <summary>Letzter Kampf mit Protokoll, für die Arena-Wiedergabe.</summary>
+        public CombatResult? LastCombat { get; private set; }
+
+        /// <summary>Ein Kampf wurde simuliert, bevor sein Ergebnis angewendet wird.</summary>
+        public event Action<CombatResult> CombatFinished;
+
+        /// <summary>Eroberte Minen, die gerade Gold bringen (nicht verlorene).</summary>
+        public int ClaimedMines => CountProducingMines();
 
         public bool IsGameOver => Stats.IsDead;
 
@@ -82,7 +90,8 @@ namespace Betaknight.Core
                     break;
 
                 case CellContent.GoldMine:
-                    if (!cell.IsResolved) ClaimMine(cell);
+                    if (cell.IsUnderAttack) DefendMine(cell);
+                    else if (!cell.IsResolved) ClaimMine(cell);
                     break;
 
                 case CellContent.Shop:
@@ -94,30 +103,46 @@ namespace Betaknight.Core
 
         private void Fight(HexCell cell)
         {
-            int tier = cell.Coord.DistanceTo(Map.Center);
-            CombatResult result = _combat.Resolve(new CombatRequest(cell.Content, tier, Stats, Runes), _random);
+            int tier = TierAt(cell.Coord);
+            var context = new BattleContext { VsBoss = cell.Content == CellContent.Boss, Turn = Turns.CurrentTurn };
+            CombatResult result = RunCombat(cell.Content, tier, context);
 
             var lines = new List<string>();
-            int dealt = Stats.Damage(result.DamageTaken);
-            if (dealt > 0) lines.Add($"-{dealt} HP");
-
+            if (!string.IsNullOrEmpty(result.EnemyName)) lines.Add(result.EnemyName);
             string title = cell.Content == CellContent.Boss ? "Boss" : "Kampf";
 
-            if (!result.Victory || Stats.IsDead)
-            {
-                // Ein verlorener Kampf endet tödlich, auch wenn der Resolver noch HP übrig liess.
-                if (!Stats.IsDead) Stats.Damage(Stats.Hp);
-                lines.Add("Niederlage");
-                MajorEventResolved?.Invoke(new MajorEventOutcome(cell, title, lines));
-                RunEnded?.Invoke();
-                return;
-            }
+            // Ein verlorener Kampf endet tödlich, auch wenn der Resolver noch HP übrig liess.
+            if (!ApplyCombat(cell, result, title, lines)) return;
 
             Stats.AddGold(result.GoldReward);
             lines.Add($"+{result.GoldReward} Gold");
             Map.MarkResolved(cell.Coord);
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, $"{title} gewonnen", lines));
             OfferRunes("Sieg");
+        }
+
+        private CombatResult RunCombat(CellContent enemy, int tier, BattleContext context)
+        {
+            CombatResult result = _combat.Resolve(new CombatRequest(enemy, tier, Stats, Runes, Gear, context), _random);
+            LastCombat = result;
+            CombatFinished?.Invoke(result);
+            return result;
+        }
+
+        /// <summary>
+        /// Wendet Schaden an und beendet bei Niederlage den Run. Gibt true zurück, wenn der Ritter gewonnen hat.
+        /// </summary>
+        private bool ApplyCombat(HexCell cell, CombatResult result, string title, List<string> lines)
+        {
+            int dealt = Stats.Damage(result.DamageTaken);
+            if (dealt > 0) lines.Add($"-{dealt} HP");
+            if (result.Victory && !Stats.IsDead) return true;
+
+            if (!Stats.IsDead) Stats.Damage(Stats.Hp);
+            lines.Add("Niederlage");
+            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, title, lines));
+            RunEnded?.Invoke();
+            return false;
         }
 
         private void OpenTreasure(HexCell cell)
@@ -131,7 +156,7 @@ namespace Betaknight.Core
 
         private void ClaimMine(HexCell cell)
         {
-            ClaimedMines++;
+            _mines.Add(cell.Coord);
             Stats.AddGold(3);
             Map.MarkResolved(cell.Coord);
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, "Goldmine erobert",
@@ -142,6 +167,8 @@ namespace Betaknight.Core
         {
             if (ClaimedMines > 0 && TurnSystem.IsIntervalTurn(turn, MineIncomeInterval))
                 Stats.AddGold(ClaimedMines * MineIncomeGold);
+            UpdateMineRaids(turn);
+            ScheduleBoss(turn);
         }
 
         /// <summary>Steht der Spieler auf einem Shop-Feld und wartet nichts anderes?</summary>
@@ -155,7 +182,7 @@ namespace Betaknight.Core
             HexCell cell = CurrentCell;
             if (!_shops.TryGetValue(cell.Coord, out ShopInventory inventory))
             {
-                inventory = new ShopInventory(RuneOffer.Create("Shop", RuneCatalog, Runes, _random).Options);
+                inventory = new ShopInventory(RuneOffer.Create("Shop", RuneCatalog, Runes, _random).Options, PickItems(ShopItemCount));
                 _shops.Add(cell.Coord, inventory);
             }
 
@@ -174,7 +201,7 @@ namespace Betaknight.Core
             if (!CanBuyShopRune(index)) return false;
 
             RuneDefinition rune = PendingShop.Inventory.Runes[index];
-            bool ok = Runes.IsFull ? Runes.TryReplace(replaceSlot, rune) : Runes.TryAdd(rune);
+            bool ok = Runes.IsFull ? Runes.TryReplace(replaceSlot, rune) : Runes.TryAdd(rune, DefaultSkillForNewRow());
             if (!ok) return false;
 
             Stats.TrySpendGold(ShopPrices.Rune);
@@ -212,6 +239,7 @@ namespace Betaknight.Core
             if (!CanRerollShop) return false;
             Stats.TrySpendGold(ShopPrices.Reroll);
             PendingShop.Inventory.Replace(RuneOffer.Create("Shop", RuneCatalog, Runes, _random).Options);
+            PendingShop.Inventory.ReplaceItems(PickItems(ShopItemCount));
             return true;
         }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Encounters;
 using Betaknight.Core.Exploration;
+using Betaknight.Core.Gear;
 using Betaknight.Core.Hex;
 using Betaknight.Core.Map;
 using Betaknight.Core.Movement;
@@ -31,7 +32,7 @@ namespace Betaknight.Core
         }
 
         /// <summary>Soll eine laufende Mehrfeld-Reise nach diesem Schritt anhalten?</summary>
-        public bool InterruptsTravel => !Success || FirstVisit || Cell.Content.IsHostile();
+        public bool InterruptsTravel => !Success || FirstVisit || Cell.Content.IsHostile() || Cell.IsUnderAttack;
 
         public static StepResult Ok(HexCell cell, bool firstVisit) => new StepResult(true, MoveFailure.None, cell, firstVisit);
         public static StepResult Fail(MoveFailure failure) => new StepResult(false, failure, null, false);
@@ -66,7 +67,7 @@ namespace Betaknight.Core
         public RuneOffer PendingRuneOffer { get; private set; }
 
         /// <summary>Wartet die Session auf eine Entscheidung des Spielers?</summary>
-        public bool IsBusy => PendingEncounter != null || PendingRuneOffer != null || PendingShop != null;
+        public bool IsBusy => PendingEncounter != null || PendingRuneOffer != null || PendingShop != null || PendingPortal;
 
         /// <summary>Wird nach jedem erfolgreichen Schritt ausgelöst, nachdem kleine Events bereits gewirkt haben.</summary>
         public event Action<StepResult> CellEntered;
@@ -88,8 +89,10 @@ namespace Betaknight.Core
 
         public OverworldSession(HexMap map, PlayerModel player, TurnSystem turns, ExplorationService exploration,
             PlayerStats stats = null, EncounterCatalog encounters = null, RuneLoadout runes = null, RuneCatalog runeCatalog = null,
-            ICombatResolver combat = null)
+            ICombatResolver combat = null, Equipment equipment = null, EquipmentCatalog items = null)
         {
+            Gear = equipment ?? new Equipment();
+            Items = items ?? EquipmentCatalog.CreateDefault();
             Map = map ?? throw new ArgumentNullException(nameof(map));
             Player = player ?? throw new ArgumentNullException(nameof(player));
             Turns = turns ?? throw new ArgumentNullException(nameof(turns));
@@ -101,8 +104,8 @@ namespace Betaknight.Core
 
             // Eigener Zufall für Events und Angebote, abgeleitet vom Karten-Seed: gleicher Seed, gleiche Beute.
             _random = new Random(unchecked(Map.Seed * 31 + 7));
-            _resolver = new EncounterResolver(Map, Exploration, Stats, _random);
-            _combat = combat ?? new PlaceholderCombatResolver();
+            _resolver = new EncounterResolver(Map, Exploration, Stats, _random, Runes);
+            _combat = combat ?? new ArenaCombatResolver();
             Turns.TurnEnded += OnTurnEnded;
 
             if (!Map.TryGetCell(Player.Position, out HexCell startCell))
@@ -117,8 +120,16 @@ namespace Betaknight.Core
         {
             HexMap map = MapGenerator.Generate(config);
             RuneCatalog runeCatalog = RuneCatalog.CreateDefault();
+            EquipmentCatalog items = EquipmentCatalog.CreateDefault();
             var runes = new RuneLoadout();
-            if (kit != null && runeCatalog.TryGet(kit.StartRuneId, out RuneDefinition startRune)) runes.TryAdd(startRune);
+            var gear = new Equipment();
+            if (kit != null)
+            {
+                foreach (string id in kit.StartItemIds)
+                    if (items.TryGet(id, out EquipmentDefinition item)) gear.Equip(item);
+                if (runeCatalog.TryGet(kit.StartRuneId, out RuneDefinition startRune))
+                    runes.TryAdd(startRune, gear.ProvidesSkill(kit.StartSkillId) ? kit.StartSkillId : null);
+            }
 
             var session = new OverworldSession(
                 map,
@@ -128,7 +139,10 @@ namespace Betaknight.Core
                 kit?.CreateStats(),
                 config.Encounters,
                 runes,
-                runeCatalog);
+                runeCatalog,
+                null,
+                gear,
+                items);
             session.Kit = kit;
             return session;
         }
@@ -166,6 +180,7 @@ namespace Betaknight.Core
 
             TriggerEncounter(cell);
             TriggerMajorEvent(cell, firstVisit);
+            TriggerBossIfDue();
 
             StepResult result = StepResult.Ok(cell, firstVisit);
             CellEntered?.Invoke(result);
@@ -200,8 +215,9 @@ namespace Betaknight.Core
         public RuneOffer OfferRunes(string source)
         {
             if (IsBusy) return null;
-            RuneOffer offer = RuneOffer.Create(source, RuneCatalog, Runes, _random);
-            if (offer.Options.Count == 0) return null;
+            RuneOffer offer = RuneOffer.Create(source, RuneCatalog, Runes, _random, isUnlocked: IsRuneUnlocked);
+            offer = offer.WithItems(RollRewardItems(source));
+            if (offer.Count == 0) return null;
 
             PendingRuneOffer = offer;
             RuneOfferStarted?.Invoke(offer);
@@ -218,7 +234,7 @@ namespace Betaknight.Core
             if (offer == null || optionIndex < 0 || optionIndex >= offer.Options.Count) return false;
 
             RuneDefinition rune = offer.Options[optionIndex];
-            bool ok = Runes.IsFull ? Runes.TryReplace(replaceSlot, rune) : Runes.TryAdd(rune);
+            bool ok = Runes.IsFull ? Runes.TryReplace(replaceSlot, rune) : Runes.TryAdd(rune, DefaultSkillForNewRow());
             if (!ok) return false;
 
             PendingRuneOffer = null;

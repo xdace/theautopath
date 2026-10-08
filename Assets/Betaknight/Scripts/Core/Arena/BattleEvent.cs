@@ -1,0 +1,72 @@
+namespace Betaknight.Core.Arena
+{
+    public enum BattleEventKind
+    {
+        BattleStart,
+
+        /// <summary>Ein Kämpfer beginnt eine Aktion (Ausholen). Bei langen Aufladungen sichtbar für "Gegner lädt auf".</summary>
+        ActionStarted,
+
+        /// <summary>Die Wirkung einer Aktion tritt ein. Amount = 1, wenn sie als Angriff zählt.</summary>
+        ActionExecuted,
+
+        /// <summary>Eine Aktion wurde abgebrochen (Betäubung oder eine höhere Zeile).</summary>
+        ActionInterrupted,
+
+        /// <summary>Ein Angriff trifft (Quelle = Angreifer, Ziel = Getroffener).</summary>
+        Hit,
+
+        /// <summary>Ziel verliert Leben. Amount = tatsächlicher Schaden.</summary>
+        Damage,
+        Dodged,
+        Blocked,
+        Crit,
+
+        /// <summary>Selbstschaden (Hitze, Opfer). Quelle = Ziel.</summary>
+        SelfDamage,
+        Healed,
+        StatusApplied,
+        StatusExpired,
+
+        /// <summary>Ein Ressourcen-Zähler (Ladung, Tempo, ...) hat sich geändert. Detail = Ressourcen-Id.</summary>
+        ResourceChanged,
+        Death,
+
+        /// <summary>Zeitlimit überschritten, Überhitzung beginnt bzw. steigt.</summary>
+        Overheat,
+        BattleEnd,
+    }
+
+    /// <summary>Ein Eintrag im Kampfprotokoll. Bedingungen und Set-Boni lesen dieselben Einträge.</summary>
+    public sealed class BattleEvent
+    {
+        public int Tick { get; }
+        public BattleEventKind Kind { get; }
+        public Combatant Source { get; }
+        public Combatant Target { get; }
+        public int Amount { get; }
+
+        /// <summary>Skill-, Status- oder Ressourcen-Id, je nach Art.</summary>
+        public string Detail { get; }
+
+        /// <summary>Zeile der Logik-Tafel, die die Aktion ausgelöst hat, sonst -1.</summary>
+        public int RowIndex { get; }
+
+        public BattleEvent(int tick, BattleEventKind kind, Combatant source, Combatant target, int amount = 0, string detail = null, int rowIndex = -1)
+        {
+            Tick = tick;
+            Kind = kind;
+            Source = source;
+            Target = target;
+            Amount = amount;
+            Detail = detail;
+            RowIndex = rowIndex;
+        }
+
+        public override string ToString()
+        {
+            string time = $"{Tick / Ticks.PerSecond}.{Tick % Ticks.PerSecond * 100 / Ticks.PerSecond:00}s";
+            return $"{time} {Kind} {Source?.Name} -> {Target?.Name} {Amount} {Detail}".TrimEnd();
+        }
+    }
+}

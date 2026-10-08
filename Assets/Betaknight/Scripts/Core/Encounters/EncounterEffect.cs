@@ -17,6 +17,9 @@ namespace Betaknight.Core.Encounters
 
         /// <summary>Kundschaftet das nächste noch unbekannte Feld mit <see cref="EncounterEffect.Target"/> aus.</summary>
         ScoutNearest,
+
+        /// <summary>Hebt eine ausgerüstete Rune eine Stufe an (die mit der niedrigsten Stufe zuerst).</summary>
+        UpgradeRune,
     }
 
     /// <summary>Eine einzelne Wirkung. Die Menge wird beim Auslösen zwischen Min und Max (inklusive) gewürfelt.</summary>
@@ -41,6 +44,7 @@ namespace Betaknight.Core.Encounters
         public static EncounterEffect MaxHp(int amount) => new EncounterEffect(EffectKind.MaxHp, amount, amount);
         public static EncounterEffect Shards(int amount) => new EncounterEffect(EffectKind.Shards, amount, amount);
         public static EncounterEffect ScoutAround(int radius) => new EncounterEffect(EffectKind.ScoutAround, radius, radius);
+        public static EncounterEffect UpgradeRune() => new EncounterEffect(EffectKind.UpgradeRune, 1, 1);
         public static EncounterEffect ScoutNearest(CellContent target) => new EncounterEffect(EffectKind.ScoutNearest, 1, 1, target);
     }
 }
