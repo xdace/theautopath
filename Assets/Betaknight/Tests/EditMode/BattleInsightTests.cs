@@ -155,13 +155,14 @@ namespace Betaknight.Tests.EditMode
         /// Mit A-07 erneut aufgenommen: Belohnungen und Shops würfeln zusätzlich seltene Module, die Kämpfe selbst sind unverändert.
         /// Mit A-08 erneut: Skills wachsen aus Kämpfen (z. B. +1 Schaden pro Kill), spätere Kämpfe eines Runs ändern sich daher.
         /// Mit A-11 erneut: Schwierigkeits-Bonus der Bausteine und neue Erleichterer in den Angeboten.
+        /// Mit A-12 erneut: Skills neu eingestellt, Basisangriff 60 % und verkürzt Cooldowns, Gegner-HP 65 %.
         /// </summary>
-        [TestCase("blade", 5, "2 Kämpfe, 155 Ereignisse, 585C43CE50272DD0")]
-        [TestCase("blade", 21, "2 Kämpfe, 132 Ereignisse, 665200B922293DFD")]
-        [TestCase("shield", 5, "6 Kämpfe, 512 Ereignisse, 855004C05E4FE512")]
-        [TestCase("shield", 21, "3 Kämpfe, 191 Ereignisse, F023E0D011A540B7")]
-        [TestCase("spark", 5, "2 Kämpfe, 136 Ereignisse, 3DE9760BA9F5AA3C")]
-        [TestCase("spark", 21, "2 Kämpfe, 146 Ereignisse, 9AEBB76742137BCB")]
+        [TestCase("blade", 5, "2 Kämpfe, 155 Ereignisse, 7D43A03E96D5715A")]
+        [TestCase("blade", 21, "3 Kämpfe, 160 Ereignisse, ADD0148D12004233")]
+        [TestCase("shield", 5, "6 Kämpfe, 595 Ereignisse, DB8431A43A105995")]
+        [TestCase("shield", 21, "2 Kämpfe, 193 Ereignisse, B0E53D70179E3C79")]
+        [TestCase("spark", 5, "2 Kämpfe, 135 Ereignisse, C214BB6BAA0AD250")]
+        [TestCase("spark", 21, "2 Kämpfe, 137 Ereignisse, 40A265FC7D1AB4B6")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {
             Assert.AreEqual(fingerprint, Fingerprint(BotBattles(KnightKit.Defaults.Single(k => k.Id == kit), seed)));

@@ -72,31 +72,32 @@ namespace Betaknight.Core.Arena
         public static SkillCatalog CreateDefault()
         {
             var c = new SkillCatalog();
-            c.Register(SkillDefinition.BasicAttack);
+            // Der Basisangriff des Ritters: Füller und Motor (60 %, Treffer verkürzen Cooldowns), siehe SkillBudgetConfig.
+            c.Register(SkillBudgetConfig.Default.CreateKnightBasicAttack());
 
             c.Register(new SkillDefinition(SkillIds.ArmorBreak, "Rüstungsbruch", CastTime.Medium, 4, Ticks.FromSeconds(8), new ISkillEffect[]
             {
-                new DamageEffect(BasisPoints.Full),
+                new DamageEffect(BasisPoints.Percent(190)),
                 new StatModifierEffect(StatusIds.ArmorBreak, StatKind.ArmorMultiplier, -BasisPoints.Percent(50), Ticks.FromSeconds(6), onTarget: true),
-            }, "Schaden, Gegner-Rüstung −50 % für 6 s.", countsAsAttack: true, kinds: SkillKind.Attack));
+            }, "190 % Schaden, Gegner-Rüstung −50 % für 6 s.", countsAsAttack: true, kinds: SkillKind.Attack));
 
             c.Register(new SkillDefinition(SkillIds.Ignite, "Entzünden", CastTime.Fast, 4, Ticks.FromSeconds(6), new ISkillEffect[]
             {
-                new BurnEffect(Ticks.FromSeconds(5), BasisPoints.Percent(50)),
-            }, "Gegner brennt 5 s (50 % Waffenschaden pro Sekunde).", kinds: SkillKind.Fire));
+                new BurnEffect(Ticks.FromSeconds(5), BasisPoints.Percent(70)),
+            }, "Gegner brennt 5 s (70 % Waffenschaden pro Sekunde).", kinds: SkillKind.Fire));
 
             c.Register(new SkillDefinition(SkillIds.ShieldBash, "Schildschlag", CastTime.Medium, 4, Ticks.FromSeconds(6), new ISkillEffect[]
             {
-                new DamageEffect(BasisPoints.Percent(80)),
+                new DamageEffect(BasisPoints.Percent(70)),
                 new InterruptChargeEffect(),
-                new StunEffect(Ticks.FromTenths(15)),
-            }, "Schaden, betäubt 1,5 s, bricht Aufladung ab.", countsAsAttack: true, kinds: SkillKind.Shield));
+                new StunEffect(Ticks.FromSeconds(2)),
+            }, "Wenig Schaden, betäubt 2 s, bricht Aufladung ab.", countsAsAttack: true, kinds: SkillKind.Shield));
 
             c.Register(new SkillDefinition(SkillIds.EmpBash, "EMP-Schildschlag", CastTime.Heavy, 4, Ticks.FromSeconds(10), new ISkillEffect[]
             {
-                new DamageEffect(BasisPoints.Percent(80), allEnemies: true),
+                new DamageEffect(BasisPoints.Percent(50), allEnemies: true),
                 new StunEffect(Ticks.FromSeconds(3), allEnemies: true),
-            }, "Schaden an allen Gegnern, betäubt alle 3 s.", countsAsAttack: true, kinds: SkillKind.Shield | SkillKind.Shock));
+            }, "Wenig Schaden an allen Gegnern, betäubt alle 3 s.", countsAsAttack: true, kinds: SkillKind.Shield | SkillKind.Shock));
 
             c.Register(new SkillDefinition(SkillIds.Repair, "Not-Reparatur", CastTime.Heavy, 4, Ticks.FromSeconds(15), new ISkillEffect[]
             {
@@ -121,8 +122,8 @@ namespace Betaknight.Core.Arena
 
             c.Register(new SkillDefinition(SkillIds.Drill, "Bohrstoß", CastTime.Heavy, 6, Ticks.FromSeconds(5), new ISkillEffect[]
             {
-                new DamageEffect(BasisPoints.Percent(120), allEnemies: true),
-            }, "120 % Waffenschaden an allen Gegnern.", countsAsAttack: true, kinds: SkillKind.Attack));
+                new DamageEffect(BasisPoints.Percent(180), allEnemies: true),
+            }, "180 % Waffenschaden an allen Gegnern.", countsAsAttack: true, kinds: SkillKind.Attack));
 
             c.Register(new SkillDefinition(SkillIds.Anchor, "Bodenanker", CastTime.Fast, 4, Ticks.FromSeconds(10), new ISkillEffect[]
             {
@@ -136,9 +137,9 @@ namespace Betaknight.Core.Arena
 
             c.Register(new SkillDefinition(SkillIds.ShockStab, "Schockstich", CastTime.Fast, 2, Ticks.FromSeconds(3), new ISkillEffect[]
             {
-                new DamageEffect(BasisPoints.Percent(60)),
+                new DamageEffect(BasisPoints.Percent(80)),
                 new ChanceEffect(BasisPoints.Percent(20), new StunEffect(Ticks.FromSeconds(1))),
-            }, "Schneller Treffer, 20 % Chance auf 1 s Betäubung.", countsAsAttack: true, kinds: SkillKind.Attack | SkillKind.Shock));
+            }, "Schneller Treffer (80 %), 20 % Chance auf 1 s Betäubung.", countsAsAttack: true, kinds: SkillKind.Attack | SkillKind.Shock));
 
             c.Register(new SkillDefinition(SkillIds.Echo, "Echo-Protokoll", CastTime.Medium, 4, Ticks.FromSeconds(12), new ISkillEffect[]
             {
@@ -172,9 +173,9 @@ namespace Betaknight.Core.Arena
 
             c.Register(new SkillDefinition(SkillIds.LightningLance, "Blitzlanze", CastTime.Fast, 2, Ticks.FromSeconds(3), new ISkillEffect[]
             {
-                new DamageEffect(BasisPoints.Full),
+                new DamageEffect(BasisPoints.Percent(120)),
                 new ChanceEffect(BasisPoints.Percent(50), new StunEffect(Ticks.FromTenths(15))),
-            }, "Evolution von Schockstich: starker Stich, 50 % Chance auf 1,5 s Betäubung.", countsAsAttack: true,
+            }, "Evolution von Schockstich: starker Stich (120 %), 50 % Chance auf 1,5 s Betäubung.", countsAsAttack: true,
                 kinds: SkillKind.Attack | SkillKind.Shock, isEvolution: true));
 
             c.Register(new SkillDefinition(SkillIds.Resonance, "Resonanz", CastTime.Medium, 4, Ticks.FromSeconds(10), new ISkillEffect[]
@@ -185,17 +186,17 @@ namespace Betaknight.Core.Arena
 
             c.Register(new SkillDefinition(SkillIds.AcidDrill, "Säurebohrer", CastTime.Heavy, 6, Ticks.FromSeconds(5), new ISkillEffect[]
             {
-                new DamageEffect(BasisPoints.Percent(120), allEnemies: true),
+                new DamageEffect(BasisPoints.Percent(200), allEnemies: true),
                 new AllEnemiesEffect(new ApplyStatusEffect(() => new PoisonStatus(Ticks.FromSeconds(6), 2), onTarget: true)),
                 new AllEnemiesEffect(new ApplyStatusEffect(() => new PoisonStatus(Ticks.FromSeconds(6), 2), onTarget: true)),
-            }, "Evolution von Bohrstoß: Schaden an allen Gegnern, je 2 Gift-Stapel.", countsAsAttack: true, kinds: SkillKind.Attack, isEvolution: true));
+            }, "Evolution von Bohrstoß: 200 % an allen Gegnern, je 2 Gift-Stapel.", countsAsAttack: true, kinds: SkillKind.Attack, isEvolution: true));
 
             c.Register(new SkillDefinition(SkillIds.ScrapRam, "Schrottramme", CastTime.Medium, 4, Ticks.FromSeconds(6), new ISkillEffect[]
             {
-                new DamageEffect(BasisPoints.Percent(120), ignoreArmor: true),
+                new DamageEffect(BasisPoints.Percent(90), ignoreArmor: true),
                 new InterruptChargeEffect(),
-                new StunEffect(Ticks.FromSeconds(2)),
-            }, "Evolution von Schildschlag: Schaden ohne Rüstung, betäubt 2 s, bricht Aufladung ab.", countsAsAttack: true,
+                new StunEffect(Ticks.FromTenths(25)),
+            }, "Evolution von Schildschlag: Schaden ohne Rüstung, betäubt 2,5 s, bricht Aufladung ab.", countsAsAttack: true,
                 kinds: SkillKind.Shield, isEvolution: true));
         }
     }

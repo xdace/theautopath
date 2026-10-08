@@ -190,7 +190,7 @@ namespace Betaknight.Tests.EditMode
 
             // A-05: Die Teilstufe hebt nur Werte; die Skill-Stufe gehört dem Skill-Exemplar.
             SkillInfo info = s.DescribeSkill(SkillIds.ArmorBreak);
-            Assert.AreEqual(BasisPoints.Full, info.Effects.First(e => e.IsDamage).DamageBp);
+            Assert.AreEqual(BasisPoints.Percent(190), info.Effects.First(e => e.IsDamage).DamageBp, "Rüstungsbruch seit A-12: 190 %");
             StringAssert.Contains("Kurzklinge → Kurzklinge +1", messages.Last());
             StringAssert.Contains("Waffenschaden 2 → 3", messages.Last());
         }
@@ -217,7 +217,7 @@ namespace Betaknight.Tests.EditMode
 
             int weapon = 5 + 2 + 2 * 1;
             BattleEvent hit = r.Events.First(e => e.Kind == BattleEventKind.Damage && e.Detail == SkillIds.ArmorBreak);
-            Assert.AreEqual(BasisPoints.Of(weapon, BasisPoints.Full) + 7, hit.Amount);
+            Assert.AreEqual(BasisPoints.Of(weapon, BasisPoints.Percent(190)) + 7, hit.Amount);
         }
 
         [Test]

@@ -215,8 +215,8 @@ namespace Betaknight.Tests.EditMode
             SkillDefinition bash = gear.Boost(Catalog.Get(SkillIds.ShieldBash));
             SkillDefinition ignite = gear.Boost(Catalog.Get(SkillIds.Ignite));
 
-            Assert.AreEqual(BasisPoints.Percent(72), ((DamageEffect)stab.Effects[0]).DamageBp, "60 % + 20 %");
-            Assert.AreEqual(BasisPoints.Full, ((DamageEffect)breaker.Effects[0]).DamageBp, "Klinge ohne Schock: unverändert");
+            Assert.AreEqual(BasisPoints.Percent(96), ((DamageEffect)stab.Effects[0]).DamageBp, "80 % + 20 %");
+            Assert.AreEqual(BasisPoints.Percent(190), ((DamageEffect)breaker.Effects[0]).DamageBp, "Klinge ohne Schock: unverändert");
             Assert.AreEqual(Ticks.FromSeconds(5), bash.CooldownTicks, "6 s − 1 s");
             Assert.AreEqual(Catalog.Get(SkillIds.Ignite).CooldownTicks, ignite.CooldownTicks);
             Assert.AreSame(Catalog.Get(SkillIds.Ignite), ignite, "Ohne passenden Tag derselbe Skill");
@@ -240,7 +240,11 @@ namespace Betaknight.Tests.EditMode
 
             List<int> bashes = r.Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.ShieldBash).Select(e => e.Tick).ToList();
             Assert.GreaterOrEqual(bashes.Count, 2);
-            Assert.AreEqual(Ticks.FromSeconds(5), bashes[1] - bashes[0], "Cooldown 5 s statt 6 s");
+            // Jeder Treffer des Basisangriffs dazwischen verkürzt den laufenden Cooldown um 0,25 s (A-12).
+            int hits = r.Events.Count(e => e.Kind == BattleEventKind.Hit && e.Detail == SkillIds.BasicAttack && e.Tick > bashes[0] && e.Tick < bashes[1]);
+            Assert.Greater(hits, 0);
+            Assert.AreEqual(Ticks.FromSeconds(5) - hits * SkillBudgetConfig.Default.BasicAttackCooldownCutTicks, bashes[1] - bashes[0],
+                "Cooldown 5 s statt 6 s, abzüglich der Basisangriff-Treffer");
         }
 
         [Test]

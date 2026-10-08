@@ -195,8 +195,9 @@ namespace Betaknight.Tests.EditMode
                 BattleResult r = Run(Duel(knight, Fighter("B", 100000, 0, 1000, armor: 100)), 3);
                 return r.Events.First(e => e.Kind == BattleEventKind.Damage && e.Source?.Name == "Ritter").Amount;
             }
-            Assert.AreEqual(10, FirstHit(six));
-            Assert.Less(FirstHit(five), 10);
+            // A-12: Der Basisangriff des Ritters macht 60 % Waffenschaden.
+            Assert.AreEqual(6, FirstHit(six));
+            Assert.Less(FirstHit(five), 6);
         }
 
         [Test]

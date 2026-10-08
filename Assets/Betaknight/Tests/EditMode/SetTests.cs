@@ -98,9 +98,10 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void BrokenPhantomFlashbang()
         {
+            // Seit A-12 (Basisangriff 60 %, Skills tragen den Schaden) gewinnt eine Tafel nur mit der Blendgranate den
+            // Referenzkampf nicht mehr; geprüft wird weiter, was das Set bricht: die Granate läuft öfter als ihr Cooldown.
             BattleResult r = Fight(Knight(Wear("gyro_thrusters", "holo_projector", "shock_dagger"), R("always", SkillIds.Flashbang)));
 
-            Assert.AreEqual(BattleOutcome.Victory, r.Outcome);
             int seconds = r.EndTick / Ticks.PerSecond;
             Assert.Greater(Starts(r, SkillIds.Flashbang), seconds / 8 + 1, "Ausweichen senkt den Cooldown, die Granate läuft öfter als alle 8 s.");
         }

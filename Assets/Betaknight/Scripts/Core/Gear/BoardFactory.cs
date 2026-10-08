@@ -82,7 +82,9 @@ namespace Betaknight.Core.Gear
                 }
             }
             edges.RemoveAll(e => e.To.Row >= result.Count);
-            return new LogicBoard(result, null, edges.Count > 0 ? new LogicGraph(edges) : null);
+            // Fallback ist der Basisangriff des Ritters aus dem Katalog (60 %, verkürzt Cooldowns).
+            SkillDefinition basic = _skills.TryGet(SkillDefinition.BasicAttackId, out SkillDefinition b) ? b : null;
+            return new LogicBoard(result, basic, edges.Count > 0 ? new LogicGraph(edges) : null);
         }
 
         /// <summary>Auslöser werden zu Kanten im Graph: vom Skill bzw. Baustein der Zeile zum Skill der Zielzeile.</summary>

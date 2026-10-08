@@ -89,8 +89,17 @@ namespace Betaknight.Core.Combat
                 $"Lädt {windupTicks * 10 / Ticks.PerSecond / 10.0:0.#} s auf, {damagePercent} % Schaden.", countsAsAttack: true);
         }
 
+        /// <summary>
+        /// Leben aller Gegner in Prozent der Werte unten (A-12: der Basisangriff macht nur noch 60 %, Skills tragen den
+        /// Schaden; frühe Kämpfe mit 1–2 Start-Skills sollen gut schaffbar bleiben).
+        /// </summary>
+        public const int HpPercent = 65;
+
         private static CombatantSetup Enemy(string name, int hp, int damage, int interval, int armor, params LogicRow[] rows) =>
-            new CombatantSetup { Name = name, Stats = new CombatStats(hp, damage, interval, armor), Board = new LogicBoard(rows) };
+            new CombatantSetup
+            {
+                Name = name, Stats = new CombatStats(Math.Max(1, hp * HpPercent / 100), damage, interval, armor), Board = new LogicBoard(rows),
+            };
 
         private static List<CombatantSetup> One(CombatantSetup s) => new List<CombatantSetup> { s };
 

@@ -100,10 +100,25 @@ namespace Betaknight.Core.Arena
             CanBeRepeated = canBeRepeated;
         }
 
-        /// <summary>Der Basisangriff: 100 % Waffenschaden, Tempo aus den Kampfwerten.</summary>
-        public static SkillDefinition BasicAttack { get; } = new SkillDefinition(
-            BasicAttackId, "Basisangriff", 0, 0, 0, new ISkillEffect[] { new DamageEffect(BasisPoints.Full) },
-            "Waffenschaden.", isBasicAttack: true);
+        /// <summary>Der Basisangriff der Gegner: 100 % Waffenschaden, Tempo aus den Kampfwerten.</summary>
+        public static SkillDefinition BasicAttack { get; } = CreateBasicAttack(BasisPoints.Full, 0);
+
+        /// <summary>
+        /// Ein Basisangriff mit <paramref name="damageBp"/> Waffenschaden. Trifft er, verkürzt er alle laufenden
+        /// Skill-Cooldowns um <paramref name="cooldownCutTicks"/> (der Ritter, siehe <see cref="SkillBudgetConfig"/>).
+        /// </summary>
+        public static SkillDefinition CreateBasicAttack(int damageBp, int cooldownCutTicks)
+        {
+            string text = damageBp == BasisPoints.Full ? "Waffenschaden." : $"{SkillInfo.Percent(damageBp)} Waffenschaden.";
+            if (cooldownCutTicks > 0) text += $" Jeder Treffer verkürzt laufende Skill-Cooldowns um {SkillInfo.Seconds(cooldownCutTicks)}.";
+            return new SkillDefinition(BasicAttackId, "Basisangriff", 0, 0, 0, new ISkillEffect[] { new DamageEffect(damageBp) }, text, isBasicAttack: true)
+            {
+                CooldownCutOnHitTicks = Math.Max(0, cooldownCutTicks),
+            };
+        }
+
+        /// <summary>Nur Basisangriff: ein Treffer verkürzt alle laufenden Skill-Cooldowns um so viele Ticks.</summary>
+        public int CooldownCutOnHitTicks { get; private set; }
 
         /// <summary>Stufe des Skill-Exemplars (0 = Grundform). Höhere Stufen haben stärkere Wirkungen.</summary>
         public int Level { get; private set; }
@@ -166,6 +181,7 @@ namespace Betaknight.Core.Arena
                 DifficultyTier = DifficultyTier,
                 Difficulty = Difficulty,
                 _cooldownBeforeDifficulty = _cooldownBeforeDifficulty,
+                CooldownCutOnHitTicks = CooldownCutOnHitTicks,
             };
 
         // ------------------------------------------------------------------ Module (A-07)

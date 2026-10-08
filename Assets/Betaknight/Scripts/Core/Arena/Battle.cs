@@ -210,6 +210,7 @@ namespace Betaknight.Core.Arena
             if (!a.Skill.IsBasicAttack && a.Skill.CanBeRepeated) c.LastRepeatableSkill = a.Skill;
 
             var context = new SkillContext(this, c, target, a.Skill, a.RowIndex);
+            int eventsBefore = _events.Count;
             BeginActor(c, a.RowIndex, a.Skill.Difficulty.PowerPercent);
             foreach (ISkillEffect effect in a.Skill.Effects)
             {
@@ -232,6 +233,17 @@ namespace Betaknight.Core.Arena
                 }
             }
             EndActor();
+
+            // Basisangriff als Motor: ein Treffer verkürzt alle laufenden Skill-Cooldowns.
+            if (a.Skill.CooldownCutOnHitTicks > 0 && c.IsAlive && HitSince(c, eventsBefore))
+                c.ReduceCooldowns(a.Skill.CooldownCutOnHitTicks);
+        }
+
+        private bool HitSince(Combatant c, int from)
+        {
+            for (int i = from; i < _events.Count; i++)
+                if (_events[i].Kind == BattleEventKind.Hit && _events[i].Source == c) return true;
+            return false;
         }
 
         /// <summary>Nach der Wirkung: Wiederholungen aus «Mehrfach» vormerken, dann Auslöser des Skills feuern.</summary>

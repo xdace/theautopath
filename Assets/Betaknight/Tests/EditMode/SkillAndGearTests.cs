@@ -142,7 +142,7 @@ namespace Betaknight.Tests.EditMode
 
             List<BattleEvent> basics = On(r, "B", BattleEventKind.Damage).Where(e => e.Detail == SkillIds.BasicAttack).ToList();
             BattleEvent broken = On(r, "B", BattleEventKind.Damage).First(e => e.Detail == SkillIds.ArmorBreak);
-            Assert.AreEqual(10, broken.Amount, "Der Bruch-Treffer selbst trifft noch volle Rüstung.");
+            Assert.AreEqual(19, broken.Amount, "Der Bruch-Treffer selbst (190 %) trifft noch volle Rüstung.");
             Assert.IsTrue(basics.Where(e => e.Tick <= broken.Tick + Ticks.FromSeconds(6)).All(e => e.Amount == 13));
             Assert.IsTrue(basics.Where(e => e.Tick > broken.Tick + Ticks.FromSeconds(6)).All(e => e.Amount == 10));
         }
@@ -155,7 +155,7 @@ namespace Betaknight.Tests.EditMode
 
             List<BattleEvent> burns = On(r, "B", BattleEventKind.Damage).Where(e => e.Detail == StatusIds.Burn).ToList();
             Assert.AreEqual(5, burns.Count);
-            Assert.IsTrue(burns.All(e => e.Amount == 5), "50 % Waffenschaden, Rüstung zählt nicht.");
+            Assert.IsTrue(burns.All(e => e.Amount == 7), "70 % Waffenschaden, Rüstung zählt nicht.");
             Assert.IsEmpty(r.Events.Where(e => e.Kind == BattleEventKind.Hit && e.Detail == StatusIds.Burn), "Brennen ist kein Treffer.");
         }
 
