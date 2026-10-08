@@ -57,10 +57,10 @@ Travel stops by itself on hostile tiles (enemy, boss), on newly discovered tiles
 | Skill | Sieg (35 %), Elite (60 %), Truhe (50 %), Mine (35 %), Runensplitter (30 %), Shop (1 Skill, 14 Gold) | Neues Exemplar frei in die Sammlung. Schon vorhanden: «Wachstum +5» für das vorhandene Exemplar (siehe Wachsen und Evolution) oder «Zweites Exemplar» für eine weitere Komponente |
 | Platinen-Erweiterung: nächste Grösse | Garantiert bei jeder Boss-Flucht und beim Akt-Wechsel, als Wahl bei Elite-Siegen (50 %) und seltenen Truhen (10 %), Shop-Platz (20, 35, 50 … Gold pro Run, einer pro Shop) | 4×3 → 4×4 → 5×4 → 5×5 → 6×5 → 6×6 |
 | Modul (selten) | Elite (35 %), Truhe (15 %), garantiert bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 30 Gold) | Neues Exemplar frei in die Sammlung; schon vorhanden: «Stufe erhöhen» (+1, wo das Modul Stufen hat) oder «Weiteres Exemplar» |
-| Chip (selten) | Elite (35 %), Truhe (15 %), garantiert 1 bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 15 Gold) | Leiterbahn, Diode, Gatter, Kondensator oder Sicherung ins Chip-Inventar (siehe «Pins, Traces and Logic Chips») |
+| Chip (selten) | Elite (35 %), Truhe (15 %), garantiert 1 bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 15 Gold) | Leiterbahn, Diode, Gatter, Kondensator, Sicherung oder Effekt-Chip (Amplifier, Watchdog, Overflow, Firewall) ins Chip-Inventar (siehe «Pins, Traces and Logic Chips» und «Circuit Effects») |
 | Gold, Splitter | Kämpfe, Events, Minen, Boss-Flucht | Elite-Siege geben +4 Gold |
 
-Kampfbelohnungen bieten bevorzugt Verbesserungen an: Stufe für einen eigenen Skill, Stufe für ein getragenes Teil, ein fehlendes Set-Teil, Stufe für eine vorhandene Rune oder eine Rune zu einem vorhandenen Tag. Mindestens eine Option ist immer eine Verbesserung. Skill-Angebote bevorzugen Skills, deren Art zum Build passt (×3 Gewicht): Arten eigener Skills, Ziele der passiven Effekte der Ausrüstung und die Runen (Klinge → Angriff, Schild → Schild, Funke → Schock, Glut → Feuer und Heilung, Phantom → Bewegung). Gegner skalieren weiter über Ring und Akt, die Schutzregeln (eine Aktion pro Tick, Überhitzung ab 90 s) bleiben. Alle Werte stehen in `Core/Run/ProgressionConfig.cs`.
+Kampfbelohnungen bieten bevorzugt Verbesserungen an: Stufe für einen eigenen Skill, Stufe für ein getragenes Teil, ein fehlendes Set-Teil, Stufe für eine vorhandene Rune oder eine Rune zu einem vorhandenen Tag. Mindestens eine Option ist immer eine Verbesserung. Skill-Angebote bevorzugen Skills, deren Art zum Build passt (×3 Gewicht): Arten eigener Skills, Ziele der passiven Effekte der Ausrüstung und die Runen (Klinge → Angriff, Schild → Schild, Funke → Schock, Glut → Feuer und Heilung, Phantom → Bewegung). Gegner skalieren weiter über Ring und Akt, die Schutzregeln (eine Aktion pro Tick, Thermal Throttling ab 30 s) bleiben. Alle Werte stehen in `Core/Run/ProgressionConfig.cs`.
 
 ### Circuit Board (A-19)
 
@@ -174,6 +174,45 @@ The AND gate touches both relays and powers the Shock Stab next to it. HP Full i
 
 Every Clock tick fires Shock Stab, whose pulse is stored in the capacitor (the diode blocks the way back). When you get hit, When Hit touches the capacitor and releases it: the pulse runs along the trace and Lightning Lance strikes, powered by Clock. Without a hit, the capacitor releases on its own after 3 s. Needs a board 6 columns wide.
 
+### Circuit Effects, Hacks and Thermal Throttling (A-21)
+
+Effects change how your own board runs; hacks attack the enemy board. Every effect is data in `Core/Circuit/Effects.cs` (`CircuitEffectCatalog`, values in `CircuitEffectConfig`). The **form** of each effect (module, chip or skill) is a field there too: `WithForm(id, form)` turns e.g. Overclock into a chip, and it works the same (`CircuitEffectsTests.AnEffectWorksTheSameInAnotherForm`).
+
+- **Modules** go onto a component like any other module (Workshop, rewards, shop).
+- **Effect chips** are 1×1 logic chips. A chip that touches a component gives it the effect; board effects (Overflow, Firewall) work anywhere on the board, Firewall once per chip.
+- **Hack skills** are components like any other skill (Shock kind, sizes 1×1 to 2×2). When they execute, they hack the enemy instead of dealing damage.
+
+#### Glossary of effects
+
+| Effect | Form | Size / Kind | What it does |
+|---|---|---|---|
+| **Overclock** | Module | own component | −50 % computing time. Each execution gives touching components 1 **Heat**; at 5 Heat a component skips one execution, then its Heat resets. |
+| **Interrupt** | Module | own component | Jumps to the front of the queue when queued. |
+| **Parallel Thread** | Module | own component | Triggered while another execution runs, it runs at the same time, bypassing the queue (once per trigger). |
+| **Buffer** | Module | own component | May stand in the queue up to 3 times instead of once. |
+| **Recursion** | Module | own component | If its relay's condition still holds after it executed, it calls itself again; each depth +20 % effect (max. depth 5). |
+| **Amplifier** | Chip | conducts like a straight trace | Each pulse passing through gains +15 % effect (per amplifier on the path, not carried to the next component). |
+| **Watchdog** | Chip | gate-like relay | If none of your components fired for 2 s, it triggers your largest touching component (as a Hard relay). The idle time restarts after every execution. |
+| **Overflow** | Chip | whole board | While your queue holds 3 entries, every further entry turns into a shock against all enemies instead: 50 % of the size bonus × weapon damage, ignoring armor. |
+| **Firewall** | Chip | whole board | Blocks the next enemy hack (one per chip). |
+| **Bit Flip** | Skill | Hack, 1×1 | An enemy state relay that currently holds (the one powering the most cells) is inverted for 3 s. Event relays like Clock can't be flipped; then the hack fails. |
+| **Jam** | Skill | Hack, 1×2 | The enemy's most important relay (most powered cells) ignores its next 2 triggers. |
+| **Hijack** | Skill | Hack, 2×2 | The next execution of the enemy's largest powered component happens for you: your weapon damage, against the enemy. |
+| **Short Circuit** | Skill | Hack, 2×1 | The enemy's largest powered component fires at once and hits its own side (the next ally, else itself). |
+| **Latency** | Skill | Hack, 1×2 | All enemies get +50 % computing time for 4 s. |
+| **Thermal Throttling** | – | both boards | From 30 s on, every 5 s one step: +10 % computing time and ×1.15 damage per step (compounding, after armor). |
+
+**Enemies hack too:** Spark Drone jams every 9 s, Smelter sends Latency every 11 s, Siege Golem flips a relay every 10 s. A Firewall chip blocks the first hack.
+
+**Thermal Throttling** replaces the old Overheat damage: nobody takes damage from time alone any more, but fights speed toward an end because every hit grows. The rune "Overheat" now holds while Thermal Throttling is active. The boss fight (survive 15 s) is unchanged. Values: `ThermalConfig`.
+
+**Arena:** hacked components and relays flicker, components with Heat show a heat bar, recursion shows its depth, pulses show their amplifier gain (e.g. +15 %), and the top bar shows the Thermal Throttling step. The log explains every effect ("Charge Coil overheated at 5 Heat and skips this execution", "Every 1 s is jammed and ignores this trigger (1 left)", "Shock Stab calls itself again (Recursion depth 2, +40 % effect)" …).
+
+#### Shop: Reroll and Lock
+
+- **Reroll** costs 3 gold, each further reroll in the same visit +2 (3 → 5 → 7 …). Leaving and reopening the shop resets the price.
+- **Lock** (padlock on an offer) keeps it: it stays through rerolls and appears again, in front, at the next shop visit, also in another shop or act. Up to 2 locks at once; buying the offer releases its lock, clicking again unlocks it. Values: `ShopPrices.Reroll`, `RerollStep`, `LockSlots`.
+
 ### Kampf: Skills, Ausrüstung und Werte
 
 Wie die Platine feuert, steht oben unter «Circuit Board». Dieser Abschnitt beschreibt Skills, Ausrüstung, Tags, Module und Wachstum.
@@ -229,7 +268,7 @@ Anzeige: Das HUD zeigt die Zähler («Ladung 3/4», erreichte Schwellen gelb) un
   Die Werte stehen nicht in der UI, sondern kommen aus den Effekten: Jede `ISkillEffect` meldet über `Describe(SkillInfoBuilder)` ihre Kennzahlen mit denselben Formeln wie `Apply`. `SkillInfo.Create(skill, stats)` fasst sie zusammen, `OverworldSession.SkillUserStats()` liefert die Werte des Ritters zu Kampfbeginn. Neue Effekte müssen `Describe` umsetzen und erscheinen dann automatisch richtig.
 - 7 Ausrüstungsplätze (Helm, Handschuhe, Brust, Beinschienen, Waffe, Schild, Stiefel). Zweihandwaffen sperren den Schild.
 - 4 Sets mit Boni ab 2 und 3 Teilen: Überlast-Protokoll, Aegis-Firewall, Schrott-Ernter, Phantom-Signal.
-- Schutzregeln statt Balance-Bremsen: höchstens eine Aktion pro Tick, Reaktionen erst im nächsten Tick, ab 90 s Überhitzung. Kaputte Builds sind erlaubt, die Engine bleibt stabil.
+- Schutzregeln statt Balance-Bremsen: höchstens eine Aktion pro Tick, Reaktionen erst im nächsten Tick, ab 30 s Thermal Throttling (Cast-Zeit und Schaden steigen in Stufen). Kaputte Builds sind erlaubt, die Engine bleibt stabil.
 - Lagerfeuer kann eine Rune eine Stufe verstärken (z. B. «HP unter 30 %» → «HP unter 40 %»).
 - Sets: Fortschritt steht im HUD, in der Stat-Leiste und im Inventar. Teile angefangener Sets kommen 3× häufiger in Angebote, Shops verkaufen 2 Teile. Aegis-Firewall (ab 2 Teilen) schaltet die Rune «Ladung voll» frei.
 - **Goldminen-Verteidigung:** Alle 8 Züge wird eine eigene Mine angegriffen (rot, «!G»). 6 Züge Zeit, sonst ist sie verloren, bis sie zurückerobert ist. Der Kampf dort läuft «auf der Goldmine» (Schrott-Ernter, Rune «Auf Goldmine»).
@@ -408,7 +447,8 @@ Shops frühestens ab Ring 3 und höchstens 2, Truhen höchstens 6, Goldminen hö
 | Blind | Lower Accuracy |
 | Armor Break | Lower Armor |
 | Heat / Charge | Resources of the knight, shown as bars |
-| Overheat | Both fighters take growing damage after 90 s |
+| Thermal Throttling | From 30 s on, every 5 s: longer computing time and more damage for both sides |
+| Circuit effects, Hacks | See «Circuit Effects, Hacks and Thermal Throttling» |
 | Rune Shards | 3 shards open a reward choice |
 | Gold Mine | Gives gold every few turns, can be raided |
 | Portal | Escape from the boss after surviving |
@@ -427,18 +467,19 @@ Assets/Betaknight/
 │   │   ├── Encounters/    Kleine und mittlere Events: Katalog, Optionen, Wirkungen, Resolver
 │   │   ├── Run/           PlayerStats (HP, Gold, Splitter), KnightKit, ProgressionConfig
 │   │   ├── Runes/         Runen (Bedingungen der Relais), Runenwahl, RuneInventory
-│   │   ├── Circuit/       CircuitBoard (Raster, Kern, Relais, Komponenten, Chips), CircuitConfig, Formen und Zellen, Pins (PinCatalog), Chips (ChipCatalog)
-│   │   ├── Arena/         Kampfsimulator: Battle (Tick-Schleife, Pulse, Gatter, Kondensatoren), Combatant, LogicBoard, Wiring (Pulsverbindungen), Conditions/ (Runen-Bedingungen + ConditionRegistry),
+│   │   ├── Circuit/       CircuitBoard (Raster, Kern, Relais, Komponenten, Chips), CircuitConfig, Formen und Zellen, Pins (PinCatalog), Chips (ChipCatalog), Effects (CircuitEffectCatalog: Effekte, Form als Daten)
+│   │   ├── Arena/         Kampfsimulator: Battle (Tick-Schleife, Pulse, Gatter, Kondensatoren, Effekte, Hacks, Thermal Throttling), Thermal (ThermalConfig), Combatant, LogicBoard, Wiring (Pulsverbindungen), Conditions/ (Runen-Bedingungen + ConditionRegistry),
 │   │   │                  Effects/ (ISkillEffect), Statuses/, Skills/ (SkillCatalog), BattleModifier, Playback/ (Wiedergabe + Protokolltext),
 │   │   │                  Insight/ (BattleReport: Auswertung pro Komponente nach dem Kampf)
 │   │   ├── Gear/          Ausrüstung: EquipmentCatalog, Equipment, Inventory (Item-Raster mit fester Reihenfolge, IInventoryItem), BuildStats, BoardFactory (Platine → Kampf-Tafel), Sets/ (SetBonusRegistry),
 │   │   │                  Synergies/ (SynergyRegistry: Tags, Schwellen, Duos als Daten; Wirkungen als BattleModifier)
 │   │   ├── Combat/        ICombatResolver, ArenaCombatResolver, EnemyCatalog (Platzhalter-Resolver nur noch für Tests)
-│   │   ├── Shop/          Shop-Bestand und Preise
+│   │   ├── Shop/          Shop-Bestand, Preise, Angebote für Lock (ShopOffer)
 │   │   ├── Autoplay/      Testspieler: AutoplayBot (Strategie), BotAction, AutoplayRecorder + AutoplayReport/AutoplaySummary (JSON),
 │   │   │                  AutoplayOptions (Kommandozeile), HeadlessAutoplay (Lauf ohne Darstellung)
 │   │   ├── OverworldSession.cs              Fassade: Bewegung, kleine/mittlere Events, Runenwahl
-│   │   ├── OverworldSession.MajorEvents.cs  Fassade: Kampf, Truhe, Goldmine, Shop
+│   │   ├── OverworldSession.MajorEvents.cs  Fassade: Kampf, Truhe, Goldmine, Shop (Reroll mit steigendem Preis)
+│   │   ├── OverworldSession.ShopLocks.cs    Fassade: gesperrte Shop-Angebote über Besuche und Akte
 │   │   ├── Skills/        SkillInstance (Exemplar), ISkillHolder (Ort), SkillCollection (Sammlung)
 │   │   ├── Modules/       ModuleDefinition + ModuleCatalog, ModuleInstance (Exemplar, Ziel), IModuleHolder (Ort), ModuleCollection, ModuleRules
 │   │   ├── Growth/        GrowthRule + GrowthCatalog (Regeln als Daten), GrowthStages (Meilensteine), GrowthApplier, GrowthTally (Zählen aus dem Protokoll)
@@ -595,7 +636,13 @@ Seit A-18 sind alle Spieltexte Englisch. Texte stehen pro Bereich an einem Ort: 
 | Rüstung, Ausweichen, Krit, Präzision, Angriffe/s | Armor, Dodge, Crit, Accuracy, Attacks/s |
 | Betäubung, Brennen, Gift, Blendung, Rüstungsbruch | Stun, Burn, Poison, Blind, Armor Break |
 | Hitze, Ladung, Takt (Tag), Schrott | Heat, Charge, Haste, Scrap |
-| Tempo-Stapel, Überhitzung | Haste stacks, Overheat |
+| Tempo-Stapel | Haste stacks |
+| Überhitzung (Zeitlimit), Hitze (Overclock) | Thermal Throttling, Heat |
+| Übertakten, Unterbrechung, Paralleler Thread, Puffer, Rekursion | Overclock, Interrupt, Parallel Thread, Buffer, Recursion |
+| Verstärker, Wachhund, Überlauf, Firewall | Amplifier, Watchdog, Overflow, Firewall |
+| Bit-Kipper, Störung, Kapern, Kurzschluss, Verzögerung | Bit Flip, Jam, Hijack, Short Circuit, Latency |
+| Neu würfeln, Sperren | Reroll, Lock |
+| Rechenzeit (= Cast-Zeit) | Computing time |
 | Protokoll, Auswertung | Log, Report |
 | Zug, Akt, Runensplitter, Lagerfeuer, Truhe, Goldmine | Turn, Act, Rune Shards, Campfire, Chest, Gold Mine |
 | Spiel vorbei, Testspieler | Game Over, Autoplay |
