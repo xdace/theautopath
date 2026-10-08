@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Betaknight.Core.Circuit;
+using Betaknight.Core.Shop;
 
 namespace Betaknight.Core
 {
@@ -98,6 +99,7 @@ namespace Betaknight.Core
             string id = PendingShop.Inventory.ChipIds[index];
             Stats.TrySpendGold(ShopPrices.Chip);
             PendingShop.Inventory.RemoveChipAt(index);
+            Unlock(ShopOfferKind.Chip, id);
             GrantChip(id);
             return true;
         }

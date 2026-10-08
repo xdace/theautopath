@@ -5,6 +5,7 @@ using Betaknight.Core.Circuit;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Modules;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Shop;
 using Betaknight.Core.Skills;
 
 namespace Betaknight.Core
@@ -226,6 +227,7 @@ namespace Betaknight.Core
             string id = PendingShop.Inventory.ModuleIds[index];
             Stats.TrySpendGold(ShopPrices.Module);
             PendingShop.Inventory.RemoveModuleAt(index);
+            Unlock(ShopOfferKind.Module, id);
             GainModule(id, choice);
             return true;
         }

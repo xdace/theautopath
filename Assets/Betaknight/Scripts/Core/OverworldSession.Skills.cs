@@ -5,6 +5,7 @@ using Betaknight.Core.Arena;
 using Betaknight.Core.Circuit;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Shop;
 using Betaknight.Core.Skills;
 
 namespace Betaknight.Core
@@ -159,6 +160,7 @@ namespace Betaknight.Core
             string id = PendingShop.Inventory.SkillIds[index];
             Stats.TrySpendGold(ShopPrices.Skill);
             PendingShop.Inventory.RemoveSkillAt(index);
+            Unlock(ShopOfferKind.Skill, id);
             GainSkill(id, choice);
             return true;
         }

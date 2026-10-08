@@ -87,6 +87,7 @@ namespace Betaknight.Core
             session.CarryRecipeBook(previous);
             session.CarryModules(previous);
             session.CarryChips(previous);
+            session.CarryShopLocks(previous);
             return session;
         }
     }

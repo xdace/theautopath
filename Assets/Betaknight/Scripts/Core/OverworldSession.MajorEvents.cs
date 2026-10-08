@@ -213,6 +213,8 @@ namespace Betaknight.Core
                 _shops.Add(cell.Coord, inventory);
             }
 
+            RerollsThisVisit = 0;
+            KeepLockedOffers(inventory);
             PendingShop = new ShopVisit(cell, inventory);
             ShopOpened?.Invoke(PendingShop);
             return true;
@@ -236,6 +238,7 @@ namespace Betaknight.Core
 
             Stats.TrySpendGold(ShopPrices.Rune);
             PendingShop.Inventory.Remove(rune);
+            Unlock(ShopOfferKind.Rune, rune.Id);
             RuneTaken?.Invoke(rune);
             return true;
         }
@@ -269,18 +272,26 @@ namespace Betaknight.Core
             return true;
         }
 
-        public bool CanRerollShop => PendingShop != null && Stats.Gold >= ShopPrices.Reroll;
+        /// <summary>Rerolls in diesem Shop-Besuch (A-21: jeder macht den nächsten teurer).</summary>
+        public int RerollsThisVisit { get; private set; }
 
-        /// <summary>Würfelt Runen, Teile und Skills im Shop neu.</summary>
+        /// <summary>Preis des nächsten Rerolls: Grundpreis + Aufschlag je Reroll in diesem Besuch.</summary>
+        public int ShopRerollPrice => ShopPrices.Reroll + ShopPrices.RerollStep * RerollsThisVisit;
+
+        public bool CanRerollShop => PendingShop != null && Stats.Gold >= ShopRerollPrice;
+
+        /// <summary>Würfelt Runen, Teile, Skills, Module und Chips im Shop neu. Gesperrte Angebote (Lock) bleiben.</summary>
         public bool RerollShop()
         {
             if (!CanRerollShop) return false;
-            Stats.TrySpendGold(ShopPrices.Reroll);
+            Stats.TrySpendGold(ShopRerollPrice);
+            RerollsThisVisit++;
             PendingShop.Inventory.Replace(RuneOffer.Create("Shop", RuneCatalog, Board, _random, isOwned: RuneInventory.Contains).Options);
             PendingShop.Inventory.ReplaceItems(PickItems(ShopItemCount));
             PendingShop.Inventory.ReplaceSkills(PickSkills(Progression.ShopSkillCount));
             PendingShop.Inventory.ReplaceModules(RollShopModules());
             PendingShop.Inventory.ReplaceChips(RollShopChips());
+            KeepLockedOffers(PendingShop.Inventory);
             return true;
         }
 

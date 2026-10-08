@@ -5,6 +5,7 @@ using Betaknight.Core.Arena;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Shop;
 using Betaknight.Core.Skills;
 
 namespace Betaknight.Core
@@ -142,6 +143,7 @@ namespace Betaknight.Core
 
             Stats.TrySpendGold(ShopPrices.Item);
             PendingShop.Inventory.RemoveItemAt(index);
+            Unlock(ShopOfferKind.Item, item.Id);
             PlaceNewItem(item, placement);
             return true;
         }
