@@ -157,10 +157,11 @@ namespace Betaknight.Tests.EditMode
         /// Mit A-11 erneut: Schwierigkeits-Bonus der Bausteine und neue Erleichterer in den Angeboten.
         /// Mit A-12 erneut: Skills neu eingestellt, Basisangriff 60 % und verkürzt Cooldowns, Gegner-HP 65 %.
         /// Mit A-13 erneut: Warteschlange, erfüllte Zeilen warten statt übersprungen zu werden; durchgehend erfüllte feuern nach jedem Cooldown.
+        /// Schild mit Bohrstoß an der Start-Rune: Seed 5 des Schildritters erneut aufgenommen.
         /// </summary>
         [TestCase("blade", 5, "2 Kämpfe, 160 Ereignisse, ECDD1EF6E91402DD")]
         [TestCase("blade", 21, "3 Kämpfe, 168 Ereignisse, 2427B85FF7426862")]
-        [TestCase("shield", 5, "6 Kämpfe, 640 Ereignisse, A33DB06D2FF3750E")]
+        [TestCase("shield", 5, "4 Kämpfe, 336 Ereignisse, 23FF6E4CF91A9B38")]
         [TestCase("shield", 21, "2 Kämpfe, 200 Ereignisse, 3CF50B54B9F5F2B1")]
         [TestCase("spark", 5, "2 Kämpfe, 139 Ereignisse, FC176BE2532C6AA4")]
         [TestCase("spark", 21, "2 Kämpfe, 142 Ereignisse, F7164EE645981A14")]

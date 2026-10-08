@@ -6,7 +6,8 @@ namespace Betaknight.Core.Run
 {
     /// <summary>
     /// Start-Ausrüstung, die der Spieler vor dem Run wählt. Gibt dem Build eine erste Richtung:
-    /// Werte, Start-Rune, Startausrüstung und 1–2 Start-Skills in der Sammlung (der erste sitzt an der Start-Rune).
+    /// Werte, Start-Rune, Startausrüstung und 2–3 Start-Skills in der Sammlung (der erste sitzt an der Start-Rune).
+    /// Jedes Kit hat mindestens einen Schadens-Skill an der Start-Rune (A-12: Skills sind der Hauptschaden).
     /// </summary>
     public sealed class KnightKit
     {
@@ -50,8 +51,8 @@ namespace Betaknight.Core.Run
                 "Setzt auf Druck: seine Zeilen feuern, wenn Angriffe treffen.",
                 new[] { "short_blade" }, "armor_break", "shock_stab"),
             new KnightKit("shield", "Schildritter", RuneTag.Shield, "when_hit", 36, 3,
-                "Hält viel aus und reagiert, wenn er getroffen wird.",
-                new[] { "short_sword", "round_shield" }, "shield_bash", "shield_wall"),
+                "Hält viel aus und schlägt zurück, wenn er getroffen wird.",
+                new[] { "short_sword", "round_shield" }, "drill", "shield_bash", "shield_wall"),
             new KnightKit("spark", "Funkenritter", RuneTag.Spark, "every_3rd", 30, 8,
                 "Zählt Angriffe und löst im Takt aus.",
                 new[] { "spark_staff" }, "ignite", "coolant"),

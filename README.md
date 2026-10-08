@@ -38,7 +38,7 @@ Eine Reise stoppt automatisch auf feindlichen Feldern (Gegner, Boss), auf neu en
 
 ### Ablauf eines frühen Runs
 
-1. **Kit wählen:** Klingen-, Schild- oder Funkenritter. Jedes Kit bringt HP, Gold, eine Start-Rune und zwei Start-Skills mit (der erste sitzt an der Start-Rune, der zweite liegt frei in der Sammlung).
+1. **Kit wählen:** Klingen-, Schild- oder Funkenritter. Jedes Kit bringt HP, Gold, eine Start-Rune und Start-Skills mit: der erste ist ein Schadens-Skill und sitzt an der Start-Rune, die übrigen liegen frei in der Sammlung. Klinge: Rüstungsbruch, Schockstich. Schild: Bohrstoß (an «Wenn getroffen»), Schildschlag, Notfall-Schildwall. Funken: Entzünden, Kühlmittel-Injektion.
 2. **Ring 1** um den Start hat nur kleine Events (Münzen, Kräuter, Runensplitter, Wegweiser). Sie wirken sofort und melden sich unten links.
 3. **Ab Ring 2** kommen mittlere Events mit einer Entscheidung und die ersten Kämpfe. Truhen sind selten, Shops gibt es erst ab Ring 3. **Ab Ring 3** gibt es Elite-Gegner (Feld «E»): zwei Stufen stärker, mit mehr Leben und Schaden, dafür mehr Gold und oft eine Tafel-Erweiterung.
 4. **3 Runensplitter** öffnen eine Runenwahl, ebenso jeder gewonnene Kampf und jede Truhe. Die Tafel startet mit 3 Zeilen und wächst bis 8 (siehe «Belohnungen»).
@@ -89,7 +89,7 @@ Die Regel steht als Daten in `Arena/SkillBudget.cs` (`SkillBudgetConfig.Default`
 | EMP-Schildschlag | 50 % an allen | Nutzen | betäubt alle 3 s |
 | Schrottramme | 90 % ohne Rüstung | Nutzen | betäubt 2,5 s |
 
-**Gegner-HP** liegen bei 65 % der früheren Werte (`EnemyCatalog.HpPercent`), damit frühe Kämpfe mit dem Start-Kit (1–2 Skills) gut schaffbar bleiben. Der Boss bleibt unbesiegbar; die 15 s bis zum Portal schafft jedes Start-Kit (Test). Gold pro Kampf bleibt unverändert, weil Kämpfe eher kürzer werden. Abgleich mit dem Testspieler über 60 Runs: ungefähr gleich viele Runs erreichen Akt 3 wie vorher. Der Schildritter startet mit zwei Nutzen-Skills und bleibt beim Basisangriff-Anteil hoch, bis er Schadens-Skills findet.
+**Gegner-HP** liegen bei 65 % der früheren Werte (`EnemyCatalog.HpPercent`), damit frühe Kämpfe mit dem Start-Kit (1–2 Skills) gut schaffbar bleiben. Der Boss bleibt unbesiegbar; die 15 s bis zum Portal schafft jedes Start-Kit (Test). Gold pro Kampf bleibt unverändert, weil Kämpfe eher kürzer werden. Abgleich mit dem Testspieler über 60 Runs: ungefähr gleich viele Runs erreichen Akt 3 wie vorher. Der Schildritter startet zusätzlich mit Bohrstoß an «Wenn getroffen» (vorher nur Schildschlag und Schildwall, beides Nutzen); sein Basisangriff-Anteil ab Akt 2 sank damit im Testspieler von etwa 65 % auf etwa 23 % (ähnlich wie bei Klinge und Funken), die Überlebensrate blieb gleich (160 Schild-Runs: Akt 3 in 61 statt 60 Runs).
 
 **Anzeige:** Die Kampf-Auswertung zeigt den Anteil gross über der Tabelle («Basisangriff 28 % · Skills 72 %», grün bis 30 %). Der Testspieler-Bericht enthält pro Run `basicAttackSharePercent`, `basicAttackShareFromAct2Percent` (Ziel höchstens 30 %) und `basicAttackShareByAct`, das Log den Anteil in der Run-Zeile.
 

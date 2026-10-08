@@ -33,9 +33,9 @@ namespace Betaknight.Tests.EditMode
         public void BotNutztAlleBausteineDesSpiels()
         {
             // Über mehrere Seeds soll die Strategie jede Art von Entscheidung mindestens einmal treffen
-            // (Seed 1 bekommt bis Akt 3 einen Auslöser angeboten).
+            // (Seed 13 bekommt bis Akt 3 einen Auslöser angeboten; seit dem Bohrstoß im Schild-Kit nicht mehr Seed 1).
             var summary = new AutoplaySummary();
-            foreach (int seed in new[] { 1, 2, 3, 4, 5, 6 }) summary.Runs.Add(HeadlessAutoplay.Run(seed, targetAct: seed == 1 ? 3 : 2));
+            foreach (int seed in new[] { 1, 2, 3, 4, 5, 6, 13 }) summary.Runs.Add(HeadlessAutoplay.Run(seed, targetAct: seed == 13 ? 3 : 2));
 
             Assert.That(summary.Ok, Is.True, summary.Summary());
             var rewards = summary.Runs.SelectMany(r => r.Rewards.Keys).Distinct().ToList();

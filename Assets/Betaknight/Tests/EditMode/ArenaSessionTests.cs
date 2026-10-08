@@ -76,14 +76,14 @@ namespace Betaknight.Tests.EditMode
             var resolver = new ArenaCombatResolver();
             BattleSetup setup = resolver.CreateSetup(new CombatRequest(CellContent.Enemy, 1, s.Stats, s.Runes, s.Gear), new List<CombatantSetup> { new CombatantSetup() }, 1);
 
-            Assert.AreEqual(SkillIds.ShieldBash, setup.Player.Board.Rows[0].Skill.Id);
+            Assert.AreEqual(SkillIds.Drill, setup.Player.Board.Rows[0].Skill.Id);
             Assert.AreEqual(s.Stats.MaxHp, setup.Player.Stats[StatKind.MaxHp]);
             Assert.AreEqual(2, setup.Player.Stats[StatKind.Armor], "Rundschild");
 
             s.Gear.Unequip(EquipmentSlot.Shield);
             setup = resolver.CreateSetup(new CombatRequest(CellContent.Enemy, 1, s.Stats, s.Runes, s.Gear), new List<CombatantSetup> { new CombatantSetup() }, 1);
             // A-05: Der Skill gehört der Zeile, nicht dem Schild. Ablegen kostet nur die Werte.
-            Assert.AreEqual(SkillIds.ShieldBash, setup.Player.Board.Rows[0].Skill.Id);
+            Assert.AreEqual(SkillIds.Drill, setup.Player.Board.Rows[0].Skill.Id);
             Assert.AreEqual(0, setup.Player.Stats[StatKind.Armor]);
         }
 

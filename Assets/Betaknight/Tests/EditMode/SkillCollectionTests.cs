@@ -20,8 +20,16 @@ namespace Betaknight.Tests.EditMode
 
         private static KnightKit Kit(string id) => KnightKit.Defaults.Single(k => k.Id == id);
 
-        private static OverworldSession Session(string kit = "shield", int seed = 3) =>
-            OverworldSession.Create(new MapGenerationConfig { Radius = 4, Seed = seed }, kit: Kit(kit));
+        /// <summary>
+        /// Session mit Start-Kit. Beim Schildritter sitzt hier Schildschlag an der Start-Rune (seit A-12 startet dort Bohrstoß),
+        /// damit die Tests weiter einen Skill mit Betäubung an Zeile 1 haben; Bohrstoß und Schildwall liegen frei.
+        /// </summary>
+        private static OverworldSession Session(string kit = "shield", int seed = 3)
+        {
+            OverworldSession s = OverworldSession.Create(new MapGenerationConfig { Radius = 4, Seed = seed }, kit: Kit(kit));
+            if (kit == "shield") s.PlaceSkill(s.Skills.All.Single(i => i.SkillId == SkillIds.ShieldBash).InstanceId, 0);
+            return s;
+        }
 
         /// <summary>Session mit drei Zeilen: Start-Rune plus zwei weitere.</summary>
         private static OverworldSession ThreeRows()
@@ -91,7 +99,7 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(s.RemoveSkill(0));
             Assert.IsNull(s.Runes.Rows[0].Skill);
             Assert.IsTrue(bash.IsFree);
-            Assert.AreEqual(2, s.Skills.Count, "Das Exemplar bleibt in der Sammlung");
+            Assert.AreEqual(3, s.Skills.Count, "Das Exemplar bleibt in der Sammlung");
         }
 
         [Test]
@@ -119,7 +127,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreSame(bash, s.GainSkill(SkillIds.ShieldBash, SkillDuplicateChoice.Upgrade));
             Assert.AreEqual(1, bash.Level);
             Assert.AreEqual(5, bash.Growth);
-            Assert.AreEqual(2, s.Skills.Count, "kein neues Exemplar");
+            Assert.AreEqual(3, s.Skills.Count, "kein neues Exemplar");
             StringAssert.Contains("Schildschlag → Schildschlag +5", messages.Last());
             Assert.AreEqual(stunBefore + 5 * Ticks.FromTenths(1), s.DescribeSkill(bash).Effects.First(e => e.DurationTicks > 0).DurationTicks);
 
@@ -266,7 +274,7 @@ namespace Betaknight.Tests.EditMode
             foreach (KnightKit kit in KnightKit.Defaults)
             {
                 OverworldSession s = OverworldSession.Create(new MapGenerationConfig { Radius = 4, Seed = 3 }, kit: kit);
-                Assert.That(s.Skills.Count, Is.InRange(1, 2), kit.Id);
+                Assert.That(s.Skills.Count, Is.InRange(2, 3), kit.Id);
                 CollectionAssert.AreEquivalent(kit.StartSkillIds, s.Skills.All.Select(i => i.SkillId), kit.Id);
                 Assert.AreEqual(kit.StartSkillId, s.Runes.Rows[0].SkillId, kit.Id);
                 Assert.AreSame(s.Runes.Rows[0].Skill, s.Skills.All[0], "Das Exemplar an der Tafel gehört zur Sammlung");
@@ -295,14 +303,14 @@ namespace Betaknight.Tests.EditMode
         {
             OverworldSession s = Session();
             s.Stats.AddGold(100);
-            var shop = new Betaknight.Core.Shop.ShopInventory(new RuneDefinition[0], null, new[] { SkillIds.Drill });
+            var shop = new Betaknight.Core.Shop.ShopInventory(new RuneDefinition[0], null, new[] { SkillIds.Anchor });
             typeof(OverworldSession).GetProperty(nameof(OverworldSession.PendingShop))
                 .SetValue(s, new ShopVisit(s.CurrentCell, shop));
 
             int gold = s.Stats.Gold;
             Assert.IsTrue(s.BuyShopSkill(0));
             Assert.AreEqual(gold - s.ShopPrices.Skill, s.Stats.Gold);
-            Assert.IsTrue(s.OwnsSkill(SkillIds.Drill));
+            Assert.IsTrue(s.OwnsSkill(SkillIds.Anchor));
             Assert.IsEmpty(shop.SkillIds);
         }
 
@@ -327,7 +335,7 @@ namespace Betaknight.Tests.EditMode
             OverworldSession next = OverworldSession.CreateNextAct(new MapGenerationConfig { Radius = 4, Seed = 3 }, s);
             Assert.AreSame(s.Skills, next.Skills);
             Assert.IsTrue(next.OwnsSkill(SkillIds.Drill));
-            Assert.AreSame(next.Skills.All[0], next.Runes.Rows[0].Skill);
+            Assert.IsTrue(next.Skills.Contains(next.Runes.Rows[0].Skill), "Das Exemplar an der Tafel reist mit");
         }
     }
 }

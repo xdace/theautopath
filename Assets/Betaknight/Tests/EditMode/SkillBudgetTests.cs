@@ -143,6 +143,14 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
+        public void EveryStartKitHasADamageSkillOnItsStartRune()
+        {
+            foreach (KnightKit kit in KnightKit.Defaults)
+                Assert.IsTrue(SkillBudgetConfig.IsDamageSkill(Skills.Get(kit.StartSkillId)), $"{kit.Name}: {kit.StartSkillId}");
+            Assert.AreEqual(SkillIds.Drill, KnightKit.Defaults.Single(k => k.Id == "shield").StartSkillId);
+        }
+
+        [Test]
         public void EveryStartKitBeatsTheEasiestEnemy()
         {
             EnemyDefinition rat = EnemyCatalog.CreateDefault().All.Single(e => e.Id == "scrap_rat");
