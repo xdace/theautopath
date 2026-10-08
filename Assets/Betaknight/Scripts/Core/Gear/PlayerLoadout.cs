@@ -7,7 +7,8 @@ namespace Betaknight.Core.Gear
     public static class PlayerLoadout
     {
         public static CombatantSetup CreateCombatant(string name, CombatStats baseStats, Equipment equipment,
-            IEnumerable<BoardRowSpec> rows, int startHp = 0, BoardFactory boards = null, SetBonusRegistry sets = null)
+            IEnumerable<BoardRowSpec> rows, int startHp = 0, BoardFactory boards = null, SetBonusRegistry sets = null,
+            SkillLevelRules skillLevels = null)
         {
             equipment = equipment ?? new Equipment();
             boards = boards ?? BoardFactory.CreateDefault();
@@ -18,7 +19,7 @@ namespace Betaknight.Core.Gear
                 Name = name,
                 Stats = equipment.ApplyTo(baseStats),
                 StartHp = startHp,
-                Board = boards.Create(rows, equipment),
+                Board = boards.Create(rows, equipment, skillLevels),
                 Modifiers = sets.CreateModifiers(equipment),
             };
         }

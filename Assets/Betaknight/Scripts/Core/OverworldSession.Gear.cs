@@ -25,11 +25,18 @@ namespace Betaknight.Core
 
         /// <summary>Werte des Ritters zu Kampfbeginn (Waffe, Werte, aktive Set-Boni), wie der Kampf sie nutzt.</summary>
         public SkillUserStats SkillUserStats() =>
-            (_combat as ArenaCombatResolver ?? new ArenaCombatResolver()).PreviewStats(Stats, Runes, Gear);
+            (_combat as ArenaCombatResolver ?? new ArenaCombatResolver()).PreviewStats(Stats, Runes, Gear, null, Progression.SkillLevels);
 
-        /// <summary>Kennzahlen eines Skills mit der aktuellen Ausrüstung. Null bei unbekannter Id.</summary>
-        public SkillInfo DescribeSkill(string skillId, SkillUserStats stats = null) =>
-            SkillCatalog.TryGet(skillId, out SkillDefinition skill) ? SkillInfo.Create(skill, stats ?? SkillUserStats()) : null;
+        /// <summary>Skill mit der Stufe aus der Ausrüstung (z. B. Bohrstoß +1). Null bei unbekannter Id.</summary>
+        public SkillDefinition LeveledSkill(string skillId) =>
+            SkillCatalog.TryGet(skillId, out SkillDefinition skill) ? skill.AtLevel(Gear.SkillLevel(skillId), Progression.SkillLevels) : null;
+
+        /// <summary>Kennzahlen eines Skills mit der aktuellen Ausrüstung und ihrer Stufe. Null bei unbekannter Id.</summary>
+        public SkillInfo DescribeSkill(string skillId, SkillUserStats stats = null)
+        {
+            SkillDefinition skill = LeveledSkill(skillId);
+            return skill != null ? SkillInfo.Create(skill, stats ?? SkillUserStats()) : null;
+        }
 
         /// <summary>Sets, von denen mindestens ein Teil getragen wird, mit Teilezahl.</summary>
         public List<(SetDefinition set, int pieces)> WornSets()
@@ -71,7 +78,7 @@ namespace Betaknight.Core
         public bool CanTakeItem(int itemIndex, ItemPlacement placement = ItemPlacement.Auto) =>
             PendingRuneOffer != null && itemIndex >= 0 && itemIndex < PendingRuneOffer.ItemIds.Count
             && Items.TryGet(PendingRuneOffer.ItemIds[itemIndex], out EquipmentDefinition item)
-            && (placement != ItemPlacement.Equip || Gear.CanEquip(item, out _));
+            && (placement != ItemPlacement.Equip || Gear.CanEquip(item, out _) || CanUpgradeItem(item.Id));
 
         /// <summary>Ordnet einer Zeile einen Skill zu. Erlaubt sind getragene Skills, der Basisangriff oder null (leer).</summary>
         public bool AssignSkill(int row, string skillId)
@@ -142,7 +149,8 @@ namespace Betaknight.Core
 
         private List<string> RollRewardItems(string source)
         {
-            bool offerItem = source == "Schatztruhe" || ((source == "Sieg" || source == "Mine verteidigt") && _random.Next(100) < VictoryItemChance);
+            bool offerItem = source == RewardSources.Treasure
+                || (RewardSources.IsFight(source) && _random.Next(100) < VictoryItemChance);
             return offerItem ? PickItems(1) : new List<string>();
         }
 
@@ -155,7 +163,7 @@ namespace Betaknight.Core
             foreach (EquipmentDefinition item in Items.All)
             {
                 // Schon getragene oder gelagerte Teile nicht noch einmal; Schilde trotz Zweihand gehen ins Inventar.
-                if (item.Weight <= 0 || Gear.Get(item.Slot) == item || Inventory.Contains(item.Id)) continue;
+                if (item.Weight <= 0 || Gear.Get(item.Slot)?.Id == item.Id || Inventory.Contains(item.Id)) continue;
                 pool.Add(item);
                 total += OfferWeight(item);
             }

@@ -91,6 +91,22 @@ namespace Betaknight.Core.Arena
             BasicAttackId, "Basisangriff", 0, 0, 0, new ISkillEffect[] { new DamageEffect(BasisPoints.Full) },
             "Waffenschaden.", isBasicAttack: true);
 
+        /// <summary>Stufe aus dem Ausrüstungsteil (0 = Grundform). Höhere Stufen haben stärkere Wirkungen.</summary>
+        public int Level { get; private set; }
+
+        /// <summary>
+        /// Derselbe Skill auf einer Stufe: stufbare Wirkungen werden stärker, Zeiten bleiben gleich.
+        /// Der Basisangriff hat keine Stufen.
+        /// </summary>
+        public SkillDefinition AtLevel(int level, SkillLevelRules rules)
+        {
+            if (level <= 0 || rules == null || IsBasicAttack) return this;
+            var effects = new List<ISkillEffect>();
+            foreach (ISkillEffect e in Effects) effects.Add(e is ILevelableEffect l ? l.AtLevel(level, rules) : e);
+            return new SkillDefinition(Id, Name, WindupTicks, RecoveryTicks, CooldownTicks, effects, Description, CountsAsAttack,
+                CanBeRepeated, IsBasicAttack) { Level = level };
+        }
+
         public override string ToString() => Name;
     }
 }

@@ -17,13 +17,16 @@ namespace Betaknight.Core.Map
 
         /// <summary>Kleines oder mittleres Event aus dem <see cref="Encounters.EncounterCatalog"/>.</summary>
         Encounter = 6,
+
+        /// <summary>Elite-Gegner: stärker als normale Gegner, ab Ring 3, kann die Tafel erweitern.</summary>
+        Elite = 7,
     }
 
     public static class CellContentExtensions
     {
         /// <summary>Feindliche Felder unterbrechen eine automatische Mehrfeld-Reise.</summary>
         public static bool IsHostile(this CellContent content) =>
-            content == CellContent.Enemy || content == CellContent.Boss;
+            content == CellContent.Enemy || content == CellContent.Boss || content == CellContent.Elite;
 
         /// <summary>Grosse Events, die eine eigene Szene bekommen (Kampf, Truhe, Shop, Goldmine).</summary>
         public static bool IsMajor(this CellContent content) =>

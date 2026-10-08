@@ -41,6 +41,7 @@ namespace Betaknight.Core.Combat
         private static (int min, int max) BaseDamage(CellContent enemy, int tier)
         {
             if (enemy == CellContent.Boss) return (18, 26);
+            if (enemy == CellContent.Elite) return (8, 14);
             if (tier <= 2) return (3, 6);
             if (tier == 3) return (5, 9);
             return (7, 12);

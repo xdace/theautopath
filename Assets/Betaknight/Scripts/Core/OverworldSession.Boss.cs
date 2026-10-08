@@ -49,6 +49,8 @@ namespace Betaknight.Core
             Stats.AddShards(BossEscapeShards);
             lines.Add($"+{BossEscapeGold} Gold");
             lines.Add($"+{BossEscapeShards} Runensplitter");
+            int before = Runes.Slots;
+            if (ExpandBoard(Progression.BoardRowsOnBossEscape)) lines.Add($"Tafel-Erweiterung: {before} → {Runes.Slots} Zeilen");
             lines.Add($"Portal zu Akt {Act + 1} offen");
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, result.Escaped ? "Durchs Portal entkommen" : "Boss besiegt", lines));
             CheckShards();

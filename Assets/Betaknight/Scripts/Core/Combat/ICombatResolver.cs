@@ -23,9 +23,20 @@ namespace Betaknight.Core.Combat
         /// <summary>Feldtyp, Boss ja/nein, Zug. Für Kontext-Runen und Set-Boni.</summary>
         public readonly BattleContext Context;
 
+        /// <summary>Skill-Stufen aus der Ausrüstung (+1 … +3). Null = Grundform.</summary>
+        public readonly SkillLevelRules SkillLevels;
+
+        /// <summary>Leben und Schaden der Gegner in Prozent (Elite > 100).</summary>
+        public readonly int EnemyHpPercent;
+        public readonly int EnemyDamagePercent;
+
         public CombatRequest(CellContent enemy, int tier, PlayerStats stats, RuneLoadout runes,
-            Equipment equipment = null, BattleContext context = null)
+            Equipment equipment = null, BattleContext context = null, SkillLevelRules skillLevels = null,
+            int enemyHpPercent = 100, int enemyDamagePercent = 100)
         {
+            SkillLevels = skillLevels;
+            EnemyHpPercent = enemyHpPercent;
+            EnemyDamagePercent = enemyDamagePercent;
             Enemy = enemy;
             Tier = tier;
             Stats = stats ?? throw new ArgumentNullException(nameof(stats));

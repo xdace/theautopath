@@ -53,6 +53,8 @@ namespace Betaknight.Core.Runes
 
         public bool Contains(RuneDefinition rune) => rune != null && _rows.Any(r => r.Rune.Id == rune.Id);
 
+        public int IndexOf(RuneDefinition rune) => rune == null ? -1 : _rows.FindIndex(r => r.Rune.Id == rune.Id);
+
         public bool HasTag(RuneTag tag) => _rows.Any(r => r.Rune.Tag == tag);
 
         public bool TryAdd(RuneDefinition rune, string skillId = null, int level = 0)

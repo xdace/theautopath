@@ -112,7 +112,7 @@ namespace Betaknight.Core
             Stats.AddGold(gold);
             lines.Add($"+{gold} Gold");
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, title, lines));
-            OfferRunes("Mine verteidigt");
+            OfferRunes(RewardSources.MineDefended);
         }
     }
 }

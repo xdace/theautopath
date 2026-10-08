@@ -220,7 +220,7 @@ namespace Betaknight.Core
         {
             if (IsBusy) return null;
             RuneOffer offer = RuneOffer.Create(source, RuneCatalog, Runes, _random, isUnlocked: IsRuneUnlocked, isOwned: RuneInventory.Contains);
-            offer = offer.WithItems(RollRewardItems(source));
+            offer = ShapeOffer(offer.WithItems(RollRewardItems(source)));
             if (offer.Count == 0) return null;
 
             PendingRuneOffer = offer;

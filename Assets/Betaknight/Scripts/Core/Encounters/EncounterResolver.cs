@@ -128,6 +128,7 @@ namespace Betaknight.Core.Encounters
                 case CellContent.GoldMine: return "Goldmine";
                 case CellContent.Enemy: return "Gegner";
                 case CellContent.Boss: return "Boss";
+                case CellContent.Elite: return "Elite-Gegner";
                 default: return "Ort";
             }
         }

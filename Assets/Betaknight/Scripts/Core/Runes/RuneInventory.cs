@@ -66,6 +66,21 @@ namespace Betaknight.Core.Runes
             return rune;
         }
 
+        /// <summary>Hebt eine gelagerte Rune eine Stufe an. False, wenn sie schon die höchste Stufe hat.</summary>
+        public bool Upgrade(int index)
+        {
+            if (!IsValid(index) || _runes[index].Level >= _runes[index].Rune.MaxLevel) return false;
+            _runes[index] = new StoredRune(_runes[index].Rune, _runes[index].Level + 1);
+            Changed?.Invoke();
+            return true;
+        }
+
+        public int IndexOf(RuneDefinition rune)
+        {
+            for (int i = 0; i < _runes.Count; i++) if (rune != null && _runes[i].Rune.Id == rune.Id) return i;
+            return -1;
+        }
+
         public bool IsValid(int index) => index >= 0 && index < _runes.Count;
     }
 }

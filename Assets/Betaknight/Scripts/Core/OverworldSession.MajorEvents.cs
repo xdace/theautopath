@@ -81,6 +81,7 @@ namespace Betaknight.Core
             switch (cell.Content)
             {
                 case CellContent.Enemy:
+                case CellContent.Elite:
                 case CellContent.Boss:
                     if (!cell.IsResolved) Fight(cell);
                     break;
@@ -103,22 +104,24 @@ namespace Betaknight.Core
 
         private void Fight(HexCell cell)
         {
-            int tier = TierAt(cell.Coord);
+            bool elite = cell.Content == CellContent.Elite;
+            int tier = TierAt(cell.Coord) + (elite ? Progression.EliteTierBonus : 0);
             var context = new BattleContext { VsBoss = cell.Content == CellContent.Boss, Turn = Turns.CurrentTurn };
             CombatResult result = RunCombat(cell.Content, tier, context);
 
             var lines = new List<string>();
             if (!string.IsNullOrEmpty(result.EnemyName)) lines.Add(result.EnemyName);
-            string title = cell.Content == CellContent.Boss ? "Boss" : "Kampf";
+            string title = cell.Content == CellContent.Boss ? "Boss" : elite ? "Elite-Kampf" : "Kampf";
 
             // Ein verlorener Kampf endet tödlich, auch wenn der Resolver noch HP übrig liess.
             if (!ApplyCombat(cell, result, title, lines)) return;
 
-            Stats.AddGold(result.GoldReward);
-            lines.Add($"+{result.GoldReward} Gold");
+            int gold = result.GoldReward + (elite ? Progression.EliteGoldBonus : 0);
+            Stats.AddGold(gold);
+            lines.Add($"+{gold} Gold");
             Map.MarkResolved(cell.Coord);
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, $"{title} gewonnen", lines));
-            OfferRunes("Sieg");
+            OfferRunes(elite ? RewardSources.Elite : RewardSources.Victory);
         }
 
         private CombatResult RunCombat(CellContent enemy, int tier, BattleContext context)
@@ -127,7 +130,10 @@ namespace Betaknight.Core
             IsInCombat = true;
             try
             {
-                result = _combat.Resolve(new CombatRequest(enemy, tier, Stats, Runes, Gear, context), _random);
+                bool elite = enemy == CellContent.Elite;
+                var request = new CombatRequest(enemy, tier, Stats, Runes, Gear, context, Progression.SkillLevels,
+                    elite ? Progression.EliteHpPercent : 100, elite ? Progression.EliteDamagePercent : 100);
+                result = _combat.Resolve(request, _random);
             }
             finally
             {
@@ -160,7 +166,7 @@ namespace Betaknight.Core
             Stats.AddGold(gold);
             Map.MarkResolved(cell.Coord);
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, "Schatztruhe", new[] { $"+{gold} Gold" }));
-            OfferRunes("Schatztruhe");
+            OfferRunes(RewardSources.Treasure);
         }
 
         private void ClaimMine(HexCell cell)
@@ -233,13 +239,21 @@ namespace Betaknight.Core
             return true;
         }
 
-        public bool CanBuyRuneSlot => PendingShop != null && !PendingShop.Inventory.SlotSold && Stats.Gold >= ShopPrices.Slot;
+        /// <summary>Preis des nächsten Runenplatzes; steigt mit jedem Kauf im Run (20, 35, 50 …).</summary>
+        public int RuneSlotPrice => Progression.SlotPrice(RuneSlotsBought);
+
+        /// <summary>Im ganzen Run gekaufte Runenplätze (wandert durch die Akte).</summary>
+        public int RuneSlotsBought { get; private set; }
+
+        public bool CanBuyRuneSlot => PendingShop != null && !PendingShop.Inventory.SlotSold && CanExpandBoard
+            && Stats.Gold >= RuneSlotPrice;
 
         public bool BuyRuneSlot()
         {
             if (!CanBuyRuneSlot) return false;
-            Stats.TrySpendGold(ShopPrices.Slot);
-            Runes.AddSlot();
+            Stats.TrySpendGold(RuneSlotPrice);
+            RuneSlotsBought++;
+            ExpandBoard(1);
             PendingShop.Inventory.SlotSold = true;
             return true;
         }

@@ -1,10 +1,13 @@
 namespace Betaknight.Core.Arena
 {
     /// <summary>Heilt den Anwender um einen Anteil seines Max-HP.</summary>
-    public sealed class HealEffect : ISkillEffect
+    public sealed class HealEffect : ISkillEffect, ILevelableEffect
     {
         public int MaxHpBp { get; }
         public HealEffect(int maxHpBp) => MaxHpBp = maxHpBp;
+
+        public ISkillEffect AtLevel(int level, SkillLevelRules rules) => level <= 0 || rules == null ? this
+            : new HealEffect(MaxHpBp + level * rules.HealBpPerLevel);
 
         public void Apply(in SkillContext c) =>
             c.Battle.Heal(c.User, System.Math.Max(1, BasisPoints.Of(c.User.MaxHp, MaxHpBp)), c.User, c.Skill.Id);
@@ -84,7 +87,7 @@ namespace Betaknight.Core.Arena
     }
 
     /// <summary>Setzt das Ziel in Brand: Schaden pro Sekunde in Prozent des eigenen Waffenschadens.</summary>
-    public sealed class BurnEffect : ISkillEffect
+    public sealed class BurnEffect : ISkillEffect, ILevelableEffect
     {
         public int Ticks { get; }
         public int DamageBpPerSecond { get; }
@@ -101,6 +104,9 @@ namespace Betaknight.Core.Arena
             int dps = DamagePerSecondFor(c.User.GetStat(StatKind.Damage));
             c.Battle.ApplyStatus(c.Target, new BurnStatus(Ticks, dps), c.User);
         }
+
+        public ISkillEffect AtLevel(int level, SkillLevelRules rules) => level <= 0 || rules == null ? this
+            : new BurnEffect(Ticks, DamageBpPerSecond + level * rules.DamageOverTimeBpPerLevel);
 
         /// <summary>Schaden pro Sekunde aus dem Waffenschaden, mindestens 1.</summary>
         public int DamagePerSecondFor(int weaponDamage) => System.Math.Max(1, BasisPoints.Of(weaponDamage, DamageBpPerSecond));
@@ -142,7 +148,7 @@ namespace Betaknight.Core.Arena
     }
 
     /// <summary>Wendet eine Wirkung nur mit einer Chance an (z. B. 20 % Betäubung).</summary>
-    public sealed class ChanceEffect : ISkillEffect
+    public sealed class ChanceEffect : ISkillEffect, ILevelableEffect
     {
         public int ChanceBp { get; }
         public ISkillEffect Inner { get; }
@@ -152,6 +158,9 @@ namespace Betaknight.Core.Arena
             ChanceBp = chanceBp;
             Inner = inner ?? throw new System.ArgumentNullException(nameof(inner));
         }
+
+        public ISkillEffect AtLevel(int level, SkillLevelRules rules) =>
+            Inner is ILevelableEffect inner && level > 0 ? new ChanceEffect(ChanceBp, inner.AtLevel(level, rules)) : this;
 
         public void Apply(in SkillContext c)
         {

@@ -111,6 +111,13 @@ namespace Betaknight.Core
         /// <summary>Neues Teil aus Belohnung oder Shop: anlegen oder ins Inventar, Verdrängtes ins Inventar.</summary>
         private void PlaceNewItem(EquipmentDefinition item, ItemPlacement placement)
         {
+            // Doppeltes Teil: das vorhandene steigt eine Stufe, statt ein zweites zu lagern.
+            if (UpgradeItem(item.Id))
+            {
+                ItemTaken?.Invoke(item, Array.Empty<EquipmentDefinition>());
+                return;
+            }
+
             bool equip = placement == ItemPlacement.Equip
                 || (placement == ItemPlacement.Auto && Gear.Get(item.Slot) == null && Gear.CanEquip(item, out _));
 
@@ -208,7 +215,10 @@ namespace Betaknight.Core
         /// </summary>
         private bool PlaceNewRune(RuneDefinition rune, int replaceSlot)
         {
-            if (rune == null || Runes.Contains(rune) || RuneInventory.Contains(rune)) return false;
+            if (rune == null) return false;
+
+            // Doppelte Rune: die vorhandene steigt eine Stufe (wie am Lagerfeuer).
+            if (OwnsRune(rune)) return UpgradeOwnedRune(rune);
 
             if (replaceSlot >= 0)
             {

@@ -50,9 +50,18 @@ namespace Betaknight.Core.Gear
     public sealed class EquipmentDefinition
     {
         private readonly Dictionary<StatKind, int> _stats;
+        private readonly Dictionary<StatKind, int> _baseStats;
 
         public string Id { get; }
-        public string Name { get; }
+
+        /// <summary>Name ohne Stufe.</summary>
+        public string BaseName { get; }
+
+        /// <summary>Name mit Stufe, z. B. "Kurzklinge +2".</summary>
+        public string Name => Level > 0 ? $"{BaseName} +{Level}" : BaseName;
+
+        /// <summary>Stufe 0 bis +3. Ein doppeltes Teil wertet das vorhandene auf.</summary>
+        public int Level { get; private set; }
         public EquipmentSlot Slot { get; }
         public string Description { get; }
         public IReadOnlyList<string> SkillIds { get; }
@@ -75,9 +84,10 @@ namespace Betaknight.Core.Gear
             if (twoHanded && slot != EquipmentSlot.Weapon) throw new ArgumentException("Nur Waffen sind zweihändig.", nameof(twoHanded));
 
             Id = id;
-            Name = name ?? id;
+            BaseName = name ?? id;
             Slot = slot;
             _stats = stats != null ? new Dictionary<StatKind, int>(stats) : new Dictionary<StatKind, int>();
+            _baseStats = new Dictionary<StatKind, int>(_stats);
             SkillIds = new List<string>(skillIds ?? Array.Empty<string>());
             SetId = setId;
             TwoHanded = twoHanded;
@@ -86,6 +96,36 @@ namespace Betaknight.Core.Gear
         }
 
         public int StatBonus(StatKind kind) => _stats.TryGetValue(kind, out int v) ? v : 0;
+
+        /// <summary>Werte auf Stufe 0.</summary>
+        public IReadOnlyDictionary<StatKind, int> BaseStats => _baseStats;
+
+        /// <summary>
+        /// Dasselbe Teil auf einer anderen Stufe. Jede Stufe gibt <paramref name="statPercentPerLevel"/> % der Grundwerte dazu,
+        /// aber nur bei vorteilhaften Werten (mindestens 1); Nachteile wie langsameres Tempo wachsen nicht mit.
+        /// </summary>
+        public EquipmentDefinition AtLevel(int level, int statPercentPerLevel)
+        {
+            level = Math.Max(0, level);
+            var stats = new Dictionary<StatKind, int>();
+            foreach (KeyValuePair<StatKind, int> stat in _baseStats)
+            {
+                bool good = stat.Key == StatKind.AttackInterval ? stat.Value < 0 : stat.Value > 0;
+                int bonus = 0;
+                if (good && level > 0)
+                {
+                    int per = Math.Max(1, Math.Abs(stat.Value) * statPercentPerLevel / 100);
+                    bonus = per * level * Math.Sign(stat.Value);
+                }
+                stats[stat.Key] = stat.Value + bonus;
+            }
+
+            var copy = new EquipmentDefinition(Id, BaseName, Slot, stats, SkillIds, SetId, TwoHanded, Weight, Description);
+            copy._baseStats.Clear();
+            foreach (KeyValuePair<StatKind, int> stat in _baseStats) copy._baseStats[stat.Key] = stat.Value;
+            copy.Level = level;
+            return copy;
+        }
 
         public override string ToString() => $"{Name} ({Slot.DisplayName()})";
     }

@@ -14,13 +14,17 @@ namespace Betaknight.Core.Runes
         /// <summary>Ausrüstung, die statt einer Rune gewählt werden kann (gemischte Belohnung). Ids aus dem Ausrüstungs-Katalog.</summary>
         public IReadOnlyList<string> ItemIds { get; }
 
-        public int Count => Options.Count + ItemIds.Count;
+        /// <summary>Bietet zusätzlich «Tafel-Erweiterung: +1 Zeile» an.</summary>
+        public bool BoardExpansion { get; }
 
-        public RuneOffer(string source, IReadOnlyList<RuneDefinition> options, IReadOnlyList<string> itemIds = null)
+        public int Count => Options.Count + ItemIds.Count + (BoardExpansion ? 1 : 0);
+
+        public RuneOffer(string source, IReadOnlyList<RuneDefinition> options, IReadOnlyList<string> itemIds = null, bool boardExpansion = false)
         {
             Source = source ?? string.Empty;
             Options = options ?? throw new ArgumentNullException(nameof(options));
             ItemIds = itemIds ?? Array.Empty<string>();
+            BoardExpansion = boardExpansion;
         }
 
         /// <summary>Dasselbe Angebot mit Ausrüstung anstelle der letzten Runen.</summary>
@@ -28,8 +32,15 @@ namespace Betaknight.Core.Runes
         {
             if (itemIds == null || itemIds.Count == 0) return this;
             int keep = Math.Max(1, Options.Count - itemIds.Count);
-            return new RuneOffer(Source, Options.Take(keep).ToList(), itemIds);
+            return new RuneOffer(Source, Options.Take(keep).ToList(), itemIds, BoardExpansion);
         }
+
+        /// <summary>Dasselbe Angebot mit der Tafel-Erweiterung als zusätzlicher Wahl.</summary>
+        public RuneOffer WithBoardExpansion() => new RuneOffer(Source, Options, ItemIds, true);
+
+        /// <summary>Dasselbe Angebot mit anderen Runen und Teilen.</summary>
+        public RuneOffer With(IReadOnlyList<RuneDefinition> options, IReadOnlyList<string> itemIds) =>
+            new RuneOffer(Source, options, itemIds, BoardExpansion);
 
         /// <summary>
         /// Stellt ein Angebot zusammen: keine Doppelten, nichts schon Ausgerüstetes, und wenn möglich

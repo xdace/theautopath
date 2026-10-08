@@ -101,6 +101,17 @@ namespace Betaknight.Core.Gear
             return false;
         }
 
+        /// <summary>Höchste Stufe der getragenen Teile, die diesen Skill liefern (0 = Grundform).</summary>
+        public int SkillLevel(string skillId)
+        {
+            int level = 0;
+            if (skillId == null) return 0;
+            foreach (EquipmentDefinition item in _worn.Values)
+                foreach (string id in item.SkillIds)
+                    if (id == skillId && item.Level > level) level = item.Level;
+            return level;
+        }
+
         public int StatBonus(StatKind kind)
         {
             int total = 0;

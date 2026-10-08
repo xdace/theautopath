@@ -47,6 +47,7 @@ namespace Betaknight.Core
             if (!CanEnterPortal) return false;
             PendingPortal = false;
             Stats.Heal(Stats.MaxHp * PortalHealPercent / 100);
+            ExpandBoard(Progression.BoardRowsOnNewAct);
             ActCompleted?.Invoke(this);
             return true;
         }
@@ -80,6 +81,8 @@ namespace Betaknight.Core
                 previous.RuneInventory);
             session.Kit = previous.Kit;
             session.Act = act;
+            session.Progression = previous.Progression;
+            session.RuneSlotsBought = previous.RuneSlotsBought;
             return session;
         }
     }

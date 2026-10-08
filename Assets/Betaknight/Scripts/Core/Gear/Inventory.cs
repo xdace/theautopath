@@ -52,6 +52,21 @@ namespace Betaknight.Core.Gear
             return false;
         }
 
+        public int IndexOf(string itemId)
+        {
+            for (int i = 0; i < _items.Count; i++) if (_items[i].Id == itemId) return i;
+            return -1;
+        }
+
+        /// <summary>Ersetzt ein Teil an seiner Stelle, z. B. durch eine höhere Stufe.</summary>
+        public bool ReplaceAt(int index, EquipmentDefinition item)
+        {
+            if (!IsValid(index) || item == null) return false;
+            _items[index] = item;
+            Changed?.Invoke();
+            return true;
+        }
+
         public bool IsValid(int index) => index >= 0 && index < _items.Count;
     }
 }

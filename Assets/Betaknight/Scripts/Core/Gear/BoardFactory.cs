@@ -38,15 +38,16 @@ namespace Betaknight.Core.Gear
 
         public static BoardFactory CreateDefault() => new BoardFactory(null, null, null);
 
-        public LogicBoard Create(IEnumerable<BoardRowSpec> rows, Equipment equipment)
+        /// <param name="skillLevels">Regeln für Skill-Stufen aus der Ausrüstung. Null = alle Skills in Grundform.</param>
+        public LogicBoard Create(IEnumerable<BoardRowSpec> rows, Equipment equipment, SkillLevelRules skillLevels = null)
         {
             var result = new List<LogicRow>();
             if (rows != null)
-                foreach (BoardRowSpec spec in rows) result.Add(CreateRow(spec, equipment));
+                foreach (BoardRowSpec spec in rows) result.Add(CreateRow(spec, equipment, skillLevels));
             return new LogicBoard(result);
         }
 
-        public LogicRow CreateRow(BoardRowSpec spec, Equipment equipment)
+        public LogicRow CreateRow(BoardRowSpec spec, Equipment equipment, SkillLevelRules skillLevels = null)
         {
             if (!_runes.TryGet(spec.RuneId, out RuneDefinition rune) ||
                 !_conditions.TryCreate(spec.RuneId, rune.ParameterAt(spec.Level), out ICondition condition))
@@ -62,6 +63,7 @@ namespace Betaknight.Core.Gear
 
             bool available = equipment != null ? equipment.ProvidesSkill(spec.SkillId) : spec.SkillId == SkillDefinition.BasicAttackId;
             SkillDefinition skill = available && _skills.TryGet(spec.SkillId, out SkillDefinition s) ? s : null;
+            if (skill != null && equipment != null) skill = skill.AtLevel(equipment.SkillLevel(skill.Id), skillLevels);
             return new LogicRow(condition, skill, label);
         }
     }
