@@ -269,5 +269,42 @@ namespace Betaknight.Tests.EditMode
                 CollectionAssert.AreEquivalent(SynergyRegistry.Thresholds, tag.Tiers.Keys, tag.Id);
             Assert.AreEqual(6, Synergies.Tags.Count);
         }
+
+        // ------------------------------------------------------------------ Anzeige der Tag-Wirkungen
+
+        [Test]
+        public void EveryTagDescribesAllItsTiers()
+        {
+            SynergyRegistry registry = SynergyRegistry.CreateDefault();
+            Assert.IsTrue(registry.TryGetTag(SynergyTagIds.Toxin, out SynergyTag toxin));
+            string text = toxin.Describe(2);
+            StringAssert.StartsWith("Toxin 2 Teile", text);
+            StringAssert.Contains("● 2 Teile: Eigene Skill-Treffer vergiften", text);
+            StringAssert.Contains("○ 4 Teile: Eigene Angriffe +1 Schaden je Gift-Stapel", text);
+            StringAssert.Contains("○ 6 Teile: Auch Basisangriffe vergiften.", text);
+            Assert.AreEqual(string.Empty, toxin.ActiveText(1));
+            foreach (SynergyTag tag in registry.Tags)
+            {
+                Assert.AreEqual(3, tag.Tiers.Count, tag.Name);
+                Assert.IsTrue(tag.Tiers.Values.All(t => t.Text.Length > 0), tag.Name);
+            }
+        }
+
+        [Test]
+        public void TheSessionPreviewsTagCountsAndActiveEffects()
+        {
+            OverworldSession s = OverworldSession.Create(new MapGenerationConfig { Radius = 4, Seed = 3 });
+            EquipmentCatalog items = EquipmentCatalog.CreateDefault();
+            EquipmentDefinition toxic = items.All.First(i => i.Tags.Contains(SynergyTagIds.Toxin) && i.Slot != EquipmentSlot.Weapon);
+            EquipmentDefinition second = items.All.First(i => i.Tags.Contains(SynergyTagIds.Toxin) && i.Slot != toxic.Slot && i.Slot != EquipmentSlot.Weapon);
+
+            Assert.AreEqual(1, s.TagCountWith(toxic, SynergyTagIds.Toxin));
+            Assert.AreEqual(string.Empty, s.ActiveSynergyText());
+            s.Gear.Equip(toxic);
+            Assert.AreEqual(1, s.TagCountWith(toxic, SynergyTagIds.Toxin), "schon getragen");
+            Assert.AreEqual(2, s.TagCountWith(second, SynergyTagIds.Toxin));
+            s.Gear.Equip(second);
+            StringAssert.Contains("Toxin 2\n2 Teile: Eigene Skill-Treffer vergiften", s.ActiveSynergyText());
+        }
     }
 }

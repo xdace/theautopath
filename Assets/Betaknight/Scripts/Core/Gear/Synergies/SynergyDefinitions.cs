@@ -52,6 +52,27 @@ namespace Betaknight.Core.Gear
             Name = name ?? id;
             Tiers = new SortedDictionary<int, SynergyEffect>(tiers ?? new Dictionary<int, SynergyEffect>());
         }
+
+        /// <summary>
+        /// Name, Teile und alle Stufen, z. B. «Ladung 3 Teile» und darunter «● 2 Teile: +10 % Block.» (aktiv) bzw.
+        /// «○ 4 Teile: …» (noch nicht). Ohne Farben; die Anzeige färbt selbst.
+        /// </summary>
+        public string Describe(int count)
+        {
+            var lines = new List<string> { $"{Name} {count} {(count == 1 ? "Teil" : "Teile")}" };
+            foreach (KeyValuePair<int, SynergyEffect> tier in Tiers)
+                lines.Add($"{(count >= tier.Key ? "●" : "○")} {tier.Key} Teile: {tier.Value.Text}");
+            return string.Join("\n", lines);
+        }
+
+        /// <summary>Aktive Stufen als Text («2 Teile: …»), leer ohne.</summary>
+        public string ActiveText(int count)
+        {
+            var lines = new List<string>();
+            foreach (KeyValuePair<int, SynergyEffect> tier in Tiers)
+                if (count >= tier.Key) lines.Add($"{tier.Key} Teile: {tier.Value.Text}");
+            return string.Join("\n", lines);
+        }
     }
 
     /// <summary>Duo-Synergie: wird frei, wenn beide Tags mindestens die Duo-Schwelle erreichen.</summary>

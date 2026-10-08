@@ -62,6 +62,43 @@ namespace Betaknight.Overworld.UI
             return string.Join("\n", lines);
         }
 
+        /// <summary>
+        /// Synergie-Tag mit allen Stufen, gefärbt wie <see cref="SetBlock(SetDefinition,int,bool)"/>.
+        /// <paramref name="before"/> = Teile ohne dieses Teil (für «neu»), <paramref name="count"/> = mit.
+        /// </summary>
+        public static string TagBlock(SynergyTag tag, int count, int before, bool preview)
+        {
+            string head = preview ? $"mit diesem Teil {count}" : $"{count} getragen";
+            var lines = new List<string> { $"Tag <b>{tag.Name}</b> ({head}; Stufen ab 2/4/6 Teilen)" };
+            foreach (KeyValuePair<int, SynergyEffect> tier in tag.Tiers)
+            {
+                bool active = count >= tier.Key;
+                bool fresh = active && before < tier.Key;
+                string color = fresh ? UiTheme.Hex(UiTheme.Good) : active ? UiTheme.Hex(UiTheme.Accent) : UiTheme.Hex(UiTheme.MutedColor);
+                lines.Add($"<color={color}>{(active ? "●" : "○")} {tier.Key} Teile: {tier.Value.Text}{(fresh ? "  (neu)" : string.Empty)}</color>");
+            }
+            return string.Join("\n", lines);
+        }
+
+        /// <summary>Alle Tags und das Set eines Teils mit ihren Wirkungen (Vorschau beim Anlegen), leer ohne beides.</summary>
+        public static string SynergyBlock(Betaknight.Core.OverworldSession session, EquipmentDefinition item)
+        {
+            if (item == null) return string.Empty;
+            var blocks = new List<string>();
+            bool worn = session.Gear.Get(item.Slot) == item;
+            var seen = new HashSet<string>();
+            foreach (string tagId in item.Tags)
+            {
+                if (!seen.Add(tagId) || !session.Synergies.TryGetTag(tagId, out SynergyTag tag)) continue;
+                int count = session.TagCountWith(item, tagId);
+                int before = worn ? count - 1 : session.Gear.TagCount(tagId);
+                blocks.Add(TagBlock(tag, count, before, !worn));
+            }
+            string set = SetBlock(session, item);
+            if (set.Length > 0) blocks.Add(set);
+            return string.Join("\n", blocks);
+        }
+
         /// <summary>Set-Block für ein Teil in der Session (getragen oder als Vorschau beim Anlegen), leer ohne Set.</summary>
         public static string SetBlock(Betaknight.Core.OverworldSession session, EquipmentDefinition item)
         {
@@ -72,7 +109,7 @@ namespace Betaknight.Overworld.UI
 
         /// <summary>Alle Angaben zu einem Teil: Platz, Werte, passive Effekte auf Skill-Arten, Set mit allen Boni.</summary>
         public static string Details(EquipmentDefinition item, Betaknight.Core.OverworldSession session) =>
-            Details(item, session.Sets, SetBlock(session, item));
+            Details(item, session.Sets, SynergyBlock(session, item));
 
         /// <summary>Alle Angaben zu einem Teil; ohne Session stehen die Set-Boni ohne Teilezahl da.</summary>
         public static string Details(EquipmentDefinition item, SetBonusRegistry sets, string setBlock = null)
@@ -83,7 +120,7 @@ namespace Betaknight.Overworld.UI
                 if (stat.Value != 0) stats.Add(Stat(stat.Key, stat.Value));
             lines.Add(stats.Count > 0 ? "Werte: " + string.Join(", ", stats) : "Werte: keine");
             foreach (SkillPassive passive in item.Passives) lines.Add($"Passiv: <color=#ffd75e>{passive.Text}</color>");
-            if (item.Tags.Count > 0) lines.Add($"Tags: {TagNames(item)}");
+            if (item.Tags.Count > 0 && string.IsNullOrEmpty(setBlock)) lines.Add($"Tags: {TagNames(item)}");
             if (!string.IsNullOrEmpty(setBlock)) lines.Add(setBlock);
             else if (item.SetId != null && sets != null && sets.TryGet(item.SetId, out SetDefinition set)) lines.Add(SetBlock(set, 1, false));
             else if (item.SetId != null) lines.Add($"Set: {item.SetId}");

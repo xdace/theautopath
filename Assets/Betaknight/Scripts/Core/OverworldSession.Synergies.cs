@@ -34,6 +34,35 @@ namespace Betaknight.Core
         /// <summary>Name eines Duos, oder «???» solange es nicht entdeckt ist (Silhouette).</summary>
         public string DuoName(SynergyDuo duo) => IsDuoDiscovered(duo.Id) ? duo.Name : "???";
 
+        /// <summary>Getragene Teile mit einem Tag, wenn <paramref name="item"/> angelegt würde (ersetzt das Teil im selben Platz).</summary>
+        public int TagCountWith(EquipmentDefinition item, string tagId)
+        {
+            int count = Gear.TagCount(tagId);
+            if (item == null) return count;
+            EquipmentDefinition worn = Gear.Get(item.Slot);
+            if (worn == item) return count;
+            if (worn != null) foreach (string tag in worn.Tags) if (tag == tagId) count--;
+            foreach (string tag in item.Tags) if (tag == tagId) count++;
+            return count;
+        }
+
+        /// <summary>
+        /// Alle aktiven Tag-Stufen und Duos mit Wirkung, für Tooltips. Ein noch nicht entdecktes Duo bleibt «???»: seine
+        /// Wirkung zeigt sich im nächsten Kampf und steht danach im Rezeptbuch.
+        /// </summary>
+        public string ActiveSynergyText()
+        {
+            var blocks = new List<string>();
+            foreach (SynergyCounter c in TagCounters())
+            {
+                string active = c.Tag.ActiveText(c.Count);
+                if (active.Length > 0) blocks.Add($"{c.Tag.Name} {c.Count}\n{active}");
+            }
+            foreach (SynergyDuo duo in ActiveDuos())
+                blocks.Add(IsDuoDiscovered(duo.Id) ? $"Duo {duo.Name}\n{duo.Effect.Text}" : "Duo ???\nWirkung zeigt sich im nächsten Kampf.");
+            return string.Join("\n\n", blocks);
+        }
+
         /// <summary>Was ein Teil beim Anlegen an Tags bewirken würde: «→ Ladung 4/6: Schwelle!».</summary>
         public List<string> TagPreview(EquipmentDefinition item) => Synergies.Preview(Gear, item, DuoName);
 

@@ -98,7 +98,7 @@ namespace Betaknight.Overworld.UI
                 if (!_session.Items.TryGet(offer.ItemIds[i], out EquipmentDefinition item)) continue;
                 EquipmentDefinition worn = _session.Gear.Get(item.Slot);
                 string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)}" : string.Empty;
-                string setBlock = ItemText.SetBlock(_session, item);
+                string setBlock = ItemText.SynergyBlock(_session, item);
                 if (_session.CanUpgradeItem(item.Id))
                 {
                     // Doppeltes Teil: das vorhandene wird aufgewertet (Werte und passive Effekte).

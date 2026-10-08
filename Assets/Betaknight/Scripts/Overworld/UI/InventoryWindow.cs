@@ -259,12 +259,18 @@ namespace Betaknight.Overworld.UI
         private void DrawTags()
         {
             GUILayout.Label("<b>Synergie-Tags und Sets</b>  <color=#9aa4b2>Schwellen 2/4/6 getragene Teile, Duo ab 4 + 4</color>", UiTheme.Text);
-            var parts = new List<string>();
-            foreach (SynergyCounter c in _session.TagCounters())
-                parts.Add(c.Reached > 0 ? $"<color=#ffd75e>{c.Text}</color>" : c.Text);
+            // Alle Tags mit ihren Stufen, auch ohne getragenes Teil: so ist sichtbar, was Toxin, Schrott, Ladung … bewirken.
+            foreach (SynergyTag tag in _session.Synergies.Tags)
+            {
+                int count = _session.Gear.TagCount(tag.Id);
+                string block = ItemText.TagBlock(tag, count, count, false);
+                GUILayout.Label(count > 0 ? block : $"<color={UiTheme.Hex(UiTheme.MutedColor)}>{block}</color>", UiTheme.Small);
+            }
             foreach (SynergyDuo duo in _session.ActiveDuos())
-                parts.Add($"<color={UiTheme.Hex(UiTheme.Good)}>Duo {_session.DuoName(duo)}</color>");
-            GUILayout.Label(parts.Count > 0 ? string.Join(", ", parts) : "<color=#888888>keine Tags getragen</color>", UiTheme.Small);
+            {
+                string text = _session.IsDuoDiscovered(duo.Id) ? duo.Effect.Text : "Wirkung zeigt sich im nächsten Kampf.";
+                GUILayout.Label($"<color={UiTheme.Hex(UiTheme.Good)}><b>Duo {_session.DuoName(duo)}</b> aktiv: {text}</color>", UiTheme.Small);
+            }
 
             // Alle Sets mit ihren Boni, auch ohne getragenes Teil: so ist sichtbar, wofür man sammelt.
             GUILayout.Space(4f);

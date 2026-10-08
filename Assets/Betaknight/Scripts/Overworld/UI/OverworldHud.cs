@@ -85,7 +85,7 @@ namespace Betaknight.Overworld.UI
                 GUILayout.Label(new GUIContent($"Sets: {sets}", string.Join("\n\n", tip)), _style);
             }
             string tags = TagList();
-            if (tags.Length > 0) GUILayout.Label($"Tags: {tags}", _style);
+            if (tags.Length > 0) GUILayout.Label(new GUIContent($"Tags: {tags}", TagTooltip()), _style);
             foreach (MineRaid raid in _session.Raids)
             {
                 string state = raid.IsLost ? "verloren" : $"angegriffen, noch {raid.TurnsLeft(_session.Turns.CurrentTurn)} Züge";
@@ -152,6 +152,16 @@ namespace Betaknight.Overworld.UI
         /// Tag-Zähler «Ladung 3/4» (erreichte Schwelle hervorgehoben) und aktive Duos. Unentdeckte Duos bleiben «???»,
         /// bis sie im ersten Kampf auslösen.
         /// </summary>
+        /// <summary>Maus über «Tags»: alle Stufen der getragenen Tags (aktive ●) und aktive Duos.</summary>
+        private string TagTooltip()
+        {
+            var blocks = new List<string>();
+            foreach (SynergyCounter c in _session.TagCounters()) blocks.Add(c.Tag.Describe(c.Count));
+            foreach (SynergyDuo duo in _session.ActiveDuos())
+                blocks.Add(_session.IsDuoDiscovered(duo.Id) ? $"Duo {duo.Name}: {duo.Effect.Text}" : "Duo ???: Wirkung zeigt sich im nächsten Kampf.");
+            return string.Join("\n\n", blocks);
+        }
+
         private string TagList()
         {
             var parts = new List<string>();

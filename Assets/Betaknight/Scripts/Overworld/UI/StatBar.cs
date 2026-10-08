@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Betaknight.Core;
 using Betaknight.Core.Gear;
 using UnityEngine;
@@ -62,9 +63,9 @@ namespace Betaknight.Overworld.UI
             string bonusText = bonuses.Count > 0 ? string.Join(", ", bonuses) : $"<color={UiTheme.Hex(UiTheme.MutedColor)}>keine aktiven Set-Boni oder Tag-Stufen</color>";
             string title = string.IsNullOrEmpty(previewTitle) ? string.Empty : $"<b>Vorschau {previewTitle}:</b>  ";
             // Maus über den Boni zeigt, was die aktiven Set-Boni bewirken.
-            string setTip = session.ActiveSetBonusText();
+            string tip = string.Join("\n\n", new[] { session.ActiveSynergyText(), session.ActiveSetBonusText() }.Where(t => t.Length > 0));
             GUILayout.Label(new GUIContent($"{title}<color={UiTheme.Hex(UiTheme.MutedColor)}>Boni</color> {bonusText}",
-                setTip.Length > 0 ? setTip : "Set-Boni greifen ab 2 Teilen desselben Sets. Alle Sets stehen im Inventar."), UiTheme.Small);
+                tip.Length > 0 ? tip : "Tag-Stufen greifen ab 2/4/6 Teilen mit demselben Tag, Set-Boni ab 2 Teilen desselben Sets. Alles steht im Inventar."), UiTheme.Small);
             GUILayout.EndVertical();
         }
     }
