@@ -231,6 +231,8 @@ Assets/Betaknight/
 │   │   │                  Synergies/ (SynergyRegistry: Tags, Schwellen, Duos als Daten; Wirkungen als BattleModifier)
 │   │   ├── Combat/        ICombatResolver, ArenaCombatResolver, EnemyCatalog (Platzhalter-Resolver nur noch für Tests)
 │   │   ├── Shop/          Shop-Bestand und Preise
+│   │   ├── Autoplay/      Testspieler: AutoplayBot (Strategie), BotAction, AutoplayRecorder + AutoplayReport/AutoplaySummary (JSON),
+│   │   │                  AutoplayOptions (Kommandozeile), HeadlessAutoplay (Lauf ohne Darstellung)
 │   │   ├── OverworldSession.cs              Fassade: Bewegung, kleine/mittlere Events, Runenwahl
 │   │   ├── OverworldSession.MajorEvents.cs  Fassade: Kampf, Truhe, Goldmine, Shop
 │   │   ├── Skills/        SkillInstance (Exemplar), ISkillHolder (Ort), SkillCollection (Sammlung)
@@ -254,6 +256,7 @@ Assets/Betaknight/
 │       ├── Controllers/   OverworldController, CameraFollow2D
 │       ├── Input/         PointerInput (neues Input System und alter Input Manager)
 │       ├── Persistence/   PlayerPrefsRecipeBookStore (Rezeptbuch über Runs)
+│       ├── Autoplay/      AutoplayRunner (Testspieler im Spiel: echte Fenster, FPS, Log, Hänger, Bericht, Exit-Code)
 │       ├── UI/            OverworldHud, Kit-Auswahl, Event-, Runen-, Shop-, Game-Over-Fenster, ArenaWindow, BuildWindow, InventoryWindow (Figur + Item-Raster), InventoryFullWindow;
 │       │                  UiTheme (deckender Stil, Schriftgrössen 18/15/13), DragDrop (Ziehen und Ablegen), StatBar (Stat-Leiste mit Vorschau)
 │       └── OverworldBootstrapper.cs
@@ -270,6 +273,57 @@ Assets/Betaknight/
 **Hex-System:** Axiale Koordinaten (q, r), spitz-oben ausgerichtet, Y-Achse nach oben wie in Unity. Grundlage ist die Referenz von [Red Blob Games](https://www.redblobgames.com/grids/hexagons/).
 
 **Fog of War:** `Hidden` (unsichtbar, nicht betretbar) → `Unexplored` (in Sichtweite, als «?» dargestellt, betretbar) → `Explored` (besucht, Inhalt bekannt, Teil der frei bereisbaren Routen).
+
+## Automatischer Testspieler
+
+Ein Bot spielt komplette Runs, um Abstürze, Fehler-Logs, Hänger und Ruckler zu finden. Er spielt über dieselben
+`OverworldSession`-Methoden wie die UI und öffnet dabei die echten Fenster (Kit-Wahl, Ereignisse, Angebote, Shop,
+Arena, Build und Inventar), damit auch UI-Fehler auffallen. Spiellogik steckt im Bot keine.
+
+**Aufruf** (Windows-Build, unter macOS/Linux entsprechend):
+
+```
+Betaknight.exe -autoplay [-seed N] [-runs N] [-speed N] [-report pfad.json] [-quit]
+```
+
+| Argument | Bedeutung |
+|---|---|
+| `-autoplay` | Testspieler statt normalem Spielstart |
+| `-seed N` | Seed des ersten Runs; weitere Runs nehmen N+1, N+2, … Ohne: zufällig |
+| `-runs N` | Anzahl Runs nacheinander (Standard 1), Bericht pro Run plus Summe |
+| `-speed N` | Tempo (Standard 1): Bot-Takt, Schritt-Animation und Arena-Wiedergabe laufen N-mal so schnell |
+| `-report pfad.json` | Ziel des JSON-Berichts. Ohne: `autoplay-report.json` in `Application.persistentDataPath` |
+| `-quit` | Nach dem letzten Run beenden. Exit-Code 0 = kein Run mit Exception oder Hänger, sonst 1. Ohne bleibt das Fenster offen |
+| `-act N` | Optional: Run endet beim Erreichen von Akt N (Standard 3) |
+
+Ohne `-quit` kann man zuschauen: Kämpfe laufen in der Arena mit Wiedergabe, unten rechts steht Run, Seed, Kit und die
+letzte Aktion. Im Editor geht es ohne Build nicht über die Kommandozeile; dafür gibt es den EditMode-Test
+`BotSpieltVollenRunOhneFehler`, der den Bot ohne Darstellung mit drei festen Seeds bis Akt 2 oder Game Over spielt.
+
+**Strategie «einfach, aber vollständig»:** Kit nach Seed; unbekannte Felder zuerst (Gegner bei unter 40 % HP meiden);
+Angebote nach Wertung Verbesserung > neue Karte > Gold, der erste Auslöser hat Vorrang; bessere Teile anlegen (Wertung
+aus der Stat-Leiste); freie Skills in Zeilen ohne Skill oder mit Basisangriff, Runen aus dem Inventar in freie Zeilen,
+Module an den ersten passenden Ort, Auslöser bekommen ein Ziel; Lagerfeuer: ruhen unter 60 % HP, sonst Rune verstärken;
+Shop: heilen, Modul, Skill, besseres Teil, Tafel-Zeile, Rune, dann verlassen; Minen erobern und verteidigen; nach dem
+Boss durchs Portal; bis Game Over oder Akt 3.
+
+**Bericht** (`total` mit Summen, `runs` mit einem Eintrag pro Run; zusätzlich eine Zeile pro Run im Log mit `[Autoplay]`):
+
+| Feld | Inhalt |
+|---|---|
+| `seed`, `kit` | Seed und gewähltes Kit |
+| `ok`, `endReason` | Run ohne Exception und Hänger; Endgrund `Game Over`, `Akt 3 erreicht`, `Hänger` oder `Zuglimit` |
+| `act`, `turns`, `actions` | Erreichter Akt, Züge, ausgeführte Bot-Aktionen |
+| `hp`, `maxHp`, `gold` | Stand am Ende |
+| `fightsWon`, `fightsLost` | Kämpfe (ohne Boss) gewonnen/verloren |
+| `elitesWon`, `elitesLost`, `bosses`, `bossesSurvived` | Elite-Kämpfe und Boss-Begegnungen |
+| `rewards` | Belohnungen je Art (Rune, Teil, Skill, Modul, Tafel-Erweiterung, Gold, Heilung, Runen-Stufe, Runensplitter) |
+| `boardRows` | Tafel-Zeilen am Ende: Rune → Skill [Module] |
+| `modules`, `triggersSet`, `triggerLinks`, `duos` | Eingesetzte Module, gelegte Auslöser, Auslöser-Verbindungen, entdeckte/aktive Duos |
+| `durationSeconds`, `fpsAverage`, `fpsMin` | Dauer und FPS (ohne Darstellung `null`) |
+| `exceptionCount`, `exceptions` | Exceptions mit Text und Stacktrace (höchstens 40 Texte, gezählt wird alles) |
+| `errorLogCount`, `errorLogs` | Fehler-Logs (`Debug.LogError`, Asserts) mit Text |
+| `hangCount`, `hangs` | Hänger: keine Aktion länger als 10 s (danach Befreiungsversuch, ab 3 Hängern Abbruch des Runs) |
 
 ## Phasenplan Meilenstein 1
 
