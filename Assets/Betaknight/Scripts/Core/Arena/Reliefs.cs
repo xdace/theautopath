@@ -120,9 +120,9 @@ namespace Betaknight.Core.Arena
                 var names = new List<string>();
                 foreach (string runeId in r.EasedRuneIds)
                     names.Add(runes != null && runes.TryGet(runeId, out Runes.RuneDefinition rune)
-                        ? $"«{rune.Name}» {DifficultyText.Symbol(rune.Difficulty)}"
+                        ? CatalogTexts.EasedRune(rune.Name, DifficultyText.Symbol(rune.Difficulty))
                         : runeId);
-                lines.Add($"Erleichtert: {string.Join(", ", names)} ({r.Text})");
+                lines.Add(CatalogTexts.Eases(string.Join(", ", names), r.Text));
             }
             return string.Join("\n", lines);
         }
@@ -149,29 +149,29 @@ namespace Betaknight.Core.Arena
         {
             // Passive an Ausrüstungsteilen (Ids aus dem EquipmentCatalog).
             new ReliefDefinition(ReliefCarrierIds.NumbingGloves, ReliefKind.Passive, ReliefIds.StunLonger, Ticks.PerSecond,
-                "Eigene Betäubungen dauern +1 s", "Ladung", "enemy_stunned"),
+                "Own stuns last +1 s", "Charge", "enemy_stunned"),
             new ReliefDefinition(ReliefCarrierIds.AfterimageVisor, ReliefKind.Passive, ReliefIds.StunAfterglow, Ticks.FromTenths(5),
-                "Gegner gilt 0,5 s nach einer Betäubung noch als betäubt", "Phantom", "enemy_stunned"),
+                "Enemy still counts as stunned for 0.5 s after a stun", "Phantom", "enemy_stunned"),
             new ReliefDefinition(ReliefCarrierIds.PrechargedCell, ReliefKind.Passive, ReliefIds.ChargeStart, 3,
-                "Ladung startet bei 3", "Ladung", "charge_full"),
+                "Charge starts at 3", "Charge", "charge_full"),
             new ReliefDefinition(ReliefCarrierIds.PhantomStep, ReliefKind.Passive, ReliefIds.DodgeTolerance, 1,
-                "Ausweicher-Serie bricht erst beim 2. Treffer", "Phantom", "dodge_streak"),
+                "Dodge streak only breaks on the 2nd hit", "Phantom", "dodge_streak"),
             new ReliefDefinition(ReliefCarrierIds.CounterShield, ReliefKind.Passive, ReliefIds.CritAfterBlock, BasisPoints.Percent(15),
-                "Krit-Chance +15 % für 2 s nach einem Block", "Ladung", "on_crit"),
+                "Crit chance +15 % for 2 s after a Block", "Charge", "on_crit"),
             new ReliefDefinition(ReliefCarrierIds.VenomTorch, ReliefKind.Passive, ReliefIds.BurnCountsPoison, 1,
-                "«Gegner brennt» gilt auch bei Gift", "Toxin", "enemy_burning"),
+                "\"Enemy Burning\" also counts Poison", "Toxin", "enemy_burning"),
             new ReliefDefinition(ReliefCarrierIds.PainConductor, ReliefKind.Passive, ReliefIds.BigHitLower, 5,
-                "«Schwerer Treffer» gilt 5 Prozentpunkte früher", "Schrott", "big_hit_taken"),
+                "\"Heavy Hit\" triggers 5 percentage points earlier", "Scrap", "big_hit_taken"),
 
             // Module am Logikbaustein (Ids aus dem ModuleCatalog).
             new ReliefDefinition(ReliefCarrierIds.AlarmSensor, ReliefKind.Module, ReliefIds.HpThresholdUp, 10,
-                "HP-Schwellen-Bausteine gelten 10 Prozentpunkte früher", "Modul", HpRunes),
+                "HP threshold runes trigger 10 percentage points earlier", "Module", HpRunes),
             new ReliefDefinition(ReliefCarrierIds.ScentModule, ReliefKind.Module, ReliefIds.EnemyLowUp, 10,
-                "«Gegner unter x %» gilt 10 Prozentpunkte früher", "Modul", "enemy_low"),
+                "\"Enemy Below x %\" triggers 10 percentage points earlier", "Module", "enemy_low"),
 
             // Skills, deren Wirkung die Bedingung herbeiführt (Ids aus dem SkillCatalog).
-            new ReliefDefinition(SkillIds.ChargeCoil, ReliefKind.Skill, null, 0, "+3 Ladung", "Schild", "charge_full"),
-            new ReliefDefinition(SkillIds.NumbingMist, ReliefKind.Skill, null, 0, "betäubt alle Gegner kurz", "Schock", "enemy_stunned"),
+            new ReliefDefinition(SkillIds.ChargeCoil, ReliefKind.Skill, null, 0, "+3 Charge", CatalogTexts.KindShield, "charge_full"),
+            new ReliefDefinition(SkillIds.NumbingMist, ReliefKind.Skill, null, 0, "briefly stuns all enemies", CatalogTexts.KindShock, "enemy_stunned"),
         });
 
         /// <summary>Gemeinsamer Standard-Katalog (unveränderlich nach dem Erstellen).</summary>
@@ -200,7 +200,7 @@ namespace Betaknight.Core.Arena
         public int CritBp { get; }
         public CritAfterBlockModifier(int critBp) => CritBp = critBp;
 
-        public override string Name => "Konter";
+        public override string Name => CatalogTexts.CounterModifierName;
 
         public override void OnEvent(Battle battle, Combatant owner, BattleEvent e)
         {

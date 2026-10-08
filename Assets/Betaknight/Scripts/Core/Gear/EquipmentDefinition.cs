@@ -31,13 +31,13 @@ namespace Betaknight.Core.Gear
         {
             switch (slot)
             {
-                case EquipmentSlot.Helmet: return "Helm";
-                case EquipmentSlot.Gloves: return "Handschuhe";
-                case EquipmentSlot.Chest: return "Brust";
-                case EquipmentSlot.Legs: return "Beinschienen";
-                case EquipmentSlot.Weapon: return "Waffe";
-                case EquipmentSlot.Shield: return "Schild";
-                case EquipmentSlot.Boots: return "Stiefel";
+                case EquipmentSlot.Helmet: return CatalogTexts.SlotHelmet;
+                case EquipmentSlot.Gloves: return CatalogTexts.SlotGloves;
+                case EquipmentSlot.Chest: return CatalogTexts.SlotChest;
+                case EquipmentSlot.Legs: return CatalogTexts.SlotLegs;
+                case EquipmentSlot.Weapon: return CatalogTexts.SlotWeapon;
+                case EquipmentSlot.Shield: return CatalogTexts.SlotShield;
+                case EquipmentSlot.Boots: return CatalogTexts.SlotBoots;
                 default: return slot.ToString();
             }
         }

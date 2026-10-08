@@ -174,7 +174,7 @@ namespace Betaknight.Core.Growth
 
         /// <summary>Für Runen ohne eigenen Eintrag: Punkte für gewonnene Kämpfe, in denen die Zeile feuerte.</summary>
         public GrowthRule DefaultRuneRule { get; set; } = new GrowthRule(GrowthTrigger.Win, GrowthEffect.None, 0, 0,
-            "+1 Wachstum pro gewonnenem Kampf, in dem die Zeile feuerte");
+            CatalogTexts.GrowthRowWins);
 
         public void SetSkill(string skillId, GrowthRule rule) => _skills[skillId] = rule;
         public void SetRune(string runeId, GrowthRule rule) => _runes[runeId] = rule;
@@ -183,24 +183,24 @@ namespace Betaknight.Core.Growth
         public GrowthRule ForRune(string runeId) => runeId != null && _runes.TryGetValue(runeId, out GrowthRule r) ? r : DefaultRuneRule;
 
         public static GrowthRule Kills(int cap = 30) =>
-            new GrowthRule(GrowthTrigger.Kill, GrowthEffect.FlatDamage, 1, cap, $"+1 Schaden pro Kill mit diesem Skill (max. +{cap})");
+            new GrowthRule(GrowthTrigger.Kill, GrowthEffect.FlatDamage, 1, cap, CatalogTexts.GrowthKills(cap));
 
         public static GrowthRule Stuns(int capTicks = 40) =>
             new GrowthRule(GrowthTrigger.Stun, GrowthEffect.StunTicks, Ticks.FromTenths(1), capTicks,
-                $"+0,1 s Dauer pro Betäubung (max. +{SkillInfo.Seconds(capTicks)})");
+                CatalogTexts.GrowthStuns(SkillInfo.Seconds(capTicks)));
 
         public static GrowthRule Heals(int cap = 50) =>
-            new GrowthRule(GrowthTrigger.Heal, GrowthEffect.PowerPercent, 1, cap, $"+1 % Heilung pro Heilung (max. +{cap} %)");
+            new GrowthRule(GrowthTrigger.Heal, GrowthEffect.PowerPercent, 1, cap, CatalogTexts.GrowthHeals(cap));
 
         public static GrowthRule Wins(int cap = 50) =>
-            new GrowthRule(GrowthTrigger.Win, GrowthEffect.PowerPercent, 1, cap, $"+1 % Wirkung pro gewonnenem Kampf, in dem er feuerte (max. +{cap} %)");
+            new GrowthRule(GrowthTrigger.Win, GrowthEffect.PowerPercent, 1, cap, CatalogTexts.GrowthWinsPower(cap));
 
         /// <summary>Nur Zähler (für Skills ohne steigerbare Zahl, z. B. Buffs): Stufen und Modul-Plätze.</summary>
         public static GrowthRule WinsCounter() =>
-            new GrowthRule(GrowthTrigger.Win, GrowthEffect.None, 0, 0, "+1 Wachstum pro gewonnenem Kampf, in dem er feuerte");
+            new GrowthRule(GrowthTrigger.Win, GrowthEffect.None, 0, 0, CatalogTexts.GrowthSkillWins);
 
         public static GrowthRule Threshold(int cap = 50) =>
-            new GrowthRule(GrowthTrigger.Win, GrowthEffect.ThresholdPercent, 1, cap, $"+1 % Schwelle pro gewonnenem Kampf, in dem die Zeile feuerte (max. {cap} %)");
+            new GrowthRule(GrowthTrigger.Win, GrowthEffect.ThresholdPercent, 1, cap, CatalogTexts.GrowthThreshold(cap));
 
         public static GrowthCatalog CreateDefault()
         {

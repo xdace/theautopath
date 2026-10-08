@@ -52,11 +52,11 @@ namespace Betaknight.Core.Runes
         {
             switch (tag)
             {
-                case RuneTag.Blade: return "Klinge";
-                case RuneTag.Shield: return "Schild";
-                case RuneTag.Spark: return "Funke";
-                case RuneTag.Ember: return "Glut";
-                case RuneTag.Phantom: return "Phantom";
+                case RuneTag.Blade: return CatalogTexts.RuneTagBlade;
+                case RuneTag.Shield: return CatalogTexts.RuneTagShield;
+                case RuneTag.Spark: return CatalogTexts.RuneTagSpark;
+                case RuneTag.Ember: return CatalogTexts.RuneTagEmber;
+                case RuneTag.Phantom: return CatalogTexts.RuneTagPhantom;
                 default: return tag.ToString();
             }
         }
@@ -133,7 +133,7 @@ namespace Betaknight.Core.Runes
         {
             if (MaxLevel == 0) return string.Empty;
             int clamped = Math.Max(0, Math.Min(level, MaxLevel));
-            return clamped >= MaxLevel ? $"Stufe {clamped}/{MaxLevel} max" : $"Stufe {clamped}/{MaxLevel}";
+            return clamped >= MaxLevel ? CatalogTexts.RuneLevelMax(clamped, MaxLevel) : CatalogTexts.RuneLevel(clamped, MaxLevel);
         }
 
         /// <summary>Name auf Stufe 0.</summary>

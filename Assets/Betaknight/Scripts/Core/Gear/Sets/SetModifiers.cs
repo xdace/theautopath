@@ -15,7 +15,7 @@ namespace Betaknight.Core.Gear
         public bool Full { get; }
         public OverloadSet(bool full) => Full = full;
 
-        public override string Name => "Überlast-Protokoll";
+        public override string Name => "Overload Protocol";
 
         public override void OnEvent(Battle battle, Combatant owner, BattleEvent e)
         {
@@ -61,7 +61,7 @@ namespace Betaknight.Core.Gear
         public bool Full { get; }
         public AegisSet(bool full) => Full = full;
 
-        public override string Name => "Aegis-Firewall";
+        public override string Name => "Aegis Firewall";
 
         public override void OnEvent(Battle battle, Combatant owner, BattleEvent e)
         {
@@ -109,7 +109,7 @@ namespace Betaknight.Core.Gear
         public bool Full { get; }
         public ScrapHarvesterSet(bool full) => Full = full;
 
-        public override string Name => "Schrott-Ernter";
+        public override string Name => "Scrap Harvester";
 
         private bool MineActive(Battle battle) => Full && battle.Context.OnGoldMine;
 
@@ -141,7 +141,7 @@ namespace Betaknight.Core.Gear
         public bool Full { get; }
         public PhantomSet(bool full) => Full = full;
 
-        public override string Name => "Phantom-Signal";
+        public override string Name => "Phantom Signal";
 
         public override int StatBonus(Battle battle, Combatant owner, StatKind kind)
         {

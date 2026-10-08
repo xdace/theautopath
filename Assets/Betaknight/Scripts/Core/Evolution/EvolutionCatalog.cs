@@ -98,17 +98,17 @@ namespace Betaknight.Core.Evolution
         {
             var c = new EvolutionCatalog();
             c.Register(new EvolutionRecipe("evo_inferno", SynergyTagIds.Heat, EvolutionSubject.Skill, SkillIds.Ignite, SkillIds.Inferno,
-                EvolutionRequirement.Module, ModuleIds.Area, "Ein Feuer-Skill auf Höchststufe und ein Modul, das alle trifft."));
+                EvolutionRequirement.Module, ModuleIds.Area, "A Fire skill at max level and a module that hits everyone."));
             c.Register(new EvolutionRecipe("evo_lance", SynergyTagIds.Charge, EvolutionSubject.Skill, SkillIds.ShockStab, SkillIds.LightningLance,
-                EvolutionRequirement.Tag, SynergyTagIds.Charge, "Ein schneller Schock-Skill auf Höchststufe, getragen von viel Ladung."));
+                EvolutionRequirement.Tag, SynergyTagIds.Charge, "A fast Shock skill at max level, carried by plenty of Charge."));
             c.Register(new EvolutionRecipe("evo_reflex", SynergyTagIds.Phantom, EvolutionSubject.Block, "hp_low", EvolvedRuneIds.PhantomReflex,
-                EvolutionRequirement.Module, ModuleIds.Extend, "Ein Leben-Baustein auf Höchststufe, der länger hält als er sollte."));
+                EvolutionRequirement.Module, ModuleIds.Extend, "An HP rune at max level that holds longer than it should."));
             c.Register(new EvolutionRecipe("evo_resonance", SynergyTagIds.Tempo, EvolutionSubject.Skill, SkillIds.Echo, SkillIds.Resonance,
-                EvolutionRequirement.Module, ModuleIds.Multicast, "Ein Skill, der wiederholt, und ein Modul, das wiederholt."));
+                EvolutionRequirement.Module, ModuleIds.Multicast, "A skill that repeats, and a module that repeats."));
             c.Register(new EvolutionRecipe("evo_acid", SynergyTagIds.Toxin, EvolutionSubject.Skill, SkillIds.Drill, SkillIds.AcidDrill,
-                EvolutionRequirement.BlockInRow, "enemy_low", "Ein schwerer Angriff auf Höchststufe, der auf geschwächte Gegner wartet."));
+                EvolutionRequirement.BlockInRow, "enemy_low", "A heavy attack at max level that waits for weakened enemies."));
             c.Register(new EvolutionRecipe("evo_ram", SynergyTagIds.Scrap, EvolutionSubject.Skill, SkillIds.ShieldBash, SkillIds.ScrapRam,
-                EvolutionRequirement.Tag, SynergyTagIds.Scrap, "Ein Schild-Skill auf Höchststufe, umhüllt von Schrott."));
+                EvolutionRequirement.Tag, SynergyTagIds.Scrap, "A Shield skill at max level, wrapped in Scrap."));
             return c;
         }
     }

@@ -141,15 +141,15 @@ namespace Betaknight.Core.Gear
                 int was = before.TryGetValue(tagId, out int b) ? b : 0;
                 int now = after.TryGetValue(tagId, out int a) ? a : 0;
                 int next = NextThreshold(now);
-                string counter = next > 0 ? $"{NameOf(tagId)} {now}/{next}" : $"{NameOf(tagId)} {now} (max)";
+                string counter = next > 0 ? CatalogTexts.TagCounter(NameOf(tagId), now, next) : CatalogTexts.TagCounterMax(NameOf(tagId), now);
                 bool crossed = ReachedThreshold(now) > ReachedThreshold(was);
-                result.Add(crossed ? $"→ {counter}: Schwelle!" : $"→ {counter}");
+                result.Add(crossed ? CatalogTexts.PreviewTagThreshold(counter) : CatalogTexts.PreviewTag(counter));
             }
             foreach (SynergyDuo duo in _duos)
             {
                 bool wasActive = Get(before, duo.TagA) >= DuoThreshold && Get(before, duo.TagB) >= DuoThreshold;
                 bool nowActive = Get(after, duo.TagA) >= DuoThreshold && Get(after, duo.TagB) >= DuoThreshold;
-                if (nowActive && !wasActive) result.Add($"→ Duo frei: {duoName?.Invoke(duo) ?? duo.Name}");
+                if (nowActive && !wasActive) result.Add(CatalogTexts.PreviewDuo(duoName?.Invoke(duo) ?? duo.Name));
             }
             return result;
         }
@@ -193,49 +193,49 @@ namespace Betaknight.Core.Gear
             var r = new SynergyRegistry();
             int halfSecond = Ticks.FromTenths(5);
 
-            r.Register(Tag(SynergyTagIds.Heat, "Hitze",
-                E("Feuer-Skills −20 % Cast-Zeit.", null, SkillPassive.Cast(SkillKind.Fire, -20)),
-                E("+25 % Schaden gegen brennende Gegner.", () => new SynergyBonusVsStatus(StatusIds.Burn, 25)),
-                E("Basisangriffe setzen Brennen (3 s, 25 % Waffenschaden pro Sekunde).", () => new SynergyBurnOnBasic())));
-            r.Register(Tag(SynergyTagIds.Charge, "Ladung",
+            r.Register(Tag(SynergyTagIds.Heat, "Heat",
+                E("Fire Skills −20 % Cast Time.", null, SkillPassive.Cast(SkillKind.Fire, -20)),
+                E("+25 % Damage against burning enemies.", () => new SynergyBonusVsStatus(StatusIds.Burn, 25)),
+                E("Basic Attacks apply Burn (3 s, 25 % Weapon Damage per second).", () => new SynergyBurnOnBasic())));
+            r.Register(Tag(SynergyTagIds.Charge, "Charge",
                 E("+10 % Block.", () => new SynergyStatBonus(StatKind.Block, BasisPoints.Percent(10))),
-                E("Schock-Skills −25 % Cast-Zeit.", null, SkillPassive.Cast(SkillKind.Shock, -25)),
-                E("Jeder Block senkt alle eigenen Cooldowns um 0,5 s.", () => new SynergyCooldownOnDefense(BattleEventKind.Blocked, halfSecond))));
+                E("Shock Skills −25 % Cast Time.", null, SkillPassive.Cast(SkillKind.Shock, -25)),
+                E("Every Block reduces all your Cooldowns by 0.5 s.", () => new SynergyCooldownOnDefense(BattleEventKind.Blocked, halfSecond))));
             r.Register(Tag(SynergyTagIds.Phantom, "Phantom",
-                E("+10 % Ausweichen.", () => new SynergyStatBonus(StatKind.Dodge, BasisPoints.Percent(10))),
-                E("Bewegung-Skills −30 % Cast-Zeit und −1 s Cooldown.", null,
+                E("+10 % Dodge.", () => new SynergyStatBonus(StatKind.Dodge, BasisPoints.Percent(10))),
+                E("Movement Skills −30 % Cast Time and −1 s Cooldown.", null,
                     SkillPassive.Cast(SkillKind.Movement, -30), SkillPassive.Cooldown(SkillKind.Movement, -Ticks.PerSecond)),
-                E("Nach jedem Ausweichen trifft der nächste eigene Angriff +50 %.", () => new SynergyRiposte(50))));
-            r.Register(Tag(SynergyTagIds.Tempo, "Takt",
-                E("+10 % Angriffstempo.", () => new SynergyStatBonus(StatKind.AttackSpeed, BasisPoints.Percent(10))),
-                E("Alle Skills −15 % Cast-Zeit.", null, SkillPassive.Cast(SkillKinds.Every, -15)),
-                E("Alle Skills weitere −15 % Cast-Zeit (zusammen −30 %).", null, SkillPassive.Cast(SkillKinds.Every, -15))));
+                E("After every Dodge your next attack hits +50 %.", () => new SynergyRiposte(50))));
+            r.Register(Tag(SynergyTagIds.Tempo, "Haste",
+                E("+10 % Attack Speed.", () => new SynergyStatBonus(StatKind.AttackSpeed, BasisPoints.Percent(10))),
+                E("All Skills −15 % Cast Time.", null, SkillPassive.Cast(SkillKinds.Every, -15)),
+                E("All Skills another −15 % Cast Time (−30 % total).", null, SkillPassive.Cast(SkillKinds.Every, -15))));
             r.Register(Tag(SynergyTagIds.Toxin, "Toxin",
-                E("Eigene Skill-Treffer vergiften 4 s (1 Schaden pro Sekunde und Stapel, bis 5 Stapel).", () => new SynergyPoisonOnHit(false)),
-                E("Eigene Angriffe +1 Schaden je Gift-Stapel des Ziels.", () => new SynergyDamagePerPoison()),
-                E("Auch Basisangriffe vergiften.", () => new SynergyPoisonOnHit(true))));
-            r.Register(Tag(SynergyTagIds.Scrap, "Schrott",
-                E("+1 Gold je besiegtem Gegner.", () => new SynergyGoldPerKill(1)),
-                E("+3 Rüstung.", () => new SynergyStatBonus(StatKind.Armor, 3)),
-                E("Eigene Angriffe ignorieren Rüstung.", () => new SynergyIgnoreArmor())));
+                E("Your skill hits poison for 4 s (1 Damage per second per stack, up to 5 stacks).", () => new SynergyPoisonOnHit(false)),
+                E("Your attacks deal +1 Damage per Poison stack on the target.", () => new SynergyDamagePerPoison()),
+                E("Basic Attacks poison too.", () => new SynergyPoisonOnHit(true))));
+            r.Register(Tag(SynergyTagIds.Scrap, "Scrap",
+                E("+1 Gold per defeated enemy.", () => new SynergyGoldPerKill(1)),
+                E("+3 Armor.", () => new SynergyStatBonus(StatKind.Armor, 3)),
+                E("Your attacks ignore Armor.", () => new SynergyIgnoreArmor())));
 
-            r.Register(new SynergyDuo("ember_rhythm", "Glutrhythmus", SynergyTagIds.Heat, SynergyTagIds.Tempo,
-                E("Basisangriffe gegen brennende Gegner senken alle eigenen Cooldowns um 0,25 s.",
+            r.Register(new SynergyDuo("ember_rhythm", "Ember Rhythm", SynergyTagIds.Heat, SynergyTagIds.Tempo,
+                E("Basic Attacks against burning enemies reduce all your Cooldowns by 0.25 s.",
                     () => new SynergyCooldownOnBasicVsStatus(StatusIds.Burn, Ticks.FromTenths(5) / 2))));
-            r.Register(new SynergyDuo("phase_shield", "Phasenschild", SynergyTagIds.Charge, SynergyTagIds.Phantom,
-                E("Jeder Block gibt +5 % Ausweichen bis Kampfende (höchstens +25 %).",
+            r.Register(new SynergyDuo("phase_shield", "Phase Shield", SynergyTagIds.Charge, SynergyTagIds.Phantom,
+                E("Every Block grants +5 % Dodge until the fight ends (max. +25 %).",
                     () => new SynergyStackOnDefense(BattleEventKind.Blocked, StatKind.Dodge, BasisPoints.Percent(5), 5))));
-            r.Register(new SynergyDuo("fire_venom", "Brandgift", SynergyTagIds.Heat, SynergyTagIds.Toxin,
-                E("Brennen auf vergifteten Gegnern macht +50 % Schaden.",
+            r.Register(new SynergyDuo("fire_venom", "Fire Venom", SynergyTagIds.Heat, SynergyTagIds.Toxin,
+                E("Burn on poisoned enemies deals +50 % Damage.",
                     () => new SynergyDotBoostVsStatus(StatusIds.Burn, StatusIds.Poison, 50))));
-            r.Register(new SynergyDuo("scrap_capacitor", "Schrottkondensator", SynergyTagIds.Scrap, SynergyTagIds.Charge,
-                E("Jeder Block gibt +1 Rüstung bis Kampfende (höchstens +10).",
+            r.Register(new SynergyDuo("scrap_capacitor", "Scrap Capacitor", SynergyTagIds.Scrap, SynergyTagIds.Charge,
+                E("Every Block grants +1 Armor until the fight ends (max. +10).",
                     () => new SynergyStackOnDefense(BattleEventKind.Blocked, StatKind.Armor, 1, 10))));
-            r.Register(new SynergyDuo("ghost_step", "Geisterschritt", SynergyTagIds.Phantom, SynergyTagIds.Tempo,
-                E("Jedes Ausweichen gibt +10 % Angriffstempo bis Kampfende (höchstens +50 %).",
+            r.Register(new SynergyDuo("ghost_step", "Ghost Step", SynergyTagIds.Phantom, SynergyTagIds.Tempo,
+                E("Every Dodge grants +10 % Attack Speed until the fight ends (max. +50 %).",
                     () => new SynergyStackOnDefense(BattleEventKind.Dodged, StatKind.AttackSpeed, BasisPoints.Percent(10), 5))));
-            r.Register(new SynergyDuo("acid_bite", "Säurefraß", SynergyTagIds.Toxin, SynergyTagIds.Scrap,
-                E("Eigene Angriffe gegen vergiftete Gegner ignorieren Rüstung.", () => new SynergyIgnoreArmor(StatusIds.Poison))));
+            r.Register(new SynergyDuo("acid_bite", "Acid Bite", SynergyTagIds.Toxin, SynergyTagIds.Scrap,
+                E("Your attacks against poisoned enemies ignore Armor.", () => new SynergyIgnoreArmor(StatusIds.Poison))));
             return r;
         }
     }

@@ -37,7 +37,7 @@ namespace Betaknight.Core.Encounters
         }
 
         private static EncounterDefinition Minor(string id, string title, string symbol, int weight, int minDistance, string text, params E[] effects) =>
-            new EncounterDefinition(id, title, symbol, EncounterSize.Minor, weight, minDistance, text, new EncounterOption("Weiter", effects));
+            new EncounterDefinition(id, title, symbol, EncounterSize.Minor, weight, minDistance, text, new EncounterOption(CatalogTexts.EncounterContinue, effects));
 
         private static EncounterDefinition Medium(string id, string title, string symbol, int weight, int minDistance, string text, params EncounterOption[] options) =>
             new EncounterDefinition(id, title, symbol, EncounterSize.Medium, weight, minDistance, text, options);
@@ -46,29 +46,29 @@ namespace Betaknight.Core.Encounters
         public static EncounterCatalog CreateDefault() => new EncounterCatalog(new[]
         {
             // Kleine Events: wirken sofort.
-            Minor("coins", "Verstreute Münzen", "c", 30, 0, "Ein paar Münzen glänzen im Gras.", E.Gold(2, 4)),
-            Minor("herbs", "Heilkräuter", "h", 20, 0, "Du kaust bittere Kräuter. Die Wunden schliessen sich ein wenig.", E.Heal(2, 4)),
-            Minor("shard", "Runensplitter", "s", 20, 0, "Ein glimmender Runensplitter steckt im Boden.", E.Shards(1)),
-            Minor("signpost", "Wegweiser", "w", 12, 0, "Ein alter Wegweiser verrät, was in der Nähe liegt.", E.ScoutAround(2)),
-            Minor("tracks", "Händlerspuren", "t", 8, 2, "Wagenspuren führen zu einem Händler.", E.ScoutNearest(CellContent.Shop)),
-            Minor("thorns", "Dornengestrüpp", "x", 10, 2, "Dornen kratzen an der Rüstung.", E.Damage(1, 2)),
+            Minor("coins", "Scattered Coins", "c", 30, 0, "A few coins glint in the grass.", E.Gold(2, 4)),
+            Minor("herbs", "Healing Herbs", "h", 20, 0, "You chew bitter herbs. Your wounds close a little.", E.Heal(2, 4)),
+            Minor("shard", "Rune Shard", "s", 20, 0, "A glowing Rune Shard is stuck in the ground.", E.Shards(1)),
+            Minor("signpost", "Signpost", "w", 12, 0, "An old signpost reveals what lies nearby.", E.ScoutAround(2)),
+            Minor("tracks", "Merchant Tracks", "t", 8, 2, "Wagon tracks lead to a merchant.", E.ScoutNearest(CellContent.Shop)),
+            Minor("thorns", "Thorn Thicket", "x", 10, 2, "Thorns scratch at your armor.", E.Damage(1, 2)),
 
             // Mittlere Events: eine Entscheidung.
-            Medium("campfire", "Lagerfeuer", "F", 20, 0, "Ein verlassenes Lagerfeuer glimmt noch.",
-                new EncounterOption("Ausruhen (+10 HP)", E.Heal(10)),
-                new EncounterOption("Rune verstärken (eine Stufe)", E.UpgradeRune())),
-            Medium("wanderer", "Wanderer", "W", 20, 0, "Ein Wanderer bietet dir einen Handel an.",
-                new EncounterOption("Runensplitter kaufen (5 Gold)", 5, E.Shards(1)),
-                new EncounterOption("Nach dem Weg fragen", E.ScoutAround(3))),
-            Medium("shrine", "Blutschrein", "S", 15, 0, "Ein Schrein verlangt ein Opfer.",
-                new EncounterOption("Blut opfern (-5 HP, +2 Splitter)", E.Damage(5), E.Shards(2)),
-                new EncounterOption("Weitergehen")),
-            Medium("mercenary", "Verletzter Söldner", "M", 12, 3, "Ein verwundeter Söldner lehnt an einem Baum.",
-                new EncounterOption("Wunden versorgen (6 Gold)", 6, E.Shards(1), E.ScoutNearest(CellContent.Treasure)),
-                new EncounterOption("Seine Börse nehmen (+6 Gold, -3 HP)", E.Gold(6), E.Damage(3))),
-            Medium("cache", "Verschütteter Vorrat", "V", 15, 0, "Unter Geröll liegt etwas begraben.",
-                new EncounterOption("Ausgraben (-2 HP, +6–9 Gold)", E.Damage(2), E.Gold(6, 9)),
-                new EncounterOption("Vorsichtig suchen (+2–3 Gold)", E.Gold(2, 3))),
+            Medium("campfire", "Campfire", "F", 20, 0, "An abandoned campfire is still smoldering.",
+                new EncounterOption("Rest (+10 HP)", E.Heal(10)),
+                new EncounterOption("Upgrade a rune (one level)", E.UpgradeRune())),
+            Medium("wanderer", "Wanderer", "W", 20, 0, "A wanderer offers you a trade.",
+                new EncounterOption("Buy a Rune Shard (5 Gold)", 5, E.Shards(1)),
+                new EncounterOption("Ask for directions", E.ScoutAround(3))),
+            Medium("shrine", "Blood Shrine", "S", 15, 0, "A shrine demands a sacrifice.",
+                new EncounterOption("Sacrifice blood (-5 HP, +2 Shards)", E.Damage(5), E.Shards(2)),
+                new EncounterOption("Move on")),
+            Medium("mercenary", "Wounded Mercenary", "M", 12, 3, "A wounded mercenary leans against a tree.",
+                new EncounterOption("Tend his wounds (6 Gold)", 6, E.Shards(1), E.ScoutNearest(CellContent.Treasure)),
+                new EncounterOption("Take his purse (+6 Gold, -3 HP)", E.Gold(6), E.Damage(3))),
+            Medium("cache", "Buried Cache", "V", 15, 0, "Something lies buried under the rubble.",
+                new EncounterOption("Dig it out (-2 HP, +6–9 Gold)", E.Damage(2), E.Gold(6, 9)),
+                new EncounterOption("Search carefully (+2–3 Gold)", E.Gold(2, 3))),
         });
     }
 }

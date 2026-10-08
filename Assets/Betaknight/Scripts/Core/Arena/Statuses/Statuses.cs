@@ -96,7 +96,7 @@ namespace Betaknight.Core.Arena
     {
         public AnchorStatus(int ticks) : base(StatusIds.Anchor, ticks) { }
 
-        public override string Summary => "Rüstung ×2, kein Ausweichen";
+        public override string Summary => CatalogTexts.AnchorSummary;
 
         public override int StatBonus(StatKind kind) => kind == StatKind.ArmorMultiplier ? BasisPoints.Full : 0;
 
@@ -108,7 +108,7 @@ namespace Betaknight.Core.Arena
     {
         public ThrustersStatus(int ticks) : base(StatusIds.Thrusters, ticks) { }
 
-        public override string Summary => "nächster gegnerischer Treffer verfehlt sicher";
+        public override string Summary => CatalogTexts.ThrustersSummary;
 
         public override void ModifyIncomingHit(Battle battle, Combatant owner, HitInfo hit)
         {

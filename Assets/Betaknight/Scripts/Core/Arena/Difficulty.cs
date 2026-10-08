@@ -34,11 +34,11 @@ namespace Betaknight.Core.Arena
             get
             {
                 var parts = new List<string>();
-                if (CooldownReductionPercent > 0) parts.Add($"−{CooldownReductionPercent} % Cooldown");
-                if (PowerPercent > 0) parts.Add($"+{PowerPercent} % Wirkung");
-                if (CastReductionPercent > 0) parts.Add($"−{CastReductionPercent} % Cast-Zeit");
-                if (ExtraStatusTicks > 0) parts.Add($"+{SkillInfo.Seconds(ExtraStatusTicks)} Dauer von Status-Wirkungen");
-                return parts.Count > 0 ? string.Join(", ", parts) : "kein Bonus";
+                if (CooldownReductionPercent > 0) parts.Add(CatalogTexts.BonusCooldown(CooldownReductionPercent));
+                if (PowerPercent > 0) parts.Add(CatalogTexts.BonusPower(PowerPercent));
+                if (CastReductionPercent > 0) parts.Add(CatalogTexts.BonusCast(CastReductionPercent));
+                if (ExtraStatusTicks > 0) parts.Add(CatalogTexts.BonusStatusDuration(SkillInfo.Seconds(ExtraStatusTicks)));
+                return parts.Count > 0 ? string.Join(", ", parts) : CatalogTexts.NoBonus;
             }
         }
     }
@@ -91,7 +91,7 @@ namespace Betaknight.Core.Arena
     public static class DifficultyText
     {
         private static readonly string[] Symbols = { "◇", "◆", "◆◆", "◆◆◆" };
-        private static readonly string[] Names = { "Leicht", "Mittel", "Schwer", "Sehr schwer" };
+        private static readonly string[] Names = CatalogTexts.DifficultyNames;
 
         /// <summary>◇ ◆ ◆◆ ◆◆◆</summary>
         public static string Symbol(int tier) => Symbols[DifficultyBonusConfig.Clamp(tier)];
@@ -103,7 +103,7 @@ namespace Betaknight.Core.Arena
         public static string Tooltip(int tier, DifficultyBonusConfig config = null)
         {
             DifficultyBonus bonus = (config ?? DifficultyBonusConfig.Default)[tier];
-            return $"{Name(tier)}: {bonus.Text}";
+            return CatalogTexts.DifficultyTooltip(Name(tier), bonus.Text);
         }
     }
 }

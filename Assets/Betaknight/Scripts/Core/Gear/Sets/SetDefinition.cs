@@ -37,7 +37,7 @@ namespace Betaknight.Core.Gear
         {
             var lines = new List<string> { $"{Name} {pieces}/{MaxPieces}" };
             foreach (KeyValuePair<int, string> bonus in Bonuses)
-                lines.Add($"{(IsActive(bonus.Key, pieces) ? "●" : "○")} {bonus.Key} Teile: {bonus.Value}");
+                lines.Add(CatalogTexts.TierLine(IsActive(bonus.Key, pieces) ? "●" : "○", bonus.Key, bonus.Value));
             return string.Join("\n", lines);
         }
 
@@ -46,7 +46,7 @@ namespace Betaknight.Core.Gear
         {
             var lines = new List<string>();
             foreach (KeyValuePair<int, string> bonus in Bonuses)
-                if (IsActive(bonus.Key, pieces)) lines.Add($"{bonus.Key} Teile: {bonus.Value}");
+                if (IsActive(bonus.Key, pieces)) lines.Add(CatalogTexts.ActiveTierLine(bonus.Key, bonus.Value));
             return string.Join("\n", lines);
         }
     }

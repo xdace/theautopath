@@ -31,12 +31,12 @@ namespace Betaknight.Core.Arena
         {
             switch (kind)
             {
-                case SkillKind.Attack: return "Angriff";
-                case SkillKind.Shield: return "Schild";
-                case SkillKind.Fire: return "Feuer";
-                case SkillKind.Shock: return "Schock";
-                case SkillKind.Healing: return "Heilung";
-                case SkillKind.Movement: return "Bewegung";
+                case SkillKind.Attack: return CatalogTexts.KindAttack;
+                case SkillKind.Shield: return CatalogTexts.KindShield;
+                case SkillKind.Fire: return CatalogTexts.KindFire;
+                case SkillKind.Shock: return CatalogTexts.KindShock;
+                case SkillKind.Healing: return CatalogTexts.KindHealing;
+                case SkillKind.Movement: return CatalogTexts.KindMovement;
                 default: return kind.ToString();
             }
         }

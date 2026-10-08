@@ -59,9 +59,9 @@ namespace Betaknight.Core.Gear
         /// </summary>
         public string Describe(int count)
         {
-            var lines = new List<string> { $"{Name} {count} {(count == 1 ? "Teil" : "Teile")}" };
+            var lines = new List<string> { CatalogTexts.TagHeader(Name, count) };
             foreach (KeyValuePair<int, SynergyEffect> tier in Tiers)
-                lines.Add($"{(count >= tier.Key ? "●" : "○")} {tier.Key} Teile: {tier.Value.Text}");
+                lines.Add(CatalogTexts.TierLine(count >= tier.Key ? "●" : "○", tier.Key, tier.Value.Text));
             return string.Join("\n", lines);
         }
 
@@ -70,7 +70,7 @@ namespace Betaknight.Core.Gear
         {
             var lines = new List<string>();
             foreach (KeyValuePair<int, SynergyEffect> tier in Tiers)
-                if (count >= tier.Key) lines.Add($"{tier.Key} Teile: {tier.Value.Text}");
+                if (count >= tier.Key) lines.Add(CatalogTexts.ActiveTierLine(tier.Key, tier.Value.Text));
             return string.Join("\n", lines);
         }
     }
@@ -119,6 +119,6 @@ namespace Betaknight.Core.Gear
         }
 
         /// <summary>«Ladung 3/4» oder bei allen Schwellen «Ladung 6 (max)».</summary>
-        public string Text => Next > 0 ? $"{Tag.Name} {Count}/{Next}" : $"{Tag.Name} {Count} (max)";
+        public string Text => Next > 0 ? CatalogTexts.TagCounter(Tag.Name, Count, Next) : CatalogTexts.TagCounterMax(Tag.Name, Count);
     }
 }

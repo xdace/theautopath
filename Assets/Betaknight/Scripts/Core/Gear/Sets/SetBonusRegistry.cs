@@ -57,21 +57,21 @@ namespace Betaknight.Core.Gear
         public static SetBonusRegistry CreateDefault()
         {
             var r = new SetBonusRegistry();
-            r.Register(Def(SetIds.Overload, "Überlast-Protokoll",
-                    "Jeder Basisangriff: +1 Tempo-Stapel (+10 % Angriffstempo), 2 % Max-HP Hitze-Schaden.",
-                    "Hitze-Schaden höchstens 1, solange eine Heil-Zeile bereit ist."),
+            r.Register(Def(SetIds.Overload, "Overload Protocol",
+                    "Every Basic Attack: +1 Haste stack (+10 % Attack Speed), 2 % Max HP Heat damage.",
+                    "Heat damage is at most 1 while a healing row is ready."),
                 p => p >= 2 ? new OverloadSet(p >= 3) : null);
-            r.Register(Def(SetIds.Aegis, "Aegis-Firewall",
-                    "Jeder Block: +1 Ladung (max. 5), bei 5 Ladung Rüstung ×2. Schaltet die Rune «Ladung voll» frei.",
-                    "Skills aus «Ladung voll»-Zeilen entladen: Ladung auf 0, Schaden = 5 × Rüstung."),
+            r.Register(Def(SetIds.Aegis, "Aegis Firewall",
+                    "Every Block: +1 Charge (max. 5), at 5 Charge Armor ×2. Unlocks the rune \"Charge Full\".",
+                    "Skills from \"Charge Full\" rows discharge: Charge to 0, Damage = 5 × Armor."),
                 p => p >= 2 ? new AegisSet(p >= 3) : null);
-            r.Register(Def(SetIds.Scrap, "Schrott-Ernter",
-                    "+2 Gold je besiegtem Gegner.",
-                    "Auf Goldminen: +50 % Flächenschaden, eigene Angriffe ignorieren Rüstung."),
+            r.Register(Def(SetIds.Scrap, "Scrap Harvester",
+                    "+2 Gold per defeated enemy.",
+                    "On Gold Mines: +50 % Area Damage, your attacks ignore Armor."),
                 p => p >= 2 ? new ScrapHarvesterSet(p >= 3) : null);
-            r.Register(Def(SetIds.Phantom, "Phantom-Signal",
-                    "+20 % Ausweichen.",
-                    "Jedes Ausweichen senkt alle Cooldowns um 1 s, Ausweich-Obergrenze 75 %."),
+            r.Register(Def(SetIds.Phantom, "Phantom Signal",
+                    "+20 % Dodge.",
+                    "Every Dodge reduces all Cooldowns by 1 s, Dodge cap 75 %."),
                 p => p >= 2 ? new PhantomSet(p >= 3) : null);
             return r;
         }

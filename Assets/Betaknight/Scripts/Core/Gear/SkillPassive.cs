@@ -72,10 +72,10 @@ namespace Betaknight.Core.Gear
         {
             get
             {
-                string who = Target == SkillKinds.Every ? "Alle Skills" : $"{SkillKinds.Names(Target)}-Skills";
-                if (Effect == SkillPassiveEffect.PowerPercent) return $"{who} {(Value >= 0 ? "+" : "−")}{System.Math.Abs(Value)} % Wirkung";
-                if (Effect == SkillPassiveEffect.CastPercent) return $"{who} {(Value <= 0 ? "−" : "+")}{System.Math.Abs(Value)} % Cast-Zeit";
-                return $"{who} {(Value <= 0 ? "−" : "+")}{SkillInfo.Seconds(System.Math.Abs(Value))} Cooldown";
+                string who = Target == SkillKinds.Every ? CatalogTexts.AllSkills : CatalogTexts.KindSkills(SkillKinds.Names(Target));
+                if (Effect == SkillPassiveEffect.PowerPercent) return CatalogTexts.PassivePower(who, Value >= 0 ? "+" : "−", System.Math.Abs(Value));
+                if (Effect == SkillPassiveEffect.CastPercent) return CatalogTexts.PassiveCast(who, Value <= 0 ? "−" : "+", System.Math.Abs(Value));
+                return CatalogTexts.PassiveCooldown(who, Value <= 0 ? "−" : "+", SkillInfo.Seconds(System.Math.Abs(Value)));
             }
         }
 

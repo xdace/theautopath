@@ -96,57 +96,57 @@ namespace Betaknight.Core.Modules
         public static ModuleCatalog CreateDefault()
         {
             var c = new ModuleCatalog();
-            c.Register(new ModuleDefinition(ModuleIds.Multicast, "Mehrfach", ModuleKind.Skill, new[]
+            c.Register(new ModuleDefinition(ModuleIds.Multicast, "Multicast", ModuleKind.Skill, new[]
             {
-                "Mehrfach ×2: die Wirkung wird nach erneuter Cast-Zeit wiederholt.",
-                "Mehrfach ×3: die Wirkung wird zweimal wiederholt, jedes Mal mit Cast-Zeit.",
+                "Multicast ×2: the effect repeats after another Cast Time.",
+                "Multicast ×3: the effect repeats twice, each time with Cast Time.",
             }, weight: 6));
-            c.Register(new ModuleDefinition(ModuleIds.Area, "Fläche", ModuleKind.Skill, new[]
+            c.Register(new ModuleDefinition(ModuleIds.Area, "Area", ModuleKind.Skill, new[]
             {
-                "Fläche: Schaden trifft alle Gegner mit 70 %.",
-                "Fläche: Schaden trifft alle Gegner mit 85 %.",
+                "Area: Damage hits all enemies at 70 %.",
+                "Area: Damage hits all enemies at 85 %.",
             }));
-            c.Register(new ModuleDefinition(ModuleIds.Chain, "Kette", ModuleKind.Skill, new[]
+            c.Register(new ModuleDefinition(ModuleIds.Chain, "Chain", ModuleKind.Skill, new[]
             {
-                "Kette auf 2 Ziele: zielgerichtete Wirkungen treffen einen weiteren Gegner.",
-                "Kette auf 3 Ziele: zielgerichtete Wirkungen treffen zwei weitere Gegner.",
+                "Chain to 2 targets: targeted effects hit one more enemy.",
+                "Chain to 3 targets: targeted effects hit two more enemies.",
             }));
-            c.Register(new ModuleDefinition(ModuleIds.BloodCost, "Blutzoll", ModuleKind.Skill, new[]
+            c.Register(new ModuleDefinition(ModuleIds.BloodCost, "Blood Toll", ModuleKind.Skill, new[]
             {
-                "Kostet 5 % Max-HP statt Cooldown.",
-                "Kostet 4 % Max-HP statt Cooldown.",
+                "Costs 5 % Max HP instead of Cooldown.",
+                "Costs 4 % Max HP instead of Cooldown.",
             }, weight: 6));
-            c.Register(new ModuleDefinition(ModuleIds.Quickcast, "Schnellcast", ModuleKind.Skill, new[]
+            c.Register(new ModuleDefinition(ModuleIds.Quickcast, "Quickcast", ModuleKind.Skill, new[]
             {
-                "Schnellcast: −30 % Cast-Zeit, +30 % Cooldown.",
-                "Schnellcast: −40 % Cast-Zeit, +30 % Cooldown.",
+                "Quickcast: −30 % Cast Time, +30 % Cooldown.",
+                "Quickcast: −40 % Cast Time, +30 % Cooldown.",
             }));
-            c.Register(new ModuleDefinition(ModuleIds.Invert, "Umkehren", ModuleKind.Block, new[]
+            c.Register(new ModuleDefinition(ModuleIds.Invert, "Invert", ModuleKind.Block, new[]
             {
-                "Umkehren (NICHT): die Zeile gilt, wenn die Bedingung nicht erfüllt ist.",
+                "Invert (NOT): the row applies when the Condition is not met.",
             }, weight: 8));
-            c.Register(new ModuleDefinition(ModuleIds.Extend, "Verlängern", ModuleKind.Block, new[]
+            c.Register(new ModuleDefinition(ModuleIds.Extend, "Extend", ModuleKind.Block, new[]
             {
-                "Verlängern: die Bedingung gilt 1 s länger.",
-                "Verlängern: die Bedingung gilt 1,5 s länger.",
+                "Extend: the Condition holds 1 s longer.",
+                "Extend: the Condition holds 1.5 s longer.",
             }));
-            c.Register(new ModuleDefinition(ModuleIds.Threshold, "Schwelle", ModuleKind.Block, new[]
+            c.Register(new ModuleDefinition(ModuleIds.Threshold, "Threshold", ModuleKind.Block, new[]
             {
-                "Schwelle +10 % (nur Runen mit Prozent-Schwelle, z. B. «HP unter 30 %» → 40 %).",
-                "Schwelle +15 % (nur Runen mit Prozent-Schwelle).",
+                "Threshold +10 % (only runes with a percent threshold, e.g. \"HP Below 30 %\" → 40 %).",
+                "Threshold +15 % (only runes with a percent threshold).",
             }));
-            c.Register(new ModuleDefinition(ModuleIds.Trigger, "Auslöser", ModuleKind.Trigger, new[]
+            c.Register(new ModuleDefinition(ModuleIds.Trigger, "Trigger", ModuleKind.Trigger, new[]
             {
-                "Am Skill: nach der Ausführung Ziel auslösen. Am Baustein: wenn er erfüllt wird, Ziel auslösen. "
-                + "Das Ziel castet normal; ist es nicht bereit, verfällt der Auslöser.",
+                "On a skill: triggers the target after it executes. On a rune: triggers the target when the rune is met. "
+                + "The target casts normally; if it is not ready, the Trigger is lost.",
             }, weight: 8));
-            c.Register(new ModuleDefinition(ModuleIds.AlarmSensor, "Alarmfühler", ModuleKind.Block, new[]
+            c.Register(new ModuleDefinition(ModuleIds.AlarmSensor, "Alarm Sensor", ModuleKind.Block, new[]
             {
-                "Erleichterer: HP-Schwellen-Bausteine («HP unter x %») gelten 10 Prozentpunkte früher. Ihr Bonus bleibt.",
+                "Easer: HP threshold runes (\"HP Below x %\") trigger 10 percentage points earlier. Their bonus stays.",
             }, weight: 6));
-            c.Register(new ModuleDefinition(ModuleIds.Scent, "Witterung", ModuleKind.Block, new[]
+            c.Register(new ModuleDefinition(ModuleIds.Scent, "Scent", ModuleKind.Block, new[]
             {
-                "Erleichterer: «Gegner unter x %» gilt 10 Prozentpunkte früher. Der Bonus bleibt.",
+                "Easer: \"Enemy Below x %\" triggers 10 percentage points earlier. The bonus stays.",
             }, weight: 6));
             return c;
         }
