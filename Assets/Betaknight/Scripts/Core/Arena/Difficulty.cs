@@ -3,38 +3,38 @@ using System.Collections.Generic;
 
 namespace Betaknight.Core.Arena
 {
-    /// <summary>Bonus einer Schwierigkeitsstufe auf den Skill einer Zeile.</summary>
+    /// <summary>Bonus und Grössen-Grenze einer Schwierigkeitsstufe (A-19, ohne Cooldown).</summary>
     public readonly struct DifficultyBonus
     {
-        /// <summary>Cooldown in Prozent kürzer (15 = −15 %).</summary>
-        public readonly int CooldownReductionPercent;
-
         /// <summary>Wirkung (Schaden, Heilung, Schild) in Prozent stärker.</summary>
         public readonly int PowerPercent;
 
-        /// <summary>Cast-Zeit in Prozent kürzer; die Untergrenze 0,1 s bleibt.</summary>
+        /// <summary>Cast-Zeit in Prozent kürzer; die Untergrenze 0.1 s bleibt.</summary>
         public readonly int CastReductionPercent;
 
         /// <summary>Zusätzliche Dauer von Status-Wirkungen (Betäubung, Brennen, Buffs, Debuffs) in Ticks.</summary>
         public readonly int ExtraStatusTicks;
 
-        public DifficultyBonus(int cooldownReductionPercent, int powerPercent = 0, int castReductionPercent = 0, int extraStatusTicks = 0)
+        /// <summary>Grösste Komponente in Zellen, die ein Relais dieser Stufe versorgen kann.</summary>
+        public readonly int MaxCells;
+
+        public DifficultyBonus(int powerPercent, int castReductionPercent = 0, int extraStatusTicks = 0, int maxCells = 1)
         {
-            CooldownReductionPercent = Math.Max(0, Math.Min(100, cooldownReductionPercent));
             PowerPercent = Math.Max(0, powerPercent);
             CastReductionPercent = Math.Max(0, Math.Min(100, castReductionPercent));
             ExtraStatusTicks = Math.Max(0, extraStatusTicks);
+            MaxCells = Math.Max(1, maxCells);
         }
 
-        public bool IsNone => CooldownReductionPercent == 0 && PowerPercent == 0 && CastReductionPercent == 0 && ExtraStatusTicks == 0;
+        /// <summary>Kein Bonus auf den Skill (die Grössen-Grenze zählt nicht als Bonus).</summary>
+        public bool IsNone => PowerPercent == 0 && CastReductionPercent == 0 && ExtraStatusTicks == 0;
 
-        /// <summary>«−30 % Cooldown, +25 % Wirkung» oder «kein Bonus».</summary>
+        /// <summary>«+30 % power, −20 % Cast Time» oder «no bonus».</summary>
         public string Text
         {
             get
             {
                 var parts = new List<string>();
-                if (CooldownReductionPercent > 0) parts.Add(CatalogTexts.BonusCooldown(CooldownReductionPercent));
                 if (PowerPercent > 0) parts.Add(CatalogTexts.BonusPower(PowerPercent));
                 if (CastReductionPercent > 0) parts.Add(CatalogTexts.BonusCast(CastReductionPercent));
                 if (ExtraStatusTicks > 0) parts.Add(CatalogTexts.BonusStatusDuration(SkillInfo.Seconds(ExtraStatusTicks)));
@@ -44,9 +44,9 @@ namespace Betaknight.Core.Arena
     }
 
     /// <summary>
-    /// Schwierigkeits-Bonus als Daten: je schwerer ein Logikbaustein (Grundschwierigkeit 0–3), desto stärker der Skill
-    /// seiner Zeile. Die Stufe hängt nur am Baustein; Ausrüstung, Module, Wachstum, Tags oder Skills, die ihn leichter
-    /// erfüllbar machen, ändern sie nicht. Das ist der gewollte Weg zu starken Builds.
+    /// Schwierigkeit als Daten (A-11, A-19): je schwerer ein Relais (Grundschwierigkeit 0–3), desto stärker die
+    /// Komponenten, die es auslöst, und desto grösser dürfen sie sein. Die Stufe hängt nur am Relais; Ausrüstung,
+    /// Module, Wachstum, Tags oder Skills, die es leichter erfüllbar machen (Erleichterer), ändern sie nicht.
     /// </summary>
     public sealed class DifficultyBonusConfig
     {
@@ -56,7 +56,7 @@ namespace Betaknight.Core.Arena
 
         public DifficultyBonusConfig(params DifficultyBonus[] tiers)
         {
-            if (tiers == null || tiers.Length != MaxTier + 1) throw new ArgumentException("Genau vier Stufen (0 bis 3).", nameof(tiers));
+            if (tiers == null || tiers.Length != MaxTier + 1) throw new ArgumentException("Exactly four tiers (0 to 3).", nameof(tiers));
             _tiers = (DifficultyBonus[])tiers.Clone();
         }
 
@@ -64,19 +64,22 @@ namespace Betaknight.Core.Arena
 
         public static int Clamp(int tier) => Math.Max(0, Math.Min(MaxTier, tier));
 
+        /// <summary>Grösste versorgbare Komponente für ein Relais dieser Stufe.</summary>
+        public int MaxCells(int tier) => this[tier].MaxCells;
+
         /// <summary>
-        /// Startwerte: 1 = −15 % Cooldown · 2 = −30 % Cooldown, +25 % Wirkung ·
-        /// 3 = −50 % Cooldown, +50 % Wirkung, −30 % Cast-Zeit, +1 s Dauer von Status-Wirkungen.
+        /// Startwerte: 0 = bis 1 Zelle · 1 = +15 % Wirkung, bis 2 Zellen · 2 = +30 % Wirkung, −20 % Cast-Zeit, bis 4 Zellen ·
+        /// 3 = +60 % Wirkung, −35 % Cast-Zeit, +1 s Status-Dauer, bis 6 Zellen.
         /// </summary>
         public static DifficultyBonusConfig Default { get; } = new DifficultyBonusConfig(
-            new DifficultyBonus(0),
-            new DifficultyBonus(15),
-            new DifficultyBonus(30, 25),
-            new DifficultyBonus(50, 50, 30, Ticks.PerSecond));
+            new DifficultyBonus(0, maxCells: 1),
+            new DifficultyBonus(15, maxCells: 2),
+            new DifficultyBonus(30, 20, maxCells: 4),
+            new DifficultyBonus(60, 35, Ticks.PerSecond, maxCells: 6));
 
-        /// <summary>Ohne Bonus (z. B. für Vergleiche in Tests).</summary>
+        /// <summary>Ohne Bonus, Grenzen wie Standard (z. B. für Vergleiche in Tests).</summary>
         public static DifficultyBonusConfig None { get; } = new DifficultyBonusConfig(
-            new DifficultyBonus(0), new DifficultyBonus(0), new DifficultyBonus(0), new DifficultyBonus(0));
+            new DifficultyBonus(0, maxCells: 1), new DifficultyBonus(0, maxCells: 2), new DifficultyBonus(0, maxCells: 4), new DifficultyBonus(0, maxCells: 6));
 
         /// <summary>Der Skill mit dem Bonus dieser Stufe. Stufe 0, Basisangriff und null bleiben unverändert.</summary>
         public SkillDefinition Apply(SkillDefinition skill, int tier)
@@ -99,11 +102,11 @@ namespace Betaknight.Core.Arena
         /// <summary>Leicht, Mittel, Schwer, Sehr schwer.</summary>
         public static string Name(int tier) => Names[DifficultyBonusConfig.Clamp(tier)];
 
-        /// <summary>Tooltip: «Schwer: −30 % Cooldown, +25 % Wirkung».</summary>
+        /// <summary>Tooltip: «Hard: +30 % power, −20 % Cast Time · powers up to 4 cells».</summary>
         public static string Tooltip(int tier, DifficultyBonusConfig config = null)
         {
             DifficultyBonus bonus = (config ?? DifficultyBonusConfig.Default)[tier];
-            return CatalogTexts.DifficultyTooltip(Name(tier), bonus.Text);
+            return CatalogTexts.DifficultyTooltip(Name(tier), bonus.Text, bonus.MaxCells);
         }
     }
 }

@@ -44,13 +44,10 @@ namespace Betaknight.Core.Arena
         // ------------------------------------------------------------------ Namen
 
         public const string BasicAttack = "Basic Attack";
-        public const string AlwaysLabel = "Always";
         public const string DefaultFighterName = "Fighter";
         public const string PlayerName = "Knight";
         public const string DummyTargetName = "Target";
         public static string EliteName(string enemy) => $"Elite: {enemy}";
-        public static string RowName(int index) => $"Row {index + 1}";
-        public const string BasicAttackRow = "Basic Attack Row";
         public static string InvertedLabel(string label) => $"NOT {label}";
 
         public static string StatName(StatKind kind)
@@ -70,6 +67,7 @@ namespace Betaknight.Core.Arena
                 case StatKind.Accuracy: return "Accuracy";
                 case StatKind.AreaDamage: return "Area Damage";
                 case StatKind.BlockCap: return "Block Cap";
+                case StatKind.CastPercent: return "Cast Time";
                 default: return kind.ToString();
             }
         }
@@ -114,20 +112,22 @@ namespace Betaknight.Core.Arena
                 case StatusIds.Anchor: return "anchored";
                 case StatusIds.Thrusters: return "thrusters ready";
                 case StatusIds.Poison: return "poisoned";
+                case StatusIds.Haste: return "hasted";
+                case StatusIds.Slow: return "slowed";
+                case StatusIds.Freeze: return "frozen";
                 default: return null;
             }
         }
 
         // ------------------------------------------------------------------ Kampfprotokoll
 
-        public static string LogTriggeredBy(int causeRow) => $"  ↪ triggered by Row {causeRow + 1}";
+        public static string LogTriggeredBy(int causeRow) => $"  ↪ triggered by #{causeRow + 1}";
         public const string LogRepeat = "  ↻ Repeat";
         public static string LogFromQueue(string waited) => $"  ⏳ from the queue after {waited}";
-        public static string LogQueued(string who, int row, string skill, string cooldownLeft) =>
-            $"{who}: Row {row + 1} ({skill}) queued, "
-            + (cooldownLeft != null ? $"waiting for cooldown ({cooldownLeft} left)" : "waiting (action running)");
-        public static string LogTriggerExpired(string who, int causeRow, int row, string skill) =>
-            $"{who}: trigger from Row {causeRow + 1} expired, Row {row + 1} ({skill}) not ready";
+        public static string LogQueued(string who, string component) => $"{who}: {component} queued";
+        public static string LogMissed(string who, string component, string reason) => $"{who}: missed trigger on {component} ({reason})";
+        public static string LogRelay(string who, string relay) => $"{who}: {relay} triggers";
+        public static string LogFrozen(string who, string component, string time) => $"{who}: {component} frozen for {time}";
         public static string LogInterrupted(string who, string skill) => $"{who}: {skill} interrupted";
         public static string LogHealed(string whom, int amount) => $"{whom} heals {amount}";
         public static string LogDeath(string whom) => $"{whom} falls";
@@ -148,74 +148,71 @@ namespace Betaknight.Core.Arena
         public const string Ready = "ready";
         public const string QueuePrefix = "Waiting: ";
 
-        /// <summary>Regel der Warteschlange (A-13) für Tooltips.</summary>
-        public const string QueueRule = "Met rows wait their turn – higher rows first.";
 
-        // ------------------------------------------------------------------ Entscheidungsgründe (H-04)
+        // ------------------------------------------------------------------ Platine (A-19)
 
-        public const string ReasonMissedTrigger = "missed trigger (condition not met)";
-        public const string ReasonCooldown = "skill on cooldown";
-        public static string ReasonCooldownLeft(string left) => $"skill on cooldown ({left} left)";
-        public const string ReasonOrphaned = "skipped (no skill)";
-        public const string ReasonActionRunning = "condition met, but an action is running";
-        public static string ReasonQueuedCooldown(string left) => $"queued, waiting for cooldown ({left} left)";
-        public const string ReasonQueuedRunning = "queued, waiting (action running)";
+        /// <summary>Regel der Warteschlange (A-19) für Tooltips.</summary>
+        public const string QueueRule = "Triggered components wait their turn in reading order (top left first). The Basic Attack fills the gaps.";
+        public const string FallbackLabel = "fills the gaps";
+        public const string NotPowered = "not powered";
+        public const string NotPoweredTooLarge = "not powered (too large)";
+        public const string CoreName = "Core";
+        public static string CoreBonus(int percent) => $"Touching components +{percent} % effect";
+        public static string ComponentName(int index, string skill) => $"#{index + 1} {skill}";
+        public static string RelayName(int index, string label) => $"Relay {index + 1} ({label})";
+
+        public const string MissAlreadyQueued = "already queued";
+        public const string MissTooLarge = "too large for the relay";
+        public const string MissFrozen = "frozen";
+        public const string MissOrphaned = "no skill";
 
         // ------------------------------------------------------------------ Auswertung
 
-        public static string TriggeredByPart(int row, int count) => $"Row {row + 1} ×{count}";
+        public static string TriggeredByPart(int component, int count) => $"#{component + 1} ×{count}";
+        public static string TriggeredCount(int count) => $"Triggered {count}×";
         public static string QueueStats(int queued) => $"{queued}× queued";
         public static string QueueStats(int queued, string averageWait) => $"{queued}× queued, Ø {averageWait} wait";
-        public static string ConditionMetCount(int count) => $"Condition met {count}×";
         public static string BonusExecutions(int count) => $"{count} executions";
         public static string BonusDamage(int amount) => $"+{amount} damage";
         public static string BonusHealing(int amount) => $"+{amount} healing";
-        public static string CooldownSaved(string time) => $"{time} cooldown saved";
+        public static string CastSaved(string time) => $"{time} cast time saved";
         public const string BonusPrefix = "Bonus: ";
         public static string DamageSplit(string basic, string skills) => $"Basic Attack {basic} · Skills {skills}";
 
-        public static string HintRarelyTriggered(int row, int conditionMet, string difficultyName)
+        public static string HintRarelyTriggered(string component, int triggered, string difficultyName)
         {
-            string how = conditionMet == 0 ? "never triggered" : $"triggered only {conditionMet}×";
-            string block = difficultyName != null ? $" ({difficultyName} block)" : string.Empty;
-            return $"Row {row + 1}: {how}{block} – try an easer or a different block.";
+            string how = triggered == 0 ? "never triggered" : $"triggered only {triggered}×";
+            string relay = difficultyName != null ? $" ({difficultyName} relay)" : string.Empty;
+            return $"{component}: {how}{relay} – try an easer or a different relay.";
         }
 
-        public static string HintNeverFired(string row, string reason) => $"{row} never fired: {reason}.";
-        public static string HintTopDamage(string row, string skill, string share) => $"{row} ({skill}) deals {share} of the damage.";
-        public static string HintBlockedByAction(string row, int count) =>
-            $"{row} was ready {count}× while another action was running. Shorter actions below help.";
-        public static string HintTriggered(string row, string skill, int count, string by) => $"{row} ({skill}) was triggered {count}×, by {by}.";
-        public static string HintTriggersExpired(int count, string row) =>
-            $"{count} triggers on {row} expired: without the queue the skill was not ready, or the target was orphaned.";
-        public static string HintBonus(string row, string symbol, int damage, string share) =>
-            $"{row}: Bonus {symbol} added +{damage} damage ({share} of the row's damage).";
-        public static string HintLongWait(string row, string skill, string wait) =>
-            $"{row} ({skill}) waited {wait} in the queue on average. Higher rows or long casts hold it up.";
-        public static string HintOtherDamage(int amount) => $"{amount} damage came from no row (set bonuses, recoil).";
+        public static string HintNeverFired(string component, string reason) => $"{component} never fired: {reason}.";
+        public static string HintTopDamage(string component, string share) => $"{component} deals {share} of the damage.";
+        public static string HintMissedQueued(string component, int count) =>
+            $"{component} missed {count} triggers because it was still queued. A faster cast or a less eager relay helps.";
+        public static string HintTriggered(string component, int count, string by) => $"{component} was triggered {count}× by {by}.";
+        public static string HintBonus(string component, string symbol, int damage, string share) =>
+            $"{component}: Bonus {symbol} added +{damage} damage ({share} of its damage).";
+        public static string HintLongWait(string component, string wait) =>
+            $"{component} waited {wait} in the queue on average. Components earlier in reading order or long casts hold it up.";
+        public static string HintOtherDamage(int amount) => $"{amount} damage came from no component (set bonuses, recoil).";
 
-        public const string NeverFiredNoDecision = "there was no decision";
-        public const string NeverFiredOrphaned = "orphaned, no skill assigned";
-        public const string NeverFiredConditionFalse = "condition never met";
-        public const string NeverFiredCooldown = "skill was always on cooldown";
-        public const string NeverFiredActionRunning = "condition was met, but another action was running every time";
-        public const string NeverFiredPriority = "condition was met, but higher rows had priority";
-        public const string NeverFiredConditionWhenReady = "condition never met while the skill was ready";
-        public const string NeverFiredMostlyCooldown = "skill mostly on cooldown";
+        public const string NeverFiredOrphaned = "no skill placed";
+        public const string NeverFiredTooLarge = "too large for every touching relay";
+        public const string NeverFiredUnpowered = "no relay touches it";
+        public const string NeverFiredOther = "its relay never triggered";
 
         // ------------------------------------------------------------------ Skill-Infos
 
         public const string NoDamage = "no damage";
         public static string BasicAttackInterval(string time) => $"Interval {time}";
-        public static string Cooldown(string time) => $"CD {time}";
-        public const string NoCooldown = "no CD";
+        public static string Size(string shape, int cells) => $"{shape} ({cells} {(cells == 1 ? "cell" : "cells")})";
         public static string Recovery(string time) => $"Recovery {time}";
         public static string Cast(string time) => $"Cast {time}";
         public static string CastWithBase(string cast, string baseTime) => $"{cast} (base {baseTime})";
         public static string PowerBonus(string sign, int percent) => $"{sign}{percent} % power";
-        public static string CooldownBonus(string sign, string time) => $"{sign}{time} CD";
         public static string CastBonus(string sign, int percent) => $"{sign}{percent} % Cast Time";
-        public static string DifficultyLine(string symbol, string name, string text) => $"Rune {symbol} {name}: {text} (included)";
+        public static string DifficultyLine(string symbol, string name, string text) => $"Relay {symbol} {name}: {text} (included)";
         public const string DetailsKinds = "\nType: ";
         public const string DetailsGear = "\nGear: ";
 
@@ -228,19 +225,20 @@ namespace Betaknight.Core.Arena
         public static string HealEffect(string percent, int amount) => $"heals {percent} Max HP ≈ {amount}";
         public static string StunEffect(bool allEnemies, string time) => $"stuns {(allEnemies ? "all enemies " : string.Empty)}for {time}";
         public const string InterruptEffect = "interrupts charging";
+        public static string FreezeEffect(bool allEnemies, string time) =>
+            $"freezes the largest component of {(allEnemies ? "all enemies" : "the enemy")} for {time}";
         public static string StatChangeEffect(bool onTarget, string change, string time) => $"{(onTarget ? "Enemy " : string.Empty)}{change} for {time}";
         public static string BurnEffect(string percent, int dps, int total, string time) =>
             $"Burn {percent} Weapon Damage/s ≈ {dps}/s, {total} over {time}";
         public static string StatusEffect(bool onTarget, string summary, string time) => $"{(onTarget ? "Enemy: " : string.Empty)}{summary} ({time})";
         public static string ResourceSet(string resource, int value) => $"{resource} set to {value}";
-        public const string RepeatEffect = "repeats your last skill with its cast time, no cooldown";
+        public const string RepeatEffect = "repeats your last skill with its cast time";
 
         public static string BasicAttackDescription(string percent) => percent == null ? "Weapon Damage." : $"{percent} Weapon Damage.";
-        public static string BasicAttackCooldownCut(string time) => $" Each hit shortens running skill cooldowns by {time}.";
 
         /// <summary>Balance-Zeile eines Skills (Budget-Prüfung).</summary>
-        public static string Budget(string skill, string perTarget, bool area, string required, string action, string cooldown) =>
+        public static string Budget(string skill, string perTarget, bool area, string required, string shape, int cells) =>
             $"{skill}: {perTarget} per {(area ? "target" : "execution")}, "
-            + $"Budget {required} ({(area ? "area" : "single target")}, {action} action, {cooldown} CD)";
+            + $"Budget {required} ({(area ? "area" : "single target")}, {shape} = {cells} {(cells == 1 ? "cell" : "cells")})";
     }
 }

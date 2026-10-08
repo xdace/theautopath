@@ -33,14 +33,15 @@ namespace Betaknight.Core.Gear
         public override void ModifyFinalDamage(Battle battle, Combatant owner, HitInfo hit)
         {
             if (!Full || !hit.IsSelfDamage || hit.Target != owner || hit.SkillId != HeatDetail) return;
-            if (HasReadyHealRow(owner)) hit.Final = System.Math.Min(hit.Final, 1);
+            if (HasReadyHealRow(battle, owner)) hit.Final = System.Math.Min(hit.Final, 1);
         }
 
-        private static bool HasReadyHealRow(Combatant c)
+        /// <summary>Eine versorgte, nicht eingefrorene Heil-Komponente auf der Platine.</summary>
+        private static bool HasReadyHealRow(Battle battle, Combatant c)
         {
             foreach (LogicRow row in c.Board.Rows)
             {
-                if (row.IsOrphaned || !c.IsReady(row.Skill)) continue;
+                if (row.IsOrphaned || !row.IsPowered || c.IsFrozen(row.Index, battle.Tick)) continue;
                 foreach (ISkillEffect effect in row.Skill.Effects)
                     if (effect is HealEffect) return true;
             }
@@ -50,7 +51,7 @@ namespace Betaknight.Core.Gear
 
     /// <summary>
     /// Aegis-Firewall. 2 Teile: jeder Block gibt 1 Ladung (max. 5), bei 5 Ladung Rüstung ×2.
-    /// 3 Teile: Ein Skill aus einer Zeile mit Ladungs-Bedingung entlädt: Ladung auf 0, Schaden = 5 × Rüstung.
+    /// 3 Teile: Eine Komponente, die ein Relais mit Ladungs-Bedingung versorgt, entlädt: Ladung auf 0, Schaden = 5 × Rüstung.
     /// </summary>
     public sealed class AegisSet : BattleModifier
     {
@@ -75,7 +76,10 @@ namespace Betaknight.Core.Gear
         public override void OnActionStarted(Battle battle, Combatant owner, SkillDefinition skill, int rowIndex)
         {
             if (!Full || rowIndex < 0 || rowIndex >= owner.Board.Rows.Count) return;
-            if (!(owner.Board.Rows[rowIndex].Condition is ResourceAtLeastCondition r) || r.ResourceId != ResourceIds.Charge) return;
+            bool charged = false;
+            foreach (LogicRelay relay in owner.Board.Rows[rowIndex].Relays)
+                charged |= relay.Condition is ResourceAtLeastCondition r && r.ResourceId == ResourceIds.Charge;
+            if (!charged) return;
             if (owner.GetResource(ResourceIds.Charge) <= 0) return;
 
             int damage = DischargeArmorFactor * owner.EffectiveArmor;
@@ -130,13 +134,14 @@ namespace Betaknight.Core.Gear
     }
 
     /// <summary>
-    /// Phantom-Signal. 2 Teile: +20 % Ausweichen. 3 Teile: jedes Ausweichen senkt alle eigenen Cooldowns um 1 s,
+    /// Phantom-Signal. 2 Teile: +20 % Ausweichen. 3 Teile: jedes Ausweichen gibt Haste (−25 % Cast-Zeit für 2 s),
     /// Ausweich-Obergrenze 75 %.
     /// </summary>
     public sealed class PhantomSet : BattleModifier
     {
         public const int DodgeBonusBp = 2000;
         public const int CapBonusBp = 1500;
+        public const int PhantomHastePercent = 25;
 
         public bool Full { get; }
         public PhantomSet(bool full) => Full = full;
@@ -152,7 +157,7 @@ namespace Betaknight.Core.Gear
 
         public override void OnEvent(Battle battle, Combatant owner, BattleEvent e)
         {
-            if (Full && e.Kind == BattleEventKind.Dodged && e.Target == owner) owner.ReduceCooldowns(Ticks.PerSecond);
+            if (Full && e.Kind == BattleEventKind.Dodged && e.Target == owner) battle.Haste(owner, PhantomHastePercent, Ticks.FromSeconds(2));
         }
     }
 }

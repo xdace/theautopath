@@ -16,7 +16,7 @@ namespace Betaknight.Core.Gear
     }
 
     /// <summary>
-    /// Eine Stufe eines Tags oder eine Duo-Wirkung: Anzeigetext, passive Effekte auf Skills (Cast-Zeit, Wirkung, Cooldown)
+    /// Eine Stufe eines Tags oder eine Duo-Wirkung: Anzeigetext, passive Effekte auf Skills (Cast-Zeit, Wirkung)
     /// und optional eine Kampfregel. Reine Daten plus Fabrik.
     /// </summary>
     public sealed class SynergyEffect

@@ -1,5 +1,6 @@
 using System;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Map;
 using Betaknight.Core.Run;
@@ -15,7 +16,8 @@ namespace Betaknight.Core.Combat
         /// <summary>Entfernung vom Start, dient als Gegnerstufe.</summary>
         public readonly int Tier;
         public readonly PlayerStats Stats;
-        public readonly RuneLoadout Runes;
+        /// <summary>Die Platine des Spielers.</summary>
+        public readonly CircuitBoard Board;
 
         /// <summary>Getragene Ausrüstung (Skills, Werte, Sets). Null = nur Basisangriff.</summary>
         public readonly Equipment Equipment;
@@ -30,7 +32,7 @@ namespace Betaknight.Core.Combat
         public readonly int EnemyHpPercent;
         public readonly int EnemyDamagePercent;
 
-        public CombatRequest(CellContent enemy, int tier, PlayerStats stats, RuneLoadout runes,
+        public CombatRequest(CellContent enemy, int tier, PlayerStats stats, CircuitBoard board,
             Equipment equipment = null, BattleContext context = null, SkillLevelRules skillLevels = null,
             int enemyHpPercent = 100, int enemyDamagePercent = 100)
         {
@@ -40,7 +42,7 @@ namespace Betaknight.Core.Combat
             Enemy = enemy;
             Tier = tier;
             Stats = stats ?? throw new ArgumentNullException(nameof(stats));
-            Runes = runes ?? throw new ArgumentNullException(nameof(runes));
+            Board = board ?? throw new ArgumentNullException(nameof(board));
             Equipment = equipment;
             Context = context ?? new BattleContext { VsBoss = enemy == CellContent.Boss };
         }
@@ -76,7 +78,7 @@ namespace Betaknight.Core.Combat
     }
 
     /// <summary>
-    /// Entscheidet einen Kampf: <see cref="ArenaCombatResolver"/> simuliert die Arena mit Logik-Tafel,
+    /// Entscheidet einen Kampf: <see cref="ArenaCombatResolver"/> simuliert die Arena mit der Platine,
     /// <see cref="PlaceholderCombatResolver"/> bleibt für Tests. Wendet selbst nichts an, das macht die Session.
     /// </summary>
     public interface ICombatResolver

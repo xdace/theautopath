@@ -40,16 +40,19 @@ namespace Betaknight.Core.Arena
         public int RecoveryLeft { get; internal set; }
         public bool EffectApplied { get; internal set; }
 
-        /// <summary>Warum die Aktion läuft: Entscheidung der Tafel, Wiederholung oder Auslöser.</summary>
+        /// <summary>Warum die Aktion läuft: Relais, Wiederholung oder Auslöser-Modul.</summary>
         public ActionCause Cause { get; internal set; }
 
-        /// <summary>Bei Auslösern: die Zeile, deren Skill oder Baustein ausgelöst hat, sonst -1.</summary>
+        /// <summary>Bei Auslöser-Modulen: die Komponente, die ausgelöst hat, sonst -1.</summary>
         public int CauseRow { get; internal set; } = -1;
+
+        /// <summary>Relais, das die Ausführung verdient hat (Index), -1 ohne (Basisangriff, Wiederholung ohne Relais).</summary>
+        public int Relay { get; internal set; } = -1;
 
         /// <summary>Noch ausstehende Wiederholungen aus «Mehrfach».</summary>
         public int RepeatsLeft { get; internal set; }
 
-        /// <summary>Schwierigkeits-Stufe, mit der diese Ausführung läuft (eigene Zeile oder höhere der auslösenden).</summary>
+        /// <summary>Schwierigkeits-Stufe, mit der diese Ausführung läuft (die des auslösenden Relais).</summary>
         public int BonusTier { get; internal set; }
 
         public bool IsRepeat => Cause == ActionCause.Repeat;
@@ -60,13 +63,13 @@ namespace Betaknight.Core.Arena
     /// <summary>Warum eine Aktion gestartet wurde.</summary>
     public enum ActionCause
     {
-        /// <summary>Entscheidung der Tafel (oberste erfüllte, bereite Zeile).</summary>
+        /// <summary>Ein Relais hat ausgelöst (oder der Basisangriff füllt eine Lücke).</summary>
         Board,
 
-        /// <summary>Wiederholung (Echo, Mehrfach): eigene Cast-Zeit, kein Cooldown.</summary>
+        /// <summary>Wiederholung (Echo, Multicast): eigene Cast-Zeit.</summary>
         Repeat,
 
-        /// <summary>Auslöser-Modul: normaler Cast mit Cooldown, ohne Bedingung der Zielzeile.</summary>
+        /// <summary>Auslöser-Modul: normaler Cast, ohne Relais der Ziel-Komponente.</summary>
         Trigger,
     }
 
@@ -80,13 +83,14 @@ namespace Betaknight.Core.Arena
         public int CauseRow = -1;
         public int RepeatsLeft;
         public int BonusTier;
+        public int Relay = -1;
     }
 
-    /// <summary>Ein Kämpfer im laufenden Kampf: Werte, Leben, Aktion, Cooldowns, Zustände, Ressourcen.</summary>
+    /// <summary>Ein Kämpfer im laufenden Kampf: Werte, Leben, Aktion, Warteschlange, Zustände, Ressourcen.</summary>
     public sealed class Combatant
     {
         private readonly CombatStats _stats;
-        private readonly Dictionary<string, int> _cooldowns = new Dictionary<string, int>();
+        private readonly Dictionary<int, int> _frozenUntil = new Dictionary<int, int>();
         private readonly Dictionary<string, int> _resources = new Dictionary<string, int>();
         private readonly Dictionary<string, int> _rollFailures = new Dictionary<string, int>();
         internal readonly List<StatusEffect> StatusList = new List<StatusEffect>();
@@ -111,7 +115,7 @@ namespace Betaknight.Core.Arena
         public IReadOnlyList<StatusEffect> Statuses => StatusList;
         public IReadOnlyList<BattleModifier> Modifiers => ModifierList;
 
-        /// <summary>Zuletzt beendete Aktion: Zeile und Tick. Für Ketten-Bedingungen.</summary>
+        /// <summary>Zuletzt beendete Aktion: Komponente und Tick. Für «Chain».</summary>
         public int LastActionRow { get; internal set; } = -1;
         public int LastActionEndTick { get; internal set; } = -1;
 
@@ -136,12 +140,12 @@ namespace Betaknight.Core.Arena
 
         internal readonly List<QueuedRow> QueueList = new List<QueuedRow>();
 
-        /// <summary>Wartende Zeilen (A-13), in der Reihenfolge des Einreihens. Gestartet wird nach Priorität der Tafel.</summary>
+        /// <summary>Wartende Komponenten, in der Reihenfolge des Einreihens. Gestartet wird nach Lesereihenfolge der Platine.</summary>
         public IReadOnlyList<QueuedRow> Queue => QueueList;
 
         public bool IsQueued(int row) => QueueList.Exists(q => q.Row == row);
 
-        /// <summary>Wie oft eine Zeile gerade in der Warteschlange steht.</summary>
+        /// <summary>Wie oft eine Komponente gerade in der Warteschlange steht.</summary>
         public int QueuedCount(int row) => QueueList.FindAll(q => q.Row == row).Count;
 
         /// <summary>Wert einer Erleichterung (0 = nicht vorhanden).</summary>
@@ -201,18 +205,15 @@ namespace Betaknight.Core.Arena
         /// <summary>Holt gerade eine sichtbare Aufladung aus (für "Gegner lädt auf").</summary>
         public bool IsCharging => Action != null && Action.InWindup && Action.Skill.IsCharge;
 
-        public int Cooldown(string skillId) => _cooldowns.TryGetValue(skillId, out int v) ? v : 0;
-        public bool IsReady(SkillDefinition skill) => Cooldown(skill.Id) <= 0;
+        /// <summary>Freeze: die Komponente kann bis zu diesem Tick (exklusiv) nicht feuern.</summary>
+        public int FrozenUntil(int row) => _frozenUntil.TryGetValue(row, out int v) ? v : 0;
 
-        internal void SetCooldown(string skillId, int ticks) => _cooldowns[skillId] = Math.Max(0, ticks);
+        public bool IsFrozen(int row, int tick) => FrozenUntil(row) > tick;
 
-        /// <summary>Senkt alle Cooldowns um <paramref name="ticks"/>, nie unter 0.</summary>
-        public void ReduceCooldowns(int ticks)
-        {
-            if (ticks <= 0) return;
-            var keys = new List<string>(_cooldowns.Keys);
-            foreach (string key in keys) _cooldowns[key] = Math.Max(0, _cooldowns[key] - ticks);
-        }
+        internal void Freeze(int row, int untilTick) => _frozenUntil[row] = Math.Max(FrozenUntil(row), untilTick);
+
+        /// <summary>Änderung der Cast-Zeit aller Komponenten in Prozent aus Zuständen (Haste negativ, Slow positiv).</summary>
+        public int CastPercent => GetStat(StatKind.CastPercent);
 
         public int GetResource(string id) => _resources.TryGetValue(id, out int v) ? v : 0;
         internal void SetResourceRaw(string id, int value) => _resources[id] = value;

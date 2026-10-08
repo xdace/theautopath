@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Encounters;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Hex;
@@ -133,7 +134,7 @@ namespace Betaknight.Core.Autoplay
             if (prompt.Definition.Id == "campfire")
             {
                 // Lagerfeuer: ruhen bei wenig HP, sonst eine Rune verstärken (falls eine steigen kann).
-                bool canUpgrade = s.Runes.BestUpgradeTarget() >= 0;
+                bool canUpgrade = s.Board.BestUpgradeTarget() >= 0;
                 order.Add(low || !canUpgrade ? 0 : 1);
             }
             else
@@ -214,7 +215,7 @@ namespace Betaknight.Core.Autoplay
             {
                 int index = i;
                 RuneDefinition rune = offer.Options[i];
-                bool room = !s.Runes.IsFull || !s.RuneInventory.IsFull || s.OwnsRune(rune);
+                bool room = !s.Board.IsFull || !s.RuneInventory.IsFull || s.OwnsRune(rune);
                 if (!room) continue;
                 int score = s.IsImprovement(rune) ? 31 : 21;
                 Add(score, Try(BotActionKind.Offer, AutoplayTexts.OfferRune(rune.Name), () => s.TakeRune(index), AutoplayTexts.RewardRune));
@@ -262,11 +263,11 @@ namespace Betaknight.Core.Autoplay
                 if (s.IsImprovement(item) || Score(s.StatsWith(item)) > Score(s.StatsNow()) + 0.5)
                     a = Try(BotActionKind.Shop, AutoplayTexts.ShopItem(item.Name), () => s.BuyShopItem(index), AutoplayTexts.RewardItem);
             }
-            if (a == null && s.CanBuyRuneSlot) a = Try(BotActionKind.Shop, AutoplayTexts.ShopBoardRow, s.BuyRuneSlot, AutoplayTexts.RewardBoardExpansion);
+            if (a == null && s.CanBuyBoardExpansion) a = Try(BotActionKind.Shop, AutoplayTexts.ShopBoardRow, s.BuyBoardExpansion, AutoplayTexts.RewardBoardExpansion);
             for (int i = 0; a == null && i < stock.Runes.Count; i++)
             {
                 int index = i;
-                if (s.CanBuyShopRune(i) && !s.Runes.IsFull)
+                if (s.CanBuyShopRune(i) && !s.Board.IsFull)
                     a = Try(BotActionKind.Shop, AutoplayTexts.ShopRune(stock.Runes[i].Name), () => s.BuyShopRune(index), AutoplayTexts.RewardRune);
             }
 
@@ -319,8 +320,8 @@ namespace Betaknight.Core.Autoplay
                 if (a != null) return a;
             }
 
-            // Runen aus dem Inventar in freie Zeilen.
-            if (!s.Runes.IsFull)
+            // Runen aus dem Inventar als Relais auf freie Zellen (neben unversorgte Komponenten).
+            if (!s.Board.IsFull)
             {
                 for (int i = 0; i < s.RuneInventory.Count; i++)
                 {
@@ -330,43 +331,46 @@ namespace Betaknight.Core.Autoplay
                 }
             }
 
-            // Freie Skills in Zeilen ohne Skill oder mit Basisangriff.
-            List<SkillInstance> free = s.Skills.Free.OrderByDescending(k => k.Level).ToList();
-            if (free.Count > 0)
+            // Unversorgte Komponenten an ein Relais legen, das sie versorgen kann.
+            for (int i = 0; i < s.Board.Components.Count; i++)
             {
-                for (int row = 0; row < s.Runes.Rows.Count; row++)
-                {
-                    SkillInstance current = s.Runes.Rows[row].Skill;
-                    if (current != null && !current.IsBasicAttack) continue;
-                    SkillInstance skill = free[0];
-                    int r = row;
-                    BotAction a = Try(BotActionKind.Build, AutoplayTexts.PlaceSkill(skill.NameFrom(s.SkillCatalog), row + 1),
-                        () => s.PlaceSkill(skill.InstanceId, r));
-                    if (a != null) return a;
-                }
+                ComponentSlot c = s.Board.Components[i];
+                if (s.IsPowered(c)) continue;
+                SkillInstance skill = c.Skill;
+                if (skill == null || !SpotFor(s, skill, out Cell at, out bool turned, c)) continue;
+                BotAction a = Try(BotActionKind.Build, AutoplayTexts.PlaceSkill(skill.NameFrom(s.SkillCatalog), at.X + 1, at.Y + 1),
+                    () => s.PlaceSkill(skill.InstanceId, at, turned) && s.IsPowered(s.Board.ComponentOf(skill)));
+                if (a != null) return a;
             }
 
-            // Freie Module an den ersten passenden Ort (Skill der Zeile, sonst Baustein).
+            // Freie Skills (grösste zuerst) neben ein Relais, das sie versorgen kann, bevorzugt am Kern.
+            foreach (SkillInstance skill in s.Skills.Free.OrderByDescending(k => s.Board.ShapeOfSkill(k.SkillId).Cells).ThenByDescending(k => k.Level))
+            {
+                if (!SpotFor(s, skill, out Cell at, out bool turned)) continue;
+                BotAction a = Try(BotActionKind.Build, AutoplayTexts.PlaceSkill(skill.NameFrom(s.SkillCatalog), at.X + 1, at.Y + 1),
+                    () => s.PlaceSkill(skill.InstanceId, at, turned));
+                if (a != null) return a;
+            }
+
+            // Freie Module an den ersten passenden Ort (Skill einer Komponente, sonst Relais).
             foreach (ModuleInstance module in s.Modules.Free)
             {
-                for (int row = 0; row < s.Runes.Rows.Count; row++)
+                string name = module.NameFrom(s.ModuleCatalog);
+                for (int i = 0; i < s.Board.Components.Count; i++)
                 {
-                    RuneSlot slot = s.Runes.Rows[row];
-                    int r = row;
-                    string name = module.NameFrom(s.ModuleCatalog);
-                    if (slot.Skill != null && !slot.Skill.IsBasicAttack && s.CanPlaceModule(module, slot.Skill))
-                    {
-                        SkillInstance skill = slot.Skill;
-                        BotAction a = Try(BotActionKind.Build, AutoplayTexts.PlaceModuleOnSkill(name, row + 1),
-                            () => s.PlaceModuleOnSkill(module.InstanceId, skill.InstanceId));
-                        if (a != null) return a;
-                    }
-                    if (s.CanPlaceModule(module, slot))
-                    {
-                        BotAction a = Try(BotActionKind.Build, AutoplayTexts.PlaceModuleOnRune(name, row + 1),
-                            () => s.PlaceModuleOnRow(module.InstanceId, r));
-                        if (a != null) return a;
-                    }
+                    SkillInstance skill = s.Board.Components[i].Skill;
+                    if (skill == null || !s.CanPlaceModule(module, skill)) continue;
+                    BotAction a = Try(BotActionKind.Build, AutoplayTexts.PlaceModuleOnSkill(name, i + 1),
+                        () => s.PlaceModuleOnSkill(module.InstanceId, skill.InstanceId));
+                    if (a != null) return a;
+                }
+                for (int i = 0; i < s.Board.Relays.Count; i++)
+                {
+                    int r = i;
+                    if (!s.CanPlaceModule(module, s.Board.Relays[i])) continue;
+                    BotAction a = Try(BotActionKind.Build, AutoplayTexts.PlaceModuleOnRune(name, i + 1),
+                        () => s.PlaceModuleOnRelay(module.InstanceId, r));
+                    if (a != null) return a;
                 }
             }
 
@@ -380,6 +384,41 @@ namespace Betaknight.Core.Autoplay
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Freie Lage für ein Exemplar neben einem Relais, das gross genug ist: bevorzugt eine, die den Kern berührt, sonst
+        /// die erste in Lesereihenfolge. <paramref name="ignore"/> ist die Komponente selbst, wenn sie umziehen soll.
+        /// </summary>
+        private static bool SpotFor(OverworldSession s, SkillInstance skill, out Cell at, out bool turned, ComponentSlot ignore = null)
+        {
+            at = default;
+            turned = false;
+            CircuitBoard board = s.Board;
+            Shape shape = board.ShapeOfSkill(skill.SkillId);
+            bool found = false;
+            bool foundCore = false;
+            foreach (RelayChip relay in board.Relays)
+            {
+                if (s.RelayMaxCells(relay) < shape.Cells) continue;
+                foreach (bool turn in shape.IsSquare ? new[] { false } : new[] { false, true })
+                {
+                    Shape sh = shape.Turned(turn);
+                    for (int y = 0; y < board.Height; y++)
+                        for (int x = 0; x < board.Width; x++)
+                        {
+                            var rect = new CellRect(new Cell(x, y), sh);
+                            if (!rect.Touches(relay.Rect) || !board.IsFree(rect, ignore)) continue;
+                            bool core = rect.Touches(board.CoreRect);
+                            if (found && (foundCore || !core)) continue;
+                            at = rect.Origin;
+                            turned = turn;
+                            found = true;
+                            foundCore = core;
+                        }
+                }
+            }
+            return found;
         }
 
         // ------------------------------------------------------------------ Bewegung

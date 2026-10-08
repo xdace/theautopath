@@ -15,7 +15,7 @@ namespace Betaknight.Core.Arena
     /// und die Zeile seitdem nicht gefeuert hat (dann ist es verbraucht). Ereignisse werden erst
     /// ab dem Tick nach ihrem Entstehen sichtbar, dadurch gibt es keine Kettenreaktion im selben Tick.
     /// </summary>
-    public sealed class EventCondition : ICondition
+    public sealed class EventCondition : IEventCondition
     {
         public const int DefaultWindow = 10;
 
@@ -55,8 +55,8 @@ namespace Betaknight.Core.Arena
         }
     }
 
-    /// <summary>Takt: fällig alle N Ticks seit Kampfbeginn bzw. seit die Zeile zuletzt gefeuert hat. Bleibt fällig.</summary>
-    public sealed class ClockCondition : ICondition
+    /// <summary>Clock: löst alle N Ticks aus, gerechnet ab Kampfbeginn bzw. ab dem letzten Auslösen. Ersetzt «Always».</summary>
+    public sealed class ClockCondition : IEventCondition
     {
         public int IntervalTicks { get; }
         public ClockCondition(int intervalTicks) => IntervalTicks = Math.Max(1, intervalTicks);
@@ -68,8 +68,8 @@ namespace Betaknight.Core.Arena
         }
     }
 
-    /// <summary>Zähler: fällig nach N passenden Ereignissen seit die Zeile zuletzt gefeuert hat. Bleibt fällig.</summary>
-    public sealed class CounterCondition : ICondition
+    /// <summary>Zähler: löst nach N passenden Ereignissen seit dem letzten Auslösen aus.</summary>
+    public sealed class CounterCondition : IEventCondition
     {
         private readonly Func<ConditionContext, BattleEvent, bool> _match;
         public int Count { get; }
@@ -89,7 +89,7 @@ namespace Betaknight.Core.Arena
     }
 
     /// <summary>[N Ausweicher in Folge] – zählt Ausweicher ohne erlittenen Treffer dazwischen.</summary>
-    public sealed class DodgeStreakCondition : ICondition
+    public sealed class DodgeStreakCondition : IEventCondition
     {
         public int Count { get; }
         public DodgeStreakCondition(int count) => Count = Math.Max(1, count);
@@ -133,7 +133,7 @@ namespace Betaknight.Core.Arena
     }
 
     /// <summary>[Kampfbeginn] – genau einmal pro Kampf.</summary>
-    public sealed class BattleStartCondition : ICondition
+    public sealed class BattleStartCondition : IEventCondition
     {
         public bool IsMet(in ConditionContext c, out Combatant target)
         {
@@ -143,19 +143,21 @@ namespace Betaknight.Core.Arena
     }
 
     /// <summary>
-    /// [Kette] – wahr direkt nachdem die Aktion der Zeile darüber beendet wurde (innerhalb des Ereignis-Fensters).
-    /// Baut Combos aus mehreren Skills mit einem einzigen Auslöser.
+    /// [Chain] – direkt nachdem eine andere Komponente (nicht eine von diesem Relais versorgte, nicht der Basisangriff)
+    /// fertig ist. Baut Combos aus mehreren Komponenten mit einem einzigen Auslöser.
     /// </summary>
-    public sealed class ChainCondition : ICondition
+    public sealed class ChainCondition : IEventCondition
     {
         public bool IsMet(in ConditionContext c, out Combatant target)
         {
             target = null;
-            int above = c.Row.Index - 1;
-            if (above < 0) return false;
-            if (c.Self.LastActionRow != above) return false;
+            int last = c.Self.LastActionRow;
+            if (last < 0 || last >= c.Self.Board.Rows.Count) return false;
+            foreach (int own in c.Row.Powered)
+                if (own == last) return false;
             if (c.Tick - c.Self.LastActionEndTick > EventCondition.DefaultWindow) return false;
-            return c.Battle.RowState(c.Self, above).LastFiredTick > c.Row.LastFiredTick;
+            // Streng grösser: das Relais feuert im selben Tick, in dem die andere Komponente fertig wird, und nicht noch einmal danach.
+            return c.Self.LastActionEndTick > c.Row.LastFiredTick;
         }
     }
 }

@@ -21,10 +21,10 @@ namespace Betaknight.Core.Autoplay
         /// <summary>Davon Kämpfe, in denen die Bedingung mindestens einmal erfüllt war.</summary>
         public int FightsMet;
 
-        /// <summary>Wie oft die Bedingung insgesamt erfüllt wurde (Wechsel zu «erfüllt»).</summary>
+        /// <summary>Wie oft das Relais ausgelöst hat (Ereignis, steigende Flanke oder Takt).</summary>
         public int Met;
 
-        /// <summary>Wie oft die Zeile eine Aktion gestartet hat (inklusive Auslöser und Wiederholungen).</summary>
+        /// <summary>Wie viele Aktionen das Relais verdient hat (versorgte Komponenten, inklusive Wiederholungen).</summary>
         public int Fired;
 
         /// <summary>Kampfzeit in Ticks, in der der Baustein auf der Tafel lag.</summary>
@@ -52,23 +52,36 @@ namespace Betaknight.Core.Autoplay
     /// </summary>
     public static class RuneFireStats
     {
-        /// <summary>Zählt einen Kampf: Zeile i der Tafel gehört zu <paramref name="runeIds"/>[i].</summary>
-        public static void Record(IDictionary<string, RuneFireStat> stats, IReadOnlyList<(string id, string name, int difficulty)> runes, BattleResult battle,
-            BattleReport report = null)
+        /// <summary>
+        /// Zählt einen Kampf je Relais der Platine (A-19): «Met» = wie oft das Relais ausgelöst hat, «Fired» = wie viele
+        /// Aktionen es verdient hat. Name und Schwierigkeit liefert <paramref name="describe"/> zur Runen-Id.
+        /// </summary>
+        public static void Record(IDictionary<string, RuneFireStat> stats, BattleResult battle, Func<string, (string name, int difficulty)> describe)
         {
-            if (stats == null || runes == null || battle == null) return;
-            report = report ?? BattleReport.Create(battle);
-            for (int i = 0; i < runes.Count && i < report.Rows.Count; i++)
+            LogicBoard board = battle?.PlayerBoard;
+            if (stats == null || board == null) return;
+            int relays = board.Relays.Count;
+            var triggered = new int[relays];
+            var fired = new int[relays];
+            foreach (BattleEvent e in battle.Events)
             {
-                RowReport row = report.Rows[i];
-                if (row.IsFallback || runes[i].id == null) continue;
-                if (!stats.TryGetValue(runes[i].id, out RuneFireStat s))
-                    stats[runes[i].id] = s = new RuneFireStat { RuneId = runes[i].id, Name = runes[i].name, Difficulty = runes[i].difficulty };
+                if (e.Source == null || e.Source.Side != Side.Player || e.Relay < 0 || e.Relay >= relays) continue;
+                if (e.Kind == BattleEventKind.RelayTriggered) triggered[e.Relay]++;
+                else if (e.Kind == BattleEventKind.ActionStarted) fired[e.Relay]++;
+            }
+            for (int i = 0; i < relays; i++)
+            {
+                string id = board.Relays[i].RuneId;
+                if (id == null) continue;
+                if (!stats.TryGetValue(id, out RuneFireStat s))
+                {
+                    (string name, int difficulty) info = describe != null ? describe(id) : (id, 0);
+                    stats[id] = s = new RuneFireStat { RuneId = id, Name = info.name ?? id, Difficulty = info.difficulty };
+                }
                 s.Fights++;
-                int met = Math.Max(0, row.ConditionMet);
-                if (met > 0) s.FightsMet++;
-                s.Met += met;
-                s.Fired += row.Fired;
+                if (triggered[i] > 0) s.FightsMet++;
+                s.Met += triggered[i];
+                s.Fired += fired[i];
                 s.Ticks += battle.EndTick;
             }
         }

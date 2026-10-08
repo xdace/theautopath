@@ -191,7 +191,6 @@ namespace Betaknight.Core.Gear
         public static SynergyRegistry CreateDefault()
         {
             var r = new SynergyRegistry();
-            int halfSecond = Ticks.FromTenths(5);
 
             r.Register(Tag(SynergyTagIds.Heat, "Heat",
                 E("Fire Skills −20 % Cast Time.", null, SkillPassive.Cast(SkillKind.Fire, -20)),
@@ -200,11 +199,10 @@ namespace Betaknight.Core.Gear
             r.Register(Tag(SynergyTagIds.Charge, "Charge",
                 E("+10 % Block.", () => new SynergyStatBonus(StatKind.Block, BasisPoints.Percent(10))),
                 E("Shock Skills −25 % Cast Time.", null, SkillPassive.Cast(SkillKind.Shock, -25)),
-                E("Every Block reduces all your Cooldowns by 0.5 s.", () => new SynergyCooldownOnDefense(BattleEventKind.Blocked, halfSecond))));
+                E("Every Block hastes you: −20 % Cast Time for 2 s.", () => new SynergyHasteOnDefense(BattleEventKind.Blocked, 20, Ticks.FromSeconds(2)))));
             r.Register(Tag(SynergyTagIds.Phantom, "Phantom",
                 E("+10 % Dodge.", () => new SynergyStatBonus(StatKind.Dodge, BasisPoints.Percent(10))),
-                E("Movement Skills −30 % Cast Time and −1 s Cooldown.", null,
-                    SkillPassive.Cast(SkillKind.Movement, -30), SkillPassive.Cooldown(SkillKind.Movement, -Ticks.PerSecond)),
+                E("Movement Skills −45 % Cast Time.", null, SkillPassive.Cast(SkillKind.Movement, -45)),
                 E("After every Dodge your next attack hits +50 %.", () => new SynergyRiposte(50))));
             r.Register(Tag(SynergyTagIds.Tempo, "Haste",
                 E("+10 % Attack Speed.", () => new SynergyStatBonus(StatKind.AttackSpeed, BasisPoints.Percent(10))),
@@ -220,8 +218,8 @@ namespace Betaknight.Core.Gear
                 E("Your attacks ignore Armor.", () => new SynergyIgnoreArmor())));
 
             r.Register(new SynergyDuo("ember_rhythm", "Ember Rhythm", SynergyTagIds.Heat, SynergyTagIds.Tempo,
-                E("Basic Attacks against burning enemies reduce all your Cooldowns by 0.25 s.",
-                    () => new SynergyCooldownOnBasicVsStatus(StatusIds.Burn, Ticks.FromTenths(5) / 2))));
+                E("Basic Attacks against burning enemies haste you: −15 % Cast Time for 1 s.",
+                    () => new SynergyHasteOnBasicVsStatus(StatusIds.Burn, 15, Ticks.FromSeconds(1)))));
             r.Register(new SynergyDuo("phase_shield", "Phase Shield", SynergyTagIds.Charge, SynergyTagIds.Phantom,
                 E("Every Block grants +5 % Dodge until the fight ends (max. +25 %).",
                     () => new SynergyStackOnDefense(BattleEventKind.Blocked, StatKind.Dodge, BasisPoints.Percent(5), 5))));

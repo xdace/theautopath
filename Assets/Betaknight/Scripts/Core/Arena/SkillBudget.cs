@@ -5,43 +5,61 @@ using System.Linq;
 namespace Betaknight.Core.Arena
 {
     /// <summary>
-    /// Skill-Budget als Daten (A-12): Skills sind der Hauptschaden, der Basisangriff ist Füller und Motor.
-    /// Ein Schadens-Skill macht pro Sekunde Aktionszeit (Cast + Erholung) ein Vielfaches des Basisangriffs pro
-    /// Sekunde; Flächen-Skills pro Ziel etwas weniger. Längerer Cooldown verlangt mehr Wirkung.
+    /// Skill-Budget als Daten (A-12, A-19): Ohne Cooldowns bestimmt die Grösse einer Komponente ihre Wirkung. Eine
+    /// Ausführung macht so viel Prozent Waffenschaden, wie die Tabelle für ihre Zellen angibt (1 Zelle ≈ 60 %,
+    /// 2 ≈ 150 %, 4 ≈ 350 %, 6 ≈ 600 %); grosse Komponenten brauchen schwere Relais, die seltener auslösen.
+    /// Flächen-Skills machen pro Ziel einen Teil davon, Nutzen-Skills einen Teil als Schaden und den Rest als Wirkung.
     /// </summary>
     public sealed class SkillBudgetConfig
     {
         /// <summary>Schaden des Basisangriffs des Ritters in Basispunkten des Waffenschadens (6000 = 60 %).</summary>
         public int BasicAttackDamageBp { get; set; } = BasisPoints.Percent(60);
 
-        /// <summary>Jeder Treffer des Basisangriffs verkürzt alle laufenden Skill-Cooldowns um so viele Ticks.</summary>
-        public int BasicAttackCooldownCutTicks { get; set; } = Ticks.PerSecond / 4;
+        /// <summary>Wirkung einer Ausführung nach Zellen, in Prozent Waffenschaden. Fehlende Grössen werden linear ergänzt.</summary>
+        public IReadOnlyDictionary<int, int> PowerPercentByCells { get; set; } = new Dictionary<int, int>
+        {
+            { 1, 60 },
+            { 2, 150 },
+            { 4, 350 },
+            { 6, 600 },
+        };
 
-        /// <summary>Angriffsintervall, auf das sich «Basisangriff pro Sekunde» bezieht (1 s wie beim Start-Ritter).</summary>
-        public int ReferenceIntervalTicks { get; set; } = Ticks.PerSecond;
+        /// <summary>Fläche: pro Ziel so viel Prozent des Budgets.</summary>
+        public int AreaSharePercent { get; set; } = 60;
 
-        /// <summary>Einzelziel: Schaden pro Sekunde Aktionszeit mindestens so viel Prozent des Basisangriffs pro Sekunde.</summary>
-        public int SingleTargetFactorPercent { get; set; } = 250;
-
-        /// <summary>Fläche: pro Ziel mindestens so viel Prozent des Basisangriffs pro Sekunde.</summary>
-        public int AreaFactorPercent { get; set; } = 150;
-
-        /// <summary>Bis zu diesem Cooldown gilt der Grundfaktor.</summary>
-        public int ReferenceCooldownTicks { get; set; } = Ticks.FromSeconds(3);
-
-        /// <summary>Jede Sekunde Cooldown darüber verlangt so viel Prozent mehr Wirkung.</summary>
-        public int CooldownPercentPerSecond { get; set; } = 5;
-
-        /// <summary>Nutzen-Skills (Betäubung, Schild, Blendung): höchstens so viel Prozent des Einzelziel-Budgets als Schaden.</summary>
+        /// <summary>Nutzen-Skills (Betäubung, Schild, Blendung): höchstens so viel Prozent des Budgets als Schaden.</summary>
         public int UtilityMaxShareOfBudgetPercent { get; set; } = 60;
+
+        /// <summary>Spielraum der Prüfung: Schadens-Skills liegen zwischen so viel Prozent des Budgets …</summary>
+        public int MinOfBudgetPercent { get; set; } = 80;
+
+        /// <summary>… und so viel Prozent.</summary>
+        public int MaxOfBudgetPercent { get; set; } = 130;
 
         public static SkillBudgetConfig Default { get; } = new SkillBudgetConfig();
 
-        /// <summary>Basisangriff pro Sekunde in Basispunkten des Waffenschadens.</summary>
-        public int BasicDamagePerSecondBp => (int)((long)BasicAttackDamageBp * Ticks.PerSecond / Math.Max(1, ReferenceIntervalTicks));
-
         /// <summary>Der Basisangriff des Ritters nach dieser Konfiguration.</summary>
-        public SkillDefinition CreateKnightBasicAttack() => SkillDefinition.CreateBasicAttack(BasicAttackDamageBp, BasicAttackCooldownCutTicks);
+        public SkillDefinition CreateKnightBasicAttack() => SkillDefinition.CreateBasicAttack(BasicAttackDamageBp);
+
+        /// <summary>Wirkung einer Ausführung für <paramref name="cells"/> Zellen in Prozent Waffenschaden.</summary>
+        public int PowerPercent(int cells)
+        {
+            cells = Math.Max(1, cells);
+            if (PowerPercentByCells.TryGetValue(cells, out int exact)) return exact;
+            List<int> keys = PowerPercentByCells.Keys.OrderBy(k => k).ToList();
+            int below = keys.LastOrDefault(k => k < cells);
+            int above = keys.FirstOrDefault(k => k > cells);
+            if (below == 0) return PowerPercentByCells[keys[0]] * cells / keys[0];
+            if (above == 0)
+            {
+                // Über der Tabelle: so viel mehr pro Zelle wie zwischen den letzten beiden Einträgen.
+                int prev = keys.Count > 1 ? keys[keys.Count - 2] : 0;
+                int step = prev == 0 ? PowerPercentByCells[below] / below : (PowerPercentByCells[below] - PowerPercentByCells[prev]) / (below - prev);
+                return PowerPercentByCells[below] + step * (cells - below);
+            }
+            int lo = PowerPercentByCells[below], hi = PowerPercentByCells[above];
+            return lo + (hi - lo) * (cells - below) / (above - below);
+        }
 
         /// <summary>Schadens-Skill: Art Angriff oder Feuer und mit Schaden. Alles andere mit Schaden ist ein Nutzen-Skill.</summary>
         public static bool IsDamageSkill(SkillDefinition skill) =>
@@ -63,22 +81,24 @@ namespace Betaknight.Core.Arena
             return (int)total;
         }
 
-        /// <summary>Aktionszeit: Cast plus Erholung, in Ticks.</summary>
-        public static int ActionTicks(SkillDefinition skill) => skill.CastTicks() + skill.RecoveryTicks;
-
-        /// <summary>Mindestschaden pro Ausführung und Ziel nach dem Budget.</summary>
+        /// <summary>Budget einer Ausführung pro Ziel in Basispunkten des Waffenschadens, nach Zellen und Fläche.</summary>
         public int RequiredDamageBp(SkillDefinition skill)
         {
-            int factor = IsArea(skill) ? AreaFactorPercent : SingleTargetFactorPercent;
-            int extraSeconds = Math.Max(0, skill.CooldownTicks - ReferenceCooldownTicks) / Ticks.PerSecond;
-            long perSecond = (long)BasicDamagePerSecondBp * factor / 100 * (100 + CooldownPercentPerSecond * extraSeconds) / 100;
-            return (int)(perSecond * ActionTicks(skill) / Ticks.PerSecond);
+            int bp = BasisPoints.Percent(PowerPercent(skill.Shape.Cells));
+            return IsArea(skill) ? bp * AreaSharePercent / 100 : bp;
         }
 
-        /// <summary>«Bohrstoß: 180 % pro Ziel, Budget 178 % (Fläche, 1,8 s Aktion, 5 s CD)».</summary>
+        /// <summary>Liegt ein Schadens-Skill im Spielraum seines Budgets?</summary>
+        public bool IsWithinBudget(SkillDefinition skill)
+        {
+            int actual = DamagePerTargetBp(skill), required = RequiredDamageBp(skill);
+            return actual * 100 >= required * MinOfBudgetPercent && actual * 100 <= required * MaxOfBudgetPercent;
+        }
+
+        /// <summary>«Drill Strike: 210 % per target, Budget 210 % (area, 2×2 = 4 cells)».</summary>
         public string Explain(SkillDefinition skill) =>
             ArenaTexts.Budget(skill.Name, SkillInfo.Percent(DamagePerTargetBp(skill)), IsArea(skill), SkillInfo.Percent(RequiredDamageBp(skill)),
-                SkillInfo.Seconds(ActionTicks(skill)), SkillInfo.Seconds(skill.CooldownTicks));
+                skill.Shape.ToString(), skill.Shape.Cells);
 
         /// <summary>Weapon 10000: Beträge entsprechen direkt Basispunkten des Waffenschadens.</summary>
         private static IReadOnlyList<EffectInfo> Describe(SkillDefinition skill) =>

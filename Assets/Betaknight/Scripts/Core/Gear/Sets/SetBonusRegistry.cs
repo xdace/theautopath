@@ -59,11 +59,11 @@ namespace Betaknight.Core.Gear
             var r = new SetBonusRegistry();
             r.Register(Def(SetIds.Overload, "Overload Protocol",
                     "Every Basic Attack: +1 Haste stack (+10 % Attack Speed), 2 % Max HP Heat damage.",
-                    "Heat damage is at most 1 while a healing row is ready."),
+                    "Heat damage is at most 1 while a powered healing component is on the board."),
                 p => p >= 2 ? new OverloadSet(p >= 3) : null);
             r.Register(Def(SetIds.Aegis, "Aegis Firewall",
                     "Every Block: +1 Charge (max. 5), at 5 Charge Armor ×2. Unlocks the rune \"Charge Full\".",
-                    "Skills from \"Charge Full\" rows discharge: Charge to 0, Damage = 5 × Armor."),
+                    "Components powered by \"Charge Full\" discharge: Charge to 0, Damage = 5 × Armor."),
                 p => p >= 2 ? new AegisSet(p >= 3) : null);
             r.Register(Def(SetIds.Scrap, "Scrap Harvester",
                     "+2 Gold per defeated enemy.",
@@ -71,7 +71,7 @@ namespace Betaknight.Core.Gear
                 p => p >= 2 ? new ScrapHarvesterSet(p >= 3) : null);
             r.Register(Def(SetIds.Phantom, "Phantom Signal",
                     "+20 % Dodge.",
-                    "Every Dodge reduces all Cooldowns by 1 s, Dodge cap 75 %."),
+                    "Every Dodge hastes you (−25 % Cast Time for 2 s), Dodge cap 75 %."),
                 p => p >= 2 ? new PhantomSet(p >= 3) : null);
             return r;
         }

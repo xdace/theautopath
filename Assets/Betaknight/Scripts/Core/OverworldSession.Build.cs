@@ -44,7 +44,7 @@ namespace Betaknight.Core
         private BuildStats BuildStatsFor(Equipment equipment)
         {
             var resolver = _combat as ArenaCombatResolver ?? new ArenaCombatResolver();
-            return BuildStats.From(resolver.PreviewCombatant(Stats, Runes, equipment, null, Progression.SkillLevels), Stats.Hp,
+            return BuildStats.From(resolver.PreviewCombatant(Stats, Board, equipment, null, Progression.SkillLevels), Stats.Hp,
                 BonusesFor(equipment));
         }
 

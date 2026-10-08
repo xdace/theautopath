@@ -49,11 +49,13 @@ namespace Betaknight.Core.Runes
             // Takt und Zähler
             new RuneDefinition("every_3rd", "Every {0} Attacks", RuneTag.Spark, ConditionKind.Counter, "Once every {0} of your attacks.", new[] { 3, 2 }, difficulty: 1, invertedDifficulty: 0),
             new RuneDefinition("every_nth_attack", "After Every {0} Attacks", RuneTag.Spark, ConditionKind.Counter, "After every {0} of your attacks.", new[] { 2 }, Uncommon, difficulty: 1, invertedDifficulty: 0),
+            // Clock (A-19): ersetzt «Always». Leicht, aber nur für 1×1-Komponenten.
+            new RuneDefinition("clock", "Clock {0} s", RuneTag.Spark, ConditionKind.Clock, "Ticks once every {0} seconds.", new[] { 2, 1 }, Rare, difficulty: 0, invertedDifficulty: 0),
             new RuneDefinition("every_5s", "Every {0} Seconds", RuneTag.Spark, ConditionKind.Clock, "Once every {0} seconds.", new[] { 5, 4, 3 }, difficulty: 1, invertedDifficulty: 0),
             new RuneDefinition("every_20s", "Every {0} Seconds", RuneTag.Spark, ConditionKind.Clock, "Once every {0} seconds. For very strong skills.", new[] { 20, 15 }, Rare, difficulty: 3, invertedDifficulty: 0),
             new RuneDefinition("battle_start", "Battle Start", RuneTag.Spark, ConditionKind.Event, "Once at the start of the fight.", difficulty: 0, invertedDifficulty: 0),
             new RuneDefinition("every_nth_hit_taken", "Every {0} Hits Taken", RuneTag.Spark, ConditionKind.Counter, "After every {0} hits the knight takes.", new[] { 5, 4, 3 }, difficulty: 2, invertedDifficulty: 0),
-            new RuneDefinition("chain", "Chain", RuneTag.Spark, ConditionKind.Event, "Right after the row above has fired.", null, Uncommon, difficulty: 1, invertedDifficulty: 0),
+            new RuneDefinition("chain", "Chain", RuneTag.Spark, ConditionKind.Event, "Right after another component has finished.", null, Uncommon, difficulty: 1, invertedDifficulty: 0),
             new RuneDefinition("after_own_skill", "After Own Skill", RuneTag.Spark, ConditionKind.Event, "After each of your skills except the Basic Attack.", difficulty: 1, invertedDifficulty: 0),
 
             // Angriff
@@ -85,7 +87,6 @@ namespace Betaknight.Core.Runes
             // Bewegung und Ausweichen
             new RuneDefinition("after_dodge", "After Dodge", RuneTag.Phantom, ConditionKind.Event, "Shortly after the knight dodged.", difficulty: 2, invertedDifficulty: 0),
             new RuneDefinition("dodge_streak", "{0} Dodges in a Row", RuneTag.Phantom, ConditionKind.Counter, "After {0} dodges with no hit in between.", new[] { 2 }, Uncommon, difficulty: 3, invertedDifficulty: 0),
-            new RuneDefinition("always", "Always", RuneTag.Phantom, ConditionKind.State, "Always true. Only held back by the skill's Cooldown.", null, Rare, difficulty: 0, invertedDifficulty: 3),
 
             // Kontext
             new RuneDefinition("on_goldmine", "On Gold Mine", RuneTag.Ember, ConditionKind.Context, "When the fight takes place on a Gold Mine tile.", null, Rare, difficulty: 3, invertedDifficulty: 0),

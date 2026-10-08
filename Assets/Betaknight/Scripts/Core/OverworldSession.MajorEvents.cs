@@ -131,7 +131,7 @@ namespace Betaknight.Core
             try
             {
                 bool elite = enemy == CellContent.Elite;
-                var request = new CombatRequest(enemy, tier, Stats, Runes, Gear, context, Progression.SkillLevels,
+                var request = new CombatRequest(enemy, tier, Stats, Board, Gear, context, Progression.SkillLevels,
                     elite ? Progression.EliteHpPercent : 100, elite ? Progression.EliteDamagePercent : 100);
                 DiscoverDuos();
                 result = _combat.Resolve(request, _random);
@@ -199,7 +199,7 @@ namespace Betaknight.Core
             HexCell cell = CurrentCell;
             if (!_shops.TryGetValue(cell.Coord, out ShopInventory inventory))
             {
-                inventory = new ShopInventory(RuneOffer.Create("Shop", RuneCatalog, Runes, _random, isOwned: RuneInventory.Contains).Options,
+                inventory = new ShopInventory(RuneOffer.Create("Shop", RuneCatalog, Board, _random, isOwned: RuneInventory.Contains).Options,
                     PickItems(ShopItemCount), PickSkills(Progression.ShopSkillCount), RollShopModules());
                 _shops.Add(cell.Coord, inventory);
             }
@@ -211,7 +211,7 @@ namespace Betaknight.Core
 
         public bool CanBuyShopRune(int index) =>
             PendingShop != null && index >= 0 && index < PendingShop.Inventory.Runes.Count
-            && Stats.Gold >= ShopPrices.Rune && !Runes.Contains(PendingShop.Inventory.Runes[index])
+            && Stats.Gold >= ShopPrices.Rune && !Board.Contains(PendingShop.Inventory.Runes[index])
             && !RuneInventory.Contains(PendingShop.Inventory.Runes[index]);
 
         /// <summary>
@@ -241,20 +241,20 @@ namespace Betaknight.Core
             return true;
         }
 
-        /// <summary>Preis des nächsten Runenplatzes; steigt mit jedem Kauf im Run (20, 35, 50 …).</summary>
-        public int RuneSlotPrice => Progression.SlotPrice(RuneSlotsBought);
+        /// <summary>Preis der nächsten Platinen-Erweiterung; steigt mit jedem Kauf im Run (20, 35, 50 …).</summary>
+        public int BoardExpansionPrice => Progression.SlotPrice(BoardExpansionsBought);
 
-        /// <summary>Im ganzen Run gekaufte Runenplätze (wandert durch die Akte).</summary>
-        public int RuneSlotsBought { get; private set; }
+        /// <summary>Im ganzen Run gekaufte Platinen-Erweiterungen (wandert durch die Akte).</summary>
+        public int BoardExpansionsBought { get; private set; }
 
-        public bool CanBuyRuneSlot => PendingShop != null && !PendingShop.Inventory.SlotSold && CanExpandBoard
-            && Stats.Gold >= RuneSlotPrice;
+        public bool CanBuyBoardExpansion => PendingShop != null && !PendingShop.Inventory.SlotSold && CanExpandBoard
+            && Stats.Gold >= BoardExpansionPrice;
 
-        public bool BuyRuneSlot()
+        public bool BuyBoardExpansion()
         {
-            if (!CanBuyRuneSlot) return false;
-            Stats.TrySpendGold(RuneSlotPrice);
-            RuneSlotsBought++;
+            if (!CanBuyBoardExpansion) return false;
+            Stats.TrySpendGold(BoardExpansionPrice);
+            BoardExpansionsBought++;
             ExpandBoard(1);
             PendingShop.Inventory.SlotSold = true;
             return true;
@@ -267,7 +267,7 @@ namespace Betaknight.Core
         {
             if (!CanRerollShop) return false;
             Stats.TrySpendGold(ShopPrices.Reroll);
-            PendingShop.Inventory.Replace(RuneOffer.Create("Shop", RuneCatalog, Runes, _random, isOwned: RuneInventory.Contains).Options);
+            PendingShop.Inventory.Replace(RuneOffer.Create("Shop", RuneCatalog, Board, _random, isOwned: RuneInventory.Contains).Options);
             PendingShop.Inventory.ReplaceItems(PickItems(ShopItemCount));
             PendingShop.Inventory.ReplaceSkills(PickSkills(Progression.ShopSkillCount));
             PendingShop.Inventory.ReplaceModules(RollShopModules());

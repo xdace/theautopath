@@ -120,29 +120,32 @@ namespace Betaknight.Core.Arena
             || (filter == LogFilter.Damage && (Category & LogCategory.Damage) != 0);
     }
 
-    /// <summary>Live-Zustand einer Tafel-Zeile in der Wiedergabe.</summary>
+    /// <summary>Live-Zustand einer Komponente der Platine in der Wiedergabe (A-19).</summary>
     public enum RowDisplay
     {
-        /// <summary>✔ Bedingung erfüllt und Skill bereit.</summary>
-        Ready,
+        /// <summary>Versorgt, wartet auf das Auslösen ihres Relais.</summary>
+        Idle,
 
-        /// <summary>✖ Bedingung nicht erfüllt.</summary>
-        ConditionFalse,
-
-        /// <summary>⏳ Skill im Cooldown.</summary>
-        Cooldown,
-
-        /// <summary>⌀ verwaist.</summary>
-        Orphaned,
-
-        /// <summary>Noch keine Entscheidung.</summary>
-        Unknown,
-
-        /// <summary>Eingereiht (A-13): erfüllt, wartet, bis sie dran ist.</summary>
+        /// <summary>Eingereiht: ihr Relais hat ausgelöst, sie wartet, bis sie dran ist.</summary>
         Queued,
+
+        /// <summary>Feuert gerade (Cast läuft).</summary>
+        Firing,
+
+        /// <summary>Eingefroren (Freeze).</summary>
+        Frozen,
+
+        /// <summary>Kein Relais berührt sie.</summary>
+        Unpowered,
+
+        /// <summary>Berührt nur Relais, für die sie zu gross ist.</summary>
+        TooLarge,
+
+        /// <summary>Kein Skill.</summary>
+        Orphaned,
     }
 
-    /// <summary>Eine wartende Zeile des Spielers in der Wiedergabe.</summary>
+    /// <summary>Eine wartende Komponente des Spielers in der Wiedergabe.</summary>
     public sealed class QueueView
     {
         public int Row { get; }
@@ -151,23 +154,22 @@ namespace Betaknight.Core.Arena
         /// <summary>Tick des Einreihens.</summary>
         public int SinceTick { get; }
 
-        /// <summary>Rest-Cooldown beim Einreihen; zählt bis zum Start herunter.</summary>
-        internal int CooldownAtQueue;
-
-        /// <summary>Eingereiht über einen Auslöser.</summary>
+        /// <summary>Eingereiht über ein Auslöser-Modul.</summary>
         public bool Triggered { get; }
 
-        internal QueueView(int row, string skill, int sinceTick, int cooldown, bool triggered)
+        /// <summary>Relais, das ausgelöst hat (-1 bei Auslöser-Modulen).</summary>
+        public int Relay { get; }
+
+        internal QueueView(int row, string skill, int sinceTick, bool triggered, int relay)
         {
             Row = row;
             Skill = skill;
             SinceTick = sinceTick;
-            CooldownAtQueue = cooldown;
             Triggered = triggered;
+            Relay = relay;
         }
 
-        /// <summary>Geschätzter Rest-Cooldown zum Tick (Basisangriff-Treffer können ihn zusätzlich kürzen).</summary>
-        public int CooldownLeft(int tick) => Math.Max(0, CooldownAtQueue - (tick - SinceTick));
+        public int WaitedTicks(int tick) => Math.Max(0, tick - SinceTick);
     }
 
     /// <summary>Zustand eines Kämpfers zu einem Zeitpunkt der Wiedergabe.</summary>
@@ -246,10 +248,11 @@ namespace Betaknight.Core.Arena
         private readonly List<LogEntry> _entries = new List<LogEntry>();
         private readonly List<Popup> _popups = new List<Popup>();
         private int _next;
-        private int _nextDecision;
-        private BattleDecision _lastDecision;
         private readonly string[] _skipReasons;
         private readonly int[] _skipTicks;
+        private readonly int[] _frozenUntil;
+        private readonly int[] _relayTicks;
+        private readonly int[] _relayCounts;
         private readonly List<QueueView> _queue = new List<QueueView>();
 
         public int Tick { get; private set; }
@@ -268,9 +271,6 @@ namespace Betaknight.Core.Arena
         /// <summary>Protokoll mit Kategorien (inklusive Schadenszeilen) für den Filter.</summary>
         public IReadOnlyList<LogEntry> Entries => _entries;
 
-        /// <summary>Letzte Entscheidung des Spielers bis zum aktuellen Tick.</summary>
-        public BattleDecision LastDecision => _lastDecision;
-
         public BattlePlayback(BattleResult result)
         {
             _result = result ?? throw new ArgumentNullException(nameof(result));
@@ -282,7 +282,11 @@ namespace Betaknight.Core.Arena
             }
             _skipReasons = new string[result.PlayerRowLabels.Count];
             _skipTicks = new int[result.PlayerRowLabels.Count];
+            _frozenUntil = new int[result.PlayerRowLabels.Count];
+            _relayTicks = new int[result.PlayerBoard?.Relays.Count ?? 0];
+            _relayCounts = new int[_relayTicks.Length];
             for (int i = 0; i < _skipTicks.Length; i++) _skipTicks[i] = -1;
+            for (int i = 0; i < _relayTicks.Length; i++) _relayTicks[i] = -1000;
         }
 
         /// <summary>Holt die schwebenden Zahlen, die seit dem letzten Aufruf entstanden sind.</summary>
@@ -293,54 +297,51 @@ namespace Betaknight.Core.Arena
             return taken;
         }
 
-        /// <summary>Wartende Zeilen des Spielers, nach Priorität der Tafel (höhere Zeile zuerst).</summary>
+        /// <summary>Wartende Komponenten des Spielers in Lesereihenfolge der Platine (oben links zuerst).</summary>
         public IReadOnlyList<QueueView> Queue => _queue;
 
         public bool IsRowQueued(int row) => _queue.Exists(q => q.Row == row);
 
-        /// <summary>
-        /// «Wartet: 2. Schildschlag ⏳1,2 s · 4. Bohrstoß bereit» oder leer. «bereit» heisst: Cooldown vorbei, eine andere
-        /// Aktion läuft noch. <paramref name="hourglass"/> für Schriften ohne ⏳.
-        /// </summary>
+        /// <summary>«Waiting: #2 Shield Bash ⏳0.4 s · #4 Drill Thrust» oder leer. <paramref name="hourglass"/> für Schriften ohne ⏳.</summary>
         public string QueueText(string hourglass = "⏳")
         {
             if (_queue.Count == 0) return string.Empty;
             var parts = new List<string>();
             foreach (QueueView q in _queue)
             {
-                int left = Math.Min(q.CooldownLeft(Tick), CooldownLeft(q.Row) > 0 ? CooldownLeft(q.Row) : int.MaxValue);
-                parts.Add($"{q.Row + 1}. {q.Skill} {(left > 0 ? hourglass + RowStateText.Seconds(left) : ArenaTexts.Ready)}");
+                int waited = q.WaitedTicks(Tick);
+                parts.Add(ArenaTexts.ComponentName(q.Row, q.Skill) + (waited > 0 ? $" {hourglass}{RowStateText.Seconds(waited)}" : string.Empty));
             }
             return ArenaTexts.QueuePrefix + string.Join(" · ", parts);
         }
 
-        /// <summary>Live-Zustand einer Zeile: aus der letzten Entscheidung, Cooldown läuft bis jetzt weiter.</summary>
+        /// <summary>Live-Zustand einer Komponente des Spielers.</summary>
         public RowDisplay RowStateAt(int row)
         {
+            LogicBoard board = _result.PlayerBoard;
+            if (board != null && row >= 0 && row < board.Rows.Count)
+            {
+                LogicRow r = board.Rows[row];
+                if (r.IsOrphaned) return RowDisplay.Orphaned;
+                if (!r.IsPowered) return r.TooLargeFor.Count > 0 ? RowDisplay.TooLarge : RowDisplay.Unpowered;
+            }
+            FighterView player = Player;
+            if (player != null && player.ActionSkill != null && player.ActionRow == row) return RowDisplay.Firing;
+            if (FrozenLeft(row) > 0) return RowDisplay.Frozen;
             if (IsRowQueued(row)) return RowDisplay.Queued;
-            if (_lastDecision == null || row < 0 || row >= _lastDecision.Rows.Count) return RowDisplay.Unknown;
-            RowCheck check = _lastDecision.Rows[row];
-            if (check.State == RowCheckState.Orphaned) return RowDisplay.Orphaned;
-            if (CooldownLeft(row) > 0) return RowDisplay.Cooldown;
-            return check.ConditionMet ? RowDisplay.Ready : RowDisplay.ConditionFalse;
+            return RowDisplay.Idle;
         }
 
-        /// <summary>Rest-Cooldown einer Zeile in Ticks zum aktuellen Tick.</summary>
-        public int CooldownLeft(int row)
-        {
-            if (_lastDecision == null || row < 0 || row >= _lastDecision.Rows.Count) return 0;
-            return Math.Max(0, _lastDecision.Rows[row].CooldownLeft - (Tick - _lastDecision.Tick));
-        }
+        /// <summary>Restdauer eines Freeze auf einer Komponente des Spielers in Ticks.</summary>
+        public int FrozenLeft(int row) => row >= 0 && row < _frozenUntil.Length ? Math.Max(0, _frozenUntil[row] - Tick) : 0;
 
-        /// <summary>Verbleibender Cooldown-Anteil 0–1 für den Restzeit-Balken.</summary>
-        public float CooldownFraction(int row)
-        {
-            if (_lastDecision == null || row < 0 || row >= _lastDecision.Rows.Count) return 0f;
-            int total = _lastDecision.Rows[row].CooldownTotal;
-            return total <= 0 ? 0f : Math.Min(1f, CooldownLeft(row) / (float)total);
-        }
+        /// <summary>Leuchtet das Relais gerade (hat eben ausgelöst)?</summary>
+        public bool IsRelayLit(int relay) => relay >= 0 && relay < _relayTicks.Length && Tick - _relayTicks[relay] < RowHighlightTicks;
 
-        /// <summary>Warum die Zeile zuletzt übersprungen wurde, mit Zeitpunkt, oder null.</summary>
+        /// <summary>Wie oft hat ein Relais des Spielers bis jetzt ausgelöst?</summary>
+        public int RelayCount(int relay) => relay >= 0 && relay < _relayCounts.Length ? _relayCounts[relay] : 0;
+
+        /// <summary>Letzter «Missed Trigger» einer Komponente mit Zeitpunkt und Grund, oder null.</summary>
         public string LastSkipReason(int row) =>
             row >= 0 && row < _skipReasons.Length && _skipReasons[row] != null
                 ? $"{BattleLogText.Time(_skipTicks[row])}: {_skipReasons[row]}"
@@ -357,8 +358,6 @@ namespace Betaknight.Core.Arena
             Tick = Math.Min(_result.EndTick, Tick + ticks);
             while (_next < _result.Events.Count && _result.Events[_next].Tick <= Tick)
                 Apply(_result.Events[_next++]);
-            while (_nextDecision < _result.Decisions.Count && _result.Decisions[_nextDecision].Tick <= Tick)
-                ApplyDecision(_result.Decisions[_nextDecision++]);
             foreach (FighterView f in _fighters)
             {
                 if (f.StunnedUntil > 0 && Tick >= f.StunnedUntil) f.StunnedUntil = 0;
@@ -367,17 +366,6 @@ namespace Betaknight.Core.Arena
         }
 
         public void SkipToEnd() => Advance(int.MaxValue / 2);
-
-        private void ApplyDecision(BattleDecision d)
-        {
-            _lastDecision = d;
-            for (int i = 0; i < d.Rows.Count && i < _skipReasons.Length; i++)
-            {
-                if (!d.Skipped(i)) continue;
-                _skipReasons[i] = RowStateText.Reason(d.Rows[i]);
-                _skipTicks[i] = d.Tick;
-            }
-        }
 
         private void Log(BattleEvent e, LogCategory category, bool classic = true)
         {
@@ -429,7 +417,28 @@ namespace Betaknight.Core.Arena
                     if (source != null) source.ActionWindupTicks = 0;
                     break;
 
-                case BattleEventKind.TriggerExpired:
+                case BattleEventKind.TriggerMissed:
+                    if (source == null || source.Info.Side != Side.Player) break;
+                    if (e.RowIndex >= 0 && e.RowIndex < _skipReasons.Length)
+                    {
+                        _skipReasons[e.RowIndex] = RowStateText.Reason((MissReason)e.Amount);
+                        _skipTicks[e.RowIndex] = e.Tick;
+                    }
+                    Log(e, LogCategory.None);
+                    break;
+
+                case BattleEventKind.RelayTriggered:
+                    if (source == null || source.Info.Side != Side.Player) break;
+                    if (e.Relay >= 0 && e.Relay < _relayTicks.Length)
+                    {
+                        _relayTicks[e.Relay] = e.Tick;
+                        _relayCounts[e.Relay]++;
+                    }
+                    break;
+
+                case BattleEventKind.Frozen:
+                    if (target != null && target.Info.Side == Side.Player && e.Extra >= 0 && e.Extra < _frozenUntil.Length)
+                        _frozenUntil[e.Extra] = Math.Max(_frozenUntil[e.Extra], e.Tick + e.Amount);
                     Log(e, LogCategory.None);
                     break;
 
@@ -437,11 +446,11 @@ namespace Betaknight.Core.Arena
                     // Nur die Warteschlange des Spielers wird gezeigt; Gegner haben auch eine, das Protokoll bliebe sonst unlesbar.
                     if (source == null || source.Info.Side != Side.Player) break;
                     string name = e.RowIndex >= 0 && e.RowIndex < _result.PlayerRowSkills.Count ? _result.PlayerRowSkills[e.RowIndex] : BattleLogText.SkillName(e.Detail);
-                    var entry = new QueueView(e.RowIndex, name, e.Tick, e.Amount, e.IsTriggered);
+                    var entry = new QueueView(e.RowIndex, name, e.Tick, e.IsTriggered, e.Relay);
                     int index = _queue.FindIndex(q => q.Row > e.RowIndex);
                     if (index < 0) _queue.Add(entry);
                     else _queue.Insert(index, entry);
-                    Log(e, LogCategory.None);
+                    Log(e, LogCategory.None, classic: false);
                     break;
 
                 case BattleEventKind.ActionInterrupted:

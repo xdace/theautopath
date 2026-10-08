@@ -4,11 +4,13 @@ using System.Collections.Generic;
 namespace Betaknight.Core.Arena
 {
     /// <summary>
-    /// Ein laufender Kampf in festen Ticks (20 pro Sekunde). Ablauf pro Tick:
-    /// 1. Zeit: Ereignisse des Vortags an Modifikatoren, Cooldowns, Zustände, Überhitzung.
+    /// Ein laufender Kampf in festen Ticks (20 pro Sekunde) auf Platinen (A-19). Es gibt keine Cooldowns. Ablauf pro Tick:
+    /// 1. Zeit: Ereignisse des Vortags an Modifikatoren, Zustände, Überhitzung.
     /// 2. Laufende Aktionen weiterschalten, Wirkungen anwenden.
-    /// 3. (Ereignisse dieses Ticks sind gesammelt; Bedingungen sehen sie ab dem nächsten Tick.)
-    /// 4. Freie Kämpfer werten ihre Logik-Tafel aus (Spieler zuerst, dann Gegner).
+    /// 3. Relais prüfen: Ereignisse lösen bei jedem Ereignis aus, Zustände bei der steigenden Flanke; ausgelöste Relais
+    ///    reihen ihre versorgten Komponenten ein (Ereignisse dieses Ticks sehen Bedingungen erst im nächsten).
+    /// 4. Freie Kämpfer starten die wartende Komponente, die in Lesereihenfolge zuerst kommt; ohne Warteschlange füllt
+    ///    der Basisangriff die Lücke. Die Cast-Zeit ist die einzige Schleifen-Regel.
     /// 5. Siegprüfung.
     /// </summary>
     public sealed class Battle
@@ -18,28 +20,16 @@ namespace Betaknight.Core.Arena
         private readonly List<Combatant> _enemies = new List<Combatant>();
         private readonly List<BattleEvent> _events = new List<BattleEvent>();
         private List<BattleEvent> _pending = new List<BattleEvent>();
-        private readonly Dictionary<Combatant, RowRuntime[]> _rows = new Dictionary<Combatant, RowRuntime[]>();
-        private readonly List<BattleDecision> _decisions = new List<BattleDecision>();
+        private readonly Dictionary<Combatant, RowRuntime[]> _relays = new Dictionary<Combatant, RowRuntime[]>();
 
-        // Wer gerade wirkt und aus welcher Zeile: Ereignisse dieses Kämpfers bekommen die Zeile angeheftet.
+        // Wer gerade wirkt und aus welcher Komponente: Ereignisse dieses Kämpfers bekommen die Komponente angeheftet.
         private Combatant _actor;
         private int _actorRow = -1;
 
         // Wirkungsbonus (Prozent) der laufenden Ausführung aus dem Schwierigkeits-Bonus, nur für die Auswertung.
         private int _actorPower;
 
-        // Wie oft die Bedingung jeder Spieler-Zeile erfüllt wurde (Wechsel von nicht erfüllt zu erfüllt).
-        private int[] _metCount;
-        private bool[] _metBefore;
-
-        // Zeilen, die während der laufenden Aktion des Spielers schon als «Aktion läuft» festgehalten sind.
-        private readonly RowQueueConfig _queue;
-
-        // Warteschlange: war die Bedingung einer Zeile im letzten Tick erfüllt (für «neu erfüllt»)?
-        private readonly Dictionary<Combatant, bool[]> _queueMet = new Dictionary<Combatant, bool[]>();
-
-        private ActionState _busyAction;
-        private readonly HashSet<int> _busyRows = new HashSet<int>();
+        private readonly QueueConfig _queue;
 
         public int Tick { get; private set; }
         public Random Random { get; }
@@ -48,9 +38,6 @@ namespace Betaknight.Core.Arena
         public IReadOnlyList<Combatant> Enemies => _enemies;
         public IReadOnlyList<Combatant> All => _all;
         public IReadOnlyList<BattleEvent> Events => _events;
-
-        /// <summary>Entscheidungen des Spielers mit Gründen je Zeile (nur bei Entscheidungen, nicht jeden Tick).</summary>
-        public IReadOnlyList<BattleDecision> Decisions => _decisions;
 
         public int TimeLimitTicks => _setup.TimeLimitTicks;
         public bool IsOverheated => Tick > _setup.TimeLimitTicks;
@@ -65,12 +52,10 @@ namespace Betaknight.Core.Arena
 
             Random = new Random(setup.Seed);
             Context = setup.Context ?? new BattleContext();
-            _queue = setup.Queue ?? RowQueueConfig.Default;
+            _queue = setup.Queue ?? QueueConfig.Default;
 
             Player = Add(setup.Player, Side.Player);
             foreach (CombatantSetup enemy in setup.Enemies) _enemies.Add(Add(enemy, Side.Enemy));
-            _metCount = new int[Player.Board.Rows.Count + 1];
-            _metBefore = new bool[Player.Board.Rows.Count + 1];
         }
 
         private Combatant Add(CombatantSetup s, Side side)
@@ -78,14 +63,14 @@ namespace Betaknight.Core.Arena
             var c = new Combatant(s, side, _all.Count) { Battle = this };
             _all.Add(c);
 
-            var rows = new RowRuntime[c.Board.Rows.Count + 1];
-            for (int i = 0; i < rows.Length; i++) rows[i] = new RowRuntime(i);
-            _rows.Add(c, rows);
-            _queueMet.Add(c, new bool[rows.Length]);
+            var relays = new RowRuntime[c.Board.Relays.Count];
+            for (int i = 0; i < relays.Length; i++) relays[i] = new RowRuntime(i) { Powered = c.Board.Relays[i].Powered };
+            _relays.Add(c, relays);
             return c;
         }
 
-        public RowRuntime RowState(Combatant c, int index) => _rows[c][index];
+        /// <summary>Laufzeit-Daten eines Relais (letztes Auslösen, Zahl der Auslösungen).</summary>
+        public RowRuntime RelayState(Combatant c, int relay) => _relays[c][relay];
 
         // ------------------------------------------------------------------ Ablauf
 
@@ -103,10 +88,8 @@ namespace Betaknight.Core.Arena
             {
                 UpdateTime();
                 AdvanceActions();
-                ObserveRows();
-                CountConditions();
+                TriggerRelays();
                 Decide();
-                QueueRows();
                 outcome = CheckEnd();
                 if (outcome.HasValue) break;
             }
@@ -128,20 +111,19 @@ namespace Betaknight.Core.Arena
 
             var labels = new List<string>();
             var skills = new List<string>();
+            var difficulties = new List<int>();
             for (int i = 0; i <= Player.Board.Rows.Count; i++)
             {
                 LogicRow row = Player.Board.RowAt(i);
                 labels.Add(row.Label);
                 skills.Add(row.Skill?.Name ?? "—");
+                difficulties.Add(row.Difficulty);
             }
-
-            var difficulties = new List<int>();
-            for (int i = 0; i <= Player.Board.Rows.Count; i++) difficulties.Add(Player.Board.RowAt(i).Difficulty);
 
             return new BattleResult(outcome.Value, Tick, Math.Max(0, Player.Hp), Player.MaxHp, defeated, BonusGold, _events, labels,
                 skills, fighters)
             {
-                SurviveTicks = _setup.SurviveTicks, Decisions = _decisions, PlayerRowMet = _metCount, PlayerRowDifficulty = difficulties,
+                SurviveTicks = _setup.SurviveTicks, PlayerRowDifficulty = difficulties, PlayerBoard = Player.Board,
             };
         }
 
@@ -157,8 +139,6 @@ namespace Betaknight.Core.Arena
             foreach (Combatant c in _all)
             {
                 if (!c.IsAlive) continue;
-                c.ReduceCooldowns(1);
-
                 for (int i = c.StatusList.Count - 1; i >= 0; i--)
                 {
                     if (i >= c.StatusList.Count) continue;
@@ -215,12 +195,11 @@ namespace Betaknight.Core.Arena
         {
             Combatant target = a.Target != null && a.Target.IsAlive ? a.Target : DefaultTarget(c);
             Emit(new BattleEvent(Tick, BattleEventKind.ActionExecuted, c, target, a.Skill.CountsAsAttack ? 1 : 0, a.Skill.Id, a.RowIndex)
-                { Cause = a.Cause, CauseRow = a.CauseRow });
+                { Cause = a.Cause, CauseRow = a.CauseRow, Relay = a.Relay });
 
             if (!a.Skill.IsBasicAttack && a.Skill.CanBeRepeated) c.LastRepeatableSkill = a.Skill;
 
             var context = new SkillContext(this, c, target, a.Skill, a.RowIndex);
-            int eventsBefore = _events.Count;
             BeginActor(c, a.RowIndex, a.Skill.Difficulty.PowerPercent);
             foreach (ISkillEffect effect in a.Skill.Effects)
             {
@@ -228,7 +207,7 @@ namespace Betaknight.Core.Arena
                 effect.Apply(context);
             }
 
-            // Modul «Kette»: zielgerichtete Wirkungen treffen weitere Gegner.
+            // Modul «Chain»: zielgerichtete Wirkungen treffen weitere Gegner.
             if (a.Skill.ExtraTargets > 0 && target != null)
             {
                 int extra = 0;
@@ -243,20 +222,12 @@ namespace Betaknight.Core.Arena
                 }
             }
             EndActor();
-
-            // Basisangriff als Motor: ein Treffer verkürzt alle laufenden Skill-Cooldowns.
-            if (a.Skill.CooldownCutOnHitTicks > 0 && c.IsAlive && HitSince(c, eventsBefore))
-                c.ReduceCooldowns(a.Skill.CooldownCutOnHitTicks);
         }
 
-        private bool HitSince(Combatant c, int from)
-        {
-            for (int i = from; i < _events.Count; i++)
-                if (_events[i].Kind == BattleEventKind.Hit && _events[i].Source == c) return true;
-            return false;
-        }
-
-        /// <summary>Nach der Wirkung: Wiederholungen aus «Mehrfach» vormerken, dann Auslöser des Skills feuern.</summary>
+        /// <summary>
+        /// Nach der Wirkung: Wiederholungen aus «Multicast» vormerken, Auslöser-Module der Komponente feuern und
+        /// «Repeat while true» prüfen (das Relais gilt noch: die Komponente kommt erneut in die Warteschlange).
+        /// </summary>
         private void AfterExecution(Combatant c, ActionState a)
         {
             if (!c.IsAlive) return;
@@ -265,11 +236,17 @@ namespace Betaknight.Core.Arena
                 c.Pending.Insert(0, new PendingAction
                 {
                     Skill = a.Skill, Target = a.Target, Row = a.RowIndex, Cause = ActionCause.Repeat, RepeatsLeft = a.RepeatsLeft - 1,
-                    BonusTier = a.BonusTier,
+                    BonusTier = a.BonusTier, Relay = a.Relay,
                 });
             }
-            // Der Bonus wandert mit: ausgelöste Ziele bekommen mindestens die Stufe dieser Ausführung.
-            if (!a.IsRepeat && a.RowIndex >= 0 && a.RowIndex < c.Board.Rows.Count) FireEdges(c, GraphNode.Skill(a.RowIndex), a.BonusTier);
+            if (a.IsRepeat || a.RowIndex < 0 || a.RowIndex >= c.Board.Rows.Count) return;
+
+            LogicRelay relay = a.Relay >= 0 && a.Relay < c.Board.Relays.Count ? c.Board.Relays[a.Relay] : null;
+            // Der Bonus und die Grenze wandern mit: ausgelöste Ziele laufen mit Stufe und Grenze dieser Ausführung.
+            FireEdges(c, GraphNode.Skill(a.RowIndex), a.BonusTier, a.Relay, relay?.MaxCells ?? int.MaxValue);
+
+            if (relay != null && relay.RepeatWhileTrue && relay.Condition.IsMet(new ConditionContext(this, c, _relays[c][a.Relay]), out Combatant target))
+                Enqueue(c, a.RowIndex, a.Relay, ActionCause.Board, -1, a.BonusTier, relay.MaxCells, target);
         }
 
         private void BeginActor(Combatant c, int row, int powerPercent = 0)
@@ -286,27 +263,9 @@ namespace Betaknight.Core.Arena
             _actorPower = 0;
         }
 
-        /// <summary>Grundschwierigkeit einer Zeile (Fallback und ungültige Zeilen: 0).</summary>
-        private static int RowTier(Combatant c, int row) =>
-            row >= 0 && row < c.Board.Rows.Count ? c.Board.Rows[row].Difficulty : 0;
-
         /// <summary>Anteil des Wirkungsbonus an einer Menge: bei +50 % ist es ein Drittel des Ergebnisses.</summary>
         private static int BonusPart(int amount, int powerPercent) =>
             powerPercent <= 0 || amount <= 0 ? 0 : amount - (int)((long)amount * 100 / (100 + powerPercent));
-
-        /// <summary>Zählt pro Spieler-Zeile, wie oft ihre Bedingung erfüllt wurde. Prüfen ändert nichts am Kampf.</summary>
-        private void CountConditions()
-        {
-            if (!Player.IsAlive) return;
-            RowRuntime[] states = _rows[Player];
-            for (int i = 0; i < Player.Board.Rows.Count; i++)
-            {
-                LogicRow row = Player.Board.Rows[i];
-                bool met = row.Condition.IsMet(new ConditionContext(this, Player, states[i]), out _);
-                if (met && !_metBefore[i]) _metCount[i]++;
-                _metBefore[i] = met;
-            }
-        }
 
         private void Finish(Combatant c, ActionState a)
         {
@@ -316,10 +275,10 @@ namespace Betaknight.Core.Arena
             StartPending(c);
         }
 
-        /// <summary>Höchstens so viele Aktionen warten hinter der laufenden; weitere Auslöser verfallen.</summary>
+        /// <summary>Höchstens so viele Wiederholungen warten hinter der laufenden Aktion.</summary>
         public const int MaxPendingActions = 4;
 
-        /// <summary>Startet die nächste vorgemerkte Aktion. Ausgelöste, deren Skill nicht mehr bereit ist, verfallen.</summary>
+        /// <summary>Startet die nächste vorgemerkte Wiederholung.</summary>
         private void StartPending(Combatant c)
         {
             while (c.Pending.Count > 0 && c.Action == null)
@@ -331,18 +290,13 @@ namespace Betaknight.Core.Arena
                     c.Pending.Clear();
                     return;
                 }
-                if (p.Cause == ActionCause.Trigger && !c.IsReady(p.Skill))
-                {
-                    Emit(new BattleEvent(Tick, BattleEventKind.TriggerExpired, c, null, p.CauseRow, p.Skill.Id, p.Row));
-                    continue;
-                }
-                StartAction(c, p.Skill, p.Target, p.Row, p.Cause, p.CauseRow, p.RepeatsLeft, p.BonusTier);
+                StartAction(c, p.Skill, p.Target, p.Row, p.Cause, p.CauseRow, p.RepeatsLeft, p.BonusTier, -1, p.Relay);
             }
         }
 
         /// <summary>
         /// Merkt eine Wiederholung für die laufende Aktion vor (Echo). Sie startet nach deren Erholung als eigene Ausführung
-        /// mit voller Cast-Zeit (ohne Cooldown). Keine Ausführung ohne Cast.
+        /// mit voller Cast-Zeit. Keine Ausführung ohne Cast.
         /// </summary>
         public void QueueRepeat(Combatant c, SkillDefinition skill)
         {
@@ -350,301 +304,223 @@ namespace Betaknight.Core.Arena
             c.Pending.Add(new PendingAction
             {
                 Skill = skill, Target = c.Action.Target, Row = c.Action.RowIndex, Cause = ActionCause.Repeat, BonusTier = c.Action.BonusTier,
+                Relay = c.Action.Relay,
             });
         }
 
-        // ------------------------------------------------------------------ Auslöser (Graph der Tafel)
+        // ------------------------------------------------------------------ Relais und Auslöser
 
-        /// <summary>Feuert alle Auslöser-Kanten eines Knotens; <paramref name="sourceTier"/> ist die Stufe der auslösenden Ausführung.</summary>
-        private void FireEdges(Combatant c, GraphNode from, int sourceTier)
+        /// <summary>
+        /// Jeden Tick: Relais beobachten und auslösen. Ein ausgelöstes Relais reiht alle Komponenten ein, die es versorgt;
+        /// berührte, aber zu grosse Komponenten zählen als «Missed Trigger». Auslöser-Module am Relais feuern mit.
+        /// </summary>
+        private void TriggerRelays()
+        {
+            foreach (Combatant c in _all)
+            {
+                if (!c.IsAlive || OpponentsOf(c).Count == 0) continue;
+                RowRuntime[] states = _relays[c];
+                for (int i = 0; i < states.Length; i++)
+                {
+                    LogicRelay relay = c.Board.Relays[i];
+                    var context = new ConditionContext(this, c, states[i]);
+                    if (relay.Condition is IObservingCondition observing) observing.Observe(context);
+                    if (!Triggers(relay.Condition, context, states[i], out Combatant target)) continue;
+
+                    states[i].LastFiredTick = Tick;
+                    states[i].FireCount++;
+                    Emit(new BattleEvent(Tick, BattleEventKind.RelayTriggered, c, target, i, relay.Label) { Extra = relay.Powered.Count, Relay = i });
+                    foreach (int row in relay.Powered) Enqueue(c, row, i, ActionCause.Board, -1, relay.Difficulty, relay.MaxCells, target);
+                    foreach (int row in relay.TooLarge) Missed(c, row, i, MissReason.TooLarge);
+                    FireEdges(c, GraphNode.Block(i), relay.Difficulty, i, relay.MaxCells);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Löst die Bedingung jetzt aus? Ereignisse (Ereignis, Zähler, Clock) bei jedem Erfüllen, Zustände nur bei der
+        /// steigenden Flanke. Bei ODER zählt jedes Teil für sich.
+        /// </summary>
+        private static bool Triggers(ICondition condition, in ConditionContext context, RowRuntime state, out Combatant target)
+        {
+            if (condition is AnyCondition any)
+            {
+                if (state.PartWasMet == null || state.PartWasMet.Length != any.Parts.Count) state.PartWasMet = new bool[any.Parts.Count];
+                bool fired = false;
+                target = null;
+                for (int p = 0; p < any.Parts.Count; p++)
+                {
+                    bool was = state.PartWasMet[p];
+                    if (PartTriggers(any.Parts[p], context, ref was, out Combatant t) && !fired)
+                    {
+                        fired = true;
+                        target = t;
+                    }
+                    state.PartWasMet[p] = was;
+                }
+                return fired;
+            }
+
+            bool wasMet = state.WasMet;
+            bool result = PartTriggers(condition, context, ref wasMet, out target);
+            state.WasMet = wasMet;
+            return result;
+        }
+
+        private static bool PartTriggers(ICondition condition, in ConditionContext context, ref bool wasMet, out Combatant target)
+        {
+            bool met = condition.IsMet(context, out target);
+            bool rising = met && !wasMet;
+            wasMet = met;
+            return TriggerKinds.IsEvent(condition) ? met : rising;
+        }
+
+        /// <summary>Feuert alle Auslöser-Kanten eines Knotens mit Stufe und Grenze der auslösenden Ausführung.</summary>
+        private void FireEdges(Combatant c, GraphNode from, int sourceTier, int sourceRelay, int maxCells)
         {
             foreach (GraphEdge edge in c.Board.Graph.From(from))
-                if (edge.Kind == GraphEdgeKind.Trigger) Trigger(c, edge.To.Row, from.Row, sourceTier);
+            {
+                if (edge.Kind != GraphEdgeKind.Trigger) continue;
+                int causeRow = from.Kind == GraphNodeKind.Skill ? from.Row : -1;
+                Enqueue(c, edge.To.Row, sourceRelay, ActionCause.Trigger, causeRow, sourceTier, maxCells, null);
+            }
+        }
+
+        // ------------------------------------------------------------------ Warteschlange
+
+        private void Missed(Combatant c, int row, int relay, MissReason reason)
+        {
+            LogicRow r = row >= 0 && row < c.Board.Rows.Count ? c.Board.Rows[row] : null;
+            Emit(new BattleEvent(Tick, BattleEventKind.TriggerMissed, c, null, (int)reason, r?.Skill?.Id, row) { Relay = relay });
         }
 
         /// <summary>
-        /// Löst den Skill einer Zeile aus: ohne deren Bedingung, mit voller Cast-Zeit und Cooldown. Ist er nicht bereit
-        /// (Cooldown, verwaist) oder der Kämpfer betäubt, verfällt der Auslöser. Läuft gerade eine Aktion, wartet er dahinter.
+        /// Reiht eine Komponente ein. Steht sie schon so oft wie erlaubt, ist das ein «Missed Trigger»; ein Auslösen mit
+        /// höherer Stufe hebt nur den Bonus der wartenden Ausführung (nicht stapelnd).
         /// </summary>
-        private void Trigger(Combatant c, int row, int sourceRow, int sourceTier)
+        private void Enqueue(Combatant c, int row, int relay, ActionCause cause, int causeRow, int tier, int maxCells, Combatant target)
         {
-            // Nicht stapelnd: die höhere Stufe von auslösender Ausführung und eigener Zeile zählt.
-            int tier = Math.Max(sourceTier, RowTier(c, row));
-            LogicRow target = row >= 0 && row < c.Board.Rows.Count ? c.Board.Rows[row] : null;
-
-            // Warteschlange: ein Auslöser verfällt nicht mehr, sein Ziel wird eingereiht, wenn es gerade nicht starten kann.
-            if (_queue.QueueTriggers && _queue.AppliesTo(c))
+            if (row < 0 || row >= c.Board.Rows.Count) return;
+            LogicRow r = c.Board.Rows[row];
+            if (r.IsOrphaned)
             {
-                if (target == null || target.IsOrphaned || !c.IsAlive || OpponentsOf(c).Count == 0)
-                {
-                    Emit(new BattleEvent(Tick, BattleEventKind.TriggerExpired, c, null, sourceRow, target?.Skill?.Id, row));
-                    return;
-                }
-                if (c.Action == null && !c.IsStunned && c.IsReady(target.Skill))
-                    StartAction(c, target.Skill, null, row, ActionCause.Trigger, sourceRow, null, tier);
-                else
-                    Enqueue(c, row, ActionCause.Trigger, sourceRow, tier, null);
+                Missed(c, row, relay, MissReason.Orphaned);
+                return;
+            }
+            if (r.Cells > maxCells)
+            {
+                Missed(c, row, relay, MissReason.TooLarge);
+                return;
+            }
+            if (c.IsFrozen(row, Tick))
+            {
+                Missed(c, row, relay, MissReason.Frozen);
                 return;
             }
 
-            if (target == null || target.IsOrphaned || !c.IsReady(target.Skill) || !c.IsAlive || c.IsStunned
-                || OpponentsOf(c).Count == 0 || (c.Action != null && c.Pending.Count >= MaxPendingActions))
-            {
-                Emit(new BattleEvent(Tick, BattleEventKind.TriggerExpired, c, null, sourceRow, target?.Skill?.Id, row));
-                return;
-            }
-
-            if (c.Action == null)
-            {
-                StartAction(c, target.Skill, null, row, ActionCause.Trigger, sourceRow, null, tier);
-                return;
-            }
-            c.Pending.Add(new PendingAction { Skill = target.Skill, Row = row, Cause = ActionCause.Trigger, CauseRow = sourceRow, BonusTier = tier });
-        }
-
-        /// <summary>
-        /// Jeden Tick vor den Entscheidungen: Bedingungen mit Gedächtnis beobachten und Bausteine mit Auslösern prüfen.
-        /// Ein Baustein-Auslöser feuert beim Wechsel von nicht erfüllt zu erfüllt.
-        /// </summary>
-        private void ObserveRows()
-        {
-            foreach (Combatant c in _all)
-            {
-                if (!c.IsAlive || !c.Board.NeedsObservation) continue;
-                RowRuntime[] states = _rows[c];
-                for (int i = 0; i < c.Board.Rows.Count; i++)
-                {
-                    LogicRow row = c.Board.Rows[i];
-                    var context = new ConditionContext(this, c, states[i]);
-                    if (row.Condition is IObservingCondition observing) observing.Observe(context);
-                    if (!c.Board.Graph.HasEdgesFrom(GraphNode.Block(i))) continue;
-
-                    bool met = row.Condition.IsMet(context, out _);
-                    bool rising = met && !states[i].WasMet;
-                    states[i].WasMet = met;
-                    if (rising) FireEdges(c, GraphNode.Block(i), row.Difficulty);
-                }
-            }
-        }
-
-        private void Decide()
-        {
-            foreach (Combatant c in _all)
-            {
-                if (!c.IsAlive || c.IsStunned) continue;
-                bool basicWindup = c.Action != null && c.Action.InWindup && c.Action.Skill.IsBasicAttack;
-                if (c.Action != null && !basicWindup)
-                {
-                    if (c == Player && OpponentsOf(c).Count > 0) RecordBusy(c);
-                    continue;
-                }
-                if (OpponentsOf(c).Count == 0) continue;
-
-                DecideFor(c, basicWindup);
-            }
-        }
-
-        private void DecideFor(Combatant c, bool basicWindup)
-        {
-            LogicBoard board = c.Board;
-            RowCheckState[] states = c == Player ? new RowCheckState[board.Rows.Count + 1] : null;
-            for (int i = 0; i <= board.Rows.Count; i++)
-            {
-                LogicRow row = board.RowAt(i);
-                QueuedRow queued = QueuedAt(c, i);
-                if (row.IsOrphaned || !c.IsReady(row.Skill))
-                {
-                    if (states != null) states[i] = row.IsOrphaned ? RowCheckState.Orphaned : queued != null ? RowCheckState.Queued : RowCheckState.Cooldown;
-                    continue;
-                }
-
-                // Eingereiht ist eingereiht: die Bedingung wird beim Start nicht erneut geprüft.
-                if (queued != null)
-                {
-                    if (basicWindup && row.Skill.IsBasicAttack) return;
-                    if (c.Action != null) Interrupt(c);
-                    StartQueued(c, queued);
-                    if (states != null) RecordDecision(c, i, states);
-                    return;
-                }
-
-                RowRuntime state = _rows[c][i];
-                if (!row.Condition.IsMet(new ConditionContext(this, c, state), out Combatant target))
-                {
-                    if (states != null) states[i] = RowCheckState.ConditionFalse;
-                    continue;
-                }
-
-                // Ein laufender Basisangriff wird nicht durch einen neuen Basisangriff ersetzt.
-                if (basicWindup && row.Skill.IsBasicAttack) return;
-
-                if (c.Action != null) Interrupt(c);
-                StartAction(c, row.Skill, target, i);
-                if (states != null) RecordDecision(c, i, states);
-                return;
-            }
-        }
-
-        // ------------------------------------------------------------------ Warteschlange (A-13)
-
-        private static QueuedRow QueuedAt(Combatant c, int row)
-        {
-            foreach (QueuedRow q in c.QueueList)
-                if (q.Row == row) return q;
-            return null;
-        }
-
-        /// <summary>
-        /// Reiht eine Zeile ein. Steht sie schon (so oft, wie die Konfiguration erlaubt), ändert erneutes Erfüllen nichts;
-        /// ein Auslöser mit höherer Stufe hebt nur den Bonus der wartenden Ausführung (nicht stapelnd).
-        /// </summary>
-        private void Enqueue(Combatant c, int row, ActionCause cause, int causeRow, int tier, Combatant target)
-        {
-            int entries = 0;
             QueuedRow existing = null;
+            int entries = 0;
             foreach (QueuedRow q in c.QueueList)
             {
                 if (q.Row != row) continue;
                 entries++;
                 existing = existing ?? q;
             }
-            if (entries >= Math.Max(1, _queue.MaxEntriesPerRow))
+            if (entries >= Math.Max(1, _queue.MaxEntriesPerComponent))
             {
-                existing.BonusTier = Math.Max(existing.BonusTier, tier);
-                // Der Auslöser-Ursprung geht mit: eine wartende Tafel-Zeile merkt sich, wer sie zusätzlich ausgelöst hat.
-                if (cause == ActionCause.Trigger && existing.Cause == ActionCause.Board)
+                if (tier > existing.BonusTier)
                 {
-                    existing.Cause = ActionCause.Trigger;
-                    existing.CauseRow = causeRow;
+                    existing.BonusTier = tier;
+                    existing.Relay = relay;
                 }
+                Missed(c, row, relay, MissReason.AlreadyQueued);
                 return;
             }
 
-            LogicRow r = c.Board.Rows[row];
             c.QueueList.Add(new QueuedRow
             {
-                Row = row, SinceTick = Tick, Cause = cause, CauseRow = causeRow, BonusTier = Math.Max(tier, r.Difficulty), Target = target,
+                Row = row, SinceTick = Tick, Cause = cause, CauseRow = causeRow, Relay = relay, BonusTier = DifficultyBonusConfig.Clamp(tier),
+                Target = target,
             });
-            Emit(new BattleEvent(Tick, BattleEventKind.RowQueued, c, target, c.Cooldown(r.Skill.Id), r.Skill.Id, row)
-                { Cause = cause, CauseRow = causeRow, Tier = tier });
+            Emit(new BattleEvent(Tick, BattleEventKind.RowQueued, c, target, 0, r.Skill.Id, row)
+                { Cause = cause, CauseRow = causeRow, Tier = tier, Relay = relay });
         }
 
-        /// <summary>Startet eine wartende Zeile ohne erneute Prüfung ihrer Bedingung, mit dem Bonus, den sie verdient hat.</summary>
+        /// <summary>Freie Kämpfer starten die erste wartende Komponente in Lesereihenfolge, sonst den Basisangriff.</summary>
+        private void Decide()
+        {
+            foreach (Combatant c in _all)
+            {
+                if (!c.IsAlive || c.IsStunned || OpponentsOf(c).Count == 0) continue;
+                bool basicWindup = c.Action != null && c.Action.InWindup && c.Action.Skill.IsBasicAttack;
+                if (c.Action != null && !basicWindup) continue;
+
+                QueuedRow next = NextQueued(c);
+                if (next != null)
+                {
+                    if (c.Action != null) Interrupt(c);
+                    StartQueued(c, next);
+                }
+                else if (c.Action == null)
+                {
+                    StartAction(c, c.Board.Fallback.Skill, null, c.Board.FallbackIndex);
+                }
+            }
+        }
+
+        /// <summary>Die wartende Komponente mit der höchsten Priorität (Lesereihenfolge), eingefrorene warten weiter.</summary>
+        private QueuedRow NextQueued(Combatant c)
+        {
+            QueuedRow best = null;
+            foreach (QueuedRow q in c.QueueList)
+            {
+                if (c.IsFrozen(q.Row, Tick)) continue;
+                if (best == null || q.Row < best.Row) best = q;
+            }
+            return best;
+        }
+
+        /// <summary>Startet eine wartende Komponente ohne erneute Prüfung, mit dem Bonus, den sie verdient hat.</summary>
         private void StartQueued(Combatant c, QueuedRow q)
         {
             c.QueueList.Remove(q);
             LogicRow row = c.Board.Rows[q.Row];
             Combatant target = q.Target != null && q.Target.IsAlive ? q.Target : null;
-            StartAction(c, row.Skill, target, q.Row, q.Cause, q.CauseRow, null, q.BonusTier, q.WaitedTicks(Tick));
+            StartAction(c, row.Skill, target, q.Row, q.Cause, q.CauseRow, null, q.BonusTier, q.WaitedTicks(Tick), q.Relay);
         }
 
+        /// <summary>Haste: −<paramref name="percent"/> % Cast-Zeit für <paramref name="ticks"/> (A-19, ersetzt «senkt Cooldowns»).</summary>
+        public void Haste(Combatant c, int percent, int ticks)
+        {
+            if (c == null || !c.IsAlive || percent == 0) return;
+            ApplyStatus(c, new StatModifierStatus(StatusIds.Haste, StatKind.CastPercent, -percent, ticks), c);
+        }
         /// <summary>
-        /// Nach den Entscheidungen: Zeilen, deren Bedingung erfüllt ist, die aber gerade nicht starten konnten, reihen sich
-        /// ein. Eine durchgehend erfüllte Bedingung reiht während des Cooldowns nicht erneut ein (siehe Konfiguration).
+        /// Freeze: die grösste Komponente des Ziels (bei Gleichstand die erste in Lesereihenfolge) kann eine Weile nicht
+        /// feuern. Holt sie gerade aus, bricht das ab.
         /// </summary>
-        private void QueueRows()
+        public void Freeze(Combatant target, int ticks, Combatant source)
         {
-            foreach (Combatant c in _all)
+            if (target == null || !target.IsAlive || ticks <= 0) return;
+            int best = -1;
+            for (int i = 0; i < target.Board.Rows.Count; i++)
             {
-                if (!c.IsAlive || !_queue.AppliesTo(c) || OpponentsOf(c).Count == 0) continue;
-                RowRuntime[] states = _rows[c];
-                bool[] before = _queueMet[c];
-                for (int i = 0; i < c.Board.Rows.Count; i++)
-                {
-                    LogicRow row = c.Board.Rows[i];
-                    if (row.IsOrphaned) continue;
-                    bool met = row.Condition.IsMet(new ConditionContext(this, c, states[i]), out Combatant target);
-                    bool fresh = met && !before[i];
-                    before[i] = met;
-                    if (!met || c.QueuedCount(i) >= Math.Max(1, _queue.MaxEntriesPerRow)) continue;
-                    // Gerade gestartet oder läuft noch: ein Zustand reiht die eigene laufende Zeile nicht ein, ein neues Ereignis schon.
-                    bool running = c.Action != null && c.Action.RowIndex == i && c.Action.Cause != ActionCause.Repeat;
-                    if (running && (c.Action.StartTick == Tick || !fresh)) continue;
-
-                    bool ready = c.IsReady(row.Skill);
-                    if (!ready && _queue.OnlyNewFulfilmentDuringCooldown && !fresh) continue;
-                    Enqueue(c, i, ActionCause.Board, -1, -1, target);
-                }
+                LogicRow r = target.Board.Rows[i];
+                if (r.IsOrphaned || !r.IsPowered) continue;
+                if (best < 0 || r.Cells > target.Board.Rows[best].Cells) best = i;
             }
-        }
-
-        // ------------------------------------------------------------------ Entscheidungs-Protokoll (nur Spieler, ändert nichts am Kampf)
-
-        /// <summary>
-        /// Hält eine Entscheidung fest: Gründe der Zeilen darüber stehen schon in <paramref name="states"/>, die Zeilen
-        /// darunter werden zur Anzeige nur geprüft. Bedingungen sind zustandslos, das Prüfen ändert also nichts.
-        /// </summary>
-        private void RecordDecision(Combatant c, int chosen, RowCheckState[] states)
-        {
-            for (int i = chosen + 1; i < states.Length; i++) states[i] = Probe(c, i);
-            _decisions.Add(new BattleDecision(Tick, chosen, Checks(c, states)));
-        }
-
-        /// <summary>
-        /// Während eine Aktion läuft, die keine Zeile abbrechen darf: Zeilen über der laufenden, die bereit und erfüllt
-        /// sind, einmal pro Aktion als «Aktion läuft» festhalten. Zeilen darunter hätten ohnehin nicht Vorrang.
-        /// </summary>
-        private void RecordBusy(Combatant c)
-        {
-            if (c.IsStunned || c.Action == null) return;
-            if (_busyAction != c.Action)
-            {
-                _busyAction = c.Action;
-                _busyRows.Clear();
-            }
-
-            RowCheckState[] states = null;
-            int above = Math.Min(c.Action.RowIndex, c.Board.Rows.Count + 1);
-            for (int i = 0; i < above; i++)
-            {
-                if (_busyRows.Contains(i)) continue;
-                RowCheckState probe = Probe(c, i);
-                if (probe != RowCheckState.Ready && probe != RowCheckState.Queued) continue;
-                if (states == null)
-                {
-                    states = new RowCheckState[c.Board.Rows.Count + 1];
-                    for (int j = 0; j < states.Length; j++) states[j] = Probe(c, j);
-                }
-                states[i] = probe == RowCheckState.Queued ? RowCheckState.Queued : RowCheckState.ActionRunning;
-                _busyRows.Add(i);
-            }
-            if (states == null) return;
-            // Schon gemeldete Zeilen stehen hier als bereit und zählen nicht doppelt.
-            _decisions.Add(new BattleDecision(Tick, -1, Checks(c, states), c.Action.RowIndex));
-        }
-
-        private RowCheckState Probe(Combatant c, int index)
-        {
-            LogicRow row = c.Board.RowAt(index);
-            if (row.IsOrphaned) return RowCheckState.Orphaned;
-            if (c.IsQueued(index)) return RowCheckState.Queued;
-            if (!c.IsReady(row.Skill)) return RowCheckState.Cooldown;
-            return row.Condition.IsMet(new ConditionContext(this, c, _rows[c][index]), out _) ? RowCheckState.Ready : RowCheckState.ConditionFalse;
-        }
-
-        private RowCheck[] Checks(Combatant c, RowCheckState[] states)
-        {
-            var checks = new RowCheck[states.Length];
-            for (int i = 0; i < states.Length; i++)
-            {
-                LogicRow row = c.Board.RowAt(i);
-                if (row.IsOrphaned)
-                {
-                    checks[i] = new RowCheck(states[i], 0, 0);
-                    continue;
-                }
-                bool met = row.Condition.IsMet(new ConditionContext(this, c, _rows[c][i]), out _);
-                checks[i] = new RowCheck(states[i], c.Cooldown(row.Skill.Id), row.Skill.CooldownTicks, met);
-            }
-            return checks;
+            if (best < 0) return;
+            target.Freeze(best, Tick + ticks);
+            Emit(new BattleEvent(Tick, BattleEventKind.Frozen, source, target, ticks, target.Board.Rows[best].Skill.Id) { Extra = best });
+            if (target.Action != null && target.Action.RowIndex == best && target.Action.InWindup) Interrupt(target);
         }
 
         /// <summary>
         /// Cast-Zeit und Erholung einer Aktion. Der Basisangriff teilt sein Intervall 2:1 auf, andere Skills nutzen ihre
-        /// Cast-Zeit mit allen Änderungen. Beide nie unter <paramref name="minCastTicks"/>.
+        /// Cast-Zeit mit allen Änderungen (auch Haste/Slow des Kämpfers). Beide nie unter <paramref name="minCastTicks"/>.
         /// </summary>
         public static void ActionTiming(SkillDefinition skill, int attackIntervalTicks, out int windup, out int recovery,
-            int minCastTicks = CastTime.DefaultMinTicks)
+            int minCastTicks = CastTime.DefaultMinTicks, int castPercent = 0)
         {
             minCastTicks = Math.Max(1, minCastTicks);
             if (skill.IsBasicAttack)
@@ -655,30 +531,34 @@ namespace Betaknight.Core.Arena
             }
             else
             {
-                windup = skill.CastTicks(minCastTicks);
+                windup = CastTime.Apply(skill.WindupTicks, skill.CastBonusPercent + castPercent, minCastTicks);
                 recovery = skill.RecoveryTicks;
             }
         }
 
         /// <summary>
-        /// Startet eine Aktion mit voller Cast-Zeit. Öffentlich für Effekte, die Aktionen auslösen.
-        /// <paramref name="cause"/>: Wiederholungen (Echo, Mehrfach) setzen keinen Cooldown; nur Entscheidungen der Tafel
-        /// zählen als Feuern der Zeile. Ohne <paramref name="repeatsLeft"/> gelten die «Mehrfach»-Wiederholungen des Skills.
+        /// Startet eine Aktion mit voller Cast-Zeit. Öffentlich für Effekte, die Aktionen auslösen. Die Stufe
+        /// <paramref name="bonusTier"/> stammt vom auslösenden Relais (Wiederholungen bringen ihre mit).
         /// </summary>
         public void StartAction(Combatant c, SkillDefinition skill, Combatant target, int rowIndex,
-            ActionCause cause = ActionCause.Board, int causeRow = -1, int? repeatsLeft = null, int bonusTier = -1, int queuedTicks = -1)
+            ActionCause cause = ActionCause.Board, int causeRow = -1, int? repeatsLeft = null, int bonusTier = 0, int queuedTicks = -1,
+            int relay = -1)
         {
             bool repeat = cause == ActionCause.Repeat;
 
-            // Schwierigkeits-Bonus: Tafel-Entscheidung = Stufe der eigenen Zeile; Auslöser und Wiederholungen bringen ihre mit.
-            int tier = DifficultyBonusConfig.Clamp(bonusTier >= 0 ? bonusTier : RowTier(c, rowIndex));
+            int tier = DifficultyBonusConfig.Clamp(bonusTier);
+            int castBefore = 0;
             if (tier > 0 && skill.DifficultyTier == 0)
             {
+                if (!skill.IsBasicAttack)
+                {
+                    ActionTiming(skill, c.AttackIntervalTicks, out castBefore, out _, _setup.MinCastTicks, c.CastPercent);
+                }
                 LogicRow own = rowIndex >= 0 && rowIndex < c.Board.Rows.Count ? c.Board.Rows[rowIndex] : null;
                 skill = own != null && own.Skill == skill ? own.SkillAt(tier, c.Board.Bonus) : c.Board.Bonus.Apply(skill, tier);
             }
             if (skill.DifficultyTier == 0) tier = 0;
-            ActionTiming(skill, c.AttackIntervalTicks, out int windup, out int recovery, _setup.MinCastTicks);
+            ActionTiming(skill, c.AttackIntervalTicks, out int windup, out int recovery, _setup.MinCastTicks, skill.IsBasicAttack ? 0 : c.CastPercent);
 
             c.Action = new ActionState
             {
@@ -690,26 +570,19 @@ namespace Betaknight.Core.Arena
                 RecoveryLeft = recovery,
                 Cause = cause,
                 CauseRow = causeRow,
+                Relay = relay,
                 RepeatsLeft = repeatsLeft ?? (repeat ? 0 : skill.ExtraCasts),
                 BonusTier = tier,
             };
-            if (!repeat) c.SetCooldown(skill.Id, skill.CooldownTicks);
-
-            if (cause == ActionCause.Board && rowIndex >= 0 && rowIndex < _rows[c].Length)
-            {
-                RowRuntime state = _rows[c][rowIndex];
-                state.LastFiredTick = Tick;
-                state.FireCount++;
-            }
 
             Emit(new BattleEvent(Tick, BattleEventKind.ActionStarted, c, c.Action.Target, windup, skill.Id, rowIndex)
             {
-                Cause = cause, CauseRow = causeRow, Tier = tier, QueuedTicks = queuedTicks,
-                Bonus = repeat ? 0 : Math.Max(0, skill.CooldownBeforeDifficulty - skill.CooldownTicks),
+                Cause = cause, CauseRow = causeRow, Tier = tier, QueuedTicks = queuedTicks, Relay = relay,
+                Bonus = tier > 0 ? Math.Max(0, castBefore - windup) : 0,
             });
             foreach (BattleModifier m in c.ModifierList.ToArray()) m.OnActionStarted(this, c, skill, rowIndex);
 
-            // Modul «kostet HP statt Cooldown».
+            // Modul «Blood Toll»: kostet bei jedem Start HP.
             if (!repeat && skill.HpCostBp > 0)
                 ResolveHit(HitInfo.SelfDamage(c, Math.Max(1, BasisPoints.Of(c.MaxHp, skill.HpCostBp)), "hp_cost"));
         }
@@ -748,7 +621,7 @@ namespace Betaknight.Core.Arena
             return null;
         }
 
-        /// <summary>Bricht die laufende Aktion ab (kein Cooldown-Rückerstatten).</summary>
+        /// <summary>Bricht die laufende Aktion ab.</summary>
         public void Interrupt(Combatant c)
         {
             if (c.Action == null) return;

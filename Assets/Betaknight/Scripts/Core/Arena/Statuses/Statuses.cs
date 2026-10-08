@@ -11,6 +11,9 @@ namespace Betaknight.Core.Arena
         public const string Anchor = "anchor";
         public const string Thrusters = "thrusters";
         public const string Poison = "poison";
+        public const string Haste = "haste";
+        public const string Slow = "slow";
+        public const string Freeze = "freeze";
     }
 
     /// <summary>Betäubt: keine Aktionen, laufende Aktion wird abgebrochen.</summary>

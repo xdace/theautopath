@@ -23,11 +23,14 @@ namespace Betaknight.Core
         public static readonly string[] DifficultyNames = { "Easy", "Medium", "Hard", "Very Hard" };
 
         public const string NoBonus = "no bonus";
-        public static string BonusCooldown(int percent) => $"−{percent} % Cooldown";
         public static string BonusPower(int percent) => $"+{percent} % power";
         public static string BonusCast(int percent) => $"−{percent} % Cast Time";
         public static string BonusStatusDuration(string seconds) => $"+{seconds} status duration";
-        public static string DifficultyTooltip(string name, string bonus) => $"{name}: {bonus}";
+        public static string DifficultyTooltip(string name, string bonus, int maxCells) =>
+            $"{name}: {bonus} · powers components up to {Cells(maxCells)}";
+
+        /// <summary>«1 cell», «4 cells».</summary>
+        public static string Cells(int count) => count == 1 ? "1 cell" : $"{count} cells";
 
         // ------------------------------------------------------------------ Erleichterer
 
@@ -55,7 +58,6 @@ namespace Betaknight.Core
         public static string KindSkills(string kinds) => $"{kinds} Skills";
         public static string PassivePower(string who, string sign, int value) => $"{who} {sign}{value} % power";
         public static string PassiveCast(string who, string sign, int value) => $"{who} {sign}{value} % Cast Time";
-        public static string PassiveCooldown(string who, string sign, string seconds) => $"{who} {sign}{seconds} Cooldown";
 
         // ------------------------------------------------------------------ Synergien und Sets
 
@@ -82,7 +84,13 @@ namespace Betaknight.Core
 
         // ------------------------------------------------------------------ Gegner
 
-        public const string AlwaysLabel = "Always";
+        public static string RelayHolder(int index) => $"Relay {index + 1}";
+        public static string ComponentHolder(int index) => $"#{index + 1}";
+        public static string EveryLabel(int seconds) => $"Every {seconds} s";
+        public static string EnemyBoardLine(string relay, string skill, string shape, string description) =>
+            $"{relay} → {skill} ({shape})" + (string.IsNullOrEmpty(description) ? string.Empty : $": {description}");
+        public const string EnemyBoardBasicOnly = "Basic Attack only";
+        public const string EnemyBoardTitle = "Board";
 
         /// <summary>«Charges 0.3 s, 300 % damage.» (Sekunden immer mit Punkt).</summary>
         public static string EnemyChargeDescription(double seconds, int damagePercent) =>
@@ -94,12 +102,12 @@ namespace Betaknight.Core
 
         // ------------------------------------------------------------------ Wachstum
 
-        public const string GrowthRowWins = "+1 Growth per fight won in which the row fired";
+        public const string GrowthRowWins = "+1 Growth per fight won in which it triggered";
         public const string GrowthSkillWins = "+1 Growth per fight won in which it fired";
         public static string GrowthKills(int cap) => $"+1 Damage per kill with this skill (max. +{cap})";
         public static string GrowthStuns(string capSeconds) => $"+0.1 s duration per stun (max. +{capSeconds})";
         public static string GrowthHeals(int cap) => $"+1 % Healing per heal (max. +{cap} %)";
         public static string GrowthWinsPower(int cap) => $"+1 % power per fight won in which it fired (max. +{cap} %)";
-        public static string GrowthThreshold(int cap) => $"+1 % threshold per fight won in which the row fired (max. {cap} %)";
+        public static string GrowthThreshold(int cap) => $"+1 % threshold per fight won in which it triggered (max. {cap} %)";
     }
 }

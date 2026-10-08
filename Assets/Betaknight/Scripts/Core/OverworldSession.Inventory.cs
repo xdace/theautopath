@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
 
@@ -167,15 +168,15 @@ namespace Betaknight.Core
         // ------------------------------------------------------------------ Runen
 
         /// <summary>
-        /// Setzt eine Rune aus dem Inventar in eine Zeile der Tafel ein. Die bisherige Rune kommt mit ihrer Stufe
-        /// an dieselbe Inventarstelle, der Skill bleibt an der Zeile.
+        /// Tauscht die Rune eines Relais gegen eine aus dem Inventar. Die bisherige Rune kommt mit ihrer Stufe an dieselbe
+        /// Inventarstelle; Lage und Module des Relais bleiben.
         /// </summary>
-        public bool SwapRune(int row, int inventoryIndex)
+        public bool SwapRune(int relay, int inventoryIndex)
         {
-            if (!CanChangeLoadout || !RuneInventory.IsValid(inventoryIndex) || row < 0 || row >= Runes.Rows.Count) return false;
+            if (!CanChangeLoadout || !RuneInventory.IsValid(inventoryIndex) || relay < 0 || relay >= Board.Relays.Count) return false;
 
             StoredRune stored = RuneInventory.RemoveAt(inventoryIndex);
-            if (!Runes.SwapRune(row, stored.Rune, stored.Level, stored.Growth, out RuneDefinition old, out int oldLevel, out int oldGrowth))
+            if (!Board.SwapRune(Board.Relays[relay], stored.Rune, stored.Level, stored.Growth, out RuneDefinition old, out int oldLevel, out int oldGrowth))
             {
                 RuneInventory.TryAdd(stored, inventoryIndex);
                 return false;
@@ -185,25 +186,50 @@ namespace Betaknight.Core
         }
 
         /// <summary>
-        /// Setzt eine Rune aus dem Inventar als neue Zeile ein (braucht eine freie Zeile). Mit <paramref name="atRow"/>
-        /// landet die neue Zeile an dieser Stelle, sonst unten.
+        /// Legt eine Rune aus dem Inventar als Relais-Chip auf die Platine: auf <paramref name="at"/>, sonst auf die beste freie
+        /// Zelle (neben einer unversorgten Komponente).
         /// </summary>
-        public bool EquipRuneFromInventory(int inventoryIndex, int atRow = -1)
+        public bool EquipRuneFromInventory(int inventoryIndex, Cell? at = null)
         {
-            if (!CanChangeLoadout || !RuneInventory.IsValid(inventoryIndex) || Runes.IsFull) return false;
+            if (!CanChangeLoadout || !RuneInventory.IsValid(inventoryIndex)) return false;
+            Cell? cell = at ?? BestRelayCell();
+            if (!cell.HasValue || !Board.IsFree(new CellRect(cell.Value, Shape.One))) return false;
             StoredRune stored = RuneInventory.RemoveAt(inventoryIndex);
-            if (!Runes.TryAdd(stored.Rune, SkillForNewRow(), stored.Level, stored.Growth)) return false;
-            int last = Runes.Rows.Count - 1;
-            if (atRow >= 0 && atRow < last) Runes.Move(last, atRow);
-            return true;
+            if (Board.AddRelay(stored.Rune, cell, stored.Level, stored.Growth) != null) return true;
+            RuneInventory.TryAdd(stored, inventoryIndex);
+            return false;
         }
 
-        /// <summary>Nimmt eine Zeile von der Tafel; die Rune kommt mit Stufe ins Inventar.</summary>
-        public bool UnequipRune(int row)
+        /// <summary>Nimmt ein Relais von der Platine; die Rune kommt mit Stufe und Wachstum ins Inventar.</summary>
+        public bool UnequipRune(int relay)
         {
-            if (!CanChangeLoadout || RuneInventory.IsFull || row < 0 || row >= Runes.Rows.Count) return false;
-            RuneSlot removed = Runes.RemoveAt(row);
+            if (!CanChangeLoadout || RuneInventory.IsFull || relay < 0 || relay >= Board.Relays.Count) return false;
+            RelayChip removed = Board.Relays[relay];
+            Board.RemoveRelay(removed);
             return RuneInventory.TryAdd(new StoredRune(removed.Rune, removed.Level, removed.Growth));
+        }
+
+        /// <summary>Verschiebt ein Relais auf eine freie Zelle.</summary>
+        public bool MoveRelay(int relay, Cell to) =>
+            CanChangeLoadout && relay >= 0 && relay < Board.Relays.Count && Board.MoveRelay(Board.Relays[relay], to);
+
+        /// <summary>
+        /// Beste freie Zelle für ein neues Relais: neben einer Komponente, die noch kein Relais hat (oben links zuerst),
+        /// sonst die erste freie Zelle.
+        /// </summary>
+        public Cell? BestRelayCell()
+        {
+            foreach (ComponentSlot c in Board.Components)
+            {
+                if (Board.RelaysTouching(c).Count > 0) continue;
+                for (int y = 0; y < Board.Height; y++)
+                    for (int x = 0; x < Board.Width; x++)
+                    {
+                        var rect = new CellRect(x, y);
+                        if (rect.Touches(c.Rect) && Board.IsFree(rect)) return rect.Origin;
+                    }
+            }
+            return Board.FreeCellFor(Shape.One);
         }
 
         /// <summary>Verwirft eine Rune aus dem Inventar; eine wartende Rune rückt nach.</summary>
@@ -240,8 +266,8 @@ namespace Betaknight.Core
         }
 
         /// <summary>
-        /// Neue Rune aus Belohnung oder Shop: in die Zeile <paramref name="replaceSlot"/> (alte Rune ins Inventar),
-        /// sonst auf eine freie Zeile, sonst ins Inventar.
+        /// Neue Rune aus Belohnung oder Shop: in das Relais <paramref name="replaceSlot"/> (alte Rune ins Inventar),
+        /// sonst als Relais auf eine freie Zelle, sonst ins Inventar.
         /// </summary>
         private bool PlaceNewRune(RuneDefinition rune, int replaceSlot)
         {
@@ -252,12 +278,14 @@ namespace Betaknight.Core
 
             if (replaceSlot >= 0)
             {
-                if (!Runes.SwapRune(replaceSlot, rune, 0, 0, out RuneDefinition old, out int oldLevel, out int oldGrowth)) return false;
+                if (replaceSlot >= Board.Relays.Count) return false;
+                if (!Board.SwapRune(Board.Relays[replaceSlot], rune, 0, 0, out RuneDefinition old, out int oldLevel, out int oldGrowth)) return false;
                 StoreRune(new StoredRune(old, oldLevel, oldGrowth));
                 return true;
             }
 
-            if (!Runes.IsFull) return Runes.TryAdd(rune, SkillForNewRow());
+            Cell? cell = BestRelayCell();
+            if (cell.HasValue && Board.AddRelay(rune, cell) != null) return true;
             StoreRune(new StoredRune(rune));
             return true;
         }

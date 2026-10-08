@@ -25,7 +25,7 @@ namespace Betaknight.Core.Arena
         /// <summary>Nach der Berechnung, bevor der Schaden abgezogen wird (z. B. Schaden begrenzen).</summary>
         public virtual void ModifyFinalDamage(Battle battle, Combatant owner, HitInfo hit) { }
 
-        /// <summary>Wenn der Kämpfer einen Skill beginnt (z. B. Cooldown anpassen).</summary>
+        /// <summary>Wenn der Kämpfer einen Skill beginnt (z. B. Ressourcen entladen).</summary>
         public virtual void OnActionStarted(Battle battle, Combatant owner, SkillDefinition skill, int rowIndex) { }
     }
 }

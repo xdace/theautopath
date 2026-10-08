@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
 using Betaknight.Core.Skills;
@@ -11,16 +12,16 @@ namespace Betaknight.Core
     /// <summary>Was mit einem Skill passiert, den man schon besitzt.</summary>
     public enum SkillDuplicateChoice
     {
-        /// <summary>Ein vorhandenes Exemplar steigt eine Stufe (sitzt eines an der Tafel, dieses).</summary>
+        /// <summary>Ein vorhandenes Exemplar steigt eine Stufe (liegt eines auf der Platine, dieses).</summary>
         Upgrade,
 
-        /// <summary>Als zweites Exemplar behalten, z. B. um denselben Skill an zwei Zeilen zu nutzen.</summary>
+        /// <summary>Als zweites Exemplar behalten, z. B. um denselben Skill zweimal auf die Platine zu legen.</summary>
         KeepCopy,
     }
 
     /// <summary>
-    /// Skills als eigene Exemplare: Sammlung, Einsetzen an der Tafel, Erhalt aus Belohnungen und Shop, Stufen.
-    /// Die Tafel ist Rune (Wann) + Skill (Was), beides frei kombinierbar; Ausrüstung gibt nur Werte und passive Boni.
+    /// Skills als eigene Exemplare: Sammlung, Legen auf die Platine, Erhalt aus Belohnungen und Shop, Stufen.
+    /// Die Platine verbindet Relais (Wann) und Komponenten (Was) über Berührung; Ausrüstung gibt nur Werte und passive Boni.
     /// </summary>
     public sealed partial class OverworldSession
     {
@@ -30,16 +31,13 @@ namespace Betaknight.Core
         /// <summary>Ein Skill kam neu in die Sammlung (nicht bei Stufen-Erhöhung).</summary>
         public event Action<SkillInstance> SkillGained;
 
-        /// <summary>Übernimmt Exemplare, die direkt an Zeilen gesetzt wurden (Aufbau, Tests), in die Sammlung.</summary>
-        private void AdoptRowSkills()
+        /// <summary>Übernimmt Exemplare, die direkt auf die Platine gelegt wurden (Aufbau, Tests), in die Sammlung.</summary>
+        private void AdoptBoardSkills()
         {
-            if (Skills == null || Runes == null) return;
-            foreach (RuneSlot row in Runes.Rows)
-                if (row.Skill != null && !row.Skill.IsBasicAttack && !Skills.Contains(row.Skill)) Skills.Adopt(row.Skill, row);
+            if (Skills == null || Board == null) return;
+            foreach (ComponentSlot c in Board.Components)
+                if (c.Skill != null && !Skills.Contains(c.Skill)) Skills.Adopt(c.Skill, c);
         }
-
-        /// <summary>Skill für eine neue Zeile: das erste freie Exemplar, sonst der Basisangriff (nie verwaist).</summary>
-        private SkillInstance SkillForNewRow() => Skills.Free.FirstOrDefault() ?? SkillInstance.BasicAttack();
 
         public bool OwnsSkill(string skillId) => Skills.Owns(skillId);
 
@@ -54,43 +52,48 @@ namespace Betaknight.Core
         /// <summary>Hat der Spieler ein Exemplar dieses Skills, das noch steigen kann?</summary>
         public bool CanUpgradeSkill(string skillId) => Skills.OfSkill(skillId).Any(s => s.Level < Progression.MaxSkillLevel);
 
-        // ------------------------------------------------------------------ Tafel
+        // ------------------------------------------------------------------ Platine
 
-        /// <summary>Skills an der Tafel umsetzen geht immer, nur nicht mitten im Kampf oder nach dem Tod.</summary>
+        /// <summary>Komponenten legen, verschieben und drehen geht immer, nur nicht mitten im Kampf oder nach dem Tod.</summary>
         public bool CanEditSkills => !IsInCombat && !IsGameOver;
 
-        /// <summary>Setzt ein Exemplar aus der Sammlung an eine Zeile. Sein alter Ort wird leer, das bisherige Exemplar der Zeile frei.</summary>
-        public bool PlaceSkill(int instanceId, int row)
+        /// <summary>
+        /// Legt ein Exemplar als Komponente auf die Platine (Drag &amp; Drop). Liegt es schon dort, wird es verschoben; sein
+        /// alter Ort wird frei. Nichts darf überlappen.
+        /// </summary>
+        public bool PlaceSkill(int instanceId, Cell at, bool rotated = false)
         {
-            if (!CanEditSkills || !IsRow(row)) return false;
+            if (!CanEditSkills) return false;
             SkillInstance skill = Skills.Get(instanceId);
-            return skill != null && Skills.Place(skill, Runes.Rows[row]);
+            return skill != null && Board.Place(skill, at, rotated) != null;
         }
 
-        /// <summary>Setzt den Basisangriff an eine Zeile (kein Exemplar nötig).</summary>
-        public bool PlaceBasicAttack(int row)
+        /// <summary>Kann dieses Exemplar hier liegen (frei, in der Platine)?</summary>
+        public bool CanPlaceSkill(int instanceId, Cell at, bool rotated = false)
         {
-            if (!CanEditSkills || !IsRow(row)) return false;
-            if (Runes.Rows[row].Skill?.IsBasicAttack == true) return true;
-            return Skills.Place(SkillInstance.BasicAttack(), Runes.Rows[row]);
+            SkillInstance skill = Skills.Get(instanceId);
+            return CanEditSkills && skill != null && Board.CanPlace(skill.SkillId, at, rotated, Board.ComponentOf(skill));
         }
 
-        /// <summary>Nimmt den Skill einer Zeile heraus: die Zeile ist verwaist, das Exemplar frei.</summary>
-        public bool RemoveSkill(int row)
+        /// <summary>Verschiebt eine Komponente (Index in Lesereihenfolge), optional gedreht.</summary>
+        public bool MoveComponent(int index, Cell to, bool rotated)
         {
-            if (!CanEditSkills || !IsRow(row) || Runes.Rows[row].Skill == null) return false;
-            Skills.TakeFrom(Runes.Rows[row]);
+            if (!CanEditSkills || !IsComponent(index)) return false;
+            return Board.Move(Board.Components[index], to, rotated);
+        }
+
+        /// <summary>Rechtsklick: dreht eine Komponente um 90°, wenn der Platz reicht.</summary>
+        public bool RotateComponent(int index) => CanEditSkills && IsComponent(index) && Board.Rotate(Board.Components[index]);
+
+        /// <summary>Nimmt eine Komponente von der Platine: ihr Exemplar liegt wieder frei in der Sammlung.</summary>
+        public bool RemoveComponent(int index)
+        {
+            if (!CanEditSkills || !IsComponent(index)) return false;
+            Board.Remove(Board.Components[index]);
             return true;
         }
 
-        /// <summary>Tauscht die Skills zweier Zeilen (Umsetzen zwischen Zeilen).</summary>
-        public bool SwapSkills(int rowA, int rowB)
-        {
-            if (!CanEditSkills || !IsRow(rowA) || !IsRow(rowB) || rowA == rowB) return false;
-            return Skills.Swap(Runes.Rows[rowA], Runes.Rows[rowB]);
-        }
-
-        private bool IsRow(int row) => row >= 0 && row < Runes.Rows.Count;
+        private bool IsComponent(int index) => index >= 0 && index < Board.Components.Count;
 
         // ------------------------------------------------------------------ Erhalt
 
@@ -124,7 +127,7 @@ namespace Betaknight.Core
 
         private bool OwnsSkillTwice(string skillId) => Skills.OfSkill(skillId).Count > 1;
 
-        /// <summary>Welches Exemplar bei «Stufe erhöhen» steigt: zuerst eines an der Tafel, dann das höchste.</summary>
+        /// <summary>Welches Exemplar bei «Stufe erhöhen» steigt: zuerst eines auf der Platine, dann das höchste.</summary>
         public SkillInstance UpgradeTarget(string skillId)
         {
             List<SkillInstance> owned = Skills.OfSkill(skillId).Where(s => s.Level < Progression.MaxSkillLevel).ToList();
@@ -172,7 +175,7 @@ namespace Betaknight.Core
             foreach (SkillInstance s in Skills.All)
                 if (SkillCatalog.TryGet(s.SkillId, out SkillDefinition d)) kinds |= d.Kinds;
             foreach (SkillPassive p in Gear.Passives) kinds |= p.Target;
-            foreach (RuneSlot row in Runes.Rows) kinds |= SkillKindsFor(row.Rune.Tag);
+            foreach (RelayChip relay in Board.Relays) kinds |= SkillKindsFor(relay.Rune.Tag);
             return kinds;
         }
 
@@ -233,11 +236,11 @@ namespace Betaknight.Core
             return result;
         }
 
-        /// <summary>Eine Stufe für einen eigenen Skill als Verbesserung, bevorzugt einer an der Tafel.</summary>
+        /// <summary>Eine Stufe für einen eigenen Skill als Verbesserung, bevorzugt einer auf der Platine.</summary>
         private string PickImprovementSkill(IReadOnlyCollection<string> already)
         {
-            var placed = Runes.Rows.Where(r => r.Skill != null && !r.Skill.IsBasicAttack && r.Skill.Level < Progression.MaxSkillLevel)
-                .Select(r => r.SkillId).Where(id => !already.Contains(id)).Distinct().ToList();
+            var placed = Board.Components.Where(c => c.Skill != null && c.Skill.Level < Progression.MaxSkillLevel)
+                .Select(c => c.Skill.SkillId).Where(id => !already.Contains(id)).Distinct().ToList();
             if (placed.Count > 0) return placed[_random.Next(placed.Count)];
             var owned = Skills.All.Where(s => s.Level < Progression.MaxSkillLevel).Select(s => s.SkillId)
                 .Where(id => !already.Contains(id)).Distinct().ToList();

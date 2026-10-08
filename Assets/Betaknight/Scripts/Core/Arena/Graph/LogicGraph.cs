@@ -61,7 +61,7 @@ namespace Betaknight.Core.Arena
 
     /// <summary>
     /// Graph über den Zeilen der Tafel: Knoten sind Bausteine und Skills, Kanten Auslöser (später UND/ODER).
-    /// Kreise sind erlaubt; begrenzt werden sie nur über Cast-Zeit und Cooldown.
+    /// Kreise sind erlaubt; begrenzt werden sie über Cast-Zeit und die Warteschlange (jede Komponente höchstens einmal eingereiht).
     /// </summary>
     public sealed class LogicGraph
     {

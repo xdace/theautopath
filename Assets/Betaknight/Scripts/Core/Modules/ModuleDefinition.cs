@@ -30,6 +30,9 @@ namespace Betaknight.Core.Modules
         public const string Threshold = "threshold";
         public const string Trigger = "trigger";
 
+        /// <summary>«Repeat while true» (A-19): Relais-Modul, versorgte Komponenten reihen sich erneut ein, solange die Bedingung gilt.</summary>
+        public const string RepeatWhileTrue = "repeat_while_true";
+
         // Erleichterer (A-11): wirken, solange sie an einem Baustein sitzen (siehe ReliefCatalog).
         public const string AlarmSensor = Arena.ReliefCarrierIds.AlarmSensor;
         public const string Scent = Arena.ReliefCarrierIds.ScentModule;
@@ -113,18 +116,22 @@ namespace Betaknight.Core.Modules
             }));
             c.Register(new ModuleDefinition(ModuleIds.BloodCost, "Blood Toll", ModuleKind.Skill, new[]
             {
-                "Costs 5 % Max HP instead of Cooldown.",
-                "Costs 4 % Max HP instead of Cooldown.",
+                "Blood Toll: costs 5 % Max HP per cast, +40 % effect.",
+                "Blood Toll: costs 4 % Max HP per cast, +50 % effect.",
             }, weight: 6));
             c.Register(new ModuleDefinition(ModuleIds.Quickcast, "Quickcast", ModuleKind.Skill, new[]
             {
-                "Quickcast: −30 % Cast Time, +30 % Cooldown.",
-                "Quickcast: −40 % Cast Time, +30 % Cooldown.",
+                "Quickcast: −30 % Cast Time, −15 % effect.",
+                "Quickcast: −40 % Cast Time, −15 % effect.",
             }));
             c.Register(new ModuleDefinition(ModuleIds.Invert, "Invert", ModuleKind.Block, new[]
             {
-                "Invert (NOT): the row applies when the Condition is not met.",
+                "Invert (NOT): the relay triggers when the Condition is not met.",
             }, weight: 8));
+            c.Register(new ModuleDefinition(ModuleIds.RepeatWhileTrue, "Repeat while true", ModuleKind.Block, new[]
+            {
+                "Repeat while true: after firing, the powered components queue again as long as the Condition still holds.",
+            }, weight: 5));
             c.Register(new ModuleDefinition(ModuleIds.Extend, "Extend", ModuleKind.Block, new[]
             {
                 "Extend: the Condition holds 1 s longer.",
@@ -137,8 +144,8 @@ namespace Betaknight.Core.Modules
             }));
             c.Register(new ModuleDefinition(ModuleIds.Trigger, "Trigger", ModuleKind.Trigger, new[]
             {
-                "On a skill: triggers the target after it executes. On a rune: triggers the target when the rune is met. "
-                + "The target casts normally; if it is not ready, the Trigger is lost.",
+                "On a component: triggers the target after it executes. On a relay: triggers the target when the relay triggers. "
+                + "The target is queued and casts normally; if it is already queued, the trigger is missed.",
             }, weight: 8));
             c.Register(new ModuleDefinition(ModuleIds.AlarmSensor, "Alarm Sensor", ModuleKind.Block, new[]
             {

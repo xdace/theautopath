@@ -53,6 +53,39 @@ namespace Betaknight.Core.Arena
             ArenaTexts.StunEffect(AllEnemies, SkillInfo.Seconds(Ticks)), durationTicks: Ticks, allEnemies: AllEnemies));
     }
 
+    /// <summary>
+    /// Freeze (A-19): Die grösste versorgte Komponente des Ziels kann eine Weile nicht feuern; ihre Auslöser gehen als
+    /// «Missed Trigger» verloren, ein laufendes Ausholen bricht ab.
+    /// </summary>
+    public sealed class FreezeEffect : ISkillEffect, IDurationEffect
+    {
+        public int Ticks { get; }
+        public bool AllEnemies { get; }
+
+        public FreezeEffect(int ticks, bool allEnemies = false)
+        {
+            Ticks = ticks;
+            AllEnemies = allEnemies;
+        }
+
+        public void Apply(in SkillContext c)
+        {
+            if (AllEnemies)
+            {
+                foreach (Combatant e in c.Battle.OpponentsOf(c.User)) c.Battle.Freeze(e, Ticks, c.User);
+            }
+            else if (c.Target != null)
+            {
+                c.Battle.Freeze(c.Target, Ticks, c.User);
+            }
+        }
+
+        public ISkillEffect Extended(int ticks) => new FreezeEffect(Ticks + ticks, AllEnemies);
+
+        public void Describe(SkillInfoBuilder info) => info.Add(new EffectInfo(EffectInfoKind.Stun,
+            ArenaTexts.FreezeEffect(AllEnemies, SkillInfo.Seconds(Ticks)), durationTicks: Ticks, allEnemies: AllEnemies));
+    }
+
     /// <summary>Bricht eine laufende Aufladung des Ziels ab, ohne es zu betäuben.</summary>
     public sealed class InterruptChargeEffect : ISkillEffect
     {
@@ -253,8 +286,8 @@ namespace Betaknight.Core.Arena
     }
 
     /// <summary>
-    /// Echo: wiederholt den zuletzt ausgeführten eigenen Skill als eigene Ausführung mit dessen Cast-Zeit,
-    /// ohne dessen Cooldown zu setzen. Skills, die sich nicht wiederholen lassen (Echo selbst), werden nie als "zuletzt" gemerkt.
+    /// Echo: wiederholt den zuletzt ausgeführten eigenen Skill als eigene Ausführung mit dessen Cast-Zeit.
+    /// Skills, die sich nicht wiederholen lassen (Echo selbst), werden nie als "zuletzt" gemerkt.
     /// </summary>
     public sealed class RepeatLastSkillEffect : ISkillEffect
     {

@@ -36,14 +36,23 @@ namespace Betaknight.Core.Arena
         Overheat,
         BattleEnd,
 
-        /// <summary>Ein Auslöser verfällt, weil die Zielzeile nicht bereit ist. RowIndex = Ziel, Amount = auslösende Zeile.</summary>
-        TriggerExpired,
+        /// <summary>
+        /// Ein Auslösen hat bei einer Komponente nichts bewirkt («Missed Trigger»): RowIndex = Komponente, Detail = Skill,
+        /// Amount = <see cref="MissReason"/>, <see cref="BattleEvent.Relay"/> = auslösendes Relais (bei Auslöser-Modulen das Relais der Quelle, sonst -1).
+        /// </summary>
+        TriggerMissed,
 
         /// <summary>
-        /// Eine Zeile wurde eingereiht (Warteschlange, A-13): Bedingung erfüllt oder Auslöser, aber der Skill kann gerade
-        /// nicht starten. RowIndex = Zeile, Detail = Skill, Amount = Rest-Cooldown in Ticks.
+        /// Eine Komponente wurde eingereiht (ihr Relais hat ausgelöst). RowIndex = Komponente, Detail = Skill,
+        /// <see cref="BattleEvent.Relay"/> = auslösendes Relais.
         /// </summary>
         RowQueued,
+
+        /// <summary>Ein Relais hat ausgelöst (A-19). Amount = Index des Relais, Extra = Zahl der versorgten Komponenten.</summary>
+        RelayTriggered,
+
+        /// <summary>Eine Komponente wurde eingefroren (Freeze). RowIndex = Komponente des Ziels, Amount = Dauer in Ticks.</summary>
+        Frozen,
     }
 
     /// <summary>Ein Eintrag im Kampfprotokoll. Bedingungen und Set-Boni lesen dieselben Einträge.</summary>
@@ -59,18 +68,21 @@ namespace Betaknight.Core.Arena
         public string Detail { get; }
 
         /// <summary>
-        /// Zeile der Logik-Tafel, die die Aktion ausgelöst hat, sonst -1. Schaden, Heilung und Zustände einer Aktion
-        /// (auch späteres Brennen) tragen die Zeile ebenfalls, damit Auswertung und Anzeige sie zuordnen können.
+        /// Komponente der Platine, deren Aktion es ist, sonst -1. Schaden, Heilung und Zustände einer Aktion (auch späteres
+        /// Brennen) tragen die Komponente ebenfalls, damit Auswertung und Anzeige sie zuordnen können.
         /// </summary>
         public int RowIndex { get; internal set; }
 
-        /// <summary>Bei Aktionen: Entscheidung der Tafel, Wiederholung (Echo, Mehrfach) oder Auslöser.</summary>
+        /// <summary>Bei Aktionen: Relais, Wiederholung (Echo, Multicast) oder Auslöser-Modul.</summary>
         public ActionCause Cause { get; internal set; }
 
-        /// <summary>Bei Auslösern: Zeile, die ausgelöst hat, sonst -1.</summary>
+        /// <summary>Bei Auslöser-Modulen: Komponente, die ausgelöst hat, sonst -1.</summary>
         public int CauseRow { get; internal set; } = -1;
 
-        /// <summary>Wiederholung (Echo, Mehrfach): eigene Cast-Zeit, kein Cooldown.</summary>
+        /// <summary>Bei Aktionen, Einreihen und Missed Triggers: das auslösende Relais (Index), sonst -1.</summary>
+        public int Relay { get; internal set; } = -1;
+
+        /// <summary>Wiederholung (Echo, Multicast): eigene Cast-Zeit.</summary>
         public bool IsRepeat => Cause == ActionCause.Repeat;
 
         /// <summary>Durch ein Auslöser-Modul gestartet.</summary>
@@ -84,7 +96,7 @@ namespace Betaknight.Core.Arena
 
         /// <summary>
         /// Anteil des Schwierigkeits-Bonus: bei Schaden und Heilung die Menge, die er dazugegeben hat; bei
-        /// <see cref="BattleEventKind.ActionStarted"/> die gesparten Cooldown-Ticks.
+        /// <see cref="BattleEventKind.ActionStarted"/> die gesparte Cast-Zeit in Ticks.
         /// </summary>
         public int Bonus { get; internal set; }
 

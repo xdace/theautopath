@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Betaknight.Core.Circuit;
+using Betaknight.Core.Gear;
 using Betaknight.Core.Modules;
 using Betaknight.Core.Runes;
 using Betaknight.Core.Skills;
@@ -8,7 +10,7 @@ using Betaknight.Core.Skills;
 namespace Betaknight.Core
 {
     /// <summary>
-    /// Module als Exemplare: Sammlung, Einsetzen an Skill-Exemplaren und Logikbausteinen (Tafel-Zeilen), Auslöser-Ziele,
+    /// Module als Exemplare: Sammlung, Einsetzen an Skill-Exemplaren und Relais der Platine, Auslöser-Ziele,
     /// seltener Erhalt (Elite, Boss-Flucht, Truhe, teurer Shop-Platz). Ein Modul sitzt an genau einem Ort.
     /// </summary>
     public sealed partial class OverworldSession
@@ -20,12 +22,12 @@ namespace Betaknight.Core
 
         public bool CanEditModules => CanEditSkills;
 
-        /// <summary>Module, deren Ort verschwunden ist (Zeile entfernt, Exemplar weg), werden frei.</summary>
+        /// <summary>Module, deren Ort verschwunden ist (Relais entfernt, Exemplar weg), werden frei.</summary>
         private void ReleaseOrphanModules()
         {
             foreach (ModuleInstance m in Modules.All.ToList())
             {
-                bool gone = m.Holder is RuneSlot row ? !Runes.Rows.Contains(row)
+                bool gone = m.Holder is RelayChip relay ? !Board.Relays.Contains(relay)
                     : m.Holder is SkillInstance skill && !Skills.Contains(skill);
                 if (gone) Modules.TakeOff(m);
             }
@@ -34,7 +36,7 @@ namespace Betaknight.Core
         public ModuleDefinition ModuleDefinitionOf(ModuleInstance module) =>
             module != null && ModuleCatalog.TryGet(module.ModuleId, out ModuleDefinition d) ? d : null;
 
-        /// <summary>Kann dieses Modul an das Skill-Exemplar bzw. an die Zeile?</summary>
+        /// <summary>Kann dieses Modul an das Skill-Exemplar bzw. an das Relais?</summary>
         public bool CanPlaceModule(ModuleInstance module, IModuleHolder holder) =>
             CanEditModules && module != null && ModuleCollection.Fits(ModuleDefinitionOf(module), holder, module);
 
@@ -46,19 +48,19 @@ namespace Betaknight.Core
             return skill != null && CanPlaceModule(module, skill) && Modules.Place(module, ModuleDefinitionOf(module), skill);
         }
 
-        /// <summary>Setzt ein Modul an den Logikbaustein einer Zeile.</summary>
-        public bool PlaceModuleOnRow(int moduleId, int row)
+        /// <summary>Setzt ein Modul an ein Relais (Index in Lesereihenfolge).</summary>
+        public bool PlaceModuleOnRelay(int moduleId, int relay)
         {
             ModuleInstance module = Modules.Get(moduleId);
-            if (!IsRow(row)) return false;
-            RuneSlot slot = Runes.Rows[row];
-            return CanPlaceModule(module, slot) && Modules.Place(module, ModuleDefinitionOf(module), slot);
+            if (relay < 0 || relay >= Board.Relays.Count) return false;
+            RelayChip chip = Board.Relays[relay];
+            return CanPlaceModule(module, chip) && Modules.Place(module, ModuleDefinitionOf(module), chip);
         }
 
         /// <summary>Nimmt ein Modul ab; es liegt danach frei in der Sammlung.</summary>
         public bool TakeOffModule(int moduleId) => CanEditModules && Modules.TakeOff(Modules.Get(moduleId));
 
-        /// <summary>Setzt das Ziel eines Auslösers (Skill-Exemplar oder Zeile per stabiler Id), null = kein Ziel.</summary>
+        /// <summary>Setzt das Ziel eines Auslösers (Skill-Exemplar einer Komponente), null = kein Ziel.</summary>
         public bool SetTriggerTarget(int moduleId, ModuleTarget? target)
         {
             ModuleInstance module = Modules.Get(moduleId);
@@ -67,57 +69,53 @@ namespace Betaknight.Core
             return true;
         }
 
-        /// <summary>Mögliche Auslöser-Ziele: jede Zeile mit Skill (als Skill-Exemplar, sonst als Zeile).</summary>
+        /// <summary>Mögliche Auslöser-Ziele: jede Komponente der Platine (als Skill-Exemplar, wandert beim Verschieben mit).</summary>
         public List<(ModuleTarget target, string label)> TriggerTargets()
         {
             var result = new List<(ModuleTarget, string)>();
-            for (int i = 0; i < Runes.Rows.Count; i++)
+            for (int i = 0; i < Board.Components.Count; i++)
             {
-                RuneSlot row = Runes.Rows[i];
-                if (row.Skill != null && !row.Skill.IsBasicAttack)
-                    result.Add((ModuleTarget.Skill(row.Skill.InstanceId), SessionTexts.SkillInRow(row.Skill.NameFrom(SkillCatalog), i)));
-                else
-                    result.Add((ModuleTarget.Row(row.RowId), SessionTexts.Row(i)));
+                ComponentSlot c = Board.Components[i];
+                if (c.Skill != null) result.Add((ModuleTarget.Skill(c.Skill.InstanceId), SessionTexts.SkillInRow(c.Skill.NameFrom(SkillCatalog), i)));
             }
             return result;
         }
 
-        /// <summary>«Bohrstoß (Zeile 3)», «Zeile 2» oder «kein Ziel», wenn das Ziel gerade nicht an der Tafel ist.</summary>
+        /// <summary>«Drill Strike (#3)» oder «no target», wenn das Ziel gerade nicht auf der Platine liegt.</summary>
         public string DescribeTarget(ModuleTarget? target)
         {
-            int row = Betaknight.Core.Gear.RuneLoadoutBoard.TargetRow(Runes, target);
             if (!target.HasValue) return SessionTexts.NoTarget;
-            if (row < 0) return target.Value.Kind == ModuleTargetKind.Skill ? SessionTexts.TargetNotOnBoard : SessionTexts.RowMissing;
-            RuneSlot slot = Runes.Rows[row];
-            return target.Value.Kind == ModuleTargetKind.Skill ? SessionTexts.SkillInRow(slot.Skill.NameFrom(SkillCatalog), row) : SessionTexts.Row(row);
+            int index = CircuitBoardSpec.TargetComponent(Board, target);
+            if (index < 0) return SessionTexts.TargetNotOnBoard;
+            return SessionTexts.SkillInRow(Board.Components[index].Skill.NameFrom(SkillCatalog), index);
         }
 
-        /// <summary>Freie Module, die an diesen Ort passen (für die Auswahl im Tafel-Editor).</summary>
+        /// <summary>Freie Module, die an diesen Ort passen (für die Auswahl im Build-Fenster).</summary>
         public List<ModuleInstance> FreeModulesFor(IModuleHolder holder) =>
             Modules.Free.Where(m => holder != null && ModuleCollection.Fits(ModuleDefinitionOf(m), holder, m)).ToList();
 
-        /// <summary>«Skill Bohrstoß (Zeile 2)», «Baustein Zeile 1» oder «frei».</summary>
+        /// <summary>«Skill Drill Strike (#2)», «Relay 1» oder «free».</summary>
         public string ModuleWhere(ModuleInstance module)
         {
             switch (module?.Holder)
             {
-                case RuneSlot row: return SessionTexts.RuneRow(Runes.IndexOfRow(row));
+                case RelayChip relay: return SessionTexts.RuneRow(Board.IndexOf(relay));
                 case SkillInstance skill:
-                    int at = skill.Holder is RuneSlot slot ? Runes.IndexOfRow(slot) : -1;
+                    int at = skill.Holder is ComponentSlot slot ? Board.IndexOf(slot) : -1;
                     return at >= 0 ? SessionTexts.HolderSkill(skill.NameFrom(SkillCatalog), at) : SessionTexts.HolderSkillFree(skill.NameFrom(SkillCatalog));
                 default: return SessionTexts.Free;
             }
         }
 
-        /// <summary>«Nach Ausführung → Bohrstoß (Zeile 3)» bzw. «Wenn erfüllt → Zeile 2». Nur für Auslöser.</summary>
+        /// <summary>«After execution → Drill Strike (#3)» bzw. «When triggered → …». Nur für Auslöser.</summary>
         public string DescribeTrigger(ModuleInstance module)
         {
             if (module == null || module.ModuleId != ModuleIds.Trigger) return string.Empty;
-            string when = module.Holder is RuneSlot ? SessionTexts.WhenMet : SessionTexts.AfterExecution;
+            string when = module.Holder is RelayChip ? SessionTexts.WhenMet : SessionTexts.AfterExecution;
             return SessionTexts.ModuleTrigger(when, DescribeTarget(module.Target));
         }
 
-        /// <summary>Wählt das nächste mögliche Ziel eines Auslösers (Reihenfolge der Zeilen, danach «kein Ziel»).</summary>
+        /// <summary>Wählt das nächste mögliche Ziel eines Auslösers (Lesereihenfolge der Komponenten, danach «kein Ziel»).</summary>
         public bool CycleTriggerTarget(int moduleId, int step = 1)
         {
             ModuleInstance module = Modules.Get(moduleId);
@@ -131,13 +129,16 @@ namespace Betaknight.Core
             return SetTriggerTarget(moduleId, targets[next]);
         }
 
-        /// <summary>Eine Auslöser-Verbindung an der Tafel, z. B. zum Zeichnen als Linie.</summary>
+        /// <summary>Eine Auslöser-Verbindung auf der Platine, z. B. zum Zeichnen als Linie.</summary>
         public readonly struct TriggerLink
         {
+            /// <summary>Index des Relais (bei <see cref="FromBlock"/>) bzw. der Komponente, von der der Auslöser ausgeht.</summary>
             public readonly int From;
+
+            /// <summary>Ziel-Komponente.</summary>
             public readonly int To;
 
-            /// <summary>Vom Baustein («wenn erfüllt») statt vom Skill («nach Ausführung»).</summary>
+            /// <summary>Vom Relais («wenn ausgelöst») statt vom Skill («nach Ausführung»).</summary>
             public readonly bool FromBlock;
 
             public TriggerLink(int from, int to, bool fromBlock)
@@ -148,15 +149,16 @@ namespace Betaknight.Core
             }
         }
 
-        /// <summary>Alle Auslöser der Tafel mit gültigem Ziel, als Verbindungen zwischen Zeilen (auch Kreise und auf sich selbst).</summary>
+        /// <summary>Alle Auslöser der Platine mit gültigem Ziel (auch Kreise und auf sich selbst).</summary>
         public List<TriggerLink> TriggerLinks()
         {
             var links = new List<TriggerLink>();
-            for (int i = 0; i < Runes.Rows.Count; i++)
+            for (int i = 0; i < Board.Relays.Count; i++)
+                foreach (ModuleInstance m in Board.Relays[i].Modules) AddLink(links, m, i, true);
+            for (int i = 0; i < Board.Components.Count; i++)
             {
-                RuneSlot row = Runes.Rows[i];
-                foreach (ModuleInstance m in row.Modules) AddLink(links, m, i, true);
-                if (row.Skill != null) foreach (ModuleInstance m in row.Skill.Modules) AddLink(links, m, i, false);
+                SkillInstance skill = Board.Components[i].Skill;
+                if (skill != null) foreach (ModuleInstance m in skill.Modules) AddLink(links, m, i, false);
             }
             return links;
         }
@@ -164,7 +166,7 @@ namespace Betaknight.Core
         private void AddLink(List<TriggerLink> links, ModuleInstance m, int from, bool fromBlock)
         {
             if (m.ModuleId != ModuleIds.Trigger) return;
-            int to = Betaknight.Core.Gear.RuneLoadoutBoard.TargetRow(Runes, m.Target);
+            int to = CircuitBoardSpec.TargetComponent(Board, m.Target);
             if (to >= 0) links.Add(new TriggerLink(from, to, fromBlock));
         }
 

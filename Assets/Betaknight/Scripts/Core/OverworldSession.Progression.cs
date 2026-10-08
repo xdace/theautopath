@@ -36,21 +36,28 @@ namespace Betaknight.Core
         /// <summary>Ersetzt die Fortschritts-Konfiguration (z. B. für Tests oder Balance-Einstellungen).</summary>
         public void UseProgression(ProgressionConfig config) => Progression = config ?? new ProgressionConfig();
 
-        // ------------------------------------------------------------------ Tafel-Erweiterung
+        // ------------------------------------------------------------------ Platinen-Erweiterung
 
-        public bool CanExpandBoard => Runes.Slots < Progression.MaxBoardRows;
+        public bool CanExpandBoard => Board.CanExpand;
 
-        /// <summary>Fügt bis zur Obergrenze Zeilen hinzu. True, wenn mindestens eine dazukam.</summary>
-        public bool ExpandBoard(int rows)
+        /// <summary>«4×3»: aktuelle Grösse der Platine.</summary>
+        public string BoardSize => $"{Board.Width}×{Board.Height}";
+
+        /// <summary>«6×6»: Höchstgrösse der Platine.</summary>
+        public string MaxBoardSize => Board.Config.MaxSize.ToString();
+
+        /// <summary>Lässt die Platine bis zur Höchstgrösse um so viele Stufen wachsen. True, wenn sie gewachsen ist.</summary>
+        public bool ExpandBoard(int steps)
         {
-            int before = Runes.Slots;
-            for (int i = 0; i < rows && CanExpandBoard; i++) Runes.AddSlot();
-            if (Runes.Slots == before) return false;
-            BuildImproved?.Invoke(SessionTexts.BoardGrown(before, Runes.Slots));
+            string before = BoardSize;
+            bool grown = false;
+            for (int i = 0; i < steps && CanExpandBoard; i++) grown |= Board.Expand();
+            if (!grown) return false;
+            BuildImproved?.Invoke(SessionTexts.BoardGrown(before, BoardSize));
             return true;
         }
 
-        /// <summary>Nimmt «Tafel-Erweiterung: +1 Zeile» aus dem wartenden Angebot.</summary>
+        /// <summary>Nimmt «Board expansion» aus dem wartenden Angebot.</summary>
         public bool TakeBoardExpansion()
         {
             if (PendingRuneOffer == null || !PendingRuneOffer.BoardExpansion || !CanExpandBoard) return false;
@@ -69,16 +76,16 @@ namespace Betaknight.Core
             return owned != null && owned.Level < Progression.MaxItemLevel;
         }
 
-        /// <summary>Liegt diese Rune schon auf der Tafel oder im Inventar und kann noch steigen?</summary>
+        /// <summary>Liegt diese Rune schon auf der Platine oder im Inventar und kann noch steigen?</summary>
         public bool CanUpgradeRune(RuneDefinition rune)
         {
-            int row = Runes.IndexOf(rune);
-            if (row >= 0) return Runes.Rows[row].CanUpgrade;
+            int row = Board.IndexOf(rune);
+            if (row >= 0) return Board.Relays[row].CanUpgrade;
             int stored = RuneInventory.IndexOf(rune);
             return stored >= 0 && RuneInventory[stored].Level < rune.MaxLevel;
         }
 
-        public bool OwnsRune(RuneDefinition rune) => Runes.Contains(rune) || RuneInventory.Contains(rune);
+        public bool OwnsRune(RuneDefinition rune) => Board.Contains(rune) || RuneInventory.Contains(rune);
 
         private EquipmentDefinition OwnedItem(string itemId)
         {
@@ -134,14 +141,14 @@ namespace Betaknight.Core
         private bool UpgradeOwnedRune(RuneDefinition rune)
         {
             if (!CanUpgradeRune(rune)) return false;
-            int row = Runes.IndexOf(rune);
+            int row = Board.IndexOf(rune);
             string before;
             string after;
             if (row >= 0)
             {
-                before = Runes.Rows[row].Name;
-                Runes.Upgrade(row);
-                after = Runes.Rows[row].Name;
+                before = Board.Relays[row].Name;
+                Board.Upgrade(row);
+                after = Board.Relays[row].Name;
             }
             else
             {
@@ -158,7 +165,7 @@ namespace Betaknight.Core
 
         /// <summary>Verbessert diese Rune den aktuellen Build (Stufe für eine vorhandene oder passender Tag)?</summary>
         public bool IsImprovement(RuneDefinition rune) =>
-            rune != null && (OwnsRune(rune) ? CanUpgradeRune(rune) : Runes.HasTag(rune.Tag));
+            rune != null && (OwnsRune(rune) ? CanUpgradeRune(rune) : Board.HasTag(rune.Tag));
 
         /// <summary>Verbessert dieses Teil den Build (Stufe für ein vorhandenes Teil oder fehlendes Set-Teil)?</summary>
         public bool IsImprovement(EquipmentDefinition item)
@@ -240,12 +247,12 @@ namespace Betaknight.Core
 
         private RuneDefinition PickImprovementRune(List<RuneDefinition> already)
         {
-            var upgrades = Runes.Rows.Where(r => r.CanUpgrade).Select(r => r.Rune)
+            var upgrades = Board.Relays.Where(r => r.CanUpgrade).Select(r => r.Rune)
                 .Concat(RuneInventory.Runes.Where(r => r.Level < r.Rune.MaxLevel).Select(r => r.Rune))
                 .Where(r => !already.Contains(r)).ToList();
             if (upgrades.Count > 0) return upgrades[_random.Next(upgrades.Count)];
 
-            var matching = RuneCatalog.All.Where(r => r.Weight > 0 && !r.IsExclusive && !OwnsRune(r) && Runes.HasTag(r.Tag) && !already.Contains(r)).ToList();
+            var matching = RuneCatalog.All.Where(r => r.Weight > 0 && !r.IsExclusive && !OwnsRune(r) && Board.HasTag(r.Tag) && !already.Contains(r)).ToList();
             return matching.Count > 0 ? matching[_random.Next(matching.Count)] : null;
         }
     }

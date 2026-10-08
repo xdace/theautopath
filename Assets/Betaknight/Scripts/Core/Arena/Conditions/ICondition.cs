@@ -1,19 +1,27 @@
+using System.Collections.Generic;
+
 namespace Betaknight.Core.Arena
 {
-    /// <summary>Laufzeit-Daten einer Zeile im Kampf.</summary>
+    /// <summary>Laufzeit-Daten eines Relais im Kampf (der Name stammt aus der Zeit der Logik-Tafel).</summary>
     public sealed class RowRuntime
     {
         public int Index { get; }
 
-        /// <summary>Tick, in dem die Zeile zuletzt eine Aktion gestartet hat. 0 = noch nie (Kampfbeginn).</summary>
+        /// <summary>Tick, in dem das Relais zuletzt ausgelöst hat. 0 = noch nie (Kampfbeginn). Verbraucht Ereignisse.</summary>
         public int LastFiredTick { get; internal set; }
         public int FireCount { get; internal set; }
 
         /// <summary>Letzter Tick, in dem die Bedingung erfüllt war (nur für beobachtete Bedingungen wie «Verlängern»).</summary>
         public int LastMetTick { get; internal set; } = int.MinValue / 2;
 
-        /// <summary>War die Bedingung im letzten beobachteten Tick erfüllt? Für Auslöser «wenn erfüllt».</summary>
+        /// <summary>War die Bedingung im letzten Tick erfüllt? Für die steigende Flanke.</summary>
         public bool WasMet { get; internal set; }
+
+        /// <summary>Flanken-Gedächtnis der Teile einer ODER-Bedingung.</summary>
+        internal bool[] PartWasMet;
+
+        /// <summary>Komponenten, die das Relais versorgt (für «Chain» und «After Own Skill»).</summary>
+        public IReadOnlyList<int> Powered { get; internal set; } = System.Array.Empty<int>();
 
         public RowRuntime(int index) => Index = index;
     }
@@ -58,7 +66,22 @@ namespace Betaknight.Core.Arena
         void Observe(in ConditionContext context);
     }
 
-    /// <summary>[Immer]</summary>
+    /// <summary>
+    /// Ereignis-Bedingung (A-19): löst bei jedem Ereignis aus. Sie verbraucht ihr Ereignis über
+    /// <see cref="RowRuntime.LastFiredTick"/> des Relais (Ereignisse, Zähler, Takt). Alle anderen sind Zustände und lösen
+    /// nur bei der steigenden Flanke (nicht erfüllt → erfüllt) aus.
+    /// </summary>
+    public interface IEventCondition : ICondition
+    {
+    }
+
+    /// <summary>Unterscheidet Ereignis- und Zustands-Auslöser.</summary>
+    public static class TriggerKinds
+    {
+        public static bool IsEvent(ICondition condition) => condition is IEventCondition;
+    }
+
+    /// <summary>Immer erfüllt. Nur noch für den Basisangriff (Lückenfüller); als Rune gibt es «Always» nicht mehr.</summary>
     public sealed class AlwaysCondition : ICondition
     {
         public static AlwaysCondition Instance { get; } = new AlwaysCondition();

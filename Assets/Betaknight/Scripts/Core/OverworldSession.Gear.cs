@@ -27,7 +27,7 @@ namespace Betaknight.Core
 
         /// <summary>Werte des Ritters zu Kampfbeginn (Waffe, Werte, aktive Set-Boni), wie der Kampf sie nutzt.</summary>
         public SkillUserStats SkillUserStats() =>
-            (_combat as ArenaCombatResolver ?? new ArenaCombatResolver()).PreviewStats(Stats, Runes, Gear, null, Progression.SkillLevels);
+            (_combat as ArenaCombatResolver ?? new ArenaCombatResolver()).PreviewStats(Stats, Board, Gear, null, Progression.SkillLevels);
 
         /// <summary>
         /// Skill mit Wachstum und den passiven Boni der getragenen Ausrüstung und der Tag-Stufen, so wie er im Kampf wirkt.
@@ -116,9 +116,6 @@ namespace Betaknight.Core
             PendingRuneOffer != null && itemIndex >= 0 && itemIndex < PendingRuneOffer.ItemIds.Count
             && Items.TryGet(PendingRuneOffer.ItemIds[itemIndex], out EquipmentDefinition item)
             && (placement != ItemPlacement.Equip || Gear.CanEquip(item, out _) || CanUpgradeItem(item.Id));
-
-        /// <summary>Verschiebt eine Zeile der Logik-Tafel (Priorität).</summary>
-        public bool MoveRow(int from, int to) => Runes.Move(from, to);
 
         /// <summary>Angebotsgewicht: angefangene Sets werden bevorzugt, damit sie sich vervollständigen lassen.</summary>
         public int OfferWeight(EquipmentDefinition item)

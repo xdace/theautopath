@@ -45,7 +45,6 @@ namespace Betaknight.Core.Arena
 
         private static void RegisterStateConditions(ConditionRegistry r)
         {
-            r.Register("always", _ => AlwaysCondition.Instance);
             r.Register("hp_low", p => new HpBelowCondition(BasisPoints.Percent(p)));
             r.Register("hp_critical", p => new HpBelowCondition(BasisPoints.Percent(p)));
             r.Register("hp_full", _ => new HpFullCondition());
@@ -64,13 +63,22 @@ namespace Betaknight.Core.Arena
             r.Register("vs_boss", _ => new ContextCondition(ContextCondition.Kind.VsBoss));
         }
 
+        /// <summary>Versorgt das Relais diese Komponente selbst? Dann zählt ihr eigenes Feuern nicht (keine Selbst-Schleife).</summary>
+        private static bool Powers(ConditionContext c, int row)
+        {
+            foreach (int own in c.Row.Powered)
+                if (own == row) return true;
+            return false;
+        }
+
         private static bool Own(ConditionContext c, BattleEvent e, BattleEventKind kind) => e.Kind == kind && e.Source == c.Self;
         private static bool OnSelf(ConditionContext c, BattleEvent e, BattleEventKind kind) => e.Kind == kind && e.Target == c.Self;
 
         private static void RegisterEventConditions(ConditionRegistry r)
         {
-            r.Register("on_hit", _ => new EventCondition((c, e) => Own(c, e, BattleEventKind.Hit), (c, e) => e.Target));
-            r.Register("on_crit", _ => new EventCondition((c, e) => Own(c, e, BattleEventKind.Crit), (c, e) => e.Target));
+            // Treffer der eigenen Komponenten zählen nicht, sonst hält sich eine Komponente an «Bei Treffer» selbst endlos in der Warteschlange.
+            r.Register("on_hit", _ => new EventCondition((c, e) => Own(c, e, BattleEventKind.Hit) && !Powers(c, e.RowIndex), (c, e) => e.Target));
+            r.Register("on_crit", _ => new EventCondition((c, e) => Own(c, e, BattleEventKind.Crit) && !Powers(c, e.RowIndex), (c, e) => e.Target));
             r.Register("when_hit", _ => new EventCondition((c, e) => OnSelf(c, e, BattleEventKind.Hit), (c, e) => e.Source));
             r.Register("after_block", _ => new EventCondition((c, e) => OnSelf(c, e, BattleEventKind.Blocked), (c, e) => e.Source));
             r.Register("after_dodge", _ => new EventCondition((c, e) => OnSelf(c, e, BattleEventKind.Dodged), (c, e) => e.Source));
@@ -81,13 +89,14 @@ namespace Betaknight.Core.Arena
                 OnSelf(c, e, BattleEventKind.Damage)
                 && (long)e.Amount * 100 > (long)Math.Max(1, p - c.Self.Relief(ReliefIds.BigHitLower)) * c.Self.MaxHp, (c, e) => e.Source));
             r.Register("after_own_skill", _ => new EventCondition((c, e) =>
-                Own(c, e, BattleEventKind.ActionExecuted) && e.Detail != SkillDefinition.BasicAttackId && e.RowIndex != c.Row.Index));
+                Own(c, e, BattleEventKind.ActionExecuted) && e.Detail != SkillDefinition.BasicAttackId && !Powers(c, e.RowIndex)));
             r.Register("battle_start", _ => new BattleStartCondition());
             r.Register("chain", _ => new ChainCondition());
         }
 
         private static void RegisterClockAndCounterConditions(ConditionRegistry r)
         {
+            r.Register("clock", p => new ClockCondition(Ticks.FromSeconds(p)));
             r.Register("every_5s", p => new ClockCondition(Ticks.FromSeconds(p)));
             r.Register("every_20s", p => new ClockCondition(Ticks.FromSeconds(p)));
             r.Register("every_3rd", p => new CounterCondition(p, (c, e) => Own(c, e, BattleEventKind.ActionExecuted) && e.Amount == 1));

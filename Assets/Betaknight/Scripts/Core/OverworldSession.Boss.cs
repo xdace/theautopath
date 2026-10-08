@@ -49,8 +49,8 @@ namespace Betaknight.Core
             Stats.AddShards(BossEscapeShards);
             lines.Add(SessionTexts.GoldGain(BossEscapeGold));
             lines.Add(SessionTexts.ShardGain(BossEscapeShards));
-            int before = Runes.Slots;
-            if (ExpandBoard(Progression.BoardRowsOnBossEscape)) lines.Add(SessionTexts.BoardExpansion(before, Runes.Slots));
+            string before = BoardSize;
+            if (ExpandBoard(Progression.BoardExpansionsOnBossEscape)) lines.Add(SessionTexts.BoardExpansion(before, BoardSize));
             string module = GrantBossModule();
             if (module != null) lines.Add(module);
             lines.AddRange(EvolveAfterBoss());

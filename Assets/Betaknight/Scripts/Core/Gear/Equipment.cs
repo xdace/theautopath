@@ -89,8 +89,8 @@ namespace Betaknight.Core.Gear
         }
 
         /// <summary>Summe der passiven Boni für einen Skill (nur Arten, die er hat).</summary>
-        public void SkillBonus(SkillDefinition skill, out int powerPercent, out int cooldownTicks) =>
-            SkillPassive.Sum(skill, Passives, out powerPercent, out cooldownTicks, out _);
+        public void SkillBonus(SkillDefinition skill, out int powerPercent, out int castPercent) =>
+            SkillPassive.Sum(skill, Passives, out powerPercent, out castPercent);
 
         /// <summary>
         /// Der Skill mit allen passiven Boni der getragenen Ausrüstung und optional weiteren passiven Effekten

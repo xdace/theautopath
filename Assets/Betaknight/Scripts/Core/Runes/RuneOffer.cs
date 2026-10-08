@@ -72,7 +72,7 @@ namespace Betaknight.Core.Runes
         /// </summary>
         /// <param name="isUnlocked">Freigeschaltete exklusive Runen (z. B. durch ein Set). Sie kommen garantiert ins Angebot.</param>
         /// <param name="isOwned">Runen, die der Spieler sonst noch besitzt (z. B. im Runen-Inventar); sie werden nicht angeboten.</param>
-        public static RuneOffer Create(string source, RuneCatalog catalog, RuneLoadout loadout, Random random, int count = 3,
+        public static RuneOffer Create(string source, RuneCatalog catalog, Circuit.CircuitBoard loadout, Random random, int count = 3,
             Func<RuneDefinition, bool> isUnlocked = null, Func<RuneDefinition, bool> isOwned = null)
         {
             if (catalog == null) throw new ArgumentNullException(nameof(catalog));

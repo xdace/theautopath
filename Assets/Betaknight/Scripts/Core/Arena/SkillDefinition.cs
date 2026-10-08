@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Betaknight.Core.Circuit;
 
 namespace Betaknight.Core.Arena
 {
@@ -39,7 +40,10 @@ namespace Betaknight.Core.Arena
         void Describe(SkillInfoBuilder info);
     }
 
-    /// <summary>Eine Aktion, das "Was" einer Zeile der Logik-Tafel. Reine Daten plus Wirkungen.</summary>
+    /// <summary>
+    /// Eine Aktion, das "Was" einer Komponente der Platine. Reine Daten plus Wirkungen. Es gibt keine Cooldowns (A-19):
+    /// die Form (<see cref="Shape"/>) bestimmt, wie stark ein Skill sein darf und welche Relais ihn versorgen können.
+    /// </summary>
     public sealed class SkillDefinition
     {
         public const string BasicAttackId = "basic_attack";
@@ -60,7 +64,9 @@ namespace Betaknight.Core.Arena
         /// <summary>Aktuelle Cast-Zeit mit allen Änderungen, nie unter <paramref name="minTicks"/>.</summary>
         public int CastTicks(int minTicks = CastTime.DefaultMinTicks) => CastTime.Apply(WindupTicks, CastBonusPercent, minTicks);
         public int RecoveryTicks { get; }
-        public int CooldownTicks { get; }
+
+        /// <summary>Form auf der Platine (Daten je Skill). Mehr Zellen = mehr Wirkung, aber nur schwere Relais versorgen sie.</summary>
+        public Shape Shape { get; }
         public IReadOnlyList<ISkillEffect> Effects { get; }
 
         public bool IsBasicAttack { get; }
@@ -79,21 +85,22 @@ namespace Betaknight.Core.Arena
         /// <summary>Skill-Arten (Angriff, Feuer, Schock ...): Ziel passiver Effekte der Ausrüstung und Grundlage der Angebote.</summary>
         public SkillKind Kinds { get; }
 
-        public SkillDefinition(string id, string name, int windupTicks, int recoveryTicks, int cooldownTicks,
+        public SkillDefinition(string id, string name, int windupTicks, int recoveryTicks,
             IEnumerable<ISkillEffect> effects, string description = null, bool countsAsAttack = false,
-            bool canBeRepeated = true, bool isBasicAttack = false, SkillKind kinds = SkillKind.None, bool isEvolution = false)
+            bool canBeRepeated = true, bool isBasicAttack = false, SkillKind kinds = SkillKind.None, bool isEvolution = false,
+            Shape? shape = null)
         {
+            Shape = shape ?? Shape.One;
             Kinds = kinds;
             IsEvolution = isEvolution;
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("Id missing.", nameof(id));
-            if (windupTicks < 0 || recoveryTicks < 0 || cooldownTicks < 0) throw new ArgumentOutOfRangeException(nameof(windupTicks));
+            if (windupTicks < 0 || recoveryTicks < 0) throw new ArgumentOutOfRangeException(nameof(windupTicks));
 
             Id = id;
             Name = name ?? id;
             Description = description ?? string.Empty;
             WindupTicks = windupTicks;
             RecoveryTicks = recoveryTicks;
-            CooldownTicks = cooldownTicks;
             Effects = new List<ISkillEffect>(effects ?? Array.Empty<ISkillEffect>());
             IsBasicAttack = isBasicAttack;
             CountsAsAttack = countsAsAttack || isBasicAttack;
@@ -101,33 +108,20 @@ namespace Betaknight.Core.Arena
         }
 
         /// <summary>Der Basisangriff der Gegner: 100 % Waffenschaden, Tempo aus den Kampfwerten.</summary>
-        public static SkillDefinition BasicAttack { get; } = CreateBasicAttack(BasisPoints.Full, 0);
+        public static SkillDefinition BasicAttack { get; } = CreateBasicAttack(BasisPoints.Full);
 
-        /// <summary>
-        /// Ein Basisangriff mit <paramref name="damageBp"/> Waffenschaden. Trifft er, verkürzt er alle laufenden
-        /// Skill-Cooldowns um <paramref name="cooldownCutTicks"/> (der Ritter, siehe <see cref="SkillBudgetConfig"/>).
-        /// </summary>
-        public static SkillDefinition CreateBasicAttack(int damageBp, int cooldownCutTicks)
+        /// <summary>Ein Basisangriff mit <paramref name="damageBp"/> Waffenschaden (der Ritter, siehe <see cref="SkillBudgetConfig"/>).</summary>
+        public static SkillDefinition CreateBasicAttack(int damageBp)
         {
             string text = ArenaTexts.BasicAttackDescription(damageBp == BasisPoints.Full ? null : SkillInfo.Percent(damageBp));
-            if (cooldownCutTicks > 0) text += ArenaTexts.BasicAttackCooldownCut(SkillInfo.Seconds(cooldownCutTicks));
-            return new SkillDefinition(BasicAttackId, ArenaTexts.BasicAttack, 0, 0, 0, new ISkillEffect[] { new DamageEffect(damageBp) }, text, isBasicAttack: true)
-            {
-                CooldownCutOnHitTicks = Math.Max(0, cooldownCutTicks),
-            };
+            return new SkillDefinition(BasicAttackId, ArenaTexts.BasicAttack, 0, 0, new ISkillEffect[] { new DamageEffect(damageBp) }, text, isBasicAttack: true);
         }
-
-        /// <summary>Nur Basisangriff: ein Treffer verkürzt alle laufenden Skill-Cooldowns um so viele Ticks.</summary>
-        public int CooldownCutOnHitTicks { get; private set; }
 
         /// <summary>Stufe des Skill-Exemplars (0 = Grundform). Höhere Stufen haben stärkere Wirkungen.</summary>
         public int Level { get; private set; }
 
         /// <summary>Wirkungsbonus in Prozent aus passiven Effekten der Ausrüstung (nur Anzeige, schon eingerechnet).</summary>
         public int PowerBonusPercent { get; private set; }
-
-        /// <summary>Cooldown-Änderung in Ticks aus passiven Effekten (nur Anzeige, schon eingerechnet).</summary>
-        public int CooldownBonusTicks { get; private set; }
 
         /// <summary>
         /// Derselbe Skill auf einer Stufe: stufbare Wirkungen werden stärker, Zeiten bleiben gleich.
@@ -138,41 +132,37 @@ namespace Betaknight.Core.Arena
             if (level <= 0 || rules == null || IsBasicAttack) return this;
             var effects = new List<ISkillEffect>();
             foreach (ISkillEffect e in Effects) effects.Add(e is ILevelableEffect l ? l.AtLevel(level, rules) : e);
-            return Copy(effects, CooldownTicks, level, PowerBonusPercent, CooldownBonusTicks, CastBonusPercent);
+            return Copy(effects, level, PowerBonusPercent, CastBonusPercent);
         }
 
         /// <summary>
-        /// Derselbe Skill mit passiven Boni der Ausrüstung: Wirkung (Schaden, Brennen, Heilung) +<paramref name="powerPercent"/> %,
-        /// Cooldown um <paramref name="cooldownTicks"/> verändert (nie unter 0), Cast-Zeit um <paramref name="castPercent"/> %.
-        /// Ohne Boni derselbe Skill.
+        /// Derselbe Skill mit passiven Boni: Wirkung (Schaden, Brennen, Heilung) +<paramref name="powerPercent"/> %,
+        /// Cast-Zeit um <paramref name="castPercent"/> % verändert. Ohne Boni derselbe Skill.
         /// </summary>
-        public SkillDefinition WithBonus(int powerPercent, int cooldownTicks, int castPercent = 0)
+        public SkillDefinition WithBonus(int powerPercent, int castPercent = 0)
         {
-            if ((powerPercent == 0 && cooldownTicks == 0 && castPercent == 0) || IsBasicAttack) return this;
+            if ((powerPercent == 0 && castPercent == 0) || IsBasicAttack) return this;
             var effects = new List<ISkillEffect>();
             foreach (ISkillEffect e in Effects) effects.Add(powerPercent != 0 && e is IBoostableEffect b ? b.Boosted(powerPercent) : e);
-            return Copy(effects, Math.Max(0, CooldownTicks + cooldownTicks), Level, PowerBonusPercent + powerPercent,
-                CooldownBonusTicks + cooldownTicks, CastBonusPercent + castPercent);
+            return Copy(effects, Level, PowerBonusPercent + powerPercent, CastBonusPercent + castPercent);
         }
 
-        private SkillDefinition Copy(List<ISkillEffect> effects, int cooldown, int level, int power, int cooldownBonus, int castBonus)
+        private SkillDefinition Copy(List<ISkillEffect> effects, int level, int power, int castBonus)
         {
-            SkillDefinition copy = Clone(effects, cooldown);
+            SkillDefinition copy = Clone(effects);
             copy.Level = level;
             copy.PowerBonusPercent = power;
-            copy.CooldownBonusTicks = cooldownBonus;
             copy.CastBonusPercent = castBonus;
             return copy;
         }
 
-        /// <summary>Kopie mit allen Zusatzwerten (Stufe, Boni, Module); Wirkungen und Cooldown optional neu.</summary>
-        private SkillDefinition Clone(List<ISkillEffect> effects = null, int? cooldown = null) =>
-            new SkillDefinition(Id, Name, WindupTicks, RecoveryTicks, cooldown ?? CooldownTicks, effects ?? new List<ISkillEffect>(Effects),
-                Description, CountsAsAttack, CanBeRepeated, IsBasicAttack, Kinds, IsEvolution)
+        /// <summary>Kopie mit allen Zusatzwerten (Stufe, Boni, Module); Wirkungen optional neu.</summary>
+        private SkillDefinition Clone(List<ISkillEffect> effects = null) =>
+            new SkillDefinition(Id, Name, WindupTicks, RecoveryTicks, effects ?? new List<ISkillEffect>(Effects),
+                Description, CountsAsAttack, CanBeRepeated, IsBasicAttack, Kinds, IsEvolution, Shape)
             {
                 Level = Level,
                 PowerBonusPercent = PowerBonusPercent,
-                CooldownBonusTicks = CooldownBonusTicks,
                 CastBonusPercent = CastBonusPercent,
                 ExtraCasts = ExtraCasts,
                 ExtraTargets = ExtraTargets,
@@ -180,8 +170,6 @@ namespace Betaknight.Core.Arena
                 _modules = new List<string>(_modules),
                 DifficultyTier = DifficultyTier,
                 Difficulty = Difficulty,
-                _cooldownBeforeDifficulty = _cooldownBeforeDifficulty,
-                CooldownCutOnHitTicks = CooldownCutOnHitTicks,
             };
 
         // ------------------------------------------------------------------ Module (A-07)
@@ -197,12 +185,12 @@ namespace Betaknight.Core.Arena
         /// <summary>«Kette»: so viele weitere Gegner treffen die zielgerichteten Wirkungen.</summary>
         public int ExtraTargets { get; private set; }
 
-        /// <summary>«Kostet HP statt Cooldown»: Selbstschaden in Basispunkten der Max-HP bei jedem Start, kein Cooldown.</summary>
+        /// <summary>«Blood Toll»: Selbstschaden in Basispunkten der Max-HP bei jedem Start (dafür mehr Wirkung).</summary>
         public int HpCostBp { get; private set; }
 
         /// <summary>Kopie mit einem Skill-Modul. <paramref name="change"/> setzt die neuen Werte auf der Kopie.</summary>
         public SkillDefinition WithModule(string moduleName, Func<ISkillEffect, ISkillEffect> mapEffect = null, int extraCasts = 0,
-            int extraTargets = 0, int hpCostBp = 0, int? cooldownTicks = null, int castPercent = 0)
+            int extraTargets = 0, int hpCostBp = 0, int castPercent = 0)
         {
             if (IsBasicAttack) return this;
             List<ISkillEffect> effects = null;
@@ -211,7 +199,7 @@ namespace Betaknight.Core.Arena
                 effects = new List<ISkillEffect>();
                 foreach (ISkillEffect e in Effects) effects.Add(mapEffect(e) ?? e);
             }
-            SkillDefinition copy = Clone(effects, hpCostBp > 0 ? 0 : cooldownTicks);
+            SkillDefinition copy = Clone(effects);
             copy.ExtraCasts += Math.Max(0, extraCasts);
             copy.ExtraTargets += Math.Max(0, extraTargets);
             copy.HpCostBp = Math.Max(copy.HpCostBp, hpCostBp);
@@ -228,13 +216,8 @@ namespace Betaknight.Core.Arena
         /// <summary>Der Bonus dieser Fassung (leer bei Stufe 0).</summary>
         public DifficultyBonus Difficulty { get; private set; }
 
-        /// <summary>Cooldown vor dem Schwierigkeits-Bonus (für Anzeige und Auswertung).</summary>
-        public int CooldownBeforeDifficulty => DifficultyTier > 0 ? _cooldownBeforeDifficulty : CooldownTicks;
-
-        private int _cooldownBeforeDifficulty;
-
         /// <summary>
-        /// Fassung mit Schwierigkeits-Bonus: Cooldown und Cast-Zeit in Prozent kürzer (Untergrenze bleibt), Wirkung
+        /// Fassung mit Schwierigkeits-Bonus: Cast-Zeit in Prozent kürzer (Untergrenze bleibt), Wirkung
         /// (Schaden, Heilung, Schild) stärker, Status-Wirkungen länger. Zählt nicht zu den Ausrüstungs-Boni.
         /// </summary>
         public SkillDefinition WithDifficultyBonus(int tier, DifficultyBonus bonus)
@@ -253,12 +236,10 @@ namespace Betaknight.Core.Arena
                 effects.Add(e);
             }
 
-            int cooldown = (int)((long)CooldownTicks * (100 - bonus.CooldownReductionPercent) / 100);
-            SkillDefinition copy = Clone(effects, cooldown);
+            SkillDefinition copy = Clone(effects);
             copy.CastBonusPercent -= bonus.CastReductionPercent;
             copy.DifficultyTier = tier;
             copy.Difficulty = bonus;
-            copy._cooldownBeforeDifficulty = CooldownTicks;
             return copy;
         }
 

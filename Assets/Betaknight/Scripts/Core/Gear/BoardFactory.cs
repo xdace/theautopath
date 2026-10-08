@@ -1,48 +1,76 @@
-using System.Collections.Generic;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Growth;
 using Betaknight.Core.Modules;
 using Betaknight.Core.Runes;
 
 namespace Betaknight.Core.Gear
 {
-    /// <summary>Eine Zeile, wie der Spieler sie baut: Rune mit Stufe und Skill mit der Stufe seines Exemplars (oder keiner).</summary>
-    public readonly struct BoardRowSpec
+    /// <summary>Ein Relais, wie der Spieler es gelegt hat: Rune mit Stufe, Modulen und Wachstum auf einer Zelle.</summary>
+    public readonly struct RelaySpec
     {
         public readonly string RuneId;
         public readonly int Level;
-        public readonly string SkillId;
-        public readonly int SkillLevel;
+        public readonly Cell Position;
 
-        /// <summary>Module am Skill-Exemplar der Zeile (Skill-Module, Auslöser «nach Ausführung»).</summary>
-        public readonly IReadOnlyList<ModuleSpec> SkillModules;
+        /// <summary>Module am Relais (Relais-Module, Auslöser «wenn ausgelöst»).</summary>
+        public readonly IReadOnlyList<ModuleSpec> Modules;
+        public readonly int Growth;
 
-        /// <summary>Module am Logikbaustein der Zeile (Baustein-Module, Auslöser «wenn erfüllt»).</summary>
-        public readonly IReadOnlyList<ModuleSpec> BlockModules;
-
-        /// <summary>Wachstum des Skill-Exemplars bzw. des Bausteins (wirkt über die Regel aus dem <see cref="GrowthCatalog"/>).</summary>
-        public readonly int SkillGrowth;
-        public readonly int BlockGrowth;
-
-        public BoardRowSpec(string runeId, string skillId, int level = 0, int skillLevel = 0,
-            IReadOnlyList<ModuleSpec> skillModules = null, IReadOnlyList<ModuleSpec> blockModules = null, int skillGrowth = 0, int blockGrowth = 0)
+        public RelaySpec(string runeId, Cell position, int level = 0, IReadOnlyList<ModuleSpec> modules = null, int growth = 0)
         {
-            SkillGrowth = skillGrowth;
-            BlockGrowth = blockGrowth;
             RuneId = runeId;
-            SkillId = skillId;
+            Position = position;
             Level = level;
-            SkillLevel = skillLevel;
-            SkillModules = skillModules ?? Array.Empty<ModuleSpec>();
-            BlockModules = blockModules ?? Array.Empty<ModuleSpec>();
+            Modules = modules ?? Array.Empty<ModuleSpec>();
+            Growth = growth;
+        }
+    }
+
+    /// <summary>Eine Komponente, wie der Spieler sie gelegt hat: Skill mit Modulen und Wachstum, Lage mit Drehung.</summary>
+    public readonly struct ComponentSpec
+    {
+        public readonly string SkillId;
+        public readonly Cell Origin;
+        public readonly bool Rotated;
+
+        /// <summary>Module am Skill-Exemplar (Skill-Module, Auslöser «nach Ausführung»).</summary>
+        public readonly IReadOnlyList<ModuleSpec> Modules;
+        public readonly int Growth;
+
+        public ComponentSpec(string skillId, Cell origin, bool rotated = false, IReadOnlyList<ModuleSpec> modules = null, int growth = 0)
+        {
+            SkillId = skillId;
+            Origin = origin;
+            Rotated = rotated;
+            Modules = modules ?? Array.Empty<ModuleSpec>();
+            Growth = growth;
         }
     }
 
     /// <summary>
-    /// Baut aus Runen-Zeilen und Ausrüstung eine <see cref="LogicBoard"/>. Der Skill kommt aus der Zeile (mit der Stufe
-    /// seines Exemplars), die Ausrüstung gibt passive Boni auf passende Skill-Arten. Ohne Skill (bewusst herausgenommen,
-    /// unbekannte Rune, Set-Rune ohne Set) bleibt die Zeile verwaist und wird im Kampf übersprungen.
+    /// Bauplan einer Platine für den Kampf: Grösse, Kern, Relais und Komponenten. Auslöser-Ziele in den Modulen sind
+    /// Komponenten-Indizes in Lesereihenfolge (wie <see cref="LogicBoard.Rows"/>).
+    /// </summary>
+    public sealed class CircuitSpec
+    {
+        public int Width { get; set; } = 4;
+        public int Height { get; set; } = 3;
+        public Cell? Core { get; set; }
+        public int CoreBonusPercent { get; set; }
+        public List<RelaySpec> Relays { get; } = new List<RelaySpec>();
+        public List<ComponentSpec> Components { get; } = new List<ComponentSpec>();
+
+        public IEnumerable<ModuleSpec> AllModules => Relays.SelectMany(r => r.Modules).Concat(Components.SelectMany(c => c.Modules));
+    }
+
+    /// <summary>
+    /// Baut aus einem <see cref="CircuitSpec"/> und der Ausrüstung eine <see cref="LogicBoard"/> (A-19). Jedes Relais
+    /// bekommt Bedingung, Schwierigkeit und damit seine Grössen-Grenze aus der Rune; die Komponenten ihren Skill mit Wachstum,
+    /// Modulen und passiven Boni. Unbekannte oder gesperrte Runen (Set-Rune ohne Set) lösen nie aus.
     /// </summary>
     public sealed class BoardFactory
     {
@@ -52,94 +80,116 @@ namespace Betaknight.Core.Gear
         private readonly ModuleCatalog _modules;
         private readonly GrowthCatalog _growth;
 
+        public DifficultyBonusConfig Bonus { get; }
+
         public BoardFactory(RuneCatalog runes, ConditionRegistry conditions, SkillCatalog skills, ModuleCatalog modules = null,
-            GrowthCatalog growth = null)
+            GrowthCatalog growth = null, DifficultyBonusConfig bonus = null)
         {
             _growth = growth ?? GrowthCatalog.CreateDefault();
             _modules = modules ?? ModuleCatalog.CreateDefault();
             _runes = runes ?? RuneCatalog.CreateDefault();
             _conditions = conditions ?? ConditionRegistry.CreateDefault();
             _skills = skills ?? SkillCatalog.CreateDefault();
+            Bonus = bonus ?? DifficultyBonusConfig.Default;
         }
 
         public static BoardFactory CreateDefault() => new BoardFactory(null, null, null);
 
-        /// <param name="skillLevels">Regeln für Skill-Stufen. Null = alle Skills in Grundform.</param>
         /// <param name="extraPassives">Weitere passive Effekte neben denen der Ausrüstung, z. B. aus Tag-Stufen.</param>
-        public LogicBoard Create(IEnumerable<BoardRowSpec> rows, Equipment equipment, SkillLevelRules skillLevels = null,
+        public LogicBoard Create(CircuitSpec spec, Equipment equipment, SkillLevelRules skillLevels = null,
             IReadOnlyList<SkillPassive> extraPassives = null)
         {
-            var result = new List<LogicRow>();
+            spec = spec ?? new CircuitSpec();
+            var relaySpecs = spec.Relays.OrderBy(r => r.Position, ReadingOrder.Instance).ToList();
+            var componentSpecs = spec.Components.OrderBy(c => c.Origin, ReadingOrder.Instance).ToList();
+
+            var relays = relaySpecs.Select(r => CreateRelay(r, equipment)).ToList();
+            var components = componentSpecs.Select(c => CreateComponent(c, equipment, skillLevels, extraPassives)).ToList();
+
             var edges = new List<GraphEdge>();
-            if (rows != null)
-            {
-                foreach (BoardRowSpec spec in rows)
-                {
-                    int index = result.Count;
-                    result.Add(CreateRow(spec, equipment, skillLevels, extraPassives));
-                    AddTriggers(edges, spec.SkillModules, GraphNode.Skill(index));
-                    AddTriggers(edges, spec.BlockModules, GraphNode.Block(index));
-                }
-            }
-            edges.RemoveAll(e => e.To.Row >= result.Count);
-            // Fallback ist der Basisangriff des Ritters aus dem Katalog (60 %, verkürzt Cooldowns).
+            for (int i = 0; i < componentSpecs.Count; i++) AddTriggers(edges, componentSpecs[i].Modules, GraphNode.Skill(i), components.Count);
+            for (int i = 0; i < relaySpecs.Count; i++) AddTriggers(edges, relaySpecs[i].Modules, GraphNode.Block(i), components.Count);
+
             SkillDefinition basic = _skills.TryGet(SkillDefinition.BasicAttackId, out SkillDefinition b) ? b : null;
-            return new LogicBoard(result, basic, edges.Count > 0 ? new LogicGraph(edges) : null);
+            return LogicBoard.Compile(new BoardLayout(spec.Width, spec.Height, spec.Core), components, relays, basic, Bonus,
+                spec.CoreBonusPercent, edges.Count > 0 ? (_, __) => new LogicGraph(edges) : (Func<IReadOnlyList<LogicRow>, IReadOnlyList<LogicRelay>, LogicGraph>)null);
         }
 
-        /// <summary>Auslöser werden zu Kanten im Graph: vom Skill bzw. Baustein der Zeile zum Skill der Zielzeile.</summary>
-        private static void AddTriggers(List<GraphEdge> edges, IReadOnlyList<ModuleSpec> modules, GraphNode from)
+        /// <summary>Auslöser werden zu Kanten: vom Skill bzw. Relais zur Ziel-Komponente.</summary>
+        private static void AddTriggers(List<GraphEdge> edges, IReadOnlyList<ModuleSpec> modules, GraphNode from, int components)
         {
             foreach (ModuleSpec m in modules)
-                if (m.ModuleId == ModuleIds.Trigger && m.TargetRow >= 0) edges.Add(new GraphEdge(from, GraphNode.Skill(m.TargetRow)));
+                if (m.ModuleId == ModuleIds.Trigger && m.TargetRow >= 0 && m.TargetRow < components) edges.Add(new GraphEdge(from, GraphNode.Skill(m.TargetRow)));
         }
 
-        public LogicRow CreateRow(BoardRowSpec spec, Equipment equipment, SkillLevelRules skillLevels = null,
-            IReadOnlyList<SkillPassive> extraPassives = null)
+        /// <summary>Ein Relais aus seiner Rune: Bedingung (mit Schwelle, Wachstum und Modulen), Schwierigkeit, Grenze, Name.</summary>
+        public LogicRelay CreateRelay(RelaySpec spec, Equipment equipment)
         {
-            if (!_runes.TryGet(spec.RuneId, out RuneDefinition rune)) return new LogicRow(AlwaysCondition.Instance, null, spec.RuneId ?? "?");
+            var rect = new CellRect(spec.Position, Shape.One);
+            if (!_runes.TryGet(spec.RuneId, out RuneDefinition rune)) return Dead(spec.RuneId ?? "?", rect);
 
             // Schwelle: Grundwert der Stufe, dann Wachstum (bis zur Obergrenze der Regel), dann Module.
-            int grown = GrowthApplier.ApplyToParameter(rune, rune.ParameterAt(spec.Level), _growth.ForRune(rune.Id), spec.BlockGrowth);
-            int parameter = ModuleRules.ApplyToParameter(rune, grown, spec.BlockModules);
-            if (!_conditions.TryCreate(spec.RuneId, parameter, out ICondition condition))
-                return new LogicRow(AlwaysCondition.Instance, null, spec.RuneId ?? "?");
+            int grown = GrowthApplier.ApplyToParameter(rune, rune.ParameterAt(spec.Level), _growth.ForRune(rune.Id), spec.Growth);
+            int parameter = ModuleRules.ApplyToParameter(rune, grown, spec.Modules);
+            if (!_conditions.TryCreate(spec.RuneId, parameter, out ICondition condition)) return Dead(spec.RuneId, rect);
 
-            // Schwierigkeit hängt nur am Baustein (umgekehrt: eigene Stufe), nie an Erleichterungen.
-            int difficulty = rune.DifficultyFor(IsInverted(spec.BlockModules));
+            // Schwierigkeit hängt nur am Relais (umgekehrt: eigene Stufe), nie an Erleichterungen.
+            int difficulty = rune.DifficultyFor(IsInverted(spec.Modules));
             string label = string.Format(rune.NameTemplate, parameter);
             if (spec.Level > 0) label = $"{label} ▲{spec.Level}";
-            foreach (ModuleSpec m in spec.BlockModules)
+            bool repeat = false;
+            foreach (ModuleSpec m in spec.Modules)
             {
                 condition = ModuleRules.ApplyToCondition(condition, m);
                 if (m.ModuleId == ModuleIds.Invert) label = ArenaTexts.InvertedLabel(label);
                 else if (m.ModuleId == ModuleIds.Extend) label = $"{label} (+{SkillInfo.Seconds(ModuleRules.ExtendTicks + ModuleRules.ExtendTicksPerLevel * m.Level)})";
+                else if (m.ModuleId == ModuleIds.RepeatWhileTrue) repeat = true;
             }
 
             // Set-exklusive Runen wirken nur, solange das Set getragen wird.
             if (rune.UnlockSetId != null && (equipment == null || equipment.SetPieces(rune.UnlockSetId) < SetDefinition.FirstBonusPieces))
-                return new LogicRow(condition, null, label, difficulty);
+                condition = AlwaysCondition.Instance.Not();
 
-            SkillDefinition skill = _skills.TryGet(spec.SkillId, out SkillDefinition s) ? s.AtLevel(spec.SkillLevel, skillLevels) : null;
-            skill = GrowthApplier.Apply(skill, _growth.ForSkill(spec.SkillId), spec.SkillGrowth);
-            foreach (ModuleSpec m in spec.SkillModules)
+            return new LogicRelay(condition, label, difficulty, Bonus.MaxCells(difficulty), rect, repeat, rune.Id);
+        }
+
+        private LogicRelay Dead(string label, CellRect rect) =>
+            new LogicRelay(AlwaysCondition.Instance.Not(), label, 0, Bonus.MaxCells(0), rect);
+
+        /// <summary>Eine Komponente: Skill mit Wachstum, Modulen und passiven Boni. Unbekannter Skill = keine Wirkung.</summary>
+        public LogicRow CreateComponent(ComponentSpec spec, Equipment equipment, SkillLevelRules skillLevels = null,
+            IReadOnlyList<SkillPassive> extraPassives = null)
+        {
+            SkillDefinition skill = _skills.TryGet(spec.SkillId, out SkillDefinition s) ? s.AtLevel(0, skillLevels) : null;
+            Shape shape = (skill?.Shape ?? Shape.One).Turned(spec.Rotated);
+            skill = GrowthApplier.Apply(skill, _growth.ForSkill(spec.SkillId), spec.Growth);
+            foreach (ModuleSpec m in spec.Modules)
                 skill = ModuleRules.ApplyToSkill(skill, m, _modules.TryGet(m.ModuleId, out ModuleDefinition d) ? d.Name : m.ModuleId);
             if (skill != null && equipment != null) skill = equipment.Boost(skill, extraPassives);
             else if (skill != null && extraPassives != null) skill = SkillPassive.Apply(skill, extraPassives);
-            return new LogicRow(condition, skill, label, difficulty);
+            return new LogicRow(skill, new CellRect(spec.Origin, shape));
         }
 
-        /// <summary>Kehrt ein Modul «Umkehren» den Baustein um?</summary>
-        public static bool IsInverted(IReadOnlyList<ModuleSpec> blockModules)
+        /// <summary>Kehrt ein Modul «Umkehren» das Relais um?</summary>
+        public static bool IsInverted(IReadOnlyList<ModuleSpec> modules)
         {
-            if (blockModules == null) return false;
-            foreach (ModuleSpec m in blockModules)
+            if (modules == null) return false;
+            foreach (ModuleSpec m in modules)
                 if (m.ModuleId == ModuleIds.Invert) return true;
             return false;
         }
 
-        /// <summary>Grundschwierigkeit einer Zeile (0–3), wie sie im Kampf zählt.</summary>
-        public int DifficultyOf(BoardRowSpec spec) =>
-            _runes.TryGet(spec.RuneId, out RuneDefinition rune) ? rune.DifficultyFor(IsInverted(spec.BlockModules)) : 0;
+        /// <summary>Grundschwierigkeit eines Relais (0–3), wie sie im Kampf zählt.</summary>
+        public int DifficultyOf(RelaySpec spec) =>
+            _runes.TryGet(spec.RuneId, out RuneDefinition rune) ? rune.DifficultyFor(IsInverted(spec.Modules)) : 0;
+
+        /// <summary>Grössen-Grenze eines Relais in Zellen.</summary>
+        public int MaxCellsOf(RelaySpec spec) => Bonus.MaxCells(DifficultyOf(spec));
+
+        private sealed class ReadingOrder : IComparer<Cell>
+        {
+            public static readonly ReadingOrder Instance = new ReadingOrder();
+            public int Compare(Cell a, Cell b) => Cell.CompareReading(a, b);
+        }
     }
 }

@@ -47,7 +47,7 @@ namespace Betaknight.Core
             if (!CanEnterPortal) return false;
             PendingPortal = false;
             Stats.Heal(Stats.MaxHp * PortalHealPercent / 100);
-            ExpandBoard(Progression.BoardRowsOnNewAct);
+            ExpandBoard(Progression.BoardExpansionsOnNewAct);
             ActCompleted?.Invoke(this);
             return true;
         }
@@ -72,7 +72,7 @@ namespace Betaknight.Core
                 new ExplorationService(map, previous.Exploration.SightRadius),
                 previous.Stats,
                 previous.Encounters,
-                previous.Runes,
+                previous.Board,
                 previous.RuneCatalog,
                 previous._combat,
                 previous.Gear,
@@ -83,7 +83,7 @@ namespace Betaknight.Core
             session.Kit = previous.Kit;
             session.Act = act;
             session.Progression = previous.Progression;
-            session.RuneSlotsBought = previous.RuneSlotsBought;
+            session.BoardExpansionsBought = previous.BoardExpansionsBought;
             session.CarryRecipeBook(previous);
             session.CarryModules(previous);
             return session;

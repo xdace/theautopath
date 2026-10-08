@@ -30,8 +30,8 @@ namespace Betaknight.Core.Arena
         /// <summary>Überlebens-Kampf: lebt der Spieler nach so vielen Ticks noch, entkommt er. 0 = aus.</summary>
         public int SurviveTicks;
 
-        /// <summary>Warteschlange für erfüllte Zeilen (A-13). Null = Standard.</summary>
-        public RowQueueConfig Queue = RowQueueConfig.Default;
+        /// <summary>Warteschlange der Komponenten (A-13, A-19). Null = Standard.</summary>
+        public QueueConfig Queue = QueueConfig.Default;
     }
 
     public enum BattleOutcome
@@ -86,22 +86,19 @@ namespace Betaknight.Core.Arena
         public int BonusGold { get; }
         public IReadOnlyList<BattleEvent> Events { get; }
 
-        /// <summary>Namen der Tafel-Zeilen des Spielers, für die Anzeige im Protokoll.</summary>
+        /// <summary>Relais-Namen der Komponenten des Spielers (inklusive Basisangriff), für die Anzeige im Protokoll.</summary>
         public IReadOnlyList<string> PlayerRowLabels { get; }
 
-        /// <summary>Skill-Namen der Tafel-Zeilen des Spielers ("—" bei verwaisten Zeilen).</summary>
+        /// <summary>Skill-Namen der Komponenten des Spielers ("—" ohne Skill), der Basisangriff zuletzt.</summary>
         public IReadOnlyList<string> PlayerRowSkills { get; }
+
+        /// <summary>Die Platine des Spielers in diesem Kampf (Anzeige: Relais, Komponenten, Kern).</summary>
+        public LogicBoard PlayerBoard { get; internal set; }
 
         /// <summary>Alle Kämpfer mit Start-Leben, Spieler zuerst.</summary>
         public IReadOnlyList<FighterInfo> Fighters { get; }
 
-        /// <summary>Entscheidungen des Spielers mit Gründen je Zeile, siehe <see cref="BattleDecision"/>.</summary>
-        public IReadOnlyList<BattleDecision> Decisions { get; internal set; } = new BattleDecision[0];
-
-        /// <summary>Pro Spieler-Zeile (inklusive Fallback): wie oft die Bedingung erfüllt wurde (Wechsel zu erfüllt).</summary>
-        public IReadOnlyList<int> PlayerRowMet { get; internal set; } = new int[0];
-
-        /// <summary>Pro Spieler-Zeile (inklusive Fallback): Grundschwierigkeit des Bausteins.</summary>
+        /// <summary>Pro Spieler-Komponente (inklusive Basisangriff): höchste Schwierigkeit der versorgenden Relais.</summary>
         public IReadOnlyList<int> PlayerRowDifficulty { get; internal set; } = new int[0];
 
         public BattleResult(BattleOutcome outcome, int endTick, int playerHp, int playerMaxHp, int enemiesDefeated, int bonusGold,

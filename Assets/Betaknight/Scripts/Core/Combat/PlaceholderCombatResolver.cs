@@ -20,7 +20,7 @@ namespace Betaknight.Core.Combat
         public CombatResult Resolve(CombatRequest request, Random random)
         {
             (int min, int max) = BaseDamage(request.Enemy, request.Tier);
-            int damage = random.Next(min, max + 1) - Mitigation(request.Runes);
+            int damage = random.Next(min, max + 1) - Mitigation(request.Board);
             damage = Math.Max(1, damage);
 
             bool victory = damage < request.Stats.Hp;
@@ -28,7 +28,7 @@ namespace Betaknight.Core.Combat
             return new CombatResult(victory, damage, gold);
         }
 
-        public int Mitigation(RuneLoadout runes)
+        public int Mitigation(Circuit.CircuitBoard runes)
         {
             int mitigation = runes.Runes.Count * ReductionPerRune;
             foreach (KeyValuePair<RuneTag, int> tag in runes.CountByTag())

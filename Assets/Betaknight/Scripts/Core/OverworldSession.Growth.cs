@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Evolution;
 using Betaknight.Core.Gear;
@@ -13,7 +14,7 @@ using Betaknight.Core.Skills;
 namespace Betaknight.Core
 {
     /// <summary>
-    /// Wachsen und Evolution. Jedes Skill-Exemplar und jeder Baustein hat einen Zähler (Wachstum), der aus Kämpfen steigt.
+    /// Wachsen und Evolution. Jedes Skill-Exemplar und jedes Relais hat einen Zähler (Wachstum), der aus Kämpfen steigt.
     /// Meilensteine: Skill-Stufen (5/15/30) und Modul-Plätze (10/25). Auf Höchststufe mit erfülltem Rezept entwickelt
     /// sich ein Exemplar nach dem nächsten überlebten Boss; Wachstum und Module bleiben, das Rezept kommt ins Rezeptbuch.
     /// </summary>
@@ -28,10 +29,10 @@ namespace Betaknight.Core
         public GrowthRule SkillGrowthRule(SkillInstance skill) =>
             skill == null || skill.IsBasicAttack ? null : GrowthCatalog.ForSkill(skill.SkillId);
 
-        public GrowthRule RowGrowthRule(RuneSlot row) => row == null ? null : GrowthCatalog.ForRune(row.Rune.Id);
+        public GrowthRule RelayGrowthRule(RelayChip relay) => relay == null ? null : GrowthCatalog.ForRune(relay.Rune.Id);
 
         /// <summary>«+7 Schaden» o. Ä.: was das Wachstum gerade bewirkt, leer ohne Wirkung.</summary>
-        public string GrowthEffectText(GrowthRule rule, int growth, RuneSlot row = null)
+        public string GrowthEffectText(GrowthRule rule, int growth, RelayChip row = null)
         {
             if (rule == null || growth <= 0) return string.Empty;
             int bonus = rule.BonusAt(growth);
@@ -60,36 +61,38 @@ namespace Betaknight.Core
             return SessionTexts.GrowthMilestone(growth, next, what);
         }
 
-        /// <summary>Nach jedem Kampf: Wachstumspunkte aus dem Protokoll an Skill-Exemplare und Bausteine verteilen.</summary>
+        /// <summary>Nach jedem Kampf: Wachstumspunkte aus dem Protokoll an Skill-Exemplare (Komponenten) und Relais verteilen.</summary>
         private void GrowFromBattle(CombatResult result)
         {
             if (result.Battle == null) return;
             Dictionary<int, RowTally> tallies = GrowthTally.Count(result.Battle);
+            var components = Board.Components.ToList();
+            var relays = Board.Relays.ToList();
 
-            for (int i = 0; i < Runes.Rows.Count; i++)
+            for (int i = 0; i < components.Count; i++)
             {
                 if (!tallies.TryGetValue(i, out RowTally tally)) continue;
-                RuneSlot row = Runes.Rows[i];
-
-                SkillInstance skill = row.Skill;
+                SkillInstance skill = components[i].Skill;
                 GrowthRule skillRule = SkillGrowthRule(skill);
                 int skillPoints = skillRule != null ? tally.PointsFor(skillRule.Trigger, result.Victory) : 0;
-                if (skillPoints > 0 && Skills.Contains(skill))
-                {
-                    int before = skill.Growth;
-                    int stage = skill.Level;
-                    Skills.Grow(skill, skillPoints);
-                    AnnounceMilestones(skill.NameFrom(SkillCatalog), before, skill.Growth, true, stage, skill.Level);
-                }
+                if (skillPoints <= 0 || !Skills.Contains(skill)) continue;
+                int before = skill.Growth;
+                int stage = skill.Level;
+                Skills.Grow(skill, skillPoints);
+                AnnounceMilestones(skill.NameFrom(SkillCatalog), before, skill.Growth, true, stage, skill.Level);
+            }
 
-                GrowthRule rowRule = RowGrowthRule(row);
-                int rowPoints = rowRule != null ? tally.PointsFor(rowRule.Trigger, result.Victory) : 0;
-                if (rowPoints > 0)
-                {
-                    int before = row.Growth;
-                    Runes.Grow(row, rowPoints);
-                    AnnounceMilestones(SessionTexts.RuneQuoted(row.Name), before, row.Growth, false, 0, 0);
-                }
+            Dictionary<int, RowTally> relayTallies = GrowthTally.CountRelays(result.Battle);
+            for (int i = 0; i < relays.Count; i++)
+            {
+                if (!relayTallies.TryGetValue(i, out RowTally tally)) continue;
+                RelayChip relay = relays[i];
+                GrowthRule rule = RelayGrowthRule(relay);
+                int points = rule != null ? tally.PointsFor(rule.Trigger, result.Victory) : 0;
+                if (points <= 0) continue;
+                int before = relay.Growth;
+                Board.Grow(relay, points);
+                AnnounceMilestones(SessionTexts.RuneQuoted(relay.Name), before, relay.Growth, false, 0, 0);
             }
         }
 
@@ -147,15 +150,17 @@ namespace Betaknight.Core
             }
 
             if (skill.Level < MaxSkillStage) missing.Add(SessionTexts.MissingLevelWithGrowth(MaxSkillStage, skill.Growth, GrowthStages.GrowthForStage(MaxSkillStage)));
-            RuneSlot row = skill.Holder as RuneSlot;
-            if (row == null || !Runes.Rows.Contains(row)) missing.Add(SessionTexts.MissingOnBoard);
+            ComponentSlot slot = skill.Holder as ComponentSlot;
+            bool onBoard = slot != null && Board.Components.Contains(slot);
+            if (!onBoard) missing.Add(SessionTexts.MissingOnBoard);
             switch (recipe.Requirement)
             {
                 case EvolutionRequirement.Module:
                     if (!skill.Modules.Any(m => m.ModuleId == recipe.RequirementId)) missing.Add(RequirementText(recipe));
                     break;
                 case EvolutionRequirement.BlockInRow:
-                    if (row == null || row.Rune.Id != recipe.RequirementId) missing.Add(RequirementText(recipe));
+                    // A-19: «in derselben Zeile» heisst jetzt: ein Relais mit dieser Rune versorgt die Komponente (berührt sie).
+                    if (!onBoard || !Board.RelaysTouching(slot).Any(r => r.Rune.Id == recipe.RequirementId)) missing.Add(RequirementText(recipe));
                     break;
                 case EvolutionRequirement.Tag:
                     AddTagMissing(missing, recipe);
@@ -164,8 +169,8 @@ namespace Betaknight.Core
             return missing;
         }
 
-        /// <summary>Was einem Baustein (Zeile) zu diesem Rezept fehlt; leer = bereit.</summary>
-        public List<string> EvolutionMissing(EvolutionRecipe recipe, RuneSlot row)
+        /// <summary>Was einem Relais zu diesem Rezept fehlt; leer = bereit.</summary>
+        public List<string> EvolutionMissing(EvolutionRecipe recipe, RelayChip row)
         {
             var missing = new List<string>();
             if (recipe == null || recipe.Subject != EvolutionSubject.Block) return missing;
@@ -203,14 +208,14 @@ namespace Betaknight.Core
         public SkillInstance BestCandidate(EvolutionRecipe recipe) =>
             Skills.OfSkill(recipe.FromId).OrderBy(s => EvolutionMissing(recipe, s).Count).ThenByDescending(s => s.Growth).FirstOrDefault();
 
-        public RuneSlot BestRowCandidate(EvolutionRecipe recipe) => Runes.Rows.FirstOrDefault(r => r.Rune.Id == recipe.FromId);
+        public RelayChip BestRelayCandidate(EvolutionRecipe recipe) => Board.Relays.FirstOrDefault(r => r.Rune.Id == recipe.FromId);
 
         /// <summary>«Evolution ???: fehlt Stufe 3, Modul Fläche» bzw. «… bereit, entwickelt sich nach dem nächsten Boss».</summary>
         public string EvolutionProgress(EvolutionRecipe recipe)
         {
             List<string> missing = recipe.Subject == EvolutionSubject.Skill
                 ? EvolutionMissing(recipe, BestCandidate(recipe))
-                : EvolutionMissing(recipe, BestRowCandidate(recipe));
+                : EvolutionMissing(recipe, BestRelayCandidate(recipe));
             return ProgressText(recipe, missing);
         }
 
@@ -222,28 +227,34 @@ namespace Betaknight.Core
                 : SessionTexts.EvolutionMissing(name, string.Join(", ", missing));
         }
 
-        /// <summary>Fortschritt der Evolutionen genau dieser Zeile (ihr Skill und ihr Baustein), für Tafel und Karte.</summary>
-        public List<string> EvolutionProgressFor(RuneSlot row)
+        /// <summary>Fortschritt der Evolutionen eines Skill-Exemplars, für Build-Fenster und Karte.</summary>
+        public List<string> EvolutionProgressFor(SkillInstance skill)
         {
             var lines = new List<string>();
-            if (row == null) return lines;
-            if (row.Skill != null && !row.Skill.IsBasicAttack)
-                foreach (EvolutionRecipe r in EvolutionCatalog.From(EvolutionSubject.Skill, row.Skill.SkillId))
-                    lines.Add(ProgressText(r, EvolutionMissing(r, row.Skill)));
-            foreach (EvolutionRecipe r in EvolutionCatalog.From(EvolutionSubject.Block, row.Rune.Id))
-                lines.Add(ProgressText(r, EvolutionMissing(r, row)));
+            if (skill == null || skill.IsBasicAttack) return lines;
+            foreach (EvolutionRecipe r in EvolutionCatalog.From(EvolutionSubject.Skill, skill.SkillId))
+                lines.Add(ProgressText(r, EvolutionMissing(r, skill)));
             return lines;
         }
 
-        /// <summary>True, wenn sich der Skill oder der Baustein dieser Zeile nach dem nächsten Boss entwickelt.</summary>
-        public bool IsEvolutionReady(RuneSlot row)
+        /// <summary>Fortschritt der Evolutionen eines Relais.</summary>
+        public List<string> EvolutionProgressFor(RelayChip relay)
         {
-            if (row == null) return false;
-            if (row.Skill != null && !row.Skill.IsBasicAttack
-                && EvolutionCatalog.From(EvolutionSubject.Skill, row.Skill.SkillId).Any(r => EvolutionMissing(r, row.Skill).Count == 0))
-                return true;
-            return EvolutionCatalog.From(EvolutionSubject.Block, row.Rune.Id).Any(r => EvolutionMissing(r, row).Count == 0);
+            var lines = new List<string>();
+            if (relay == null) return lines;
+            foreach (EvolutionRecipe r in EvolutionCatalog.From(EvolutionSubject.Block, relay.Rune.Id))
+                lines.Add(ProgressText(r, EvolutionMissing(r, relay)));
+            return lines;
         }
+
+        /// <summary>True, wenn sich das Exemplar nach dem nächsten Boss entwickelt.</summary>
+        public bool IsEvolutionReady(SkillInstance skill) =>
+            skill != null && !skill.IsBasicAttack
+            && EvolutionCatalog.From(EvolutionSubject.Skill, skill.SkillId).Any(r => EvolutionMissing(r, skill).Count == 0);
+
+        /// <summary>True, wenn sich das Relais nach dem nächsten Boss entwickelt.</summary>
+        public bool IsEvolutionReady(RelayChip relay) =>
+            relay != null && EvolutionCatalog.From(EvolutionSubject.Block, relay.Rune.Id).Any(r => EvolutionMissing(r, relay).Count == 0);
 
         /// <summary>Fortschritt zu Evolutionen, die ein angebotener Skill, ein Modul, eine Rune oder ein Teil voranbringt.</summary>
         public List<string> EvolutionHintsForSkill(string skillId) =>
@@ -276,7 +287,7 @@ namespace Betaknight.Core
         }
 
         private bool OwnsSubject(EvolutionRecipe r) =>
-            r.Subject == EvolutionSubject.Skill ? OwnsSkill(r.FromId) : Runes.Rows.Any(row => row.Rune.Id == r.FromId);
+            r.Subject == EvolutionSubject.Skill ? OwnsSkill(r.FromId) : Board.Relays.Any(relay => relay.Rune.Id == r.FromId);
 
         /// <summary>Nach einem überlebten Boss: alles Bereite entwickelt sich. Gibt Meldungen für das Ergebnisfenster zurück.</summary>
         private List<string> EvolveAfterBoss()
@@ -296,11 +307,11 @@ namespace Betaknight.Core
                 }
                 else
                 {
-                    foreach (RuneSlot row in Runes.Rows.ToList())
+                    foreach (RelayChip row in Board.Relays.ToList())
                     {
                         if (EvolutionMissing(recipe, row).Count > 0 || !RuneCatalog.TryGet(recipe.ToId, out RuneDefinition evolved)) continue;
                         string from = row.Name;
-                        Runes.Evolve(row, evolved);
+                        Board.Evolve(row, evolved);
                         lines.Add(Announce(recipe, $"{from} → {row.Name}"));
                     }
                 }

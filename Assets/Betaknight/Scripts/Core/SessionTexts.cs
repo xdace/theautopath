@@ -52,12 +52,12 @@ namespace Betaknight.Core
         /// <summary>Titel nach dem Boss-Kampf. Die Autoplay-Auswertung hängt nicht mehr an diesen Texten.</summary>
         public const string BossDefeated = "Boss defeated";
         public const string EscapedThroughPortal = "Escaped through the portal";
-        public static string BoardExpansion(int before, int after) => $"Board expansion: {before} → {after} rows";
+        public static string BoardExpansion(string before, string after) => $"Board expansion: {before} → {after}";
         public static string PortalOpen(int act) => $"Portal to Act {act} open";
 
         // ------------------------------------------------------------------ Build verbessert
 
-        public static string BoardGrown(int before, int after) => $"Board {before} → {after} rows";
+        public static string BoardGrown(string before, string after) => $"Board {before} → {after}";
         public static string RuneLevelUp(string before, string after) => $"Rune {before} → {after}";
         public static string Upgrade(string before, string after) => $"{before} → {after}";
         public static string HealChange(string skill, int before, int after) => $"{skill} heals {before} → {after}";
@@ -85,7 +85,7 @@ namespace Betaknight.Core
 
         public const string Unknown = "???";
         public static string RequirementModule(string module) => $"Module {module}";
-        public static string RequirementRuneInRow(string rune) => $"Rune \"{rune}\" in the same row";
+        public static string RequirementRuneInRow(string rune) => $"powered by the relay \"{rune}\"";
         public static string RequirementTag(string tag, int threshold) => $"Tag {tag} {threshold}";
         public static string Recipe(string from, string requirement, string to) => $"{from} at max level + {requirement} → {to}";
         public static string MissingSkill(string skill) => $"Skill {skill}";
@@ -99,22 +99,20 @@ namespace Betaknight.Core
         public static string EvolutionReady(string name) => $"Evolution {name}: ready, after the next boss";
         public static string EvolutionMissing(string name, string missing) => $"Evolution {name}: missing {missing}";
         public static string EvolutionHintModule(string progress, string from) => $"{progress} (part of the recipe for {from})";
-        public static string EvolutionHintRune(string progress, string from) => $"{progress} (into the row of {from})";
+        public static string EvolutionHintRune(string progress, string from) => $"{progress} (as relay next to {from})";
         public static string EvolutionHintTag(string tag, int count, int threshold, string from) => $"→ {tag} {count}/{threshold} for evolution of {from}";
         public static string Evolution(string change) => $"Evolution: {change}";
 
         // ------------------------------------------------------------------ Module
 
-        public static string SkillInRow(string skill, int row) => $"{skill} (Row {row + 1})";
-        public static string Row(int row) => $"Row {row + 1}";
+        public static string SkillInRow(string skill, int component) => $"{skill} (#{component + 1})";
         public const string NoTarget = "no target";
         public const string TargetNotOnBoard = "target not on the board";
-        public const string RowMissing = "row missing";
-        public static string RuneRow(int row) => $"Rune Row {row + 1}";
-        public static string HolderSkill(string skill, int row) => $"Skill {skill} (Row {row + 1})";
+        public static string RuneRow(int relay) => $"Relay {relay + 1}";
+        public static string HolderSkill(string skill, int component) => $"Skill {skill} (#{component + 1})";
         public static string HolderSkillFree(string skill) => $"Skill {skill} (free)";
         public const string Free = "free";
-        public const string WhenMet = "When met";
+        public const string WhenMet = "When triggered";
         public const string AfterExecution = "After execution";
         public static string ModuleTrigger(string when, string target) => $"{when} → {target}";
         public static string ModuleLabel(string name) => $"Module: {name}";

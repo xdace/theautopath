@@ -53,7 +53,7 @@ namespace Betaknight.Core.Autoplay
         public static string ShopModule(string name) => $"Shop: Module {name}";
         public static string ShopSkill(string name) => $"Shop: Skill {name}";
         public static string ShopItem(string name) => $"Shop: Item {name}";
-        public const string ShopBoardRow = "Shop: Board Row";
+        public const string ShopBoardRow = "Shop: Board Expansion";
         public static string ShopRune(string name) => $"Shop: Rune {name}";
         public const string ShopLeave = "Leave shop";
 
@@ -61,9 +61,9 @@ namespace Betaknight.Core.Autoplay
 
         public static string Equip(string name) => $"Equip: {name}";
         public static string PlaceRune(string name) => $"Place rune: {name}";
-        public static string PlaceSkill(string name, int row) => $"Place skill: {name} → Row {row}";
-        public static string PlaceModuleOnSkill(string name, int row) => $"Place module: {name} → Skill Row {row}";
-        public static string PlaceModuleOnRune(string name, int row) => $"Place module: {name} → Rune Row {row}";
+        public static string PlaceSkill(string name, int column, int row) => $"Place component: {name} → column {column}, row {row}";
+        public static string PlaceModuleOnSkill(string name, int component) => $"Place module: {name} → component #{component}";
+        public static string PlaceModuleOnRune(string name, int relay) => $"Place module: {name} → Relay {relay}";
         public static string SetTriggerTarget(int instanceId) => $"Set trigger target: Module #{instanceId}";
 
         public const string WhyDefendMine = "defend mine";
@@ -100,7 +100,7 @@ namespace Betaknight.Core.Autoplay
             int elitesWon, int elitesLost, int bossesSurvived, int bosses, int boardRows, int modules, int triggers, int duos,
             string basicShare, string basicShareFromAct2, string duration, string fps, int exceptions, int errorLogs, int hangs, bool ok) =>
             $"Seed {seed}, {kit}: {endReason} in Act {act} after {turns} turns. Fights {fightsWon}:{fightsLost}, " +
-            $"Elite {elitesWon}:{elitesLost}, Boss {bossesSurvived}/{bosses}, Board {boardRows} rows, " +
+            $"Elite {elitesWon}:{elitesLost}, Boss {bossesSurvived}/{bosses}, Board {boardRows} parts, " +
             $"Modules {modules}, Triggers {triggers}, Duos {duos}, Basic Attack {basicShare} " +
             $"(from Act 2: {basicShareFromAct2}), {duration} s{fps}. " +
             $"Exceptions {exceptions}, Error logs {errorLogs}, Hangs {hangs} → {(ok ? Ok : Failed)}";

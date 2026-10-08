@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Map;
 using Betaknight.Core.Run;
@@ -67,16 +68,16 @@ namespace Betaknight.Core.Combat
 
         /// <summary>
         /// Werte des Ritters zu Kampfbeginn, genau wie der Simulator ihn baut (Grundwerte, Ausrüstung, aktive Set-Boni).
-        /// Für Kennzahlen im Tafel-Editor; gekämpft wird dabei nicht.
+        /// Für Kennzahlen im Build-Fenster; gekämpft wird dabei nicht.
         /// </summary>
-        public SkillUserStats PreviewStats(PlayerStats stats, RuneLoadout runes, Equipment equipment, BattleContext context = null,
+        public SkillUserStats PreviewStats(PlayerStats stats, CircuitBoard runes, Equipment equipment, BattleContext context = null,
             SkillLevelRules skillLevels = null)
         {
             return SkillUserStats.From(PreviewCombatant(stats, runes, equipment, context, skillLevels));
         }
 
         /// <summary>Der Ritter zu Kampfbeginn, gebaut wie im Kampf (für Stat-Leiste und Vorschau). Gekämpft wird nicht.</summary>
-        public Combatant PreviewCombatant(PlayerStats stats, RuneLoadout runes, Equipment equipment, BattleContext context = null,
+        public Combatant PreviewCombatant(PlayerStats stats, CircuitBoard runes, Equipment equipment, BattleContext context = null,
             SkillLevelRules skillLevels = null)
         {
             var request = new CombatRequest(CellContent.Enemy, 0, stats, runes, equipment, context, skillLevels);
@@ -88,7 +89,7 @@ namespace Betaknight.Core.Combat
         {
             var baseStats = new CombatStats(Math.Max(1, request.Stats.MaxHp), BaseDamage, BaseAttackInterval);
             CombatantSetup player = PlayerLoadout.CreateCombatant(ArenaTexts.PlayerName, baseStats, request.Equipment,
-                request.Runes.ToBoardSpecs(), Math.Max(1, request.Stats.Hp), _boards, _sets, request.SkillLevels, _synergies);
+                request.Board.ToSpec(), Math.Max(1, request.Stats.Hp), _boards, _sets, request.SkillLevels, _synergies);
 
             return new BattleSetup
             {

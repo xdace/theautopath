@@ -3,30 +3,27 @@ using Betaknight.Core.Arena;
 namespace Betaknight.Core.Run
 {
     /// <summary>
-    /// Alle Werte, mit denen ein Build über den Run wächst: Tafel-Erweiterungen, Elite-Gegner, Stufen für
-    /// Ausrüstung und Skills, Preis des Runenplatzes im Shop. An einer Stelle, damit Balance-Änderungen
+    /// Alle Werte, mit denen ein Build über den Run wächst: Platinen-Erweiterungen, Elite-Gegner, Stufen für
+    /// Ausrüstung und Skills, Preis der Platinen-Erweiterung im Shop. Grössen der Platine: <see cref="Circuit.CircuitConfig"/>. An einer Stelle, damit Balance-Änderungen
     /// nicht im Code verstreut sind.
     /// </summary>
     public sealed class ProgressionConfig
     {
-        // ------------------------------------------------------------------ Tafel-Erweiterung
+        // ------------------------------------------------------------------ Platinen-Erweiterung (A-19)
 
-        /// <summary>Obergrenze der Zeilen auf der Logik-Tafel.</summary>
-        public int MaxBoardRows = 8;
+        /// <summary>Garantierte Erweiterungen (Grössen-Stufen der Platine) bei jeder Boss-Flucht durchs Portal.</summary>
+        public int BoardExpansionsOnBossEscape = 1;
 
-        /// <summary>Garantierte Erweiterung bei jeder Boss-Flucht durchs Portal.</summary>
-        public int BoardRowsOnBossEscape = 1;
+        /// <summary>Garantierte Erweiterungen beim Akt-Wechsel (Portal betreten).</summary>
+        public int BoardExpansionsOnNewAct = 1;
 
-        /// <summary>Garantierte Erweiterung beim Akt-Wechsel (Portal betreten).</summary>
-        public int BoardRowsOnNewAct = 1;
-
-        /// <summary>Chance in Prozent, dass eine Elite-Belohnung die Tafel-Erweiterung anbietet.</summary>
+        /// <summary>Chance in Prozent, dass eine Elite-Belohnung die Platinen-Erweiterung anbietet.</summary>
         public int EliteBoardExpansionChance = 50;
 
-        /// <summary>Chance in Prozent für eine seltene Truhe mit Tafel-Erweiterung im Angebot.</summary>
+        /// <summary>Chance in Prozent für eine seltene Truhe mit Platinen-Erweiterung im Angebot.</summary>
         public int TreasureBoardExpansionChance = 10;
 
-        /// <summary>Preis des Runenplatzes im Shop: Basis + Schritt × bereits gekaufte (20, 35, 50 …).</summary>
+        /// <summary>Preis der Platinen-Erweiterung im Shop: Basis + Schritt × bereits gekaufte (20, 35, 50 …).</summary>
         public int SlotPriceBase = 20;
         public int SlotPriceStep = 15;
 

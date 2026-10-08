@@ -38,6 +38,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Obergrenze der Blockchance in Basispunkten.</summary>
         BlockCap,
+
+        /// <summary>Cast-Zeit aller Komponenten in Prozent (A-19): Haste negativ, Slow positiv. Untergrenze 0.1 s bleibt.</summary>
+        CastPercent,
     }
 
     /// <summary>Grundwerte eines Kämpfers. Nicht gesetzte Werte haben ihren Standard.</summary>

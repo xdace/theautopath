@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Arena;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Gear;
@@ -78,7 +79,8 @@ namespace Betaknight.Core.Autoplay
             if (s != null)
             {
                 Report.BoardRows.Clear();
-                for (int i = 0; i < s.Runes.Rows.Count; i++) Report.BoardRows.Add(RowText(s, i));
+                for (int i = 0; i < s.Board.Components.Count; i++) Report.BoardRows.Add(ComponentText(s, i));
+                for (int i = 0; i < s.Board.Relays.Count; i++) Report.BoardRows.Add(RelayText(s, i));
 
                 Report.Modules.Clear();
                 foreach (ModuleInstance m in s.Modules.All.Where(m => !m.IsFree))
@@ -97,14 +99,25 @@ namespace Betaknight.Core.Autoplay
             Detach();
         }
 
-        private static string RowText(OverworldSession s, int i)
+        /// <summary>«#1 Shock Stab 1×1 @(1, 0) ← On Hit [Area]» bzw. «… not powered».</summary>
+        private static string ComponentText(OverworldSession s, int i)
         {
-            RuneSlot row = s.Runes.Rows[i];
-            string skill = row.Skill == null ? AutoplayTexts.EmptyRow : row.Skill.NameFrom(s.SkillCatalog);
-            var modules = new List<ModuleInstance>(row.Modules);
-            if (row.Skill != null) modules.AddRange(row.Skill.Modules);
+            ComponentSlot c = s.Board.Components[i];
+            string skill = c.Skill == null ? AutoplayTexts.EmptyRow : c.Skill.NameFrom(s.SkillCatalog);
+            List<RelayChip> powering = s.PoweringRelays(c);
+            string power = powering.Count > 0 ? string.Join(" / ", powering.Select(r => r.Name))
+                : s.IsTooLarge(c) ? ArenaTexts.NotPoweredTooLarge : ArenaTexts.NotPowered;
+            var modules = c.Skill != null ? new List<ModuleInstance>(c.Skill.Modules) : new List<ModuleInstance>();
             string extra = modules.Count == 0 ? string.Empty : " [" + string.Join(", ", modules.Select(m => m.NameFrom(s.ModuleCatalog))) + "]";
-            return $"{i + 1}. {row.Name} → {skill}{extra}";
+            return $"#{i + 1} {skill} {c.Shape} @{c.Origin} ← {power}{extra}";
+        }
+
+        /// <summary>«Relay 1: On Hit @(0, 0), max 2 cells [Invert]».</summary>
+        private static string RelayText(OverworldSession s, int i)
+        {
+            RelayChip r = s.Board.Relays[i];
+            string extra = r.Modules.Count == 0 ? string.Empty : " [" + string.Join(", ", r.Modules.Select(m => m.NameFrom(s.ModuleCatalog))) + "]";
+            return $"{CatalogTexts.RelayHolder(i)}: {r.Name} @{r.Position}, {CatalogTexts.Cells(s.RelayMaxCells(r))}{extra}";
         }
 
         private void Snapshot()
@@ -127,10 +140,10 @@ namespace Betaknight.Core.Autoplay
 
             if (result.Battle != null && _session != null)
             {
-                var runes = new List<(string, string, int)>();
-                foreach (RuneSlot row in _session.Runes.Rows) runes.Add((row.Rune?.Id, row.Rune?.Name ?? "?", row.Rune?.Difficulty ?? 0));
                 BattleReport report = BattleReport.Create(result.Battle);
-                RuneFireStats.Record(Report.RuneStats, runes, result.Battle, report);
+                RuneCatalog catalog = _session.RuneCatalog;
+                RuneFireStats.Record(Report.RuneStats, result.Battle,
+                    id => catalog.TryGet(id, out RuneDefinition rune) ? (rune.Name, rune.Difficulty) : (id, 0));
                 Report.AddDamage(_session.Act, report.BasicAttackDamage, report.TotalDamage);
             }
         }

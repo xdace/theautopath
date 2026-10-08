@@ -25,17 +25,23 @@ namespace Betaknight.Core.Arena
             {
                 case BattleEventKind.ActionStarted:
                     string row = RowLabel(e, result);
-                    text = row != null ? $"{who}: [{row}] → {SkillName(e.Detail)}" : $"{who}: {SkillName(e.Detail)}";
+                    text = row != null ? $"{who}: [{row}] → {Component(e.RowIndex, e.Detail)}" : $"{who}: {SkillName(e.Detail)}";
                     if (e.IsTriggered) text += ArenaTexts.LogTriggeredBy(e.CauseRow);
                     else if (e.IsRepeat) text += ArenaTexts.LogRepeat;
                     if (e.FromQueue) text += ArenaTexts.LogFromQueue(Time(e.QueuedTicks));
                     break;
                 case BattleEventKind.RowQueued:
-                    text = ArenaTexts.LogQueued(who, e.RowIndex, SkillName(e.Detail), e.Amount > 0 ? Time(e.Amount) : null);
+                    text = ArenaTexts.LogQueued(who, Component(e.RowIndex, e.Detail));
                     if (e.IsTriggered) text += ArenaTexts.LogTriggeredBy(e.CauseRow);
                     break;
-                case BattleEventKind.TriggerExpired:
-                    text = ArenaTexts.LogTriggerExpired(who, e.Amount, e.RowIndex, SkillName(e.Detail));
+                case BattleEventKind.TriggerMissed:
+                    text = ArenaTexts.LogMissed(who, Component(e.RowIndex, e.Detail), RowStateText.Reason((MissReason)e.Amount));
+                    break;
+                case BattleEventKind.RelayTriggered:
+                    text = ArenaTexts.LogRelay(who, ArenaTexts.RelayName(e.Relay, e.Detail));
+                    break;
+                case BattleEventKind.Frozen:
+                    text = ArenaTexts.LogFrozen(whom, Component(e.Extra, e.Detail), ArenaTexts.Seconds(e.Amount));
                     break;
                 case BattleEventKind.ActionInterrupted: text = ArenaTexts.LogInterrupted(who, SkillName(e.Detail)); break;
                 case BattleEventKind.Healed: text = ArenaTexts.LogHealed(whom, e.Amount); break;
@@ -63,6 +69,8 @@ namespace Betaknight.Core.Arena
                 default: return ArenaTexts.TimeUp;
             }
         }
+
+        private static string Component(int index, string skillId) => ArenaTexts.ComponentName(index, SkillName(skillId));
 
         private static string RowLabel(BattleEvent e, BattleResult result)
         {

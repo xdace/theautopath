@@ -126,7 +126,6 @@ namespace Betaknight.Core.Arena
         /// <summary>Grund-Cast-Zeit ohne Änderungen. Beim Basisangriff gleich der aktuellen.</summary>
         public int BaseCastTicks { get; }
         public int RecoveryTicks { get; }
-        public int CooldownTicks { get; }
         public IReadOnlyList<EffectInfo> Effects { get; }
 
         public bool DealsDamage
@@ -138,14 +137,13 @@ namespace Betaknight.Core.Arena
             }
         }
 
-        private SkillInfo(SkillDefinition skill, SkillUserStats stats, int windup, int recovery, int cooldown, IReadOnlyList<EffectInfo> effects)
+        private SkillInfo(SkillDefinition skill, SkillUserStats stats, int windup, int recovery, IReadOnlyList<EffectInfo> effects)
         {
             Skill = skill;
             Stats = stats;
             WindupTicks = windup;
             BaseCastTicks = skill.IsBasicAttack ? windup : Math.Max(1, skill.WindupTicks);
             RecoveryTicks = recovery;
-            CooldownTicks = cooldown;
             Effects = effects;
         }
 
@@ -157,7 +155,7 @@ namespace Betaknight.Core.Arena
             Battle.ActionTiming(skill, stats.AttackIntervalTicks, out int windup, out int recovery);
             var builder = new SkillInfoBuilder(stats);
             foreach (ISkillEffect effect in skill.Effects) effect.Describe(builder);
-            return new SkillInfo(skill, stats, windup, recovery, skill.CooldownTicks, builder.Effects);
+            return new SkillInfo(skill, stats, windup, recovery, builder.Effects);
         }
 
         /// <summary>Alle Schadens-Wirkungen, z. B. "120 % Waffenschaden ≈ 18 an allen Gegnern", sonst "kein Schaden".</summary>
@@ -182,13 +180,13 @@ namespace Betaknight.Core.Arena
             }
         }
 
-        /// <summary>"CD 5 s · Cast 0,8 s · Erholung 0,3 s"; geänderte Cast-Zeit mit Grundwert: "Cast 0,6 s (Grund 0,8 s)".</summary>
+        /// <summary>"2×1 (2 cells) · Cast 0.8 s · Recovery 0.2 s"; geänderte Cast-Zeit mit Grundwert: "Cast 0.6 s (base 0.8 s)".</summary>
         public string TimingText
         {
             get
             {
                 string cd = Skill.IsBasicAttack ? ArenaTexts.BasicAttackInterval(Seconds(WindupTicks + RecoveryTicks))
-                    : CooldownTicks > 0 ? ArenaTexts.Cooldown(Seconds(CooldownTicks)) : ArenaTexts.NoCooldown;
+                    : ArenaTexts.Size(Skill.Shape.ToString(), Skill.Shape.Cells);
                 return $"{cd} · {CastText} · {ArenaTexts.Recovery(Seconds(RecoveryTicks))}";
             }
         }
@@ -206,20 +204,19 @@ namespace Betaknight.Core.Arena
         /// <summary>Kompakte Infozeile: Schaden, dann Zeiten.</summary>
         public string Summary => $"{DamageText} · {TimingText}";
 
-        /// <summary>Passive Boni von Ausrüstung und Tags auf diesen Skill, z. B. «+20 % Wirkung, −1 s CD, −20 % Cast-Zeit». Leer ohne Bonus.</summary>
+        /// <summary>Passive Boni von Ausrüstung und Tags auf diesen Skill, z. B. «+20 % power, −20 % Cast Time». Leer ohne Bonus.</summary>
         public string BonusText
         {
             get
             {
                 var parts = new List<string>();
                 if (Skill.PowerBonusPercent != 0) parts.Add(ArenaTexts.PowerBonus(Skill.PowerBonusPercent > 0 ? "+" : "−", Math.Abs(Skill.PowerBonusPercent)));
-                if (Skill.CooldownBonusTicks != 0) parts.Add(ArenaTexts.CooldownBonus(Skill.CooldownBonusTicks < 0 ? "−" : "+", Seconds(Math.Abs(Skill.CooldownBonusTicks))));
                 if (Skill.CastBonusPercent != 0) parts.Add(ArenaTexts.CastBonus(Skill.CastBonusPercent < 0 ? "−" : "+", Math.Abs(Skill.CastBonusPercent)));
                 return string.Join(", ", parts);
             }
         }
 
-        /// <summary>«Baustein ◆◆ Schwer: −30 % Cooldown, +25 % Wirkung (eingerechnet)» oder leer ohne Bonus.</summary>
+        /// <summary>«Relay ◆◆ Hard: +30 % effect, −20 % Cast Time (included)» oder leer ohne Bonus.</summary>
         public string DifficultyLine =>
             Skill.DifficultyTier > 0
                 ? ArenaTexts.DifficultyLine(DifficultyText.Symbol(Skill.DifficultyTier), DifficultyText.Name(Skill.DifficultyTier), Skill.Difficulty.Text)
@@ -274,6 +271,7 @@ namespace Betaknight.Core.Arena
         /// <summary>"+100 % Block", "Rüstung −50 %", "+3 Rüstung".</summary>
         public static string StatChange(StatKind kind, int amount)
         {
+            if (kind == StatKind.CastPercent) return $"{StatName(kind)} {(amount < 0 ? "−" : "+")}{Math.Abs(amount)} %";
             string value = IsPercentStat(kind) ? Percent(amount) : $"{(amount < 0 ? "−" : string.Empty)}{Math.Abs(amount)}";
             if (amount >= 0) value = "+" + value;
             return $"{StatName(kind)} {value}";

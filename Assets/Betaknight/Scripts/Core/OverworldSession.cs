@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Encounters;
 using Betaknight.Core.Exploration;
@@ -53,7 +54,8 @@ namespace Betaknight.Core
         public ExplorationService Exploration { get; }
         public PlayerStats Stats { get; }
         public EncounterCatalog Encounters { get; }
-        public RuneLoadout Runes { get; }
+        /// <summary>Die Platine (A-19): Relais, Komponenten und Kern.</summary>
+        public CircuitBoard Board { get; }
         public RuneCatalog RuneCatalog { get; }
 
         /// <summary>So viele Runensplitter ergeben eine Runenwahl.</summary>
@@ -91,7 +93,7 @@ namespace Betaknight.Core
         private readonly EncounterResolver _resolver;
 
         public OverworldSession(HexMap map, PlayerModel player, TurnSystem turns, ExplorationService exploration,
-            PlayerStats stats = null, EncounterCatalog encounters = null, RuneLoadout runes = null, RuneCatalog runeCatalog = null,
+            PlayerStats stats = null, EncounterCatalog encounters = null, CircuitBoard board = null, RuneCatalog runeCatalog = null,
             ICombatResolver combat = null, Equipment equipment = null, EquipmentCatalog items = null,
             Inventory inventory = null, RuneInventory runeInventory = null, SkillCollection skills = null)
         {
@@ -106,18 +108,18 @@ namespace Betaknight.Core
             Exploration = exploration ?? throw new ArgumentNullException(nameof(exploration));
             Stats = stats ?? new PlayerStats();
             Encounters = encounters ?? EncounterCatalog.CreateDefault();
-            Runes = runes ?? new RuneLoadout();
+            Board = board ?? new CircuitBoard();
             RuneCatalog = runeCatalog ?? RuneCatalog.CreateDefault();
 
-            // Exemplare, die beim Aufbau schon an Zeilen sitzen, gehören zur Sammlung; ebenso später direkt gesetzte.
-            AdoptRowSkills();
-            Runes.Changed += AdoptRowSkills;
-            Runes.Changed += ReleaseOrphanModules;
+            // Exemplare, die beim Aufbau schon auf der Platine liegen, gehören zur Sammlung; ebenso später direkt gelegte.
+            AdoptBoardSkills();
+            Board.Changed += AdoptBoardSkills;
+            Board.Changed += ReleaseOrphanModules;
             Skills.Changed += ReleaseOrphanModules;
 
             // Eigener Zufall für Events und Angebote, abgeleitet vom Karten-Seed: gleicher Seed, gleiche Beute.
             _random = new Random(unchecked(Map.Seed * 31 + 7));
-            _resolver = new EncounterResolver(Map, Exploration, Stats, _random, Runes);
+            _resolver = new EncounterResolver(Map, Exploration, Stats, _random, Board);
             _combat = combat ?? new ArenaCombatResolver(synergies: Synergies);
             Turns.TurnEnded += OnTurnEnded;
 
@@ -134,7 +136,7 @@ namespace Betaknight.Core
             HexMap map = MapGenerator.Generate(config);
             RuneCatalog runeCatalog = RuneCatalog.CreateDefault();
             EquipmentCatalog items = EquipmentCatalog.CreateDefault();
-            var runes = new RuneLoadout();
+            var board = new CircuitBoard();
             var gear = new Equipment();
             var skills = new SkillCollection();
             if (kit != null)
@@ -142,11 +144,11 @@ namespace Betaknight.Core
                 foreach (string id in kit.StartItemIds)
                     if (items.TryGet(id, out EquipmentDefinition item)) gear.Equip(item);
 
-                // Start-Skills liegen in der Sammlung; der erste sitzt an der Start-Rune.
+                // Start-Skills liegen in der Sammlung; der erste liegt am Start-Relais (oben links, neben dem Kern).
                 foreach (string id in kit.StartSkillIds) skills.Add(id);
                 SkillInstance first = kit.StartSkillId != null ? skills.All.FirstOrDefault(s => s.SkillId == kit.StartSkillId) : null;
                 if (runeCatalog.TryGet(kit.StartRuneId, out RuneDefinition startRune))
-                    runes.TryAdd(startRune, first ?? SkillInstance.BasicAttack());
+                    KnightKit.LayOut(board, startRune, first);
             }
 
             var session = new OverworldSession(
@@ -156,7 +158,7 @@ namespace Betaknight.Core
                 new ExplorationService(map, sightRadius),
                 kit?.CreateStats(),
                 config.Encounters,
-                runes,
+                board,
                 runeCatalog,
                 null,
                 gear,
@@ -274,7 +276,7 @@ namespace Betaknight.Core
         public RuneOffer OfferRunes(string source)
         {
             if (IsBusy) return null;
-            RuneOffer offer = RuneOffer.Create(source, RuneCatalog, Runes, _random, isUnlocked: IsRuneUnlocked, isOwned: RuneInventory.Contains);
+            RuneOffer offer = RuneOffer.Create(source, RuneCatalog, Board, _random, isUnlocked: IsRuneUnlocked, isOwned: RuneInventory.Contains);
             offer = ShapeOffer(offer.WithItems(RollRewardItems(source)).WithSkills(RollRewardSkills(source)))
                 .WithModules(RollRewardModules(source));
             if (offer.Count == 0) return null;

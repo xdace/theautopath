@@ -35,21 +35,23 @@ namespace Betaknight.Core.Gear
         }
     }
 
-    /// <summary>Jeder Block bzw. jedes Ausweichen des Trägers senkt alle eigenen Cooldowns.</summary>
-    public sealed class SynergyCooldownOnDefense : BattleModifier
+    /// <summary>Jeder Block bzw. jedes Ausweichen des Trägers gibt Haste (kürzere Cast-Zeit). Ersetzt seit A-19 «senkt Cooldowns».</summary>
+    public sealed class SynergyHasteOnDefense : BattleModifier
     {
         private readonly BattleEventKind _kind;
+        private readonly int _percent;
         private readonly int _ticks;
 
-        public SynergyCooldownOnDefense(BattleEventKind kind, int ticks)
+        public SynergyHasteOnDefense(BattleEventKind kind, int percent, int ticks)
         {
             _kind = kind;
+            _percent = percent;
             _ticks = ticks;
         }
 
         public override void OnEvent(Battle battle, Combatant owner, BattleEvent e)
         {
-            if (e.Kind == _kind && e.Target == owner && owner.IsAlive) owner.ReduceCooldowns(_ticks);
+            if (e.Kind == _kind && e.Target == owner && owner.IsAlive) battle.Haste(owner, _percent, _ticks);
         }
     }
 
@@ -151,22 +153,24 @@ namespace Betaknight.Core.Gear
         }
     }
 
-    /// <summary>Eigene Basisangriffe gegen Ziele mit einem Zustand senken alle eigenen Cooldowns.</summary>
-    public sealed class SynergyCooldownOnBasicVsStatus : BattleModifier
+    /// <summary>Eigene Basisangriffe gegen Ziele mit einem Zustand geben Haste. Ersetzt seit A-19 «senkt Cooldowns».</summary>
+    public sealed class SynergyHasteOnBasicVsStatus : BattleModifier
     {
         private readonly string _statusId;
+        private readonly int _percent;
         private readonly int _ticks;
 
-        public SynergyCooldownOnBasicVsStatus(string statusId, int ticks)
+        public SynergyHasteOnBasicVsStatus(string statusId, int percent, int ticks)
         {
             _statusId = statusId;
+            _percent = percent;
             _ticks = ticks;
         }
 
         public override void OnEvent(Battle battle, Combatant owner, BattleEvent e)
         {
             if (e.Kind != BattleEventKind.Hit || e.Source != owner || e.Detail != SkillDefinition.BasicAttackId) return;
-            if (e.Target != null && e.Target.HasStatus(_statusId)) owner.ReduceCooldowns(_ticks);
+            if (e.Target != null && e.Target.HasStatus(_statusId)) battle.Haste(owner, _percent, _ticks);
         }
     }
 

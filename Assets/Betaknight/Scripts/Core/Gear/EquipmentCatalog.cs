@@ -51,7 +51,8 @@ namespace Betaknight.Core.Gear
 
         private static SkillPassive Power(SkillKind tag, int percent) => SkillPassive.Power(tag, percent);
 
-        private static SkillPassive Faster(SkillKind tag, int seconds) => SkillPassive.Cooldown(tag, -Ticks.FromSeconds(seconds));
+        /// <summary>Früher «−1 s Cooldown» je Stufe, seit A-19 (keine Cooldowns) −15 % Cast-Zeit je Stufe.</summary>
+        private static SkillPassive Faster(SkillKind tag, int steps) => SkillPassive.Cast(tag, -15 * steps);
 
         public static EquipmentCatalog CreateDefault() => new EquipmentCatalog(new[]
         {

@@ -29,9 +29,11 @@ namespace Betaknight.Core.Modules
         public const int AreaPercent = 70;
         public const int AreaPercentPerLevel = 15;
         public const int BloodCostPercent = 5;
+        public const int BloodPowerPercent = 40;
+        public const int BloodPowerPercentPerLevel = 10;
         public const int QuickcastPercent = -30;
         public const int QuickcastPercentPerLevel = -10;
-        public const int QuickcastCooldownPercent = 30;
+        public const int QuickcastPowerPercent = -15;
         public static readonly int ExtendTicks = Ticks.PerSecond;
         public static readonly int ExtendTicksPerLevel = Ticks.FromTenths(5);
         public const int ThresholdPercent = 10;
@@ -53,10 +55,11 @@ namespace Betaknight.Core.Modules
                 case ModuleIds.Chain:
                     return skill.WithModule(name, extraTargets: 1 + level);
                 case ModuleIds.BloodCost:
-                    return skill.WithModule(name, hpCostBp: BasisPoints.Percent(System.Math.Max(1, BloodCostPercent - level)));
+                    return skill.WithModule(name, hpCostBp: BasisPoints.Percent(System.Math.Max(1, BloodCostPercent - level)))
+                        .WithBonus(BloodPowerPercent + BloodPowerPercentPerLevel * level);
                 case ModuleIds.Quickcast:
-                    return skill.WithModule(name, cooldownTicks: skill.CooldownTicks * (100 + QuickcastCooldownPercent) / 100,
-                        castPercent: QuickcastPercent + QuickcastPercentPerLevel * level);
+                    return skill.WithModule(name, castPercent: QuickcastPercent + QuickcastPercentPerLevel * level)
+                        .WithBonus(QuickcastPowerPercent);
                 default:
                     return skill;
             }

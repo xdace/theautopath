@@ -15,9 +15,9 @@ namespace Betaknight.Core.Encounters
         private readonly ExplorationService _exploration;
         private readonly PlayerStats _stats;
         private readonly Random _random;
-        private readonly RuneLoadout _runes;
+        private readonly Circuit.CircuitBoard _runes;
 
-        public EncounterResolver(HexMap map, ExplorationService exploration, PlayerStats stats, Random random, RuneLoadout runes = null)
+        public EncounterResolver(HexMap map, ExplorationService exploration, PlayerStats stats, Random random, Circuit.CircuitBoard runes = null)
         {
             _runes = runes;
             _map = map ?? throw new ArgumentNullException(nameof(map));
@@ -92,7 +92,7 @@ namespace Betaknight.Core.Encounters
             int index = _runes?.BestUpgradeTarget() ?? -1;
             if (index < 0) return SessionTexts.NoRuneToUpgrade;
             _runes.Upgrade(index);
-            return SessionTexts.RuneUpgraded(_runes.Rows[index].Name);
+            return SessionTexts.RuneUpgraded(_runes.Relays[index].Name);
         }
 
         private string ScoutNearest(CellContent target, HexCoord origin)

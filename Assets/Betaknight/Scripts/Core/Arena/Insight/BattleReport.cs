@@ -2,30 +2,32 @@ using System.Collections.Generic;
 
 namespace Betaknight.Core.Arena
 {
-    /// <summary>Auswertung einer Tafel-Zeile nach dem Kampf.</summary>
+    /// <summary>Auswertung einer Komponente der Platine nach dem Kampf (A-19).</summary>
     public sealed class RowReport
     {
         public int Index { get; }
+
+        /// <summary>Versorgende Relais, z. B. «On Hit».</summary>
         public string Label { get; }
         public string Skill { get; }
         public bool IsFallback { get; }
 
-        /// <summary>Wie oft die Zeile eine Aktion gestartet hat (inklusive ausgelöster und wiederholter).</summary>
+        /// <summary>Wie oft die Komponente eine Aktion gestartet hat (inklusive ausgelöster und wiederholter).</summary>
         public int Fired { get; internal set; }
 
-        /// <summary>Davon durch Auslöser gestartet.</summary>
-        public int Triggered { get; internal set; }
+        /// <summary>Wie oft ein Relais oder Auslöser sie erreicht hat (eingereiht oder verpasst).</summary>
+        public int Triggered => Queued + Missed;
 
-        /// <summary>Davon Wiederholungen (Echo, Modul «Mehrfach»).</summary>
+        /// <summary>Davon durch Auslöser-Module gestartet.</summary>
+        public int FromTriggerModule { get; internal set; }
+
+        /// <summary>Davon Wiederholungen (Echo, Modul «Multicast»).</summary>
         public int Repeated { get; internal set; }
 
-        /// <summary>Auslöser auf diese Zeile, die verfallen sind (Skill nicht bereit).</summary>
-        public int TriggersExpired { get; internal set; }
-
-        /// <summary>Welche Zeilen diese ausgelöst haben (Index, Anzahl), für die Kette in der Auswertung.</summary>
+        /// <summary>Welche Komponenten diese über ein Auslöser-Modul gestartet haben (Index, Anzahl).</summary>
         internal readonly SortedDictionary<int, int> TriggeredBy = new SortedDictionary<int, int>();
 
-        /// <summary>«Zeile 1 ×3, Zeile 2 ×1» oder leer.</summary>
+        /// <summary>«#1 ×3, #2 ×1» oder leer.</summary>
         public string TriggeredByText
         {
             get
@@ -36,88 +38,78 @@ namespace Betaknight.Core.Arena
             }
         }
 
-        /// <summary>Schaden an Gegnern aus Aktionen dieser Zeile (inklusive Brennen, das sie gesetzt hat).</summary>
+        /// <summary>Schaden an Gegnern aus Aktionen dieser Komponente (inklusive Brennen, das sie gesetzt hat).</summary>
         public int Damage { get; internal set; }
         public int Healing { get; internal set; }
 
         /// <summary>Anteil am Gesamtschaden in Basispunkten.</summary>
         public int DamageShareBp { get; internal set; }
 
-        /// <summary>Wie oft die Zeile eingereiht wurde (A-13: erfüllt, aber gerade nicht startbar).</summary>
+        /// <summary>Wie oft die Komponente eingereiht wurde.</summary>
         public int Queued { get; internal set; }
 
-        /// <summary>Starts aus der Warteschlange und ihre gesamte Wartezeit in Ticks.</summary>
+        /// <summary>Starts aus der Warteschlange, davon mit Wartezeit, und die gesamte Wartezeit in Ticks.</summary>
         public int StartedFromQueue { get; internal set; }
+        public int Waited { get; internal set; }
         public int WaitTicksTotal { get; internal set; }
 
-        /// <summary>Mittlere Wartezeit der Starts aus der Warteschlange in Ticks (0 ohne solche Starts).</summary>
-        public int AverageWaitTicks => StartedFromQueue > 0 ? WaitTicksTotal / StartedFromQueue : 0;
+        /// <summary>Mittlere Wartezeit der Starts, die warten mussten, in Ticks (0 ohne solche Starts).</summary>
+        public int AverageWaitTicks => Waited > 0 ? WaitTicksTotal / Waited : 0;
 
-        /// <summary>«4× eingereiht, Ø 1,2 s gewartet» oder leer.</summary>
+        /// <summary>«4× queued, Ø 1.2 s wait» oder leer.</summary>
         public string QueueText => Queued == 0 ? string.Empty
-            : StartedFromQueue > 0 ? ArenaTexts.QueueStats(Queued, SkillInfo.Seconds(AverageWaitTicks)) : ArenaTexts.QueueStats(Queued);
+            : Waited > 0 ? ArenaTexts.QueueStats(Queued, SkillInfo.Seconds(AverageWaitTicks)) : ArenaTexts.QueueStats(Queued);
 
-        /// <summary>Grundschwierigkeit des Bausteins (0–3); bestimmt den Bonus.</summary>
+        /// <summary>«Missed Trigger»: Auslösen, das nichts bewirkt hat (schon eingereiht, zu gross, eingefroren).</summary>
+        public int Missed { get; internal set; }
+
+        internal readonly Dictionary<MissReason, int> MissReasons = new Dictionary<MissReason, int>();
+
+        public int MissCount(MissReason reason) => MissReasons.TryGetValue(reason, out int n) ? n : 0;
+
+        /// <summary>Häufigster Grund für Missed Triggers, null ohne.</summary>
+        public MissReason? MainMissReason { get; internal set; }
+
+        /// <summary>Wird die Komponente von einem Relais versorgt? (Ohne Versorgung feuert sie nie.)</summary>
+        public bool IsPowered { get; internal set; }
+
+        /// <summary>Berührt sie ein Relais, für das sie zu gross ist?</summary>
+        public bool IsTooLargeSomewhere { get; internal set; }
+
+        /// <summary>Höchste Schwierigkeit der versorgenden Relais (0–3).</summary>
         public int Difficulty { get; internal set; }
 
-        /// <summary>Wie oft die Bedingung erfüllt wurde (Wechsel von «nicht erfüllt» zu «erfüllt»), -1 wenn unbekannt.</summary>
-        public int ConditionMet { get; internal set; } = -1;
-
-        /// <summary>Ausführungen mit Schwierigkeits-Bonus (eigener oder über einen Auslöser mitgebrachter).</summary>
+        /// <summary>Ausführungen mit Schwierigkeits-Bonus.</summary>
         public int BonusExecutions { get; internal set; }
 
         /// <summary>Schaden bzw. Heilung, die der Bonus dazugegeben hat.</summary>
         public int BonusDamage { get; internal set; }
         public int BonusHealing { get; internal set; }
 
-        /// <summary>Cooldown, den der Bonus eingespart hat, in Ticks.</summary>
-        public int CooldownSavedTicks { get; internal set; }
+        /// <summary>Cast-Zeit, die der Bonus eingespart hat, in Ticks.</summary>
+        public int CastSavedTicks { get; internal set; }
 
-        /// <summary>«Bedingung 12× erfüllt · Bonus: 8 Ausführungen, +140 Schaden, 6,0 s Cooldown gespart» oder leer.</summary>
+        /// <summary>«Triggered 12× · Bonus: 8 executions, +140 damage, 1.5 s cast saved» oder leer.</summary>
         public string DifficultyText
         {
             get
             {
                 if (IsFallback) return string.Empty;
-                var parts = new List<string>();
-                if (ConditionMet >= 0) parts.Add(ArenaTexts.ConditionMetCount(ConditionMet));
+                var parts = new List<string> { ArenaTexts.TriggeredCount(Triggered) };
                 if (BonusExecutions > 0)
                 {
                     var bonus = new List<string> { ArenaTexts.BonusExecutions(BonusExecutions) };
                     if (BonusDamage > 0) bonus.Add(ArenaTexts.BonusDamage(BonusDamage));
                     if (BonusHealing > 0) bonus.Add(ArenaTexts.BonusHealing(BonusHealing));
-                    if (CooldownSavedTicks > 0) bonus.Add(ArenaTexts.CooldownSaved(SkillInfo.Seconds(CooldownSavedTicks)));
+                    if (CastSavedTicks > 0) bonus.Add(ArenaTexts.CastSaved(SkillInfo.Seconds(CastSavedTicks)));
                     parts.Add(ArenaTexts.BonusPrefix + string.Join(", ", bonus));
                 }
                 return string.Join(" · ", parts);
             }
         }
 
-        /// <summary>Wie oft die Zeile nicht drankam (über der gewählten Zeile oder «Aktion läuft»), alle Gründe zusammen.</summary>
-        public int Skipped { get; internal set; }
-
-        /// <summary>
-        /// H-04 «Missed Trigger»: wie oft die Bedingung nicht erfüllt war, während eine tiefere Zeile oder der Basisangriff
-        /// feuerte. Seit der Warteschlange (A-13) der Normalfall des Nicht-Drankommens.
-        /// </summary>
-        public int MissedTrigger => SkipCount(RowCheckState.ConditionFalse);
-
-        /// <summary>Häufigster Grund beim Nicht-Drankommen, null wenn nie.</summary>
-        public RowCheckState? MainReason { get; internal set; }
-
-        /// <summary>
-        /// Häufigster Grund ausser «Bedingung nicht erfüllt» und Cooldown (z. B. verwaist, Aktion läuft), null ohne.
-        /// Nur solche Gründe bekommen in der Auswertung eine eigene Spalte.
-        /// </summary>
-        public RowCheckState? OtherReason { get; internal set; }
-
-        internal readonly Dictionary<RowCheckState, int> SkipReasons = new Dictionary<RowCheckState, int>();
-        internal readonly Dictionary<RowCheckState, int> AllStates = new Dictionary<RowCheckState, int>();
-
-        public int SkipCount(RowCheckState reason) => SkipReasons.TryGetValue(reason, out int n) ? n : 0;
-
-        /// <summary>«Zeile 3» oder «Basisangriff» für die Fallback-Zeile.</summary>
-        public string Name => IsFallback ? ArenaTexts.BasicAttackRow : ArenaTexts.RowName(Index);
+        /// <summary>«#2 Shield Bash» oder «Basic Attack».</summary>
+        public string Name => IsFallback ? ArenaTexts.BasicAttack : ArenaTexts.ComponentName(Index, Skill);
 
         internal RowReport(int index, string label, string skill, bool fallback)
         {
@@ -129,8 +121,8 @@ namespace Betaknight.Core.Arena
     }
 
     /// <summary>
-    /// Auswertung nach dem Kampf aus Protokoll und Entscheidungen: pro Zeile Feuern, Schaden, Heilung, Überspringen
-    /// und Hinweise wie «Zeile 3 hat nie gefeuert: Bedingung nie erfüllt». Rechnet nichts neu.
+    /// Auswertung nach dem Kampf aus dem Protokoll: pro Komponente Feuern, Einreihen, Missed Triggers, Schaden, Heilung
+    /// und Hinweise wie «#3 Drill Strike never fired: not powered». Rechnet nichts neu.
     /// </summary>
     public sealed class BattleReport
     {
@@ -143,32 +135,31 @@ namespace Betaknight.Core.Arena
         /// <summary>Gesamtschaden des Spielers an Gegnern laut Protokoll.</summary>
         public int TotalDamage { get; private set; }
 
-        /// <summary>Schaden ohne Zeile, z. B. aus Set-Boni oder Rückschlag.</summary>
+        /// <summary>Schaden ohne Komponente, z. B. aus Set-Boni oder Rückschlag.</summary>
         public int OtherDamage { get; private set; }
         public int TotalHealing { get; private set; }
 
-        /// <summary>Schaden des Basisangriffs (aus allen Zeilen, auch der Basisangriff-Zeile).</summary>
+        /// <summary>Schaden des Basisangriffs.</summary>
         public int BasicAttackDamage { get; private set; }
 
         /// <summary>Anteil des Basisangriffs am Gesamtschaden in Basispunkten; der Rest kommt aus Skills.</summary>
         public int BasicAttackShareBp => TotalDamage > 0 ? (int)((long)BasicAttackDamage * BasisPoints.Full / TotalDamage) : 0;
 
-        /// <summary>«Basisangriff 28 % · Skills 72 %», leer ohne Schaden.</summary>
+        /// <summary>«Basic Attack 28 % · Skills 72 %», leer ohne Schaden.</summary>
         public string DamageSplitText => TotalDamage > 0
             ? ArenaTexts.DamageSplit(SkillInfo.Percent(BasicAttackShareBp), SkillInfo.Percent(BasisPoints.Full - BasicAttackShareBp))
             : string.Empty;
 
         /// <summary>Schaden, den Schwierigkeits-Boni insgesamt dazugegeben haben.</summary>
         public int BonusDamage { get; private set; }
-        public int Decisions { get; private set; }
 
-        /// <summary>Gibt es Gründe ausser «Bedingung nicht erfüllt» (z. B. verwaist)? Nur dann zeigt die Auswertung die Grund-Spalte.</summary>
-        public bool HasOtherReasons { get; private set; }
+        /// <summary>Wie oft Relais des Spielers ausgelöst haben.</summary>
+        public int RelayTriggers { get; private set; }
 
-        /// <summary>Gründe, die mehr erklären als ein verpasster Auslöser: verwaist oder eine laufende Aktion.</summary>
-        public static bool IsOtherReason(RowCheckState state) => state == RowCheckState.Orphaned || state == RowCheckState.ActionRunning;
+        /// <summary>Gibt es Missed Triggers? Nur dann zeigt die Auswertung die Spalte.</summary>
+        public bool HasMissedTriggers { get; private set; }
 
-        /// <summary>Bis zu so vielen erfüllten Bedingungen gilt eine Zeile als selten ausgelöst (Hinweis).</summary>
+        /// <summary>Bis zu so vielen Auslösungen gilt eine Komponente als selten ausgelöst (Hinweis).</summary>
         public const int RarelyTriggered = 1;
 
         public static BattleReport Create(BattleResult result)
@@ -181,12 +172,18 @@ namespace Betaknight.Core.Arena
         private void Build(BattleResult result)
         {
             int count = result.PlayerRowLabels.Count;
+            LogicBoard board = result.PlayerBoard;
             for (int i = 0; i < count; i++)
             {
                 string skill = i < result.PlayerRowSkills.Count ? result.PlayerRowSkills[i] : "?";
                 var r = new RowReport(i, result.PlayerRowLabels[i], skill, i == count - 1);
                 if (result.PlayerRowDifficulty != null && i < result.PlayerRowDifficulty.Count) r.Difficulty = result.PlayerRowDifficulty[i];
-                if (result.PlayerRowMet != null && i < result.PlayerRowMet.Count) r.ConditionMet = result.PlayerRowMet[i];
+                if (board != null && i < board.Rows.Count)
+                {
+                    r.IsPowered = board.Rows[i].IsPowered;
+                    r.IsTooLargeSomewhere = board.Rows[i].TooLargeFor.Count > 0;
+                }
+                else r.IsPowered = true;
                 _rows.Add(r);
             }
 
@@ -197,31 +194,42 @@ namespace Betaknight.Core.Arena
                 RowReport row = e.RowIndex >= 0 && e.RowIndex < count ? _rows[e.RowIndex] : null;
                 switch (e.Kind)
                 {
+                    case BattleEventKind.RelayTriggered:
+                        RelayTriggers++;
+                        break;
                     case BattleEventKind.ActionStarted:
                         if (row == null) break;
                         row.Fired++;
                         if (e.FromQueue)
                         {
                             row.StartedFromQueue++;
-                            row.WaitTicksTotal += e.QueuedTicks;
+                            if (e.QueuedTicks > 0)
+                            {
+                                row.Waited++;
+                                row.WaitTicksTotal += e.QueuedTicks;
+                            }
                         }
                         if (e.IsRepeat) row.Repeated++;
                         if (e.Tier > 0)
                         {
                             row.BonusExecutions++;
-                            row.CooldownSavedTicks += e.Bonus;
+                            row.CastSavedTicks += e.Bonus;
                         }
-                        if (e.IsTriggered)
+                        if (e.IsTriggered && e.CauseRow >= 0)
                         {
-                            row.Triggered++;
+                            row.FromTriggerModule++;
                             row.TriggeredBy[e.CauseRow] = (row.TriggeredBy.TryGetValue(e.CauseRow, out int n) ? n : 0) + 1;
                         }
                         break;
                     case BattleEventKind.RowQueued:
                         if (row != null) row.Queued++;
                         break;
-                    case BattleEventKind.TriggerExpired:
-                        if (row != null) row.TriggersExpired++;
+                    case BattleEventKind.TriggerMissed:
+                        if (row == null) break;
+                        row.Missed++;
+                        var reason = (MissReason)e.Amount;
+                        row.MissReasons[reason] = row.MissCount(reason) + 1;
+                        HasMissedTriggers = true;
                         break;
                     case BattleEventKind.Damage:
                         if (e.Target == null || e.Target.Side == player.Side) break;
@@ -246,26 +254,10 @@ namespace Betaknight.Core.Arena
                 }
             }
 
-            foreach (BattleDecision d in result.Decisions)
-            {
-                Decisions++;
-                for (int i = 0; i < count && i < d.Rows.Count; i++)
-                {
-                    RowCheckState state = d.Rows[i].State;
-                    Add(_rows[i].AllStates, state);
-                    // Eingereiht ist nicht übersprungen: die Zeile wartet und kommt dran (A-13).
-                    if (!d.Skipped(i) || d.Queued(i)) continue;
-                    _rows[i].Skipped++;
-                    Add(_rows[i].SkipReasons, state);
-                }
-            }
-
             foreach (RowReport row in _rows)
             {
                 row.DamageShareBp = TotalDamage > 0 ? (int)((long)row.Damage * BasisPoints.Full / TotalDamage) : 0;
-                row.MainReason = Most(row.SkipReasons);
-                row.OtherReason = Most(row.SkipReasons, IsOtherReason);
-                if (row.OtherReason.HasValue) HasOtherReasons = true;
+                row.MainMissReason = MostMissed(row);
             }
 
             BuildHints();
@@ -275,18 +267,16 @@ namespace Betaknight.Core.Arena
         {
             foreach (RowReport row in _rows)
             {
-                if (row.IsFallback) continue;
-                // H-04: Wie oft wurde die Bedingung erfüllt? Selten erfüllte Bausteine brauchen Erleichterer oder einen anderen Baustein.
-                if (row.ConditionMet >= 0 && row.ConditionMet <= RarelyTriggered && row.Triggered == 0 && !OnlyOrphaned(row) && row.AllStates.Count > 0)
-                {
-                    _hints.Add(ArenaTexts.HintRarelyTriggered(row.Index, row.ConditionMet, row.Difficulty > 0 ? DifficultyText.Name(row.Difficulty) : null));
-                    continue;
-                }
-                if (row.Fired > 0) continue;
-                _hints.Add(ArenaTexts.HintNeverFired(row.Name, NeverFiredReason(row)));
+                if (row.IsFallback || row.Fired > 0) continue;
+                if (row.Skill == "—") _hints.Add(ArenaTexts.HintNeverFired(row.Name, ArenaTexts.NeverFiredOrphaned));
+                else if (!row.IsPowered)
+                    _hints.Add(ArenaTexts.HintNeverFired(row.Name, row.IsTooLargeSomewhere ? ArenaTexts.NeverFiredTooLarge : ArenaTexts.NeverFiredUnpowered));
+                else if (row.Triggered <= RarelyTriggered)
+                    _hints.Add(ArenaTexts.HintRarelyTriggered(row.Name, row.Triggered, row.Difficulty > 0 ? DifficultyText.Name(row.Difficulty) : null));
+                else _hints.Add(ArenaTexts.HintNeverFired(row.Name, ArenaTexts.NeverFiredOther));
             }
 
-            // Wer trägt den Schaden? Nur sinnvoll, wenn mehrere Zeilen Schaden machen.
+            // Wer trägt den Schaden? Nur sinnvoll, wenn mehrere Komponenten Schaden machen.
             RowReport best = null;
             int dealing = 0;
             foreach (RowReport row in _rows)
@@ -296,84 +286,68 @@ namespace Betaknight.Core.Arena
                 if (best == null || row.Damage > best.Damage) best = row;
             }
             if (best != null && dealing > 1)
-                _hints.Add(ArenaTexts.HintTopDamage(best.Name, best.Skill, SkillInfo.Percent(best.DamageShareBp)));
+                _hints.Add(ArenaTexts.HintTopDamage(best.Name, SkillInfo.Percent(best.DamageShareBp)));
 
+            // Viele Missed Triggers, weil die Komponente schon wartete: das Relais löst schneller aus, als sie feuern kann.
             foreach (RowReport row in _rows)
             {
-                if (row.Fired == 0 || row.Skipped < 3) continue;
-                if (row.MainReason == RowCheckState.ActionRunning && row.SkipCount(RowCheckState.ActionRunning) * 2 >= row.Skipped)
-                    _hints.Add(ArenaTexts.HintBlockedByAction(row.Name, row.SkipCount(RowCheckState.ActionRunning)));
+                if (row.IsFallback) continue;
+                int queued = row.MissCount(MissReason.AlreadyQueued);
+                if (queued >= 3 && queued * 2 >= row.Triggered) _hints.Add(ArenaTexts.HintMissedQueued(row.Name, queued));
             }
 
-            // Auslöser-Ketten: wer löst wen aus, und wie viele verfallen, weil das Ziel nicht bereit war.
+            // Auslöser-Ketten: wer startet wen über ein Modul.
+            foreach (RowReport row in _rows)
+                if (row.FromTriggerModule > 0) _hints.Add(ArenaTexts.HintTriggered(row.Name, row.FromTriggerModule, row.TriggeredByText));
+
+            // Schwierigkeits-Bonus: was hat er ausgemacht?
             foreach (RowReport row in _rows)
             {
-                if (row.Triggered > 0) _hints.Add(ArenaTexts.HintTriggered(row.Name, row.Skill, row.Triggered, row.TriggeredByText));
-                if (row.TriggersExpired > 0)
-                    _hints.Add(ArenaTexts.HintTriggersExpired(row.TriggersExpired, row.Name));
+                if (row.IsFallback || row.BonusDamage <= 0 || row.Damage <= 0) continue;
+                _hints.Add(ArenaTexts.HintBonus(row.Name, DifficultyText.Symbol(row.Difficulty), row.BonusDamage,
+                    SkillInfo.Percent((int)((long)row.BonusDamage * BasisPoints.Full / row.Damage))));
             }
 
-            // Schwierigkeits-Bonus: was hat er ausgemacht, und welche schweren Bausteine kamen nie zum Zug?
-            foreach (RowReport row in _rows)
-            {
-                if (row.IsFallback || row.Difficulty == 0) continue;
-                if (row.BonusDamage > 0 && row.Damage > 0)
-                    _hints.Add(ArenaTexts.HintBonus(row.Name, DifficultyText.Symbol(row.Difficulty), row.BonusDamage,
-                        SkillInfo.Percent((int)((long)row.BonusDamage * BasisPoints.Full / row.Damage))));
-            }
-
-            // Warteschlange: welche Zeile wartet am längsten?
+            // Warteschlange: welche Komponente wartet am längsten?
             RowReport waiting = null;
             foreach (RowReport row in _rows)
-                if (row.StartedFromQueue > 0 && (waiting == null || row.AverageWaitTicks > waiting.AverageWaitTicks)) waiting = row;
+                if (row.Waited > 0 && (waiting == null || row.AverageWaitTicks > waiting.AverageWaitTicks)) waiting = row;
             if (waiting != null && waiting.AverageWaitTicks >= Ticks.PerSecond)
-                _hints.Add(ArenaTexts.HintLongWait(waiting.Name, waiting.Skill, SkillInfo.Seconds(waiting.AverageWaitTicks)));
+                _hints.Add(ArenaTexts.HintLongWait(waiting.Name, SkillInfo.Seconds(waiting.AverageWaitTicks)));
 
             if (OtherDamage > 0) _hints.Add(ArenaTexts.HintOtherDamage(OtherDamage));
         }
 
-        private static bool OnlyOrphaned(RowReport row)
+        private static MissReason? MostMissed(RowReport row)
         {
-            int total = 0;
-            foreach (int n in row.AllStates.Values) total += n;
-            return total > 0 && row.AllStates.TryGetValue(RowCheckState.Orphaned, out int orphaned) && orphaned == total;
-        }
-
-        private static string NeverFiredReason(RowReport row)
-        {
-            if (row.AllStates.Count == 0) return ArenaTexts.NeverFiredNoDecision;
-            int Count(RowCheckState s) => row.AllStates.TryGetValue(s, out int n) ? n : 0;
-            int total = 0;
-            foreach (int n in row.AllStates.Values) total += n;
-
-            if (Count(RowCheckState.Orphaned) == total) return ArenaTexts.NeverFiredOrphaned;
-            if (Count(RowCheckState.ConditionFalse) == total) return ArenaTexts.NeverFiredConditionFalse;
-            if (Count(RowCheckState.Cooldown) == total) return ArenaTexts.NeverFiredCooldown;
-            if (Count(RowCheckState.ActionRunning) > 0) return ArenaTexts.NeverFiredActionRunning;
-            if (Count(RowCheckState.Ready) > 0) return ArenaTexts.NeverFiredPriority;
-            return Count(RowCheckState.ConditionFalse) >= Count(RowCheckState.Cooldown)
-                ? ArenaTexts.NeverFiredConditionWhenReady
-                : ArenaTexts.NeverFiredMostlyCooldown;
-        }
-
-        private static void Add(Dictionary<RowCheckState, int> counts, RowCheckState state) =>
-            counts[state] = (counts.TryGetValue(state, out int n) ? n : 0) + 1;
-
-        private static RowCheckState? Most(Dictionary<RowCheckState, int> counts, System.Func<RowCheckState, bool> only = null)
-        {
-            RowCheckState? best = null;
+            MissReason? best = null;
             int max = 0;
-            // Feste Reihenfolge, damit Gleichstände immer gleich ausgehen.
-            foreach (RowCheckState s in new[] { RowCheckState.ConditionFalse, RowCheckState.Cooldown, RowCheckState.Orphaned, RowCheckState.ActionRunning, RowCheckState.Queued, RowCheckState.Ready })
+            foreach (MissReason r in new[] { MissReason.AlreadyQueued, MissReason.TooLarge, MissReason.Frozen, MissReason.Orphaned })
             {
-                if (only != null && !only(s)) continue;
-                if (counts.TryGetValue(s, out int n) && n > max)
-                {
-                    max = n;
-                    best = s;
-                }
+                int n = row.MissCount(r);
+                if (n <= max) continue;
+                max = n;
+                best = r;
             }
             return best;
         }
+    }
+
+    /// <summary>Lesbare Gründe für Missed Triggers.</summary>
+    public static class RowStateText
+    {
+        public static string Reason(MissReason reason)
+        {
+            switch (reason)
+            {
+                case MissReason.TooLarge: return ArenaTexts.MissTooLarge;
+                case MissReason.Frozen: return ArenaTexts.MissFrozen;
+                case MissReason.Orphaned: return ArenaTexts.MissOrphaned;
+                default: return ArenaTexts.MissAlreadyQueued;
+            }
+        }
+
+        /// <summary>«1.5 s» mit einer Nachkommastelle.</summary>
+        public static string Seconds(int ticks) => ArenaTexts.SecondsOneDecimal(ticks);
     }
 }
