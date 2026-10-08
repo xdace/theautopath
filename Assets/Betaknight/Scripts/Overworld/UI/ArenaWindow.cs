@@ -164,12 +164,13 @@ namespace Betaknight.Overworld.UI
 
         private void OnGUI()
         {
+            UiTheme.Apply();
             if (_playback == null) return;
             EnsureStyles();
             GUI.depth = -10;
 
             var screen = new Rect(0, 0, Screen.width, Screen.height);
-            Fill(screen, new Color(0.04f, 0.05f, 0.07f, 0.96f));
+            Fill(screen, new Color(0.04f, 0.05f, 0.07f, 1f));
 
             const float pad = 16f;
             float boardWidth = Mathf.Min(360f, Screen.width * 0.33f);
@@ -280,7 +281,7 @@ namespace Betaknight.Overworld.UI
                 Fill(back, new Color(0.18f, 0.18f, 0.2f));
                 Fill(new Rect(back.x, back.y, back.width * r.Fill, back.height), ResourceColor(r.Id));
                 string max = r.Max > 0 ? $"/{r.Max}" : string.Empty;
-                GUI.Label(new Rect(x - 20f, back.yMax - 1f, width + 40f, 16f), $"<size=11>{SkillInfo.ResourceName(r.Id)} {r.Value}{max}</size>", _small);
+                GUI.Label(new Rect(x - 20f, back.yMax - 1f, width + 40f, 16f), $"<size=13>{SkillInfo.ResourceName(r.Id)} {r.Value}{max}</size>", _small);
                 y += 26f;
             }
             return y;
@@ -301,7 +302,7 @@ namespace Betaknight.Overworld.UI
                 Fill(new Rect(box.x, box.yMax - 4f, box.width * st.Remaining(_playback.Tick), 4f), c);
                 string stacks = st.Stacks > 1 ? $" ×{st.Stacks}" : string.Empty;
                 string tooltip = $"{BattleLogText.StatusName(st.Id)}: noch {RowStateText.Seconds(st.TicksLeft(_playback.Tick))}{(st.Stacks > 1 ? $", {st.Stacks} Stapel" : string.Empty)}";
-                GUI.Label(box, new GUIContent($"<size=11><b>{StatusShort(st.Id)}</b>{stacks}\n{RowStateText.Seconds(st.TicksLeft(_playback.Tick))}</size>", tooltip), _cell);
+                GUI.Label(box, new GUIContent($"<size=13><b>{StatusShort(st.Id)}</b>{stacks}\n{RowStateText.Seconds(st.TicksLeft(_playback.Tick))}</size>", tooltip), _cell);
             }
         }
 
@@ -339,7 +340,7 @@ namespace Betaknight.Overworld.UI
         private void DrawBoard(Rect area)
         {
             GUILayout.BeginArea(area, GUI.skin.box);
-            GUILayout.Label("<b>Logik-Tafel</b>  <size=12><color=#9aa4b2>Zeile hovern für den Grund</color></size>", _text);
+            GUILayout.Label("<b>Logik-Tafel</b>  <size=13><color=#9aa4b2>Zeile hovern für den Grund</color></size>", _text);
             BattleResult r = _playback.Result;
             for (int i = 0; i < r.PlayerRowLabels.Count; i++)
             {
@@ -371,7 +372,7 @@ namespace Betaknight.Overworld.UI
                 }
             }
             GUILayout.FlexibleSpace();
-            GUILayout.Label($"<size=11>{StateGlyph(RowDisplay.Ready)} bereit   {StateGlyph(RowDisplay.ConditionFalse)} Bedingung falsch   "
+            GUILayout.Label($"<size=13>{StateGlyph(RowDisplay.Ready)} bereit   {StateGlyph(RowDisplay.ConditionFalse)} Bedingung falsch   "
                 + $"{StateGlyph(RowDisplay.Cooldown)} Cooldown   {StateGlyph(RowDisplay.Orphaned)} verwaist</size>", _row);
             GUILayout.EndArea();
         }
@@ -492,7 +493,7 @@ namespace Betaknight.Overworld.UI
                 BattleResult r = _playback.Result;
                 GUILayout.Label($"<b>{BattleLogText.OutcomeText(r.Outcome)}</b>   −{_current.DamageTaken} HP   +{_current.GoldReward} Gold", _text);
                 GUILayout.FlexibleSpace();
-                if (OnEditBoard != null && r.IsSurvived && GUILayout.Button("Tafel bearbeiten", GUILayout.Width(160f), GUILayout.Height(32f)))
+                if (OnEditBoard != null && r.IsSurvived && GUILayout.Button("Build öffnen (B)", GUILayout.Width(160f), GUILayout.Height(32f)))
                 {
                     _queue.Clear();
                     OpenNext();
@@ -528,7 +529,7 @@ namespace Betaknight.Overworld.UI
             float width = 320f;
             float height = _tooltip.CalcHeight(content, width) + 10f;
             var rect = new Rect(Mathf.Min(mouse.x + 16f, Screen.width - width - 8f), Mathf.Min(mouse.y + 16f, Screen.height - height - 8f), width, height);
-            Fill(rect, new Color(0.05f, 0.06f, 0.08f, 0.97f));
+            Fill(rect, new Color(0.05f, 0.06f, 0.08f, 1f));
             GUI.Label(new Rect(rect.x + 6f, rect.y + 5f, rect.width - 12f, rect.height - 10f), content, _tooltip);
         }
 
@@ -636,15 +637,15 @@ namespace Betaknight.Overworld.UI
         {
             if (_white == null) _white = Texture2D.whiteTexture;
             if (_title != null) return;
-            _title = new GUIStyle(GUI.skin.label) { fontSize = 22, richText = true };
-            _text = new GUIStyle(GUI.skin.label) { fontSize = 16, richText = true };
+            _title = new GUIStyle(GUI.skin.label) { fontSize = 18, richText = true };
+            _text = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true };
             _small = new GUIStyle(GUI.skin.label) { fontSize = 13, richText = true, alignment = TextAnchor.UpperCenter, wordWrap = true };
             _row = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true, wordWrap = true };
             _row.normal.textColor = new Color(0.9f, 0.92f, 0.96f);
             _logLine = new GUIStyle(_row) { fontSize = 13, wordWrap = false };
             _popup = new GUIStyle(GUI.skin.label) { fontSize = 19, richText = true, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
             _popupSmall = new GUIStyle(GUI.skin.label) { fontSize = 14, richText = true, alignment = TextAnchor.MiddleCenter };
-            _cell = new GUIStyle(GUI.skin.label) { fontSize = 11, richText = true, alignment = TextAnchor.UpperCenter, wordWrap = false };
+            _cell = new GUIStyle(GUI.skin.label) { fontSize = 13, richText = true, alignment = TextAnchor.UpperCenter, wordWrap = false };
             _cell.normal.textColor = Color.white;
             _tooltip = new GUIStyle(GUI.skin.label) { fontSize = 13, richText = true, wordWrap = true };
             _tooltip.normal.textColor = new Color(0.92f, 0.94f, 0.98f);

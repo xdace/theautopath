@@ -18,7 +18,7 @@ namespace Betaknight.Overworld.UI
             if (!session.SkillCatalog.TryGet(skillId, out SkillDefinition skill)) return skillId;
             SkillInfo info = session.DescribeSkill(skillId, null, 0);
             string kinds = SkillKinds.Names(skill.Kinds);
-            string text = $"<b>Skill: {skill.Name}</b>{(kinds.Length > 0 ? $"  [{kinds}]" : string.Empty)}{suffix}\n<size=12>{skill.Description}";
+            string text = $"<b>Skill: {skill.Name}</b>{(kinds.Length > 0 ? $"  [{kinds}]" : string.Empty)}{suffix}\n<size=13>{skill.Description}";
             if (info != null) text += $"\n<color=#ffd75e>{info.Summary}</color>";
             GrowthRule rule = session.GrowthCatalog.ForSkill(skillId);
             if (rule != null) text += $"\n<color=#b5e48c>Wächst: {rule.Text}</color>";

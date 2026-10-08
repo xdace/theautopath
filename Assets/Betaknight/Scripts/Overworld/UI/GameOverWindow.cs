@@ -23,13 +23,14 @@ namespace Betaknight.Overworld.UI
 
         private void OnGUI()
         {
+            UiTheme.Apply();
             if (Hidden != null && Hidden()) return;
             if (_session == null || !_session.IsGameOver) return;
 
             if (_titleStyle == null)
             {
-                _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 26, richText = true, alignment = TextAnchor.MiddleCenter };
-                _textStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, alignment = TextAnchor.MiddleCenter };
+                _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, richText = true, alignment = TextAnchor.MiddleCenter };
+                _textStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, alignment = TextAnchor.MiddleCenter };
             }
 
             const float width = 380f;

@@ -29,6 +29,7 @@ namespace Betaknight.Overworld.UI
 
         private void OnGUI()
         {
+            UiTheme.Apply();
             if (Hidden != null && Hidden()) return;
             if (_session == null || _session.PendingShop == null)
             {
@@ -47,6 +48,7 @@ namespace Betaknight.Overworld.UI
             else DrawReplace();
 
             GUILayout.EndArea();
+            UiTheme.DrawTooltip();
         }
 
         private void DrawStock()
@@ -82,7 +84,7 @@ namespace Betaknight.Overworld.UI
                 EquipmentDefinition worn = _session.Gear.Get(item.Slot);
                 string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)} ({_session.Gear.SetPieces(item.SetId)}/3)" : string.Empty;
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]  – {prices.Item} Gold{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>", _plainStyle);
+                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]  – {prices.Item} Gold{set}\n{ItemText.Describe(item)}\n<size=13>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>", _plainStyle);
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _session.CanBuyShopItem(i, ItemPlacement.Equip);
                 if (GUILayout.Button(worn != null ? $"Kaufen und anlegen ({worn.Name} ins Inventar)" : "Kaufen und anlegen", GUILayout.Height(28f)))
@@ -140,10 +142,12 @@ namespace Betaknight.Overworld.UI
 
             GUILayout.Space(8f);
             GUILayout.Label($"<b>Verkaufen</b> (halber Preis: Teil {prices.SellItem} Gold, Rune {prices.SellRune} Gold)", _plainStyle);
-            IReadOnlyList<EquipmentDefinition> items = _session.Inventory.Items;
-            for (int i = 0; i < items.Count; i++)
+            // Indizes sind Zellen des Item-Rasters; leere Zellen überspringen.
+            for (int i = 0; i < _session.Inventory.Capacity; i++)
             {
-                if (GUILayout.Button($"{items[i].Name} [{items[i].Slot.DisplayName()}] verkaufen  +{prices.SellItem} Gold", GUILayout.Height(26f)))
+                EquipmentDefinition item = _session.Inventory[i];
+                if (item == null) continue;
+                if (GUILayout.Button($"{item.Name} [{item.Slot.DisplayName()}] verkaufen  +{prices.SellItem} Gold", GUILayout.Height(26f)))
                 {
                     _session.SellItem(i);
                     return;
@@ -199,9 +203,9 @@ namespace Betaknight.Overworld.UI
         private void EnsureStyles()
         {
             if (_titleStyle != null) return;
-            _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, richText = true };
+            _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, richText = true };
             _textStyle = new GUIStyle(GUI.skin.label) { fontSize = 15 };
-            _plainStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, richText = true, wordWrap = true };
+            _plainStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true, wordWrap = true };
             _itemStyle = new GUIStyle(GUI.skin.button)
             {
                 fontSize = 15,

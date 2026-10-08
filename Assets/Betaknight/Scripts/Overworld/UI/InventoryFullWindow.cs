@@ -25,6 +25,7 @@ namespace Betaknight.Overworld.UI
 
         private void OnGUI()
         {
+            UiTheme.Apply();
             if (Hidden != null && Hidden()) return;
             if (_session == null || (_session.PendingItem == null && _session.PendingRune == null)) return;
             EnsureStyles();
@@ -48,10 +49,12 @@ namespace Betaknight.Overworld.UI
             GUILayout.Label("Ein Teil verwerfen, damit das neue hineinpasst:", _text);
 
             _scroll = GUILayout.BeginScrollView(_scroll);
-            IReadOnlyList<EquipmentDefinition> items = _session.Inventory.Items;
-            for (int i = 0; i < items.Count; i++)
+            // Indizes sind Zellen des Item-Rasters; leere Zellen überspringen.
+            for (int i = 0; i < _session.Inventory.Capacity; i++)
             {
-                if (GUILayout.Button($"<b>{items[i].Name}</b> [{items[i].Slot.DisplayName()}] verwerfen\n<size=12>{ItemText.Describe(items[i])}</size>", _button))
+                EquipmentDefinition item = _session.Inventory[i];
+                if (item == null) continue;
+                if (GUILayout.Button($"<b>{item.Name}</b> [{item.Slot.DisplayName()}] verwerfen\n<size=13>{ItemText.Describe(item)}</size>", _button))
                 {
                     _session.DiscardItem(i);
                     break;
@@ -72,7 +75,7 @@ namespace Betaknight.Overworld.UI
             IReadOnlyList<StoredRune> runes = _session.RuneInventory.Runes;
             for (int i = 0; i < runes.Count; i++)
             {
-                if (GUILayout.Button($"<b>{runes[i].Name}</b> verwerfen\n<size=12>{runes[i].Description}</size>", _button))
+                if (GUILayout.Button($"<b>{runes[i].Name}</b> verwerfen\n<size=13>{runes[i].Description}</size>", _button))
                 {
                     _session.DiscardRune(i);
                     break;
@@ -86,11 +89,11 @@ namespace Betaknight.Overworld.UI
         private void EnsureStyles()
         {
             if (_title != null) return;
-            _title = new GUIStyle(GUI.skin.label) { fontSize = 20, richText = true };
-            _text = new GUIStyle(GUI.skin.label) { fontSize = 14, richText = true, wordWrap = true };
+            _title = new GUIStyle(GUI.skin.label) { fontSize = 18, richText = true };
+            _text = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true, wordWrap = true };
             _button = new GUIStyle(GUI.skin.button)
             {
-                fontSize = 14,
+                fontSize = 15,
                 richText = true,
                 wordWrap = true,
                 alignment = TextAnchor.MiddleLeft,

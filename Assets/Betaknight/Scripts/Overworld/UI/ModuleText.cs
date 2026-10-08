@@ -24,7 +24,7 @@ namespace Betaknight.Overworld.UI
         public static string Describe(OverworldSession session, string moduleId, string suffix = "")
         {
             if (!session.ModuleCatalog.TryGet(moduleId, out ModuleDefinition module)) return moduleId;
-            string text = $"<b>Modul: {module.Name}</b>  [{KindName(module.Kind)}]{suffix}\n<size=12>{module.Description}";
+            string text = $"<b>Modul: {module.Name}</b>  [{KindName(module.Kind)}]{suffix}\n<size=13>{module.Description}";
             string owned = Owned(session, moduleId);
             if (owned.Length > 0) text += $"\n<color=#9fc7ff>Besitzt: {owned}</color>";
             text += SkillText.EvolutionHints(session.EvolutionHintsForModule(moduleId));

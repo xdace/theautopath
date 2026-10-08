@@ -60,6 +60,7 @@ namespace Betaknight.Overworld.UI
 
         private void OnGUI()
         {
+            UiTheme.Apply();
             if (Hidden != null && Hidden()) return;
             if (_session == null) return;
             EnsureStyles();
@@ -109,9 +110,9 @@ namespace Betaknight.Overworld.UI
         private void EnsureStyles()
         {
             if (_titleStyle != null) return;
-            _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, richText = true };
-            _textStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, wordWrap = true };
-            _messageStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, richText = true };
+            _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, richText = true };
+            _textStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, wordWrap = true };
+            _messageStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true };
         }
 
         private void Unsubscribe()

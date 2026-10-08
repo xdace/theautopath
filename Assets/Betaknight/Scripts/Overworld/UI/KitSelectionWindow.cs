@@ -26,6 +26,7 @@ namespace Betaknight.Overworld.UI
 
         private void OnGUI()
         {
+            UiTheme.Apply();
             if (_kits == null) return;
             EnsureStyles();
 
@@ -60,7 +61,7 @@ namespace Betaknight.Overworld.UI
         private void EnsureStyles()
         {
             if (_titleStyle != null) return;
-            _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 22, richText = true, alignment = TextAnchor.MiddleCenter };
+            _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, richText = true, alignment = TextAnchor.MiddleCenter };
             _kitStyle = new GUIStyle(GUI.skin.button)
             {
                 fontSize = 15,

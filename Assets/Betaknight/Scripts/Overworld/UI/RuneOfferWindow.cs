@@ -35,6 +35,7 @@ namespace Betaknight.Overworld.UI
 
         private void OnGUI()
         {
+            UiTheme.Apply();
             if (Hidden != null && Hidden()) return;
             if (_session == null) return;
 
@@ -57,6 +58,7 @@ namespace Betaknight.Overworld.UI
             else DrawReplace(offer.Options[_choiceAwaitingSlot]);
 
             GUILayout.EndArea();
+            UiTheme.DrawTooltip();
         }
 
         private void DrawOptions(RuneOffer offer)
@@ -105,7 +107,7 @@ namespace Betaknight.Overworld.UI
                     continue;
                 }
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>", _plainStyle);
+                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}\n<size=13>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>", _plainStyle);
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _session.CanTakeItem(i, ItemPlacement.Equip);
                 string equip = worn != null ? $"Anlegen ({worn.Name} ins Inventar)" : "Anlegen";
@@ -202,9 +204,9 @@ namespace Betaknight.Overworld.UI
         private void EnsureStyles()
         {
             if (_titleStyle != null) return;
-            _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, richText = true };
+            _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, richText = true };
             _textStyle = new GUIStyle(GUI.skin.label) { fontSize = 15 };
-            _plainStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, richText = true, wordWrap = true };
+            _plainStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true, wordWrap = true };
             _nameStyle = new GUIStyle(GUI.skin.button)
             {
                 fontSize = 15,
