@@ -53,10 +53,11 @@ namespace Betaknight.Core.Autoplay
     public static class RuneFireStats
     {
         /// <summary>Zählt einen Kampf: Zeile i der Tafel gehört zu <paramref name="runeIds"/>[i].</summary>
-        public static void Record(IDictionary<string, RuneFireStat> stats, IReadOnlyList<(string id, string name, int difficulty)> runes, BattleResult battle)
+        public static void Record(IDictionary<string, RuneFireStat> stats, IReadOnlyList<(string id, string name, int difficulty)> runes, BattleResult battle,
+            BattleReport report = null)
         {
             if (stats == null || runes == null || battle == null) return;
-            BattleReport report = BattleReport.Create(battle);
+            report = report ?? BattleReport.Create(battle);
             for (int i = 0; i < runes.Count && i < report.Rows.Count; i++)
             {
                 RowReport row = report.Rows[i];

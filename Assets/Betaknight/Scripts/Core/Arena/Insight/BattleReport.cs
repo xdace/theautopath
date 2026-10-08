@@ -121,6 +121,17 @@ namespace Betaknight.Core.Arena
         public int OtherDamage { get; private set; }
         public int TotalHealing { get; private set; }
 
+        /// <summary>Schaden des Basisangriffs (aus allen Zeilen, auch der Basisangriff-Zeile).</summary>
+        public int BasicAttackDamage { get; private set; }
+
+        /// <summary>Anteil des Basisangriffs am Gesamtschaden in Basispunkten; der Rest kommt aus Skills.</summary>
+        public int BasicAttackShareBp => TotalDamage > 0 ? (int)((long)BasicAttackDamage * BasisPoints.Full / TotalDamage) : 0;
+
+        /// <summary>«Basisangriff 28 % · Skills 72 %», leer ohne Schaden.</summary>
+        public string DamageSplitText => TotalDamage > 0
+            ? $"Basisangriff {SkillInfo.Percent(BasicAttackShareBp)} · Skills {SkillInfo.Percent(BasisPoints.Full - BasicAttackShareBp)}"
+            : string.Empty;
+
         /// <summary>Schaden, den Schwierigkeits-Boni insgesamt dazugegeben haben.</summary>
         public int BonusDamage { get; private set; }
         public int Decisions { get; private set; }
@@ -172,6 +183,7 @@ namespace Betaknight.Core.Arena
                     case BattleEventKind.Damage:
                         if (e.Target == null || e.Target.Side == player.Side) break;
                         TotalDamage += e.Amount;
+                        if (e.Detail == SkillDefinition.BasicAttackId) BasicAttackDamage += e.Amount;
                         if (row != null)
                         {
                             row.Damage += e.Amount;

@@ -68,6 +68,31 @@ Kämpfe laufen automatisch in festen Ticks (20 pro Sekunde). Jede Zeile der Tafe
 - **Skill-Arten** stehen im `SkillCatalog` (Angriff, Schild, Feuer, Schock, Heilung, Bewegung; ein Skill kann mehrere haben) und im Tooltip. Sie dienen nur als Ziel der passiven Effekte und für passende Angebote.
 - **Gegner** haben feste Tafeln wie bisher.
 
+#### Skills sind der Hauptschaden (A-12)
+
+Der Basisangriff ist **Füller und Motor**: Er macht beim Ritter nur noch **60 % Waffenschaden**, und **jeder Treffer verkürzt alle laufenden Skill-Cooldowns um 0,25 s** (Ausweicher zählen nicht). Den Schaden tragen die Skills. Gegner behalten ihren Basisangriff mit 100 %.
+
+Die Regel steht als Daten in `Arena/SkillBudget.cs` (`SkillBudgetConfig.Default`) und wird von einem Test für jeden Skill im Katalog geprüft:
+
+- **Schadens-Skill** (Art Angriff oder Feuer, mit Schaden): Schaden pro Sekunde Aktionszeit (Cast + Erholung) mindestens **2,5×** Basisangriff pro Sekunde (60 % bei 1 s Takt), **Flächen-Skills pro Ziel mindestens 1,5×**. Brennen zählt mit seiner ganzen Dauer, Chancen anteilig.
+- **Längerer Cooldown → mehr Wirkung:** Jede Sekunde Cooldown über 3 s verlangt 5 % mehr.
+- **Nutzen-Skills** (Betäubung, Schild, Blendung, Heilung) machen höchstens 60 % des Budgets als Schaden und punkten mit ihrer Wirkung.
+
+| Skill | Schaden | Budget | Bemerkung |
+|---|---|---|---|
+| Schockstich | 80 % | 75 % | 0,5 s Aktion, 3 s CD |
+| Rüstungsbruch | 190 % | 188 % | plus Rüstung −50 % für 6 s |
+| Entzünden | Brennen 70 %/s × 5 s = 350 % | 104 % | Schaden kommt verzögert |
+| Bohrstoß | 180 % an allen | 178 % pro Ziel | Fläche |
+| Blitzlanze / Säurebohrer / Feuersturm | 120 % / 200 % an allen / 60 % + 350 % Brennen an allen | erfüllt | Evolutionen |
+| Schildschlag | 70 % | Nutzen | betäubt jetzt 2 s |
+| EMP-Schildschlag | 50 % an allen | Nutzen | betäubt alle 3 s |
+| Schrottramme | 90 % ohne Rüstung | Nutzen | betäubt 2,5 s |
+
+**Gegner-HP** liegen bei 65 % der früheren Werte (`EnemyCatalog.HpPercent`), damit frühe Kämpfe mit dem Start-Kit (1–2 Skills) gut schaffbar bleiben. Der Boss bleibt unbesiegbar; die 15 s bis zum Portal schafft jedes Start-Kit (Test). Gold pro Kampf bleibt unverändert, weil Kämpfe eher kürzer werden. Abgleich mit dem Testspieler über 60 Runs: ungefähr gleich viele Runs erreichen Akt 3 wie vorher. Der Schildritter startet mit zwei Nutzen-Skills und bleibt beim Basisangriff-Anteil hoch, bis er Schadens-Skills findet.
+
+**Anzeige:** Die Kampf-Auswertung zeigt den Anteil gross über der Tabelle («Basisangriff 28 % · Skills 72 %», grün bis 30 %). Der Testspieler-Bericht enthält pro Run `basicAttackSharePercent`, `basicAttackShareFromAct2Percent` (Ziel höchstens 30 %) und `basicAttackShareByAct`, das Log den Anteil in der Run-Zeile.
+
 #### Cast-Zeit
 
 Jede Ausführung braucht ihre **Cast-Zeit** (das Ausholen bis zur Wirkung), auch Wiederholungen durch Echo. Loops werden nur über Cast-Zeiten begrenzt, nicht über feste Bremsen.
@@ -96,7 +121,7 @@ Jedes Teil trägt 1–2 Tags (vorläufig, als Daten in `SynergyRegistry.CreateDe
 
 Anzeige: Das HUD zeigt die Zähler («Ladung 3/4», erreichte Schwellen gelb) und aktive Duos. Das Inventar listet alle Tags mit ihren Stufen und das Rezeptbuch. Angebote, Shop und das Inventar zeigen, was ein Teil bewirken würde («→ Ladung 4/6: Schwelle!», «→ Duo frei: ???»).
 
-- **Skill-Kennzahlen im Build:** Jede Zeile und jeder Skill im Skill-Inventar zeigt Kurzwerte (erste Wirkung und Cooldown), der Tooltip alles: Wirkung, Schaden, CD, Cast-Zeit und Erholung. Schaden steht doppelt, als Prozent vom Waffenschaden und als Wert mit der aktuellen Ausrüstung samt aktiver Set-Boni, gegen ein Ziel ohne Rüstung, ohne Block und Krit (z. B. «120 % Waffenschaden ≈ 10 an allen Gegnern», «Brennen 50 % Waffenschaden/s ≈ 3/s, 15 über 5 s», «20 % Chance: betäubt 1 s»). Skills ohne Schaden zeigen «kein Schaden». Bei kleinen Auflösungen scrollt jeder Bereich für sich.
+- **Skill-Kennzahlen im Build:** Jede Zeile und jeder Skill im Skill-Inventar zeigt Kurzwerte (erste Wirkung und Cooldown), der Tooltip alles: Wirkung, Schaden, CD, Cast-Zeit und Erholung. Schaden steht doppelt, als Prozent vom Waffenschaden und als Wert mit der aktuellen Ausrüstung samt aktiver Set-Boni, gegen ein Ziel ohne Rüstung, ohne Block und Krit (z. B. «180 % Waffenschaden ≈ 10 an allen Gegnern», «Brennen 70 % Waffenschaden/s ≈ 4/s, 20 über 5 s», «20 % Chance: betäubt 1 s»). Skills ohne Schaden zeigen «kein Schaden». Bei kleinen Auflösungen scrollt jeder Bereich für sich.
   Die Werte stehen nicht in der UI, sondern kommen aus den Effekten: Jede `ISkillEffect` meldet über `Describe(SkillInfoBuilder)` ihre Kennzahlen mit denselben Formeln wie `Apply`. `SkillInfo.Create(skill, stats)` fasst sie zusammen, `OverworldSession.SkillUserStats()` liefert die Werte des Ritters zu Kampfbeginn. Neue Effekte müssen `Describe` umsetzen und erscheinen dann automatisch richtig.
 - 7 Ausrüstungsplätze (Helm, Handschuhe, Brust, Beinschienen, Waffe, Schild, Stiefel). Zweihandwaffen sperren den Schild.
 - 4 Sets mit Boni ab 2 und 3 Teilen: Überlast-Protokoll, Aegis-Firewall, Schrott-Ernter, Phantom-Signal.
@@ -154,11 +179,11 @@ Build-Fenster: In jeder Zeile stehen die Modul-Plätze von Baustein und Skill (�
 | Tag | Aus | Bedingung | Evolution |
 |---|---|---|---|
 | Hitze | Entzünden | Modul Fläche | Feuersturm: 60 % an alle Gegner, alle brennen 5 s |
-| Ladung | Schockstich | Tag Ladung 4 | Blitzlanze: 100 %, 50 % Chance auf 1,5 s Betäubung, Cooldown 3 s |
+| Ladung | Schockstich | Tag Ladung 4 | Blitzlanze: 120 %, 50 % Chance auf 1,5 s Betäubung, Cooldown 3 s |
 | Phantom | Baustein «HP unter 30/40/50 %» | Modul Verlängern | «HP unter 50 % oder ausgewichen» (gilt auch direkt nach einem Ausweichen) |
 | Takt | Echo-Protokoll | Modul Mehrfach | Resonanz: wiederholt den letzten Skill zweimal, Cooldown 10 s |
-| Toxin | Bohrstoß | Baustein «Gegner unter … %» in derselben Zeile | Säurebohrer: 120 % an alle Gegner, doppeltes Gift |
-| Schrott | Schildschlag | Tag Schrott 4 | Schrottramme: 120 % durch Rüstung, unterbricht, 2 s Betäubung |
+| Toxin | Bohrstoß | Baustein «Gegner unter … %» in derselben Zeile | Säurebohrer: 200 % an alle Gegner, doppeltes Gift |
+| Schrott | Schildschlag | Tag Schrott 4 | Schrottramme: 90 % durch Rüstung, unterbricht, 2,5 s Betäubung |
 
 Evolutionsformen werden nie angeboten, man erreicht sie nur über ein Rezept. Angebote, Shop, Inventar und das Rezeptbuch im Build zeigen den Fortschritt («Evolution ???: fehlt Modul Fläche», «→ Ladung 3/4 für Evolution von Schockstich»), das Build-Fenster pro Zeile (Tooltip und ✦), das HUD ein ✦ an Zeilen, die nach dem nächsten Boss evolvieren.
 
@@ -362,6 +387,7 @@ Boss durchs Portal; bis Game Over oder Akt 3.
 | `exceptionCount`, `exceptions` | Exceptions mit Text und Stacktrace (höchstens 40 Texte, gezählt wird alles) |
 | `errorLogCount`, `errorLogs` | Fehler-Logs (`Debug.LogError`, Asserts) mit Text |
 | `hangCount`, `hangs` | Hänger: keine Aktion länger als 10 s (danach Befreiungsversuch, ab 3 Hängern Abbruch des Runs) |
+| `totalDamage`, `basicAttackDamage`, `basicAttackSharePercent`, `basicAttackShareFromAct2Percent`, `basicAttackShareByAct` | Schaden des Ritters und Anteil des Basisangriffs, gesamt, ab Akt 2 (Ziel höchstens 30 %) und pro Akt |
 | `runeStats` | Pro Baustein: Grundschwierigkeit, Kämpfe auf der Tafel, Kämpfe mit erfüllter Bedingung, wie oft erfüllt und gefeuert, Feuern pro Minute |
 
 **Messung für die Schwierigkeit:** Aus `runeStats` (pro Run und summiert in `total`) lässt sich ablesen, wie oft jeder Baustein in Bot-Kämpfen feuert. Am Ende steht dieselbe Tabelle im Log (`[Autoplay] Bausteine in Bot-Kämpfen …`), im Code `RuneFireStats.Table(runs)`. Bausteine, die der Bot oft erfüllt, sind Kandidaten für eine niedrigere Stufe, und umgekehrt.

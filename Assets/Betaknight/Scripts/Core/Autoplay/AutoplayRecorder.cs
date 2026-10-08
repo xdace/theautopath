@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Betaknight.Core.Arena;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Map;
@@ -124,7 +125,9 @@ namespace Betaknight.Core.Autoplay
             {
                 var runes = new List<(string, string, int)>();
                 foreach (RuneSlot row in _session.Runes.Rows) runes.Add((row.Rune?.Id, row.Rune?.Name ?? "?", row.Rune?.Difficulty ?? 0));
-                RuneFireStats.Record(Report.RuneStats, runes, result.Battle);
+                BattleReport report = BattleReport.Create(result.Battle);
+                RuneFireStats.Record(Report.RuneStats, runes, result.Battle, report);
+                Report.AddDamage(_session.Act, report.BasicAttackDamage, report.TotalDamage);
             }
         }
 

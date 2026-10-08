@@ -417,6 +417,13 @@ namespace Betaknight.Overworld.UI
             BattleResult r = _playback.Result;
             GUILayout.Label($"<b>Auswertung</b>   {BattleLogText.OutcomeText(r.Outcome)}, {BattleLogText.Time(r.EndTick)}, "
                 + $"Schaden gesamt {_report.TotalDamage}, Heilung {_report.TotalHealing}", _text);
+            if (_report.TotalDamage > 0)
+            {
+                // A-12: Skills sollen der Hauptschaden sein; der Anteil steht deshalb gross über der Tabelle.
+                string color = _report.BasicAttackShareBp <= BasisPoints.Percent(30) ? "#7ddc6f" : "#ffd75e";
+                GUILayout.Label(new GUIContent($"<size=18><b><color={color}>{_report.DamageSplitText}</color></b></size>",
+                    "Anteil am Schaden: Basisangriff gegen Skills. Ziel mit 3 oder mehr Schadens-Skills: Basisangriff höchstens etwa 30 %."), _text);
+            }
 
             _reportScroll = GUILayout.BeginScrollView(_reportScroll);
             float w = area.width - 40f;

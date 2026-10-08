@@ -28,6 +28,40 @@ namespace Betaknight.Core.Autoplay
         public readonly List<string> Modules = new List<string>();
         public int TriggersSet;
 
+        /// <summary>Schaden des Ritters in allen Kämpfen und davon aus dem Basisangriff (A-12: Skills sind der Hauptschaden).</summary>
+        public int TotalDamage;
+        public int BasicAttackDamage;
+
+        /// <summary>Dasselbe pro Akt: Akt → (Basisangriff, gesamt).</summary>
+        public readonly SortedDictionary<int, (int basic, int total)> DamageByAct = new SortedDictionary<int, (int basic, int total)>();
+
+        /// <summary>Anteil des Basisangriffs am Schaden in Prozent, null ohne Schaden.</summary>
+        public double? BasicAttackSharePercent => TotalDamage > 0 ? 100.0 * BasicAttackDamage / TotalDamage : (double?)null;
+
+        /// <summary>Anteil des Basisangriffs ab Akt 2 (Ziel höchstens 30 %), null ohne Kämpfe ab Akt 2.</summary>
+        public double? BasicAttackShareFromAct2Percent
+        {
+            get
+            {
+                int basic = 0, total = 0;
+                foreach (KeyValuePair<int, (int basic, int total)> p in DamageByAct)
+                {
+                    if (p.Key < 2) continue;
+                    basic += p.Value.basic;
+                    total += p.Value.total;
+                }
+                return total > 0 ? 100.0 * basic / total : (double?)null;
+            }
+        }
+
+        public void AddDamage(int act, int basic, int total)
+        {
+            BasicAttackDamage += basic;
+            TotalDamage += total;
+            DamageByAct.TryGetValue(act, out (int basic, int total) v);
+            DamageByAct[act] = (v.basic + basic, v.total + total);
+        }
+
         /// <summary>Pro Baustein (Runen-Id): wie oft erfüllt und gefeuert, für die Einstufung der Schwierigkeit.</summary>
         public readonly SortedDictionary<string, RuneFireStat> RuneStats = new SortedDictionary<string, RuneFireStat>(StringComparer.Ordinal);
         public int TriggerLinks;
@@ -83,7 +117,8 @@ namespace Betaknight.Core.Autoplay
             string fps = FpsAverage.HasValue ? $", FPS Ø {Num(FpsAverage.Value)} / min {Num(FpsMin ?? 0)}" : string.Empty;
             return $"Seed {Seed}, {Kit}: {EndReason} in Akt {Act} nach {Turns} Zügen. Kämpfe {FightsWon}:{FightsLost}, " +
                 $"Elite {ElitesWon}:{ElitesLost}, Boss {BossesSurvived}/{Bosses}, Tafel {BoardRows.Count} Zeilen, " +
-                $"Module {Modules.Count}, Auslöser {TriggersSet}, Duos {Duos.Count}, {Num(DurationSeconds)} s{fps}. " +
+                $"Module {Modules.Count}, Auslöser {TriggersSet}, Duos {Duos.Count}, Basisangriff {ShareText(BasicAttackSharePercent)} " +
+                $"(ab Akt 2: {ShareText(BasicAttackShareFromAct2Percent)}), {Num(DurationSeconds)} s{fps}. " +
                 $"Exceptions {ExceptionCount}, Fehler-Logs {ErrorLogCount}, Hänger {HangCount} → {(Ok ? "OK" : "FEHLER")}";
         }
 
@@ -132,9 +167,20 @@ namespace Betaknight.Core.Autoplay
             w.Field("errorLogs", ErrorLogs);
             w.Field("hangCount", HangCount);
             w.Field("hangs", Hangs);
+            w.Field("totalDamage", TotalDamage);
+            w.Field("basicAttackDamage", BasicAttackDamage);
+            w.Field("basicAttackSharePercent", BasicAttackSharePercent);
+            w.Field("basicAttackShareFromAct2Percent", BasicAttackShareFromAct2Percent);
+            w.Name("basicAttackShareByAct");
+            w.Open('{');
+            foreach (KeyValuePair<int, (int basic, int total)> p in DamageByAct)
+                w.Field(p.Key.ToString(CultureInfo.InvariantCulture), p.Value.total > 0 ? 100.0 * p.Value.basic / p.Value.total : (double?)null);
+            w.Close('}');
             w.Name("runeStats");
             RuneFireStats.Write(w, RuneStats.Values);
         }
+
+        internal static string ShareText(double? percent) => percent.HasValue ? $"{Num(percent.Value)} %" : "–";
 
         internal static string Num(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
     }
@@ -191,6 +237,8 @@ namespace Betaknight.Core.Autoplay
             w.Field("errorLogCount", Runs.Sum(r => r.ErrorLogCount));
             w.Field("hangCount", Runs.Sum(r => r.HangCount));
             w.Field("endReasons", Runs.Select(r => r.EndReason).ToList());
+            int total = Runs.Sum(r => r.TotalDamage);
+            w.Field("basicAttackSharePercent", total > 0 ? 100.0 * Runs.Sum(r => r.BasicAttackDamage) / total : (double?)null);
             w.Name("runeStats");
             RuneFireStats.Write(w, RuneFireStats.Merge(Runs));
             w.Close('}');
