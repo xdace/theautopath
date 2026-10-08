@@ -85,12 +85,15 @@ namespace Betaknight.Core.Runes
         /// <summary>Kommt nie in Angeboten vor, nur über Set-Boni o. Ä.</summary>
         public bool IsExclusive { get; }
 
+        /// <summary>Set, das diese exklusive Rune freischaltet (ab 2 Teilen), oder null.</summary>
+        public string UnlockSetId { get; }
+
         /// <summary>Parameter pro Stufe (Prozent, Sekunden, Anzahl). Stufe 0 ist der Startwert, höhere Stufen sind Verstärkungen.</summary>
         public IReadOnlyList<int> Levels => _levels;
         public int MaxLevel => Math.Max(0, _levels.Length - 1);
 
         public RuneDefinition(string id, string name, RuneTag tag, ConditionKind kind, string description,
-            int[] levels = null, int weight = 10, bool exclusive = false)
+            int[] levels = null, int weight = 10, bool exclusive = false, string unlockSetId = null)
         {
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("Id fehlt.", nameof(id));
             if (weight < 0) throw new ArgumentOutOfRangeException(nameof(weight));
@@ -102,6 +105,7 @@ namespace Betaknight.Core.Runes
             _levels = levels != null && levels.Length > 0 ? (int[])levels.Clone() : new[] { 0 };
             Weight = weight;
             IsExclusive = exclusive;
+            UnlockSetId = unlockSetId;
         }
 
         public int ParameterAt(int level) => _levels[Math.Max(0, Math.Min(level, MaxLevel))];

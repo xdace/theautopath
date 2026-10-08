@@ -35,7 +35,9 @@ namespace Betaknight.Core.Runes
         /// Stellt ein Angebot zusammen: keine Doppelten, nichts schon Ausgerüstetes, und wenn möglich
         /// mindestens eine Rune mit einem Tag, den der Spieler bereits hat. Passende Tags sind doppelt gewichtet.
         /// </summary>
-        public static RuneOffer Create(string source, RuneCatalog catalog, RuneLoadout loadout, Random random, int count = 3)
+        /// <param name="isUnlocked">Freigeschaltete exklusive Runen (z. B. durch ein Set). Sie kommen garantiert ins Angebot.</param>
+        public static RuneOffer Create(string source, RuneCatalog catalog, RuneLoadout loadout, Random random, int count = 3,
+            Func<RuneDefinition, bool> isUnlocked = null)
         {
             if (catalog == null) throw new ArgumentNullException(nameof(catalog));
             if (loadout == null) throw new ArgumentNullException(nameof(loadout));
@@ -44,8 +46,17 @@ namespace Betaknight.Core.Runes
             List<RuneDefinition> pool = catalog.All.Where(r => r.Weight > 0 && !r.IsExclusive && !loadout.Contains(r)).ToList();
             var picked = new List<RuneDefinition>();
 
+            if (isUnlocked != null)
+            {
+                foreach (RuneDefinition unlocked in catalog.All.Where(r => r.IsExclusive && isUnlocked(r) && !loadout.Contains(r)))
+                {
+                    if (picked.Count >= count) break;
+                    picked.Add(unlocked);
+                }
+            }
+
             List<RuneDefinition> matching = pool.Where(r => loadout.HasTag(r.Tag)).ToList();
-            if (matching.Count > 0)
+            if (matching.Count > 0 && picked.Count < count)
             {
                 RuneDefinition first = PickWeighted(matching, random, r => r.Weight);
                 picked.Add(first);

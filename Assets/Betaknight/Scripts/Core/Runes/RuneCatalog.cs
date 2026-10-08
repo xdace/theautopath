@@ -65,7 +65,7 @@ namespace Betaknight.Core.Runes
             new RuneDefinition("enemy_charging", "Gegner lädt auf", RuneTag.Shield, ConditionKind.State, "Solange ein Gegner einen Angriff auflädt."),
             new RuneDefinition("hp_full", "HP voll", RuneTag.Shield, ConditionKind.State, "Solange das eigene Leben voll ist."),
             new RuneDefinition("big_hit_taken", "Schwerer Treffer", RuneTag.Shield, ConditionKind.Event, "Nach einem Treffer über {0} % Max-HP.", new[] { 15, 10 }),
-            new RuneDefinition("charge_full", "Ladung voll", RuneTag.Shield, ConditionKind.Resource, "Bei {0} Ladung (Aegis-Firewall).", new[] { 5 }, 0, exclusive: true),
+            new RuneDefinition("charge_full", "Ladung voll", RuneTag.Shield, ConditionKind.Resource, "Bei {0} Ladung (Aegis-Firewall).", new[] { 5 }, 0, exclusive: true, unlockSetId: "aegis"),
 
             // Risiko und Notfall
             new RuneDefinition("hp_low", "HP unter {0} %", RuneTag.Ember, ConditionKind.State, "Solange das eigene Leben unter {0} % liegt.", new[] { 30, 40, 50 }),

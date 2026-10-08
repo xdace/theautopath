@@ -214,7 +214,7 @@ namespace Betaknight.Core
         public RuneOffer OfferRunes(string source)
         {
             if (IsBusy) return null;
-            RuneOffer offer = RuneOffer.Create(source, RuneCatalog, Runes, _random);
+            RuneOffer offer = RuneOffer.Create(source, RuneCatalog, Runes, _random, isUnlocked: IsRuneUnlocked);
             offer = offer.WithItems(RollRewardItems(source));
             if (offer.Count == 0) return null;
 

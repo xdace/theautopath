@@ -55,6 +55,11 @@ namespace Betaknight.Core.Gear
             }
 
             string label = rune.NameAt(spec.Level);
+
+            // Set-exklusive Runen wirken nur, solange das Set getragen wird.
+            if (rune.UnlockSetId != null && (equipment == null || equipment.SetPieces(rune.UnlockSetId) < SetDefinition.FirstBonusPieces))
+                return new LogicRow(condition, null, label);
+
             bool available = equipment != null ? equipment.ProvidesSkill(spec.SkillId) : spec.SkillId == SkillDefinition.BasicAttackId;
             SkillDefinition skill = available && _skills.TryGet(spec.SkillId, out SkillDefinition s) ? s : null;
             return new LogicRow(condition, skill, label);

@@ -12,8 +12,28 @@ namespace Betaknight.Core
         /// <summary>Chance in Prozent, dass ein Sieg eine Ausrüstung statt der dritten Rune anbietet.</summary>
         public const int VictoryItemChance = 50;
 
+        /// <summary>Teile eines Sets, von dem schon etwas getragen wird, kommen so viel häufiger in Angebote.</summary>
+        public const int StartedSetWeightFactor = 3;
+
         public Equipment Gear { get; }
         public EquipmentCatalog Items { get; }
+        public SetBonusRegistry Sets { get; } = SetBonusRegistry.CreateDefault();
+
+        /// <summary>Sets, von denen mindestens ein Teil getragen wird, mit Teilezahl.</summary>
+        public List<(SetDefinition set, int pieces)> WornSets()
+        {
+            var result = new List<(SetDefinition, int)>();
+            foreach (SetDefinition set in Sets.All)
+            {
+                int pieces = Gear.SetPieces(set.Id);
+                if (pieces > 0) result.Add((set, pieces));
+            }
+            return result;
+        }
+
+        /// <summary>Set-exklusive Runen sind frei, solange das Set mit mindestens 2 Teilen getragen wird.</summary>
+        public bool IsRuneUnlocked(RuneDefinition rune) =>
+            rune != null && rune.UnlockSetId != null && Gear.SetPieces(rune.UnlockSetId) >= SetDefinition.FirstBonusPieces;
 
         /// <summary>Ein Teil wurde aus einem Angebot angelegt; abgelegte Teile gehen verloren.</summary>
         public event Action<EquipmentDefinition, IReadOnlyList<EquipmentDefinition>> ItemTaken;
@@ -28,14 +48,8 @@ namespace Betaknight.Core
             if (offer == null || itemIndex < 0 || itemIndex >= offer.ItemIds.Count) return false;
             if (!Items.TryGet(offer.ItemIds[itemIndex], out EquipmentDefinition item)) return false;
 
-            List<EquipmentDefinition> removed = Gear.Equip(item);
+            List<EquipmentDefinition> removed = EquipItem(item);
             if (removed == null) return false;
-
-            if (item.SkillIds.Count > 0)
-            {
-                for (int i = 0; i < Runes.Rows.Count; i++)
-                    if (!Gear.ProvidesSkill(Runes.Rows[i].SkillId)) Runes.AssignSkill(i, item.SkillIds[0]);
-            }
 
             PendingRuneOffer = null;
             ItemTaken?.Invoke(item, removed);
@@ -72,29 +86,79 @@ namespace Betaknight.Core
             return skills[0];
         }
 
+        /// <summary>Angebotsgewicht: angefangene Sets werden bevorzugt, damit sie sich vervollständigen lassen.</summary>
+        public int OfferWeight(EquipmentDefinition item)
+        {
+            if (item == null || item.Weight <= 0) return 0;
+            bool started = item.SetId != null && Gear.SetPieces(item.SetId) > 0;
+            return started ? item.Weight * StartedSetWeightFactor : item.Weight;
+        }
+
+        /// <summary>So viele Ausrüstungsteile liegen in jedem Shop.</summary>
+        public const int ShopItemCount = 2;
+
+        public bool CanBuyShopItem(int index) =>
+            PendingShop != null && index >= 0 && index < PendingShop.Inventory.ItemIds.Count
+            && Stats.Gold >= ShopPrices.Item
+            && Items.TryGet(PendingShop.Inventory.ItemIds[index], out EquipmentDefinition item) && Gear.CanEquip(item, out _);
+
+        /// <summary>Kauft ein Ausrüstungsteil und legt es sofort an. Abgelegte Teile gehen verloren.</summary>
+        public bool BuyShopItem(int index)
+        {
+            if (!CanBuyShopItem(index)) return false;
+            EquipmentDefinition item = Items.Get(PendingShop.Inventory.ItemIds[index]);
+            List<EquipmentDefinition> removed = EquipItem(item);
+            if (removed == null) return false;
+
+            Stats.TrySpendGold(ShopPrices.Item);
+            PendingShop.Inventory.RemoveItemAt(index);
+            ItemTaken?.Invoke(item, removed);
+            return true;
+        }
+
+        /// <summary>Legt an und gibt verwaisten Zeilen den ersten neuen Skill.</summary>
+        private List<EquipmentDefinition> EquipItem(EquipmentDefinition item)
+        {
+            List<EquipmentDefinition> removed = Gear.Equip(item);
+            if (removed == null) return null;
+            if (item.SkillIds.Count > 0)
+            {
+                for (int i = 0; i < Runes.Rows.Count; i++)
+                    if (!Gear.ProvidesSkill(Runes.Rows[i].SkillId)) Runes.AssignSkill(i, item.SkillIds[0]);
+            }
+            return removed;
+        }
+
         private List<string> RollRewardItems(string source)
         {
             bool offerItem = source == "Schatztruhe" || (source == "Sieg" && _random.Next(100) < VictoryItemChance);
-            var result = new List<string>();
-            if (!offerItem) return result;
+            return offerItem ? PickItems(1) : new List<string>();
+        }
 
+        /// <summary>Würfelt verschiedene, anlegbare Teile nach Angebotsgewicht.</summary>
+        private List<string> PickItems(int count)
+        {
+            var result = new List<string>();
             var pool = new List<EquipmentDefinition>();
             int total = 0;
             foreach (EquipmentDefinition item in Items.All)
             {
                 if (item.Weight <= 0 || Gear.Get(item.Slot) == item || !Gear.CanEquip(item, out _)) continue;
                 pool.Add(item);
-                total += item.Weight;
+                total += OfferWeight(item);
             }
-            if (total == 0) return result;
-
-            int roll = _random.Next(total);
-            foreach (EquipmentDefinition item in pool)
+            while (result.Count < count && total > 0)
             {
-                roll -= item.Weight;
-                if (roll >= 0) continue;
-                result.Add(item.Id);
-                break;
+                int roll = _random.Next(total);
+                foreach (EquipmentDefinition item in pool)
+                {
+                    roll -= OfferWeight(item);
+                    if (roll >= 0) continue;
+                    result.Add(item.Id);
+                    pool.Remove(item);
+                    total -= OfferWeight(item);
+                    break;
+                }
             }
             return result;
         }

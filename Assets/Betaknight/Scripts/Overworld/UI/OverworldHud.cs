@@ -59,6 +59,8 @@ namespace Betaknight.Overworld.UI
             GUILayout.Label($"HP: {_session.Stats.Hp}/{_session.Stats.MaxHp}   Gold: {_session.Stats.Gold}   Splitter: {_session.Stats.Shards}", _style);
             GUILayout.Label($"Logik-Tafel ({_session.Runes.Rows.Count}/{_session.Runes.Slots}):\n{BoardList()}", _style);
             GUILayout.Label($"Ausrüstung: {GearList()}", _style);
+            string sets = SetList();
+            if (sets.Length > 0) GUILayout.Label($"Sets: {sets}", _style);
             GUILayout.Label($"Position: {_session.Player.Position}", _style);
             GUILayout.Label($"Feld: {Describe(_session.CurrentCell)}", _style);
             GUILayout.Label($"Seed: {_session.Map.Seed}", _style);
@@ -103,6 +105,18 @@ namespace Betaknight.Overworld.UI
         }
 
         private static string SkillName(string id) => Skills.TryGet(id, out SkillDefinition skill) ? skill.Name : id;
+
+        /// <summary>Getragene Sets mit Teilezahl; aktive Boni (ab 2 Teilen) hervorgehoben.</summary>
+        private string SetList()
+        {
+            var parts = new List<string>();
+            foreach ((SetDefinition set, int pieces) in _session.WornSets())
+            {
+                string text = $"{set.Name} {pieces}/{set.MaxPieces}";
+                parts.Add(pieces >= SetDefinition.FirstBonusPieces ? $"<color=#ffd75e>{text}</color>" : text);
+            }
+            return string.Join(", ", parts);
+        }
 
         private string GearList()
         {

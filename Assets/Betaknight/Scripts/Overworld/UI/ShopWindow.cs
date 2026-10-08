@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Betaknight.Core;
+using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
 using Betaknight.Core.Shop;
 using UnityEngine;
@@ -36,7 +37,7 @@ namespace Betaknight.Overworld.UI
             EnsureStyles();
 
             const float width = 540f;
-            const float height = 500f;
+            const float height = 640f;
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUILayout.BeginArea(rect, GUI.skin.box);
 
@@ -68,6 +69,18 @@ namespace Betaknight.Overworld.UI
                     if (_session.Runes.IsFull) _runeAwaitingSlot = i;
                     else _session.BuyShopRune(i);
                 }
+            }
+
+            IReadOnlyList<string> items = shop.Inventory.ItemIds;
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (!_session.Items.TryGet(items[i], out EquipmentDefinition item)) continue;
+                EquipmentDefinition worn = _session.Gear.Get(item.Slot);
+                string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)} ({_session.Gear.SetPieces(item.SetId)}/3)" : string.Empty;
+                string replaces = worn != null ? $"  ersetzt {worn.Name}" : string.Empty;
+                GUI.enabled = _session.CanBuyShopItem(i);
+                string label = $"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]  – {prices.Item} Gold{set}\n{ItemText.Describe(item)}{replaces}";
+                if (GUILayout.Button(label, _itemStyle, GUILayout.Height(58f))) _session.BuyShopItem(i);
             }
 
             GUILayout.Space(8f);

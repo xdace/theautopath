@@ -80,8 +80,8 @@ namespace Betaknight.Overworld.UI
                 if (!_session.Items.TryGet(offer.ItemIds[i], out EquipmentDefinition item)) continue;
                 EquipmentDefinition worn = _session.Gear.Get(item.Slot);
                 string replaces = worn != null ? $"  (ersetzt {worn.Name})" : string.Empty;
-                string set = item.SetId != null ? $"  Set: {item.SetId}" : string.Empty;
-                string label = $"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}{replaces}\n{ItemText(item)}";
+                string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)} ({_session.Gear.SetPieces(item.SetId)}/3)" : string.Empty;
+                string label = $"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}{replaces}\n{ItemText.Describe(item)}";
                 GUI.enabled = _session.CanTakeItem(i);
                 if (GUILayout.Button(label, _nameStyle, GUILayout.Height(64f))) _session.TakeItem(i);
                 GUI.enabled = true;
@@ -112,18 +112,6 @@ namespace Betaknight.Overworld.UI
 
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Zurück", GUILayout.Height(30f))) _choiceAwaitingSlot = -1;
-        }
-
-        private static readonly SkillCatalog Skills = SkillCatalog.CreateDefault();
-
-        private static string ItemText(EquipmentDefinition item)
-        {
-            var parts = new List<string>();
-            foreach (string id in item.SkillIds)
-                parts.Add(Skills.TryGet(id, out SkillDefinition skill) ? $"Skill: {skill.Name}" : id);
-            foreach (KeyValuePair<StatKind, int> stat in item.Stats) parts.Add($"{stat.Key} {stat.Value:+#;-#;0}");
-            if (item.TwoHanded) parts.Add("zweihändig");
-            return parts.Count > 0 ? string.Join(", ", parts) : item.Description;
         }
 
         private void EnsureStyles()

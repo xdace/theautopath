@@ -166,7 +166,7 @@ namespace Betaknight.Core
             HexCell cell = CurrentCell;
             if (!_shops.TryGetValue(cell.Coord, out ShopInventory inventory))
             {
-                inventory = new ShopInventory(RuneOffer.Create("Shop", RuneCatalog, Runes, _random).Options);
+                inventory = new ShopInventory(RuneOffer.Create("Shop", RuneCatalog, Runes, _random).Options, PickItems(ShopItemCount));
                 _shops.Add(cell.Coord, inventory);
             }
 
@@ -223,6 +223,7 @@ namespace Betaknight.Core
             if (!CanRerollShop) return false;
             Stats.TrySpendGold(ShopPrices.Reroll);
             PendingShop.Inventory.Replace(RuneOffer.Create("Shop", RuneCatalog, Runes, _random).Options);
+            PendingShop.Inventory.ReplaceItems(PickItems(ShopItemCount));
             return true;
         }
 

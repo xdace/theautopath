@@ -36,7 +36,7 @@ namespace Betaknight.Overworld.UI
             GUI.depth = -5;
 
             const float width = 620f;
-            float height = Mathf.Min(Screen.height - 40f, 140f + 64f * (_session.Runes.Rows.Count + 1));
+            float height = Mathf.Min(Screen.height - 40f, 140f + 64f * (_session.Runes.Rows.Count + 1) + 90f * _session.WornSets().Count);
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUILayout.BeginArea(rect, GUI.skin.box);
 
@@ -48,6 +48,7 @@ namespace Betaknight.Overworld.UI
             for (int i = 0; i < rows.Count; i++) DrawRow(i, rows[i], options, rows.Count);
 
             GUILayout.Label("↓  [Immer] → Basisangriff (fest)", _text);
+            DrawSets();
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Schliessen", GUILayout.Height(30f))) IsOpen = false;
             GUILayout.EndArea();
@@ -73,6 +74,20 @@ namespace Betaknight.Overworld.UI
             if (GUILayout.Button("▶", GUILayout.Width(28f))) Assign(index, options, current + 1);
 
             GUILayout.EndHorizontal();
+        }
+
+        private void DrawSets()
+        {
+            foreach ((SetDefinition set, int pieces) in _session.WornSets())
+            {
+                GUILayout.Space(4f);
+                GUILayout.Label($"<b>{set.Name}</b> {pieces}/{set.MaxPieces}", _text);
+                foreach (KeyValuePair<int, string> bonus in set.Bonuses)
+                {
+                    string line = $"  {bonus.Key} Teile: {bonus.Value}";
+                    GUILayout.Label(pieces >= bonus.Key ? $"<color=#ffd75e>{line}</color>" : $"<color=#888888>{line}</color>", _text);
+                }
+            }
         }
 
         private void Assign(int row, List<string> options, int index)
