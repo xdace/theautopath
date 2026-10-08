@@ -7,17 +7,24 @@ namespace Betaknight.Core.Arena
         public bool AllEnemies { get; }
         public bool IgnoreArmor { get; }
 
-        public DamageEffect(int damageBp, bool allEnemies = false, bool ignoreArmor = false)
+        /// <summary>Fester Zusatzschaden pro Ziel, z. B. aus Wachstum («+1 Schaden pro Kill»).</summary>
+        public int FlatBonus { get; }
+
+        public DamageEffect(int damageBp, bool allEnemies = false, bool ignoreArmor = false, int flatBonus = 0)
         {
             DamageBp = damageBp;
             AllEnemies = allEnemies;
             IgnoreArmor = ignoreArmor;
+            FlatBonus = System.Math.Max(0, flatBonus);
         }
+
+        /// <summary>Dieselbe Wirkung mit mehr festem Zusatzschaden.</summary>
+        public DamageEffect WithFlatBonus(int bonus) => new DamageEffect(DamageBp, AllEnemies, IgnoreArmor, FlatBonus + bonus);
 
         /// <summary>Schaden pro Ziel vor Abwehr, aus Waffenschaden und Flächenbonus.</summary>
         public int AmountFor(int weaponDamage, int areaDamageBp)
         {
-            int amount = BasisPoints.Of(weaponDamage, DamageBp);
+            int amount = BasisPoints.Of(weaponDamage, DamageBp) + FlatBonus;
             if (!AllEnemies) return amount;
             int bonus = System.Math.Max(-BasisPoints.Full, areaDamageBp);
             return BasisPoints.Of(amount, BasisPoints.Full + bonus);
@@ -39,14 +46,15 @@ namespace Betaknight.Core.Arena
         }
 
         public ISkillEffect AtLevel(int level, SkillLevelRules rules) => level <= 0 || rules == null ? this
-            : new DamageEffect(DamageBp + level * rules.DamageBpPerLevel, AllEnemies, IgnoreArmor);
+            : new DamageEffect(DamageBp + level * rules.DamageBpPerLevel, AllEnemies, IgnoreArmor, FlatBonus);
 
-        public ISkillEffect Boosted(int percent) => new DamageEffect(DamageBp * (100 + percent) / 100, AllEnemies, IgnoreArmor);
+        public ISkillEffect Boosted(int percent) => new DamageEffect(DamageBp * (100 + percent) / 100, AllEnemies, IgnoreArmor, FlatBonus);
 
         public void Describe(SkillInfoBuilder info)
         {
             int amount = AmountFor(info.Stats.WeaponDamage, info.Stats.AreaDamageBp);
-            string text = $"{SkillInfo.Percent(DamageBp)} Waffenschaden ≈ {amount}{(AllEnemies ? " an allen Gegnern" : string.Empty)}"
+            string flat = FlatBonus > 0 ? $" +{FlatBonus}" : string.Empty;
+            string text = $"{SkillInfo.Percent(DamageBp)} Waffenschaden{flat} ≈ {amount}{(AllEnemies ? " an allen Gegnern" : string.Empty)}"
                 + (IgnoreArmor ? " (ignoriert Rüstung)" : string.Empty);
             info.Add(new EffectInfo(EffectInfoKind.Damage, text, DamageBp, amount, allEnemies: AllEnemies));
         }

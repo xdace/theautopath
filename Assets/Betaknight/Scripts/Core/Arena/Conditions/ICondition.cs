@@ -93,6 +93,32 @@ namespace Betaknight.Core.Arena
         }
     }
 
+    /// <summary>ODER: erfüllt, wenn eine der Bedingungen erfüllt ist (die erste liefert das Ziel). Grundlage für Evolutionen.</summary>
+    public sealed class AnyCondition : IObservingCondition
+    {
+        public System.Collections.Generic.IReadOnlyList<ICondition> Parts { get; }
+
+        public AnyCondition(params ICondition[] parts)
+        {
+            if (parts == null || parts.Length == 0) throw new System.ArgumentException("Mindestens eine Bedingung.", nameof(parts));
+            Parts = parts;
+        }
+
+        public void Observe(in ConditionContext context)
+        {
+            foreach (ICondition part in Parts)
+                if (part is IObservingCondition observing) observing.Observe(context);
+        }
+
+        public bool IsMet(in ConditionContext context, out Combatant target)
+        {
+            foreach (ICondition part in Parts)
+                if (part.IsMet(context, out target)) return true;
+            target = null;
+            return false;
+        }
+    }
+
     /// <summary>Modul «Verlängern»: die Bedingung gilt nach dem letzten Erfülltsein noch eine Weile weiter.</summary>
     public sealed class ExtendedCondition : IObservingCondition
     {

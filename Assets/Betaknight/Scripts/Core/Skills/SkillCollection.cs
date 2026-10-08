@@ -111,11 +111,30 @@ namespace Betaknight.Core.Skills
             return true;
         }
 
-        /// <summary>Hebt ein Exemplar eine Stufe an, höchstens bis <paramref name="maxLevel"/>.</summary>
+        /// <summary>
+        /// Duplikat «Wachstum +5»: das Exemplar bekommt Wachstumspunkte, solange es unter <paramref name="maxLevel"/> ist.
+        /// </summary>
         public bool Upgrade(SkillInstance skill, int maxLevel)
         {
             if (!Contains(skill) || skill.Level >= maxLevel) return false;
-            skill.Level++;
+            skill.Growth += Betaknight.Core.Growth.GrowthStages.DuplicateGrowth;
+            Changed?.Invoke();
+            return true;
+        }
+
+        /// <summary>Wachstumspunkte für ein Exemplar (aus Kämpfen).</summary>
+        public void Grow(SkillInstance skill, int points)
+        {
+            if (!Contains(skill) || points <= 0) return;
+            skill.Growth = (int)Math.Min(int.MaxValue, (long)skill.Growth + points);
+            Changed?.Invoke();
+        }
+
+        /// <summary>Evolution: das Exemplar wird zu einem anderen Skill. Wachstum, Ort und Module bleiben.</summary>
+        public bool Evolve(SkillInstance skill, string evolvedSkillId)
+        {
+            if (!Contains(skill) || string.IsNullOrEmpty(evolvedSkillId)) return false;
+            skill.SkillId = evolvedSkillId;
             Changed?.Invoke();
             return true;
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Betaknight.Core.Arena;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Gear;
@@ -29,26 +30,27 @@ namespace Betaknight.Core
             (_combat as ArenaCombatResolver ?? new ArenaCombatResolver()).PreviewStats(Stats, Runes, Gear, null, Progression.SkillLevels);
 
         /// <summary>
-        /// Skill auf einer Stufe mit den passiven Boni der getragenen Ausrüstung und der Tag-Stufen, so wie er im Kampf wirkt.
-        /// Ohne <paramref name="level"/> gilt die höchste Stufe der eigenen Exemplare. Null bei unbekannter Id.
+        /// Skill mit Wachstum und den passiven Boni der getragenen Ausrüstung und der Tag-Stufen, so wie er im Kampf wirkt.
+        /// Ohne <paramref name="growth"/> gilt das höchste Wachstum der eigenen Exemplare. Null bei unbekannter Id.
         /// </summary>
-        public SkillDefinition LeveledSkill(string skillId, int level = -1)
+        public SkillDefinition GrownSkill(string skillId, int growth = -1)
         {
             if (!SkillCatalog.TryGet(skillId, out SkillDefinition skill)) return null;
-            if (level < 0) level = HighestSkillLevel(skillId);
-            return Gear.Boost(skill.AtLevel(level, Progression.SkillLevels), Synergies.Passives(Gear));
+            if (growth < 0) growth = Skills.OfSkill(skillId).Select(s => s.Growth).DefaultIfEmpty(0).Max();
+            skill = Growth.GrowthApplier.Apply(skill, GrowthCatalog.ForSkill(skillId), growth);
+            return Gear.Boost(skill, Synergies.Passives(Gear));
         }
 
-        /// <summary>Kennzahlen eines Skills mit der aktuellen Ausrüstung. Ohne Stufe: höchste eigene Stufe. Null bei unbekannter Id.</summary>
-        public SkillInfo DescribeSkill(string skillId, SkillUserStats stats = null, int level = -1)
+        /// <summary>Kennzahlen eines Skills mit der aktuellen Ausrüstung. Ohne Wachstum: höchstes eigenes. Null bei unbekannter Id.</summary>
+        public SkillInfo DescribeSkill(string skillId, SkillUserStats stats = null, int growth = -1)
         {
-            SkillDefinition skill = LeveledSkill(skillId, level);
+            SkillDefinition skill = GrownSkill(skillId, growth);
             return skill != null ? SkillInfo.Create(skill, stats ?? SkillUserStats()) : null;
         }
 
-        /// <summary>Kennzahlen eines Skill-Exemplars (seine Stufe, passive Boni der Ausrüstung).</summary>
+        /// <summary>Kennzahlen eines Skill-Exemplars (sein Wachstum, passive Boni der Ausrüstung).</summary>
         public SkillInfo DescribeSkill(SkillInstance skill, SkillUserStats stats = null) =>
-            skill != null ? DescribeSkill(skill.SkillId, stats, skill.Level) : null;
+            skill != null ? DescribeSkill(skill.SkillId, stats, skill.Growth) : null;
 
         /// <summary>Sets, von denen mindestens ein Teil getragen wird, mit Teilezahl.</summary>
         public List<(SetDefinition set, int pieces)> WornSets()

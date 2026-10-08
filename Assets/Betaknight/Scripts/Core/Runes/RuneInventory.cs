@@ -9,10 +9,14 @@ namespace Betaknight.Core.Runes
         public RuneDefinition Rune { get; }
         public int Level { get; }
 
-        public StoredRune(RuneDefinition rune, int level = 0)
+        /// <summary>Wachstum des Bausteins, bleibt beim Ablegen erhalten.</summary>
+        public int Growth { get; }
+
+        public StoredRune(RuneDefinition rune, int level = 0, int growth = 0)
         {
             Rune = rune ?? throw new ArgumentNullException(nameof(rune));
             Level = Math.Max(0, Math.Min(level, rune.MaxLevel));
+            Growth = Math.Max(0, growth);
         }
 
         public string Name => Rune.NameAt(Level);
@@ -70,7 +74,7 @@ namespace Betaknight.Core.Runes
         public bool Upgrade(int index)
         {
             if (!IsValid(index) || _runes[index].Level >= _runes[index].Rune.MaxLevel) return false;
-            _runes[index] = new StoredRune(_runes[index].Rune, _runes[index].Level + 1);
+            _runes[index] = new StoredRune(_runes[index].Rune, _runes[index].Level + 1, _runes[index].Growth);
             Changed?.Invoke();
             return true;
         }

@@ -50,6 +50,8 @@ namespace Betaknight.Core.Arena
             r.Register("hp_critical", p => new HpBelowCondition(BasisPoints.Percent(p)));
             r.Register("hp_full", _ => new HpFullCondition());
             r.Register("enemy_low", p => new EnemyHpBelowCondition(BasisPoints.Percent(p)));
+            // Evolution von «HP unter x %» (Rezept Phantom): auch direkt nach dem Ausweichen.
+            r.Register(Runes.EvolvedRuneIds.PhantomReflex, p => new AnyCondition(new HpBelowCondition(BasisPoints.Percent(p)), r.Create("after_dodge", 0)));
             r.Register("enemy_armored", _ => new EnemyArmoredCondition());
             r.Register("enemy_stunned", _ => new EnemyStunnedCondition());
             r.Register("enemy_charging", _ => new EnemyChargingCondition());

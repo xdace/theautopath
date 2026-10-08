@@ -20,6 +20,13 @@ namespace Betaknight.Core.Arena
         public const string Thrusters = "thrusters";
         public const string ShockStab = "shock_stab";
         public const string Echo = "echo";
+
+        // Evolutionsformen (nie angeboten, siehe EvolutionCatalog).
+        public const string Inferno = "inferno";
+        public const string LightningLance = "lightning_lance";
+        public const string Resonance = "resonance";
+        public const string AcidDrill = "acid_drill";
+        public const string ScrapRam = "scrap_ram";
     }
 
     /// <summary>
@@ -131,7 +138,46 @@ namespace Betaknight.Core.Arena
                 new RepeatLastSkillEffect(),
             }, "Wiederholt den zuletzt ausgeführten eigenen Skill.", canBeRepeated: false, kinds: SkillKind.Attack));
 
+            RegisterEvolutions(c);
             return c;
+        }
+
+        /// <summary>Evolutionsformen: stärkere Fassungen bestehender Skills, entstehen nur über ein Rezept.</summary>
+        private static void RegisterEvolutions(SkillCatalog c)
+        {
+            c.Register(new SkillDefinition(SkillIds.Inferno, "Feuersturm", CastTime.Fast, 4, Ticks.FromSeconds(6), new ISkillEffect[]
+            {
+                new DamageEffect(BasisPoints.Percent(60), allEnemies: true),
+                new AllEnemiesEffect(new BurnEffect(Ticks.FromSeconds(5), BasisPoints.Percent(70))),
+            }, "Evolution von Entzünden: Schaden an allen Gegnern, alle brennen 5 s.", kinds: SkillKind.Fire, isEvolution: true));
+
+            c.Register(new SkillDefinition(SkillIds.LightningLance, "Blitzlanze", CastTime.Fast, 2, Ticks.FromSeconds(3), new ISkillEffect[]
+            {
+                new DamageEffect(BasisPoints.Full),
+                new ChanceEffect(BasisPoints.Percent(50), new StunEffect(Ticks.FromTenths(15))),
+            }, "Evolution von Schockstich: starker Stich, 50 % Chance auf 1,5 s Betäubung.", countsAsAttack: true,
+                kinds: SkillKind.Attack | SkillKind.Shock, isEvolution: true));
+
+            c.Register(new SkillDefinition(SkillIds.Resonance, "Resonanz", CastTime.Medium, 4, Ticks.FromSeconds(10), new ISkillEffect[]
+            {
+                new RepeatLastSkillEffect(),
+                new RepeatLastSkillEffect(),
+            }, "Evolution von Echo: wiederholt den letzten eigenen Skill zweimal.", canBeRepeated: false, kinds: SkillKind.Attack, isEvolution: true));
+
+            c.Register(new SkillDefinition(SkillIds.AcidDrill, "Säurebohrer", CastTime.Heavy, 6, Ticks.FromSeconds(5), new ISkillEffect[]
+            {
+                new DamageEffect(BasisPoints.Percent(120), allEnemies: true),
+                new AllEnemiesEffect(new ApplyStatusEffect(() => new PoisonStatus(Ticks.FromSeconds(6), 2), onTarget: true)),
+                new AllEnemiesEffect(new ApplyStatusEffect(() => new PoisonStatus(Ticks.FromSeconds(6), 2), onTarget: true)),
+            }, "Evolution von Bohrstoß: Schaden an allen Gegnern, je 2 Gift-Stapel.", countsAsAttack: true, kinds: SkillKind.Attack, isEvolution: true));
+
+            c.Register(new SkillDefinition(SkillIds.ScrapRam, "Schrottramme", CastTime.Medium, 4, Ticks.FromSeconds(6), new ISkillEffect[]
+            {
+                new DamageEffect(BasisPoints.Percent(120), ignoreArmor: true),
+                new InterruptChargeEffect(),
+                new StunEffect(Ticks.FromSeconds(2)),
+            }, "Evolution von Schildschlag: Schaden ohne Rüstung, betäubt 2 s, bricht Aufladung ab.", countsAsAttack: true,
+                kinds: SkillKind.Shield, isEvolution: true));
         }
     }
 }

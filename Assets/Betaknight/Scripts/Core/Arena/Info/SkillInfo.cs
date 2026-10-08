@@ -85,6 +85,10 @@ namespace Betaknight.Core.Arena
         }
 
         /// <summary>Dieselbe Wirkung, nur mit einer Chance (Text bekommt "20 % Chance: " vorangestellt).</summary>
+        /// <summary>Dieselbe Kennzahl für alle Gegner («an allen Gegnern»).</summary>
+        public EffectInfo ForAllEnemies() => AllEnemies ? this
+            : new EffectInfo(Kind, $"{Text} an allen Gegnern", DamageBp, Amount, Total, DurationTicks, ChanceBp, true);
+
         public EffectInfo WithChance(int chanceBp) => new EffectInfo(Kind, $"{SkillInfo.Percent(chanceBp)} Chance: {Text}",
             DamageBp, Amount, Total, DurationTicks, (int)((long)ChanceBp * chanceBp / BasisPoints.Full), AllEnemies);
     }

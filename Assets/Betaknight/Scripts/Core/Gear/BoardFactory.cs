@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Growth;
 using Betaknight.Core.Modules;
 using Betaknight.Core.Runes;
 
@@ -20,9 +21,15 @@ namespace Betaknight.Core.Gear
         /// <summary>Module am Logikbaustein der Zeile (Baustein-Module, Auslöser «wenn erfüllt»).</summary>
         public readonly IReadOnlyList<ModuleSpec> BlockModules;
 
+        /// <summary>Wachstum des Skill-Exemplars bzw. des Bausteins (wirkt über die Regel aus dem <see cref="GrowthCatalog"/>).</summary>
+        public readonly int SkillGrowth;
+        public readonly int BlockGrowth;
+
         public BoardRowSpec(string runeId, string skillId, int level = 0, int skillLevel = 0,
-            IReadOnlyList<ModuleSpec> skillModules = null, IReadOnlyList<ModuleSpec> blockModules = null)
+            IReadOnlyList<ModuleSpec> skillModules = null, IReadOnlyList<ModuleSpec> blockModules = null, int skillGrowth = 0, int blockGrowth = 0)
         {
+            SkillGrowth = skillGrowth;
+            BlockGrowth = blockGrowth;
             RuneId = runeId;
             SkillId = skillId;
             Level = level;
@@ -43,9 +50,12 @@ namespace Betaknight.Core.Gear
         private readonly ConditionRegistry _conditions;
         private readonly SkillCatalog _skills;
         private readonly ModuleCatalog _modules;
+        private readonly GrowthCatalog _growth;
 
-        public BoardFactory(RuneCatalog runes, ConditionRegistry conditions, SkillCatalog skills, ModuleCatalog modules = null)
+        public BoardFactory(RuneCatalog runes, ConditionRegistry conditions, SkillCatalog skills, ModuleCatalog modules = null,
+            GrowthCatalog growth = null)
         {
+            _growth = growth ?? GrowthCatalog.CreateDefault();
             _modules = modules ?? ModuleCatalog.CreateDefault();
             _runes = runes ?? RuneCatalog.CreateDefault();
             _conditions = conditions ?? ConditionRegistry.CreateDefault();
@@ -85,14 +95,14 @@ namespace Betaknight.Core.Gear
         public LogicRow CreateRow(BoardRowSpec spec, Equipment equipment, SkillLevelRules skillLevels = null,
             IReadOnlyList<SkillPassive> extraPassives = null)
         {
-            if (!_runes.TryGet(spec.RuneId, out RuneDefinition rune) ||
-                !_conditions.TryCreate(spec.RuneId, ModuleRules.ApplyToParameter(rune, rune.ParameterAt(spec.Level), spec.BlockModules),
-                    out ICondition condition))
-            {
-                return new LogicRow(AlwaysCondition.Instance, null, spec.RuneId ?? "?");
-            }
+            if (!_runes.TryGet(spec.RuneId, out RuneDefinition rune)) return new LogicRow(AlwaysCondition.Instance, null, spec.RuneId ?? "?");
 
-            int parameter = ModuleRules.ApplyToParameter(rune, rune.ParameterAt(spec.Level), spec.BlockModules);
+            // Schwelle: Grundwert der Stufe, dann Wachstum (bis zur Obergrenze der Regel), dann Module.
+            int grown = GrowthApplier.ApplyToParameter(rune, rune.ParameterAt(spec.Level), _growth.ForRune(rune.Id), spec.BlockGrowth);
+            int parameter = ModuleRules.ApplyToParameter(rune, grown, spec.BlockModules);
+            if (!_conditions.TryCreate(spec.RuneId, parameter, out ICondition condition))
+                return new LogicRow(AlwaysCondition.Instance, null, spec.RuneId ?? "?");
+
             string label = string.Format(rune.NameTemplate, parameter);
             foreach (ModuleSpec m in spec.BlockModules)
             {
@@ -106,6 +116,7 @@ namespace Betaknight.Core.Gear
                 return new LogicRow(condition, null, label);
 
             SkillDefinition skill = _skills.TryGet(spec.SkillId, out SkillDefinition s) ? s.AtLevel(spec.SkillLevel, skillLevels) : null;
+            skill = GrowthApplier.Apply(skill, _growth.ForSkill(spec.SkillId), spec.SkillGrowth);
             foreach (ModuleSpec m in spec.SkillModules)
                 skill = ModuleRules.ApplyToSkill(skill, m, _modules.TryGet(m.ModuleId, out ModuleDefinition d) ? d.Name : m.ModuleId);
             if (skill != null && equipment != null) skill = equipment.Boost(skill, extraPassives);

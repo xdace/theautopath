@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace Betaknight.Core.Arena
 {
     /// <summary>Heilt den Anwender um einen Anteil seines Max-HP.</summary>
@@ -221,6 +223,30 @@ namespace Betaknight.Core.Arena
 
 namespace Betaknight.Core.Arena
 {
+    /// <summary>Wendet eine zielgerichtete Wirkung auf jeden Gegner an (z. B. Brennen oder Gift an allen).</summary>
+    public sealed class AllEnemiesEffect : ISkillEffect
+    {
+        public ISkillEffect Inner { get; }
+
+        public AllEnemiesEffect(ISkillEffect inner) => Inner = inner ?? throw new System.ArgumentNullException(nameof(inner));
+
+        public void Apply(in SkillContext c)
+        {
+            foreach (Combatant enemy in c.Battle.OpponentsOf(c.User).ToArray())
+            {
+                if (!c.User.IsAlive) break;
+                Inner.Apply(new SkillContext(c.Battle, c.User, enemy, c.Skill, c.RowIndex));
+            }
+        }
+
+        public void Describe(SkillInfoBuilder info)
+        {
+            SkillInfoBuilder inner = info.Nested();
+            Inner.Describe(inner);
+            foreach (EffectInfo e in inner.Effects) info.Add(e.ForAllEnemies());
+        }
+    }
+
     public static class SkillEffects
     {
         /// <summary>
@@ -238,6 +264,7 @@ namespace Betaknight.Core.Arena
                 case StatModifierEffect m: return m.OnTarget;
                 case ApplyStatusEffect a: return a.OnTarget;
                 case ChanceEffect c: return HitsTarget(c.Inner);
+                case AllEnemiesEffect _: return false;
                 default: return false;
             }
         }

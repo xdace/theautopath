@@ -19,8 +19,11 @@ namespace Betaknight.Core.Runes
         /// <summary>Stabile Id der Zeile (bleibt beim Umsortieren gleich). Ziel für Auslöser.</summary>
         public int RowId { get; }
 
-        /// <summary>Modul-Plätze des Logikbausteins (Start 1).</summary>
-        public int ModuleSlots { get; internal set; } = 1;
+        /// <summary>Modul-Plätze des Logikbausteins: 1, mehr ab Wachstum 10 und 25.</summary>
+        public int ModuleSlots => Betaknight.Core.Growth.GrowthStages.ModuleSlotsFor(Growth);
+
+        /// <summary>Wachstum des Bausteins (gewonnene Kämpfe, in denen die Zeile feuerte). Wandert mit der Rune ins Inventar.</summary>
+        public int Growth { get; internal set; }
 
         public IReadOnlyList<ModuleInstance> Modules => _modules.Modules;
         string IModuleHolder.ModuleHolderName => HolderName;
@@ -102,11 +105,11 @@ namespace Betaknight.Core.Runes
             TryAdd(rune, skillId != null ? new SkillInstance(skillId) : null, level);
 
         /// <summary>Neue Zeile mit diesem Exemplar. Es darf noch nirgends sitzen.</summary>
-        public bool TryAdd(RuneDefinition rune, SkillInstance skill, int level = 0)
+        public bool TryAdd(RuneDefinition rune, SkillInstance skill, int level = 0, int growth = 0)
         {
             if (rune == null || IsFull || Contains(rune)) return false;
             if (skill != null && !skill.IsBasicAttack && skill.Holder != null) return false;
-            var row = new RuneSlot(this, rune, skill, _nextRowId++) { Level = Math.Max(0, Math.Min(level, rune.MaxLevel)) };
+            var row = new RuneSlot(this, rune, skill, _nextRowId++) { Level = Math.Max(0, Math.Min(level, rune.MaxLevel)), Growth = Math.Max(0, growth) };
             if (skill != null && !skill.IsBasicAttack) skill.Holder = row;
             _rows.Add(row);
             Changed?.Invoke();
@@ -121,8 +124,13 @@ namespace Betaknight.Core.Runes
         /// Tauscht die Rune einer Zeile gegen eine andere mit deren Stufe. Der zugeordnete Skill bleibt an der Zeile.
         /// Die bisherige Rune kommt mit ihrer Stufe zurück, z. B. fürs Runen-Inventar.
         /// </summary>
-        public bool SwapRune(int index, RuneDefinition rune, int level, out RuneDefinition oldRune, out int oldLevel)
+        public bool SwapRune(int index, RuneDefinition rune, int level, out RuneDefinition oldRune, out int oldLevel) =>
+            SwapRune(index, rune, level, 0, out oldRune, out oldLevel, out _);
+
+        /// <summary>Wie oben, mit dem Wachstum des Bausteins: das neue kommt an die Zeile, das alte zurück.</summary>
+        public bool SwapRune(int index, RuneDefinition rune, int level, int growth, out RuneDefinition oldRune, out int oldLevel, out int oldGrowth)
         {
+            oldGrowth = IsValid(index) ? _rows[index].Growth : 0;
             oldRune = null;
             oldLevel = 0;
             if (rune == null || !IsValid(index)) return false;
@@ -133,6 +141,25 @@ namespace Betaknight.Core.Runes
             oldLevel = _rows[index].Level;
             _rows[index].Rune = rune;
             _rows[index].Level = Math.Max(0, Math.Min(level, rune.MaxLevel));
+            _rows[index].Growth = Math.Max(0, growth);
+            Changed?.Invoke();
+            return true;
+        }
+
+        /// <summary>Wachstumspunkte für den Baustein einer Zeile.</summary>
+        public void Grow(RuneSlot row, int points)
+        {
+            if (row == null || !_rows.Contains(row) || points <= 0) return;
+            row.Growth = (int)Math.Min(int.MaxValue, (long)row.Growth + points);
+            Changed?.Invoke();
+        }
+
+        /// <summary>Evolution eines Bausteins: die Zeile bekommt die Evolutionsform der Rune; Stufe, Wachstum, Skill und Module bleiben.</summary>
+        public bool Evolve(RuneSlot row, RuneDefinition evolved)
+        {
+            if (row == null || evolved == null || !_rows.Contains(row)) return false;
+            row.Rune = evolved;
+            row.Level = Math.Min(row.Level, evolved.MaxLevel);
             Changed?.Invoke();
             return true;
         }

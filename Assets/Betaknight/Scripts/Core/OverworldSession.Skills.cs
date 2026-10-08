@@ -214,7 +214,7 @@ namespace Betaknight.Core
         /// <summary>Würfelt verschiedene Skills nach Angebotsgewicht. Eigene Skills dürfen kommen (Stufe oder zweites Exemplar).</summary>
         private List<string> PickSkills(int count, ICollection<string> exclude = null)
         {
-            var pool = SkillCatalog.All.Where(s => !s.IsBasicAttack && (exclude == null || !exclude.Contains(s.Id))).ToList();
+            var pool = SkillCatalog.All.Where(s => !s.IsBasicAttack && !s.IsEvolution && (exclude == null || !exclude.Contains(s.Id))).ToList();
             var result = new List<string>();
             while (result.Count < count && pool.Count > 0)
             {

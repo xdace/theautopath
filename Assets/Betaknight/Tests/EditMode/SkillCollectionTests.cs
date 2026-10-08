@@ -114,11 +114,14 @@ namespace Betaknight.Tests.EditMode
             var messages = new List<string>();
             s.BuildImproved += messages.Add;
 
+            // Begründet angepasst (A-08): ein Duplikat gibt +5 Wachstum (= Stufe 1); Schildschlag wächst in der Betäubung.
+            int stunBefore = s.DescribeSkill(bash).Effects.First(e => e.DurationTicks > 0).DurationTicks;
             Assert.AreSame(bash, s.GainSkill(SkillIds.ShieldBash, SkillDuplicateChoice.Upgrade));
             Assert.AreEqual(1, bash.Level);
+            Assert.AreEqual(5, bash.Growth);
             Assert.AreEqual(2, s.Skills.Count, "kein neues Exemplar");
-            StringAssert.Contains("Schildschlag → Schildschlag +1", messages.Last());
-            StringAssert.Contains("80 % → 95 %", messages.Last());
+            StringAssert.Contains("Schildschlag → Schildschlag +5", messages.Last());
+            Assert.AreEqual(stunBefore + 5 * Ticks.FromTenths(1), s.DescribeSkill(bash).Effects.First(e => e.DurationTicks > 0).DurationTicks);
 
             SkillInstance copy = s.GainSkill(SkillIds.ShieldBash, SkillDuplicateChoice.KeepCopy);
             Assert.AreNotSame(bash, copy);
@@ -137,8 +140,16 @@ namespace Betaknight.Tests.EditMode
         {
             OverworldSession s = Session();
             SkillInstance bash = s.Runes.Rows[0].Skill;
-            for (int i = 0; i < s.Progression.MaxSkillLevel; i++) s.GainSkill(SkillIds.ShieldBash);
+            // Begründet angepasst (A-08): je Duplikat +5 Wachstum, Stufe 3 liegt bei 30.
+            int duplicates = 0;
+            while (s.CanUpgradeSkill(SkillIds.ShieldBash) && duplicates < 20)
+            {
+                s.GainSkill(SkillIds.ShieldBash);
+                duplicates++;
+            }
 
+            Assert.AreEqual(6, duplicates);
+            Assert.AreEqual(30, bash.Growth);
             Assert.AreEqual(s.Progression.MaxSkillLevel, bash.Level);
             Assert.IsFalse(s.CanUpgradeSkill(SkillIds.ShieldBash));
 
@@ -150,20 +161,24 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void SkillLevelChangesTheNumbersAndTheFight()
+        public void SkillGrowthChangesTheNumbersAndTheFight()
         {
+            // Begründet angepasst (A-08): Duplikate geben Wachstum, Rüstungsbruch wächst um +1 Schaden pro Punkt.
             OverworldSession s = Session("blade");
             SkillInstance breaker = s.Runes.Rows[0].Skill;
-            int before = s.DescribeSkill(breaker).Effects.First(e => e.IsDamage).DamageBp;
+            int before = s.DescribeSkill(breaker).Effects.First(e => e.IsDamage).Amount;
 
             s.GainSkill(SkillIds.ArmorBreak);
             s.GainSkill(SkillIds.ArmorBreak);
             SkillInfo info = s.DescribeSkill(breaker);
-            Assert.AreEqual(before + 2 * s.Progression.SkillLevels.DamageBpPerLevel, info.Effects.First(e => e.IsDamage).DamageBp);
+            Assert.AreEqual(before + 10, info.Effects.First(e => e.IsDamage).Amount);
 
-            // Der Kampf rechnet mit derselben Stufe wie die Anzeige.
+            // Der Kampf rechnet mit demselben Wachstum wie die Anzeige.
             var loadout = new RuneLoadout();
-            loadout.TryAdd(s.RuneCatalog.Get("always"), breaker.SkillId == null ? null : new SkillInstance(SkillIds.ArmorBreak, breaker.Level));
+            var copy = new SkillCollection();
+            SkillInstance grown = copy.Add(SkillIds.ArmorBreak);
+            copy.Grow(grown, breaker.Growth);
+            loadout.TryAdd(s.RuneCatalog.Get("always"), grown);
             BattleSetup setup = new ArenaCombatResolver().CreateSetup(
                 new CombatRequest(CellContent.Enemy, 0, new PlayerStats(30, 0), loadout, s.Gear, null, s.Progression.SkillLevels),
                 new List<CombatantSetup> { new CombatantSetup { Name = "Sandsack", Stats = new CombatStats(9999, 0) } }, 1);

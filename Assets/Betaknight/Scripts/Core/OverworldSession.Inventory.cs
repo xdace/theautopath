@@ -151,12 +151,12 @@ namespace Betaknight.Core
             if (!CanChangeLoadout || !RuneInventory.IsValid(inventoryIndex) || row < 0 || row >= Runes.Rows.Count) return false;
 
             StoredRune stored = RuneInventory.RemoveAt(inventoryIndex);
-            if (!Runes.SwapRune(row, stored.Rune, stored.Level, out RuneDefinition old, out int oldLevel))
+            if (!Runes.SwapRune(row, stored.Rune, stored.Level, stored.Growth, out RuneDefinition old, out int oldLevel, out int oldGrowth))
             {
                 RuneInventory.TryAdd(stored, inventoryIndex);
                 return false;
             }
-            RuneInventory.TryAdd(new StoredRune(old, oldLevel), inventoryIndex);
+            RuneInventory.TryAdd(new StoredRune(old, oldLevel, oldGrowth), inventoryIndex);
             return true;
         }
 
@@ -165,7 +165,7 @@ namespace Betaknight.Core
         {
             if (!CanChangeLoadout || !RuneInventory.IsValid(inventoryIndex) || Runes.IsFull) return false;
             StoredRune stored = RuneInventory.RemoveAt(inventoryIndex);
-            return Runes.TryAdd(stored.Rune, SkillForNewRow(), stored.Level);
+            return Runes.TryAdd(stored.Rune, SkillForNewRow(), stored.Level, stored.Growth);
         }
 
         /// <summary>Nimmt eine Zeile von der Tafel; die Rune kommt mit Stufe ins Inventar.</summary>
@@ -173,7 +173,7 @@ namespace Betaknight.Core
         {
             if (!CanChangeLoadout || RuneInventory.IsFull || row < 0 || row >= Runes.Rows.Count) return false;
             RuneSlot removed = Runes.RemoveAt(row);
-            return RuneInventory.TryAdd(new StoredRune(removed.Rune, removed.Level));
+            return RuneInventory.TryAdd(new StoredRune(removed.Rune, removed.Level, removed.Growth));
         }
 
         /// <summary>Verwirft eine Rune aus dem Inventar; eine wartende Rune rückt nach.</summary>
@@ -222,8 +222,8 @@ namespace Betaknight.Core
 
             if (replaceSlot >= 0)
             {
-                if (!Runes.SwapRune(replaceSlot, rune, 0, out RuneDefinition old, out int oldLevel)) return false;
-                StoreRune(new StoredRune(old, oldLevel));
+                if (!Runes.SwapRune(replaceSlot, rune, 0, 0, out RuneDefinition old, out int oldLevel, out int oldGrowth)) return false;
+                StoreRune(new StoredRune(old, oldLevel, oldGrowth));
                 return true;
             }
 

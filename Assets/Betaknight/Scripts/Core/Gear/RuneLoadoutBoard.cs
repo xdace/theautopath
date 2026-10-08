@@ -16,8 +16,9 @@ namespace Betaknight.Core.Gear
             if (loadout == null) return specs;
             foreach (RuneSlot row in loadout.Rows)
             {
-                specs.Add(new BoardRowSpec(row.Rune.Id, row.SkillId, row.Level, row.SkillLevel,
-                    Specs(loadout, row.Skill?.Modules), Specs(loadout, row.Modules)));
+                // Die Skill-Stufe wirkt nicht mehr selbst (A-08): ihre Werte kommen über das Wachstum.
+                specs.Add(new BoardRowSpec(row.Rune.Id, row.SkillId, row.Level, 0,
+                    Specs(loadout, row.Skill?.Modules), Specs(loadout, row.Modules), row.Skill?.Growth ?? 0, row.Growth));
             }
             return specs;
         }

@@ -141,6 +141,7 @@ namespace Betaknight.Core
                 IsInCombat = false;
             }
             LastCombat = result;
+            GrowFromBattle(result);
             CombatFinished?.Invoke(result);
             return result;
         }

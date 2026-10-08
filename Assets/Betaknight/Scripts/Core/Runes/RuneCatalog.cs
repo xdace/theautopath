@@ -4,6 +4,12 @@ using System.Collections.Generic;
 namespace Betaknight.Core.Runes
 {
     /// <summary>Alle Runen des Spiels, nachschlagbar über die Id. Neue Runen: Eintrag hier + Bedingung in der ConditionRegistry.</summary>
+    /// <summary>Ids der Evolutionsformen von Bausteinen.</summary>
+    public static class EvolvedRuneIds
+    {
+        public const string PhantomReflex = "phantom_reflex";
+    }
+
     public sealed class RuneCatalog
     {
         private readonly Dictionary<string, RuneDefinition> _byId = new Dictionary<string, RuneDefinition>();
@@ -86,6 +92,10 @@ namespace Betaknight.Core.Runes
             new RuneDefinition("vs_boss", "Gegen Boss", RuneTag.Shield, ConditionKind.Context, "Wenn der Gegner ein Boss ist.", null, Rare),
             new RuneDefinition("outnumbered", "In Unterzahl", RuneTag.Shield, ConditionKind.State, "Solange mindestens {0} Gegner stehen.", new[] { 3 }, Rare),
             new RuneDefinition("last_enemy", "Letzter Gegner", RuneTag.Blade, ConditionKind.State, "Solange nur noch ein Gegner steht.", null, Rare),
+
+            // Evolutionsformen: nie angeboten, entstehen nur durch Evolution (siehe EvolutionCatalog).
+            new RuneDefinition(EvolvedRuneIds.PhantomReflex, "HP unter {0} % oder ausgewichen", RuneTag.Ember, ConditionKind.State,
+                "Solange das eigene Leben unter {0} % liegt, und kurz nach jedem Ausweichen.", new[] { 30, 40, 50 }, 0, exclusive: true),
         });
     }
 }

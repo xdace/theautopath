@@ -65,6 +65,9 @@ namespace Betaknight.Core.Arena
 
         public bool IsBasicAttack { get; }
 
+        /// <summary>Evolutionsform eines anderen Skills: wird nie angeboten, entsteht nur durch Evolution.</summary>
+        public bool IsEvolution { get; }
+
         /// <summary>Zählt für Zähler wie "Jeder 3. Angriff". Basisangriff immer, sonst nach Definition.</summary>
         public bool CountsAsAttack { get; }
 
@@ -78,9 +81,10 @@ namespace Betaknight.Core.Arena
 
         public SkillDefinition(string id, string name, int windupTicks, int recoveryTicks, int cooldownTicks,
             IEnumerable<ISkillEffect> effects, string description = null, bool countsAsAttack = false,
-            bool canBeRepeated = true, bool isBasicAttack = false, SkillKind kinds = SkillKind.None)
+            bool canBeRepeated = true, bool isBasicAttack = false, SkillKind kinds = SkillKind.None, bool isEvolution = false)
         {
             Kinds = kinds;
+            IsEvolution = isEvolution;
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("Id fehlt.", nameof(id));
             if (windupTicks < 0 || recoveryTicks < 0 || cooldownTicks < 0) throw new ArgumentOutOfRangeException(nameof(windupTicks));
 
@@ -149,7 +153,7 @@ namespace Betaknight.Core.Arena
         /// <summary>Kopie mit allen Zusatzwerten (Stufe, Boni, Module); Wirkungen und Cooldown optional neu.</summary>
         private SkillDefinition Clone(List<ISkillEffect> effects = null, int? cooldown = null) =>
             new SkillDefinition(Id, Name, WindupTicks, RecoveryTicks, cooldown ?? CooldownTicks, effects ?? new List<ISkillEffect>(Effects),
-                Description, CountsAsAttack, CanBeRepeated, IsBasicAttack, Kinds)
+                Description, CountsAsAttack, CanBeRepeated, IsBasicAttack, Kinds, IsEvolution)
             {
                 Level = Level,
                 PowerBonusPercent = PowerBonusPercent,
@@ -195,6 +199,15 @@ namespace Betaknight.Core.Arena
             copy.CastBonusPercent += castPercent;
             if (!string.IsNullOrEmpty(moduleName)) copy._modules.Add(moduleName);
             return copy;
+        }
+
+        /// <summary>Kopie mit veränderten Wirkungen (z. B. Wachstum), alle Zusatzwerte bleiben.</summary>
+        public SkillDefinition MapEffects(Func<ISkillEffect, ISkillEffect> map)
+        {
+            if (map == null || IsBasicAttack) return this;
+            var effects = new List<ISkillEffect>();
+            foreach (ISkillEffect e in Effects) effects.Add(map(e) ?? e);
+            return Clone(effects);
         }
 
         public override string ToString() => Name;

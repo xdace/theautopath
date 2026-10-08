@@ -196,12 +196,17 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void LeveledSkillsHitHarderInTheSimulator()
+        public void GrownSkillsHitHarderInTheSimulator()
         {
+            // Begründet angepasst (A-08): Stufen geben keinen eigenen Schaden mehr, die Wirkung kommt aus dem Wachstum
+            // (Rüstungsbruch: +1 Schaden pro Kill, hier 7 Punkte).
             var gear = new Equipment();
             gear.Equip(AllItems.Get("short_blade").AtLevel(2, 50));
+            var skills = new Betaknight.Core.Skills.SkillCollection();
+            Betaknight.Core.Skills.SkillInstance breaker = skills.Add(SkillIds.ArmorBreak);
+            skills.Grow(breaker, 7);
             var loadout = new RuneLoadout();
-            loadout.TryAdd(RuneCatalog.CreateDefault().Get("always"), new Betaknight.Core.Skills.SkillInstance(SkillIds.ArmorBreak, 2));
+            loadout.TryAdd(RuneCatalog.CreateDefault().Get("always"), breaker);
             var rules = new SkillLevelRules();
 
             var request = new CombatRequest(CellContent.Enemy, 0, new PlayerStats(30, 0), loadout, gear, null, rules);
@@ -212,7 +217,7 @@ namespace Betaknight.Tests.EditMode
 
             int weapon = 5 + 2 + 2 * 1;
             BattleEvent hit = r.Events.First(e => e.Kind == BattleEventKind.Damage && e.Detail == SkillIds.ArmorBreak);
-            Assert.AreEqual(BasisPoints.Of(weapon, BasisPoints.Full + 2 * rules.DamageBpPerLevel), hit.Amount);
+            Assert.AreEqual(BasisPoints.Of(weapon, BasisPoints.Full) + 7, hit.Amount);
         }
 
         [Test]

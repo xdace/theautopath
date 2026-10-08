@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Betaknight.Core.Modules;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Growth;
 
 namespace Betaknight.Core.Skills
 {
@@ -30,8 +31,8 @@ namespace Betaknight.Core.Skills
     {
         private readonly ModuleSlotList _modules = new ModuleSlotList();
 
-        /// <summary>Modul-Plätze des Exemplars (Start 1, der Basisangriff hat keine).</summary>
-        public int ModuleSlots { get; internal set; }
+        /// <summary>Modul-Plätze des Exemplars: 1, mehr ab Wachstum 10 und 25. Der Basisangriff hat keine.</summary>
+        public int ModuleSlots => IsBasicAttack ? 0 : GrowthStages.ModuleSlotsFor(Growth);
 
         public IReadOnlyList<ModuleInstance> Modules => _modules.Modules;
         string IModuleHolder.ModuleHolderName => SkillId;
@@ -41,8 +42,17 @@ namespace Betaknight.Core.Skills
 
         /// <summary>Eindeutig innerhalb der Sammlung eines Runs, 0 solange das Exemplar noch keiner Sammlung gehört.</summary>
         public int InstanceId { get; internal set; }
-        public string SkillId { get; }
-        public int Level { get; internal set; }
+        /// <summary>Welcher Skill. Ändert sich nur durch Evolution; Exemplar, Wachstum und Module bleiben.</summary>
+        public string SkillId { get; internal set; }
+
+        /// <summary>
+        /// Wachstum: der eine Zähler des Exemplars. Punkte aus der Wachstums-Regel des Skills (Kills, Betäubungen …)
+        /// und +5 je Duplikat. Bleibt über den ganzen Run, auch durch Evolution.
+        /// </summary>
+        public int Growth { get; internal set; }
+
+        /// <summary>Stufe 0–3 als Meilenstein des Wachstums (5/15/30), siehe <see cref="GrowthStages"/>. Ohne eigene Werte.</summary>
+        public int Level => GrowthStages.StageFor(Growth);
 
         /// <summary>Wo das Exemplar sitzt, null = frei in der Sammlung.</summary>
         public ISkillHolder Holder { get; internal set; }
@@ -50,24 +60,24 @@ namespace Betaknight.Core.Skills
         public bool IsFree => Holder == null;
         public bool IsBasicAttack => SkillId == SkillDefinition.BasicAttackId;
 
+        /// <param name="level">Startet mit dem Wachstum dieser Stufe (für Aufbau und Tests).</param>
         public SkillInstance(string skillId, int level = 0)
         {
             if (string.IsNullOrEmpty(skillId)) throw new ArgumentException("Skill-Id fehlt.", nameof(skillId));
             SkillId = skillId;
-            Level = Math.Max(0, level);
-            ModuleSlots = IsBasicAttack ? 0 : 1;
+            Growth = GrowthStages.GrowthForStage(Math.Max(0, level));
         }
 
         /// <summary>Ein neuer Basisangriff für eine Zeile (gehört zu keiner Sammlung).</summary>
         public static SkillInstance BasicAttack() => new SkillInstance(SkillDefinition.BasicAttackId);
 
-        /// <summary>«Bohrstoß +2» mit dem Namen aus dem Katalog.</summary>
+        /// <summary>«Bohrstoß +7» (Wachstum) mit dem Namen aus dem Katalog.</summary>
         public string NameFrom(SkillCatalog catalog)
         {
             string name = catalog != null && catalog.TryGet(SkillId, out SkillDefinition s) ? s.Name : SkillId;
-            return Level > 0 ? $"{name} +{Level}" : name;
+            return Growth > 0 ? $"{name} +{Growth}" : name;
         }
 
-        public override string ToString() => Level > 0 ? $"{SkillId} +{Level} #{InstanceId}" : $"{SkillId} #{InstanceId}";
+        public override string ToString() => Growth > 0 ? $"{SkillId} +{Growth} #{InstanceId}" : $"{SkillId} #{InstanceId}";
     }
 }
