@@ -1,0 +1,225 @@
+using System;
+using System.Collections.Generic;
+using Betaknight.Core.Combat;
+using Betaknight.Core.Hex;
+using Betaknight.Core.Map;
+using Betaknight.Core.Runes;
+using Betaknight.Core.Shop;
+using Betaknight.Core.Turns;
+
+namespace Betaknight.Core
+{
+    /// <summary>Ergebnis eines grossen Events (Kampf, Truhe, Goldmine) mit lesbaren Zeilen für die Anzeige.</summary>
+    public sealed class MajorEventOutcome
+    {
+        public HexCell Cell { get; }
+        public string Title { get; }
+        public IReadOnlyList<string> Lines { get; }
+
+        public MajorEventOutcome(HexCell cell, string title, IReadOnlyList<string> lines)
+        {
+            Cell = cell;
+            Title = title;
+            Lines = lines;
+        }
+
+        public string Summary => Lines.Count == 0 ? string.Empty : string.Join(", ", Lines);
+    }
+
+    /// <summary>Ein geöffneter Shop.</summary>
+    public sealed class ShopVisit
+    {
+        public HexCell Cell { get; }
+        public ShopInventory Inventory { get; }
+
+        public ShopVisit(HexCell cell, ShopInventory inventory)
+        {
+            Cell = cell;
+            Inventory = inventory;
+        }
+    }
+
+    /// <summary>Grosse Events: Kampf (Platzhalter bis zur Arena), Schatztruhe, Goldmine und Shop.</summary>
+    public sealed partial class OverworldSession
+    {
+        /// <summary>Alle so viele Züge bringt jede eroberte Goldmine Gold.</summary>
+        public const int MineIncomeInterval = 3;
+
+        /// <summary>Gold pro Mine und Auszahlung.</summary>
+        public const int MineIncomeGold = 1;
+
+        public ShopPrices ShopPrices { get; } = new ShopPrices();
+
+        /// <summary>Geöffneter Shop. Solange gesetzt, ist Bewegung gesperrt.</summary>
+        public ShopVisit PendingShop { get; private set; }
+
+        public int ClaimedMines { get; private set; }
+
+        public bool IsGameOver => Stats.IsDead;
+
+        /// <summary>Kampf, Truhe oder Goldmine hat gewirkt.</summary>
+        public event Action<MajorEventOutcome> MajorEventResolved;
+
+        public event Action<ShopVisit> ShopOpened;
+
+        /// <summary>Der Ritter ist gefallen.</summary>
+        public event Action RunEnded;
+
+        private readonly ICombatResolver _combat;
+        private readonly Dictionary<HexCoord, ShopInventory> _shops = new Dictionary<HexCoord, ShopInventory>();
+
+        private void TriggerMajorEvent(HexCell cell, bool firstVisit)
+        {
+            switch (cell.Content)
+            {
+                case CellContent.Enemy:
+                case CellContent.Boss:
+                    if (!cell.IsResolved) Fight(cell);
+                    break;
+
+                case CellContent.Treasure:
+                    if (!cell.IsResolved) OpenTreasure(cell);
+                    break;
+
+                case CellContent.GoldMine:
+                    if (!cell.IsResolved) ClaimMine(cell);
+                    break;
+
+                case CellContent.Shop:
+                    // Beim ersten Betreten öffnet der Shop von selbst, danach über OpenShop.
+                    if (firstVisit) OpenShop();
+                    break;
+            }
+        }
+
+        private void Fight(HexCell cell)
+        {
+            int tier = cell.Coord.DistanceTo(Map.Center);
+            CombatResult result = _combat.Resolve(new CombatRequest(cell.Content, tier, Stats, Runes), _random);
+
+            var lines = new List<string>();
+            int dealt = Stats.Damage(result.DamageTaken);
+            if (dealt > 0) lines.Add($"-{dealt} HP");
+
+            string title = cell.Content == CellContent.Boss ? "Boss" : "Kampf";
+
+            if (!result.Victory || Stats.IsDead)
+            {
+                // Ein verlorener Kampf endet tödlich, auch wenn der Resolver noch HP übrig liess.
+                if (!Stats.IsDead) Stats.Damage(Stats.Hp);
+                lines.Add("Niederlage");
+                MajorEventResolved?.Invoke(new MajorEventOutcome(cell, title, lines));
+                RunEnded?.Invoke();
+                return;
+            }
+
+            Stats.AddGold(result.GoldReward);
+            lines.Add($"+{result.GoldReward} Gold");
+            Map.MarkResolved(cell.Coord);
+            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, $"{title} gewonnen", lines));
+            OfferRunes("Sieg");
+        }
+
+        private void OpenTreasure(HexCell cell)
+        {
+            int gold = _random.Next(6, 11);
+            Stats.AddGold(gold);
+            Map.MarkResolved(cell.Coord);
+            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, "Schatztruhe", new[] { $"+{gold} Gold" }));
+            OfferRunes("Schatztruhe");
+        }
+
+        private void ClaimMine(HexCell cell)
+        {
+            ClaimedMines++;
+            Stats.AddGold(3);
+            Map.MarkResolved(cell.Coord);
+            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, "Goldmine erobert",
+                new[] { "+3 Gold", $"+{MineIncomeGold} Gold alle {MineIncomeInterval} Züge" }));
+        }
+
+        private void OnTurnEnded(int turn)
+        {
+            if (ClaimedMines > 0 && TurnSystem.IsIntervalTurn(turn, MineIncomeInterval))
+                Stats.AddGold(ClaimedMines * MineIncomeGold);
+        }
+
+        /// <summary>Steht der Spieler auf einem Shop-Feld und wartet nichts anderes?</summary>
+        public bool CanOpenShop => !IsBusy && !IsGameOver && CurrentCell.Content == CellContent.Shop;
+
+        /// <summary>Öffnet den Shop auf dem aktuellen Feld. Der Bestand bleibt pro Shop erhalten.</summary>
+        public bool OpenShop()
+        {
+            if (!CanOpenShop) return false;
+
+            HexCell cell = CurrentCell;
+            if (!_shops.TryGetValue(cell.Coord, out ShopInventory inventory))
+            {
+                inventory = new ShopInventory(RuneOffer.Create("Shop", RuneCatalog, Runes, _random).Options);
+                _shops.Add(cell.Coord, inventory);
+            }
+
+            PendingShop = new ShopVisit(cell, inventory);
+            ShopOpened?.Invoke(PendingShop);
+            return true;
+        }
+
+        public bool CanBuyShopRune(int index) =>
+            PendingShop != null && index >= 0 && index < PendingShop.Inventory.Runes.Count
+            && Stats.Gold >= ShopPrices.Rune && !Runes.Contains(PendingShop.Inventory.Runes[index]);
+
+        /// <summary>Kauft eine Rune. Bei vollen Plätzen muss <paramref name="replaceSlot"/> angegeben werden.</summary>
+        public bool BuyShopRune(int index, int replaceSlot = -1)
+        {
+            if (!CanBuyShopRune(index)) return false;
+
+            RuneDefinition rune = PendingShop.Inventory.Runes[index];
+            bool ok = Runes.IsFull ? Runes.TryReplace(replaceSlot, rune) : Runes.TryAdd(rune);
+            if (!ok) return false;
+
+            Stats.TrySpendGold(ShopPrices.Rune);
+            PendingShop.Inventory.Remove(rune);
+            RuneTaken?.Invoke(rune);
+            return true;
+        }
+
+        public bool CanBuyHeal => PendingShop != null && Stats.Gold >= ShopPrices.Heal && Stats.Hp < Stats.MaxHp;
+
+        public bool BuyHeal()
+        {
+            if (!CanBuyHeal) return false;
+            Stats.TrySpendGold(ShopPrices.Heal);
+            Stats.Heal(ShopPrices.HealAmount);
+            return true;
+        }
+
+        public bool CanBuyRuneSlot => PendingShop != null && !PendingShop.Inventory.SlotSold && Stats.Gold >= ShopPrices.Slot;
+
+        public bool BuyRuneSlot()
+        {
+            if (!CanBuyRuneSlot) return false;
+            Stats.TrySpendGold(ShopPrices.Slot);
+            Runes.AddSlot();
+            PendingShop.Inventory.SlotSold = true;
+            return true;
+        }
+
+        public bool CanRerollShop => PendingShop != null && Stats.Gold >= ShopPrices.Reroll;
+
+        /// <summary>Würfelt die Runen im Shop neu.</summary>
+        public bool RerollShop()
+        {
+            if (!CanRerollShop) return false;
+            Stats.TrySpendGold(ShopPrices.Reroll);
+            PendingShop.Inventory.Replace(RuneOffer.Create("Shop", RuneCatalog, Runes, _random).Options);
+            return true;
+        }
+
+        public void LeaveShop()
+        {
+            if (PendingShop == null) return;
+            PendingShop = null;
+            CheckShards();
+        }
+    }
+}

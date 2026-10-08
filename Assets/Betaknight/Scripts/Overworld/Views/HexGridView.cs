@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Betaknight.Core.Encounters;
 using Betaknight.Core.Hex;
 using Betaknight.Core.Map;
 using Betaknight.Overworld.Config;
@@ -20,7 +21,7 @@ namespace Betaknight.Overworld.Views
 
         public HexLayout Layout => _layout;
 
-        public void Initialize(HexMap map, HexLayout layout, OverworldSettings settings)
+        public void Initialize(HexMap map, HexLayout layout, OverworldSettings settings, EncounterCatalog encounters)
         {
             Unsubscribe();
             Clear();
@@ -30,7 +31,7 @@ namespace Betaknight.Overworld.Views
 
             foreach (HexCell cell in map.Cells)
             {
-                HexCellView view = HexCellView.Create(transform, cell, ToWorld(cell.Coord), settings);
+                HexCellView view = HexCellView.Create(transform, cell, ToWorld(cell.Coord), settings, encounters);
                 _views.Add(cell.Coord, view);
             }
 

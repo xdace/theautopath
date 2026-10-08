@@ -43,6 +43,13 @@ namespace Betaknight.Overworld.Controllers
             if (_session == null || _camera == null) return;
             if (IsTravelling) return;
 
+            // Ein offenes Fenster (Event, Runenwahl, Shop, Game Over) hat Vorrang vor der Karte.
+            if (_session.IsBusy || _session.IsGameOver)
+            {
+                SetHovered(null);
+                return;
+            }
+
             UpdateHover();
 
             if (PointerInput.PressedThisFrame() && _hovered.HasValue && _previewRoute != null && _previewRoute.Count > 0)
@@ -92,7 +99,7 @@ namespace Betaknight.Overworld.Controllers
                 yield return _player.AnimateStep(_grid.ToWorld(step));
 
                 StepResult result = _session.TryStep(step);
-                if (result.InterruptsTravel) break;
+                if (result.InterruptsTravel || _session.IsBusy) break;
             }
 
             // Sicherheitsnetz: Darstellung exakt auf die logische Position setzen.

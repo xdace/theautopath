@@ -1,6 +1,8 @@
 using Betaknight.Core;
 using Betaknight.Core.Hex;
 using Betaknight.Core.Map;
+using Betaknight.Core.Run;
+using Betaknight.Core.Runes;
 using Betaknight.Overworld.Config;
 using Betaknight.Overworld.Controllers;
 using Betaknight.Overworld.UI;
@@ -24,6 +26,12 @@ namespace Betaknight.Overworld
 
         private GameObject _root;
         private OverworldHud _hud;
+        private EncounterWindow _encounterWindow;
+        private RuneOfferWindow _runeWindow;
+        private ShopWindow _shopWindow;
+        private GameOverWindow _gameOverWindow;
+        private KitSelectionWindow _kitWindow;
+        private KnightKit _kit;
 
         public OverworldSession Session { get; private set; }
 
@@ -36,18 +44,40 @@ namespace Betaknight.Overworld
             }
 
             _hud = gameObject.AddComponent<OverworldHud>();
+            _encounterWindow = gameObject.AddComponent<EncounterWindow>();
+            _runeWindow = gameObject.AddComponent<RuneOfferWindow>();
+            _shopWindow = gameObject.AddComponent<ShopWindow>();
+            _gameOverWindow = gameObject.AddComponent<GameOverWindow>();
+            _kitWindow = gameObject.AddComponent<KitSelectionWindow>();
         }
 
-        private void Start() => BuildWorld();
+        private void Start() => StartNewRun();
 
-        /// <summary>Erzeugt eine komplett neue Karte. Wird auch vom HUD-Button "Neue Karte" genutzt.</summary>
+        /// <summary>Neuer Run: Welt abbauen und das Ritter-Kit wählen lassen. Danach wird die Karte erzeugt.</summary>
+        public void StartNewRun()
+        {
+            if (_root != null) Destroy(_root);
+            _root = null;
+            Session = null;
+            _hud.Initialize(null, null, null, null);
+            SetRunWindowsEnabled(false);
+
+            _kitWindow.Open(KnightKit.Defaults, RuneCatalog.CreateDefault(), kit =>
+            {
+                _kit = kit;
+                BuildWorld();
+            });
+        }
+
+        /// <summary>Erzeugt eine komplett neue Karte mit dem gewählten Kit.</summary>
         public void BuildWorld()
         {
             if (_root != null) Destroy(_root);
+            SetRunWindowsEnabled(true);
 
             int seed = settings.seed != 0 ? settings.seed : Random.Range(1, int.MaxValue);
             MapGenerationConfig config = settings.ToGenerationConfig(seed);
-            Session = OverworldSession.Create(config, settings.sightRadius);
+            Session = OverworldSession.Create(config, settings.sightRadius, _kit);
 
             _root = new GameObject("Overworld");
             var layout = new HexLayout(settings.hexSize);
@@ -55,7 +85,7 @@ namespace Betaknight.Overworld
             var gridGo = new GameObject("Grid");
             gridGo.transform.SetParent(_root.transform, false);
             HexGridView grid = gridGo.AddComponent<HexGridView>();
-            grid.Initialize(Session.Map, layout, settings);
+            grid.Initialize(Session.Map, layout, settings, config.Encounters);
 
             PlayerView player = PlayerView.Create(_root.transform, grid.ToWorld(Session.Player.Position), settings);
 
@@ -64,9 +94,21 @@ namespace Betaknight.Overworld
             OverworldController controller = _root.AddComponent<OverworldController>();
             controller.Initialize(Session, grid, player, cam);
 
-            _hud.Initialize(Session, controller, BuildWorld);
+            _hud.Initialize(Session, controller, config.Encounters, StartNewRun);
+            _encounterWindow.Initialize(Session);
+            _runeWindow.Initialize(Session);
+            _shopWindow.Initialize(Session);
+            _gameOverWindow.Initialize(Session, StartNewRun);
 
-            Debug.Log($"[Betaknight] Oberwelt erzeugt: {Session.Map.Count} Felder, Seed {seed}.");
+            Debug.Log($"[Betaknight] Oberwelt erzeugt: {Session.Map.Count} Felder, Seed {seed}, Kit {_kit?.Name ?? "keins"}.");
+        }
+
+        private void SetRunWindowsEnabled(bool enabled)
+        {
+            _encounterWindow.enabled = enabled;
+            _runeWindow.enabled = enabled;
+            _shopWindow.enabled = enabled;
+            _gameOverWindow.enabled = enabled;
         }
 
         private Camera SetupCamera(Transform followTarget)

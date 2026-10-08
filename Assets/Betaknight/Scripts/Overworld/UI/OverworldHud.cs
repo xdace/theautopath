@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using Betaknight.Core;
+using Betaknight.Core.Encounters;
 using Betaknight.Core.Map;
+using Betaknight.Core.Runes;
 using Betaknight.Overworld.Controllers;
 using UnityEngine;
 
@@ -14,17 +17,19 @@ namespace Betaknight.Overworld.UI
     {
         private OverworldSession _session;
         private OverworldController _controller;
+        private EncounterCatalog _encounters;
         private Action _onNewMap;
         private GUIStyle _style;
 
-        public void Initialize(OverworldSession session, OverworldController controller, Action onNewMap)
+        public void Initialize(OverworldSession session, OverworldController controller, EncounterCatalog encounters, Action onNewMap)
         {
             _session = session;
             _controller = controller;
+            _encounters = encounters;
             _onNewMap = onNewMap;
         }
 
-        private static readonly Rect PanelRect = new Rect(12, 12, 340, 230);
+        private static readonly Rect PanelRect = new Rect(12, 12, 360, 360);
 
         /// <summary>Liegt ein Bildschirmpunkt (Ursprung unten links) über dem HUD? Dann ignoriert die Karte den Klick.</summary>
         public static bool ContainsScreenPoint(Vector2 screen)
@@ -39,41 +44,66 @@ namespace Betaknight.Overworld.UI
 
             if (_style == null)
             {
-                _style = new GUIStyle(GUI.skin.label) { fontSize = 16, richText = true };
+                _style = new GUIStyle(GUI.skin.label) { fontSize = 16, richText = true, wordWrap = true };
             }
 
             GUILayout.BeginArea(PanelRect, GUI.skin.box);
-            GUILayout.Label($"<b>Betaknight – Oberwelt</b>", _style);
+            string kit = _session.Kit != null ? $" – {_session.Kit.Name}" : string.Empty;
+            GUILayout.Label($"<b>Betaknight{kit}</b>", _style);
             GUILayout.Label($"Zug: {_session.Turns.CurrentTurn}", _style);
+            GUILayout.Label($"HP: {_session.Stats.Hp}/{_session.Stats.MaxHp}   Gold: {_session.Stats.Gold}   Splitter: {_session.Stats.Shards}", _style);
+            GUILayout.Label($"Runen ({_session.Runes.Runes.Count}/{_session.Runes.Slots}): {RuneList()}", _style);
             GUILayout.Label($"Position: {_session.Player.Position}", _style);
-            GUILayout.Label($"Feld: {Describe(_session.CurrentCell.Content)}", _style);
+            GUILayout.Label($"Feld: {Describe(_session.CurrentCell)}", _style);
             GUILayout.Label($"Seed: {_session.Map.Seed}", _style);
 
             if (_controller != null && _controller.HoveredCoord.HasValue
                 && _session.Map.TryGetCell(_controller.HoveredCoord.Value, out HexCell hovered))
             {
-                string info = hovered.Visibility == CellVisibility.Explored ? Describe(hovered.Content) : "unbekannt";
+                string info = hovered.IsContentKnown ? Describe(hovered) : "unbekannt";
                 GUILayout.Label($"Zeiger: {hovered.Coord} – {info}", _style);
             }
 
             GUILayout.FlexibleSpace();
-            if (_onNewMap != null && GUILayout.Button("Neue Karte"))
+            if (_session.CanOpenShop && GUILayout.Button("Shop öffnen"))
+            {
+                _session.OpenShop();
+            }
+            if (_onNewMap != null && GUILayout.Button("Neuer Run"))
             {
                 _onNewMap();
             }
             GUILayout.EndArea();
         }
 
-        private static string Describe(CellContent content)
+        private string RuneList()
         {
-            switch (content)
+            if (_session.Runes.Runes.Count == 0) return "keine";
+            var names = new List<string>();
+            foreach (RuneDefinition rune in _session.Runes.Runes) names.Add(rune.Name);
+            return string.Join(", ", names);
+        }
+
+        private string Describe(HexCell cell)
+        {
+            string text = DescribeContent(cell);
+            return cell.IsResolved ? $"{text} (erledigt)" : text;
+        }
+
+        private string DescribeContent(HexCell cell)
+        {
+            if (cell.Content == CellContent.Encounter && _encounters != null
+                && _encounters.TryGet(cell.EncounterId, out EncounterDefinition encounter))
+                return encounter.Title;
+
+            switch (cell.Content)
             {
                 case CellContent.Enemy: return "Gegner";
                 case CellContent.Boss: return "Boss";
                 case CellContent.Shop: return "Shop";
                 case CellContent.Treasure: return "Schatztruhe";
                 case CellContent.GoldMine: return "Goldmine";
-                default: return "leer";
+                default: return "Start";
             }
         }
     }

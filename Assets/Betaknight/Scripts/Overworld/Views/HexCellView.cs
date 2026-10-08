@@ -1,3 +1,4 @@
+using Betaknight.Core.Encounters;
 using Betaknight.Core.Map;
 using Betaknight.Overworld.Config;
 using UnityEngine;
@@ -12,7 +13,8 @@ namespace Betaknight.Overworld.Views
     }
 
     /// <summary>
-    /// Darstellung eines einzelnen Feldes: eingefärbtes Hexagon plus Textlabel ("?" oder Inhalts-Symbol).
+    /// Darstellung eines einzelnen Feldes: eingefärbtes Hexagon plus Textlabel ("?", Inhalts- oder Event-Symbol).
+    /// Erledigte Events werden abgedunkelt.
     /// Kennt keine Spielregeln, sondern bildet nur den Zustand einer <see cref="HexCell"/> ab.
     /// </summary>
     public sealed class HexCellView : MonoBehaviour
@@ -23,26 +25,28 @@ namespace Betaknight.Overworld.Views
         private TextMesh _label;
         private MeshRenderer _labelRenderer;
         private OverworldSettings _settings;
+        private EncounterCatalog _encounters;
         private HexCell _cell;
         private CellHighlight _highlight;
 
         public HexCell Cell => _cell;
 
-        public static HexCellView Create(Transform parent, HexCell cell, Vector3 position, OverworldSettings settings)
+        public static HexCellView Create(Transform parent, HexCell cell, Vector3 position, OverworldSettings settings, EncounterCatalog encounters)
         {
             var go = new GameObject($"Hex {cell.Coord}");
             go.transform.SetParent(parent, false);
             go.transform.localPosition = position;
 
             HexCellView view = go.AddComponent<HexCellView>();
-            view.Build(cell, settings);
+            view.Build(cell, settings, encounters);
             return view;
         }
 
-        private void Build(HexCell cell, OverworldSettings settings)
+        private void Build(HexCell cell, OverworldSettings settings, EncounterCatalog encounters)
         {
             _cell = cell;
             _settings = settings;
+            _encounters = encounters;
 
             float scale = settings.hexSize * (1f - settings.hexGap);
 
@@ -100,12 +104,22 @@ namespace Betaknight.Overworld.Views
                     color = _settings.unexploredColor;
                     text = "?";
                     textColor = _settings.unexploredLabelColor;
+                    if (_cell.IsScouted)
+                    {
+                        // Ausgekundschaftet: Inhalt ist bekannt, das Feld aber noch nicht betreten.
+                        ResolveContentLook(out Color contentColor, out string contentText);
+                        color = Color.Lerp(_settings.unexploredColor, contentColor, 0.5f);
+                        if (!string.IsNullOrEmpty(contentText)) text = contentText;
+                    }
                     break;
 
                 default:
-                    OverworldSettings.ContentStyle style = _settings.GetStyle(_cell.Content);
-                    color = style.color;
-                    text = style.label;
+                    ResolveContentLook(out color, out text);
+                    if (_cell.IsResolved)
+                    {
+                        color = Color.Lerp(color, _settings.resolvedColor, 0.7f);
+                        textColor = new Color(1f, 1f, 1f, 0.35f);
+                    }
                     break;
             }
 
@@ -127,6 +141,21 @@ namespace Betaknight.Overworld.Views
             _label.text = text;
             _label.color = textColor;
             _labelRenderer.enabled = visible && !string.IsNullOrEmpty(text);
+        }
+
+        private void ResolveContentLook(out Color color, out string text)
+        {
+            if (_cell.Content == CellContent.Encounter
+                && _encounters != null && _encounters.TryGet(_cell.EncounterId, out EncounterDefinition encounter))
+            {
+                color = encounter.Size == EncounterSize.Medium ? _settings.mediumEventColor : _settings.minorEventColor;
+                text = encounter.Symbol;
+                return;
+            }
+
+            OverworldSettings.ContentStyle style = _settings.GetStyle(_cell.Content);
+            color = style.color;
+            text = style.label;
         }
     }
 }

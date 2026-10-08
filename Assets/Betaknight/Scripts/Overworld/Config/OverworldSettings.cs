@@ -14,20 +14,6 @@ namespace Betaknight.Overworld.Config
     public sealed class OverworldSettings : ScriptableObject
     {
         [Serializable]
-        public struct WeightEntry
-        {
-            public CellContent content;
-            [Min(0)] public int weight;
-        }
-
-        [Serializable]
-        public struct QuotaEntry
-        {
-            public CellContent content;
-            [Min(0)] public int count;
-        }
-
-        [Serializable]
         public struct ContentStyle
         {
             public CellContent content;
@@ -41,22 +27,14 @@ namespace Betaknight.Overworld.Config
         [Tooltip("0 = bei jedem Start ein neuer Zufalls-Seed.")]
         public int seed = 0;
 
-        [Min(0)] public int safeZoneRadius = 1;
+        [Tooltip("Event-Mischung nach Entfernung vom Start (klein / mittel / gross). Das letzte Band gilt bis zum Kartenrand.")]
+        public List<DistanceBand> distanceBands = MapGenerationConfig.DefaultBands();
 
-        public WeightEntry[] contentWeights =
-        {
-            new WeightEntry { content = CellContent.Empty, weight = 45 },
-            new WeightEntry { content = CellContent.Enemy, weight = 30 },
-            new WeightEntry { content = CellContent.Treasure, weight = 12 },
-            new WeightEntry { content = CellContent.Shop, weight = 5 },
-            new WeightEntry { content = CellContent.GoldMine, weight = 8 },
-        };
+        [Tooltip("Frühestens ab welcher Entfernung und höchstens wie oft ein grosser Inhalt vorkommt (MaxCount 0 = unbegrenzt).")]
+        public List<ContentRule> contentRules = MapGenerationConfig.DefaultRules();
 
-        public QuotaEntry[] contentQuotas =
-        {
-            new QuotaEntry { content = CellContent.Shop, count = 2 },
-            new QuotaEntry { content = CellContent.GoldMine, count = 2 },
-        };
+        [Tooltip("Garantierte grosse Inhalte in einem Entfernungsbereich.")]
+        public List<ContentQuota> contentQuotas = MapGenerationConfig.DefaultQuotas();
 
         [Header("Erkundung")]
         [Min(0)] public int sightRadius = 1;
@@ -87,6 +65,15 @@ namespace Betaknight.Overworld.Config
             new ContentStyle { content = CellContent.GoldMine, color = new Color(0.85f, 0.72f, 0.20f), label = "G" },
         };
 
+        [Tooltip("Farbe kleiner Events. Das Symbol kommt aus dem Event-Katalog.")]
+        public Color minorEventColor = new Color(0.45f, 0.55f, 0.45f);
+
+        [Tooltip("Farbe mittlerer Events (Entscheidung).")]
+        public Color mediumEventColor = new Color(0.55f, 0.45f, 0.70f);
+
+        [Tooltip("Erledigte Events werden in Richtung dieser Farbe abgedunkelt.")]
+        public Color resolvedColor = new Color(0.25f, 0.27f, 0.30f);
+
         [Header("Bewegung & Kamera")]
         [Min(0.01f)] public float stepDuration = 0.18f;
         [Min(0.5f)] public float cameraOrthoSize = 5f;
@@ -94,21 +81,18 @@ namespace Betaknight.Overworld.Config
 
         public MapGenerationConfig ToGenerationConfig(int effectiveSeed)
         {
-            var weights = new List<ContentWeight>();
-            foreach (WeightEntry w in contentWeights)
-                weights.Add(new ContentWeight(w.content, w.weight));
-
-            var quotas = new List<ContentQuota>();
-            foreach (QuotaEntry q in contentQuotas)
-                quotas.Add(new ContentQuota(q.content, q.count));
+            // Kopien, damit die Generierung das Asset nie verändert.
+            var bands = new List<DistanceBand>();
+            foreach (DistanceBand b in distanceBands)
+                bands.Add(new DistanceBand(b.MaxDistance, b.MinorWeight, b.MediumWeight, b.MajorWeight, b.MajorWeights != null ? b.MajorWeights.ToArray() : new ContentWeight[0]));
 
             return new MapGenerationConfig
             {
                 Radius = mapRadius,
                 Seed = effectiveSeed,
-                SafeZoneRadius = Mathf.Clamp(safeZoneRadius, 0, mapRadius - 1),
-                Weights = weights,
-                Quotas = quotas,
+                Bands = bands,
+                Rules = new List<ContentRule>(contentRules),
+                Quotas = new List<ContentQuota>(contentQuotas),
             };
         }
 
