@@ -103,7 +103,7 @@ namespace Betaknight.Overworld.UI
                     continue;
                 }
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}</size>", _plainStyle);
+                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}</size>", _plainStyle);
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _session.CanTakeItem(i, ItemPlacement.Equip);
                 string equip = worn != null ? $"Anlegen ({worn.Name} ins Inventar)" : "Anlegen";

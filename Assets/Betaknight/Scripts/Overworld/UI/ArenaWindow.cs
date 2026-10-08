@@ -257,7 +257,9 @@ namespace Betaknight.Overworld.UI
                     Fill(bar, new Color(0.2f, 0.2f, 0.22f));
                     Fill(new Rect(bar.x, bar.y, bar.width * f.WindupProgress(_playback.Tick), bar.height),
                         charging ? new Color(1f, 0.55f, 0.15f) : new Color(0.7f, 0.7f, 0.75f));
-                    string label = charging ? $"<color=#ffae42>lädt auf: {BattleLogText.SkillName(f.ActionSkill)}</color>" : BattleLogText.SkillName(f.ActionSkill);
+                    string cast = $"Cast {SkillInfo.Seconds(f.ActionWindupTicks)}";
+                    string label = charging ? $"<color=#ffae42>lädt auf: {BattleLogText.SkillName(f.ActionSkill)} ({cast})</color>"
+                        : $"{BattleLogText.SkillName(f.ActionSkill)} ({cast})";
                     GUI.Label(new Rect(bar.x - 30f, bar.yMax, bar.width + 60f, 20f), label, _small);
                 }
                 y += 28f;

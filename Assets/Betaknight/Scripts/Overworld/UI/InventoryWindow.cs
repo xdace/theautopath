@@ -76,6 +76,8 @@ namespace Betaknight.Overworld.UI
             DrawRunes();
             GUILayout.Space(8f);
             DrawSkills();
+            GUILayout.Space(8f);
+            DrawTags();
             GUILayout.EndScrollView();
 
             if (GUILayout.Button("Schliessen", GUILayout.Height(30f))) IsOpen = false;
@@ -154,6 +156,11 @@ namespace Betaknight.Overworld.UI
             if (item.SetId != null)
                 GUILayout.Label($"Set getragen: {_session.Gear.SetPieces(item.SetId)}/3 Teile", _small);
             GUILayout.Label(ItemText.Compare(item, _session.Gear.Get(item.Slot)), _text);
+            if (!_selectedSlot.HasValue)
+            {
+                string preview = ItemText.TagPreview(_session, item);
+                if (preview.Length > 0) GUILayout.Label(preview, _small);
+            }
 
             GUILayout.BeginHorizontal();
             if (_selectedSlot.HasValue)
@@ -243,6 +250,43 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndVertical();
 
             GUILayout.EndHorizontal();
+        }
+
+        // ------------------------------------------------------------------ Synergie-Tags
+
+        /// <summary>
+        /// Tag-Zähler mit allen Stufen (erreichte hervorgehoben, nächste Schwelle) und das Rezeptbuch der Duos:
+        /// unentdeckte als Silhouette «???», aktive grün.
+        /// </summary>
+        private void DrawTags()
+        {
+            SynergyRegistry registry = _session.Synergies;
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label("<b>Synergie-Tags</b>  <size=11>(Schwellen 2/4/6 getragene Teile, Duo ab 4 + 4)</size>", _text);
+            foreach (SynergyTag tag in registry.Tags)
+            {
+                int count = _session.Gear.TagCount(tag.Id);
+                SynergyCounter counter = registry.Counter(tag, count);
+                string head = count > 0 ? $"<b>{counter.Text}</b>" : $"<color=#888888>{counter.Text}</color>";
+                var tiers = new List<string>();
+                foreach (KeyValuePair<int, SynergyEffect> tier in tag.Tiers)
+                {
+                    string line = $"{tier.Key}: {tier.Value.Text}";
+                    tiers.Add(count >= tier.Key ? $"<color=#ffd75e>{line}</color>" : $"<color=#888888>{line}</color>");
+                }
+                GUILayout.Label($"{head}\n<size=11>{string.Join("\n", tiers)}</size>", _small);
+            }
+
+            GUILayout.Label("<b>Rezeptbuch</b>", _text);
+            foreach (SynergyDuo duo in registry.Duos)
+            {
+                bool active = registry.IsDuoActive(duo, _session.Gear);
+                bool known = _session.IsDuoDiscovered(duo.Id);
+                string pair = $"{registry.NameOf(duo.TagA)} {_session.Gear.TagCount(duo.TagA)}/4 + {registry.NameOf(duo.TagB)} {_session.Gear.TagCount(duo.TagB)}/4";
+                string text = known ? $"<b>{duo.Name}</b> ({pair}): {duo.Effect.Text}" : $"<b>???</b> ({pair})";
+                GUILayout.Label(active ? $"<color=#7ddc6f>{text}</color>" : text, _small);
+            }
+            GUILayout.EndVertical();
         }
 
         // ------------------------------------------------------------------ Skills

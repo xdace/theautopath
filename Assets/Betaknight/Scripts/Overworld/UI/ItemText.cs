@@ -13,6 +13,7 @@ namespace Betaknight.Overworld.UI
             foreach (SkillPassive passive in item.Passives) parts.Add(passive.Text);
             foreach (KeyValuePair<StatKind, int> stat in item.Stats)
                 if (stat.Value != 0) parts.Add(Stat(stat.Key, stat.Value));
+            if (item.Tags.Count > 0) parts.Add(TagNames(item));
             if (item.TwoHanded) parts.Add("zweihändig, sperrt Schild");
             return parts.Count > 0 ? string.Join(", ", parts) : item.Description;
         }
@@ -50,9 +51,30 @@ namespace Betaknight.Overworld.UI
                 if (stat.Value != 0) stats.Add(Stat(stat.Key, stat.Value));
             lines.Add(stats.Count > 0 ? "Werte: " + string.Join(", ", stats) : "Werte: keine");
             foreach (SkillPassive passive in item.Passives) lines.Add($"Passiv: <color=#ffd75e>{passive.Text}</color>");
+            if (item.Tags.Count > 0) lines.Add($"Tags: {TagNames(item)}");
             if (item.SetId != null) lines.Add($"Set: {sets?.NameOf(item.SetId) ?? item.SetId}");
             if (item.Description.Length > 0) lines.Add($"<i>{item.Description}</i>");
             return string.Join("\n", lines);
+        }
+
+        private static readonly SynergyRegistry Synergies = SynergyRegistry.CreateDefault();
+
+        /// <summary>«[Hitze] [Takt]».</summary>
+        public static string TagNames(EquipmentDefinition item)
+        {
+            var names = new List<string>();
+            foreach (string tag in item.Tags) names.Add($"[{Synergies.NameOf(tag)}]");
+            return string.Join(" ", names);
+        }
+
+        /// <summary>Vorschau der Tags beim Anlegen, eine Zeile: «→ Ladung 4/6: Schwelle!, → Duo frei: ???». Leer ohne Tags.</summary>
+        public static string TagPreview(Betaknight.Core.OverworldSession session, EquipmentDefinition item)
+        {
+            List<string> lines = session.TagPreview(item);
+            if (lines.Count == 0) return string.Empty;
+            for (int i = 0; i < lines.Count; i++)
+                if (lines[i].EndsWith("!") || lines[i].Contains("Duo")) lines[i] = $"<color=#7ddc6f>{lines[i]}</color>";
+            return string.Join("  ", lines);
         }
 
         public static string Stat(StatKind kind, int value)

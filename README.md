@@ -60,9 +60,37 @@ Kämpfe laufen automatisch in festen Ticks (20 pro Sekunde). Jede Zeile der Tafe
 - **Skills sind eigene Exemplare** (`Core/Skills/`: `SkillInstance`, `SkillCollection`): Skill-Id, Stufe, Instanz-Id. Jedes Exemplar sitzt an höchstens einem Ort (`ISkillHolder`, heute eine Tafelzeile, später ein Ausrüstungs-Sockel). Die Stufe gehört dem Exemplar, nicht dem Skill. Die Sammlung hat keine Obergrenze und wandert durch die Akte mit. Den Basisangriff gibt es ohne Exemplar beliebig oft.
 - **Ausrüstung = Werte + passive Effekte.** Teile liefern keine Skills mehr. Die Waffe bestimmt Waffenschaden und Basisangriff, alle Teile geben Werte und manche passive Effekte auf eine Skill-Art, z. B. «Schock-Skills +20 % Wirkung» (Schaden, Brennen, Heilung, Chancen) oder «Schild-Skills −1 s Cooldown». Ablegen eines Teils nimmt keinen Skill weg.
 - **Skill-Arten** stehen im `SkillCatalog` (Angriff, Schild, Feuer, Schock, Heilung, Bewegung; ein Skill kann mehrere haben) und im Tooltip. Sie dienen nur als Ziel der passiven Effekte und für passende Angebote.
-- **Gegner** haben feste Tafeln wie bisher; ein neuer Run spielt mit den Start-Skills der Kits gleich wie vorher (die Start-Teile haben keine passiven Effekte).
+- **Gegner** haben feste Tafeln wie bisher.
 
-- **Skill-Kennzahlen im Tafel-Editor:** Unter jedem Skill (auch beim Durchblättern mit ◀▶ und beim festen Basisangriff) steht eine Infozeile: Wirkung, Schaden, CD, Ausholen und Erholung. Schaden steht doppelt, als Prozent vom Waffenschaden und als Wert mit der aktuellen Ausrüstung samt aktiver Set-Boni, gegen ein Ziel ohne Rüstung, ohne Block und Krit (z. B. «120 % Waffenschaden ≈ 10 an allen Gegnern», «Brennen 50 % Waffenschaden/s ≈ 3/s, 15 über 5 s», «20 % Chance: betäubt 1 s»). Skills ohne Schaden zeigen «kein Schaden». Mit der Maus über der Zeile erscheinen alle Details als Tooltip, bei vielen Zeilen scrollt das Fenster.
+#### Cast-Zeit
+
+Jede Ausführung braucht ihre **Cast-Zeit** (das Ausholen bis zur Wirkung), auch Wiederholungen durch Echo. Loops werden nur über Cast-Zeiten begrenzt, nicht über feste Bremsen.
+
+- Grund-Cast-Zeiten: schnell 0,4 s (Entzünden, Schildwall, Bodenanker, Schubdüsen, Schockstich), mittel 0,8 s (Rüstungsbruch, Schildschlag, Kühlmittel, Blendgranate, Echo), schwer 1,5 s (EMP-Schildschlag, Not-Reparatur, Bohrstoß). Ab 1 s gilt ein Cast als sichtbare Aufladung, die Betäubung und «Gegner lädt auf» kontern. Der Basisangriff holt wie bisher 2/3 seines Intervalls aus.
+- Ausrüstung, Tag-Stufen und später Module ändern die Cast-Zeit in Prozent («Schock-Skills −20 % Cast-Zeit»). Alle Prozente addieren sich; das Ergebnis fällt nie unter die **Untergrenze 0,1 s** (2 Ticks, `CastTime.DefaultMinTicks`, pro Kampf `BattleSetup.MinCastTicks`). Infozeile und Tooltip zeigen «Cast 0,3 s (Grund 0,4 s)», der Arena-Balken die Cast-Zeit der laufenden Aktion.
+- **Echo** merkt sich den letzten eigenen Skill und startet ihn nach der eigenen Erholung als eigene Ausführung mit dessen Cast-Zeit, ohne Cooldown. Betäubung bricht wie jede Aktion ab. Im Protokoll ist die Wiederholung markiert (`BattleEvent.IsRepeat`).
+- Ungedeckelte Stellen (Überlast-Tempo, Phantom-Cooldowns) bleiben bewusst stark. Der Test mit absurden Werten (Cast −100000 %, Riesen-Tempo, Riesen-Rüstung) läuft stabil durch, jede Ausführung hat ihren Cast.
+
+#### Synergie-Tags auf der Ausrüstung
+
+Jedes Teil trägt 1–2 Tags (vorläufig, als Daten in `SynergyRegistry.CreateDefault`): **Hitze, Ladung, Phantom, Takt, Toxin, Schrott**. Gezählt werden nur getragene Teile. Schwellen bei **2/4/6** Teilen schalten je Tag eine Stufe frei, die Stufen gelten zusammen:
+
+| Tag | 2 | 4 | 6 |
+|---|---|---|---|
+| Hitze | Feuer-Skills −20 % Cast-Zeit | +25 % Schaden gegen brennende Gegner | Basisangriffe setzen Brennen (3 s) |
+| Ladung | +10 % Block | Schock-Skills −25 % Cast-Zeit | Jeder Block: alle Cooldowns −0,5 s |
+| Phantom | +10 % Ausweichen | Bewegung-Skills −30 % Cast-Zeit, −1 s Cooldown | Nach Ausweichen: nächster Angriff +50 % |
+| Takt | +10 % Angriffstempo | Alle Skills −15 % Cast-Zeit | Alle Skills weitere −15 % |
+| Toxin | Skill-Treffer vergiften (bis 5 Stapel, 1 Schaden/s je Stapel) | +1 Schaden je Gift-Stapel | Auch Basisangriffe vergiften |
+| Schrott | +1 Gold je Gegner | +3 Rüstung | Angriffe ignorieren Rüstung |
+
+**Duos:** Haben zwei Tags gleichzeitig mindestens 4, greift ihr Duo: Glutrhythmus (Hitze + Takt), Phasenschild (Ladung + Phantom), Brandgift (Hitze + Toxin), Schrottkondensator (Schrott + Ladung), Geisterschritt (Phantom + Takt), Säurefraß (Toxin + Schrott). Bis ein Duo einmal in einem Kampf aktiv war, zeigt das Spiel es als Silhouette «???»; danach steht es mit Namen und Wirkung im **Rezeptbuch** (Inventar). Das Rezeptbuch gilt für den Run und wandert durch die Akte mit.
+
+**Sets bleiben.** Sie behalten ihre Boni und die Rune «Ladung voll»; ihre Teile tragen zusätzlich passende Tags (Überlast → Hitze/Takt, Aegis → Ladung, Schrott-Ernter → Schrott, Phantom-Signal → Phantom). Grund: Die Set-Boni sind eigene Mechaniken (Tempo-Stapel, Entladung, Minen, Ausweich-Obergrenze), die als Tag-Stufen zu speziell wären, und ein Set ist mit 3 Teilen erreichbar, eine Tag-Stufe 6 erst mit fast voller Ausrüstung. So zahlen Set-Teile auf beide Systeme ein.
+
+Anzeige: Das HUD zeigt die Zähler («Ladung 3/4», erreichte Schwellen gelb) und aktive Duos. Das Inventar listet alle Tags mit ihren Stufen und das Rezeptbuch. Angebote, Shop und das Inventar zeigen, was ein Teil bewirken würde («→ Ladung 4/6: Schwelle!», «→ Duo frei: ???»).
+
+- **Skill-Kennzahlen im Tafel-Editor:** Unter jedem Skill (auch beim Durchblättern mit ◀▶ und beim festen Basisangriff) steht eine Infozeile: Wirkung, Schaden, CD, Cast-Zeit und Erholung. Schaden steht doppelt, als Prozent vom Waffenschaden und als Wert mit der aktuellen Ausrüstung samt aktiver Set-Boni, gegen ein Ziel ohne Rüstung, ohne Block und Krit (z. B. «120 % Waffenschaden ≈ 10 an allen Gegnern», «Brennen 50 % Waffenschaden/s ≈ 3/s, 15 über 5 s», «20 % Chance: betäubt 1 s»). Skills ohne Schaden zeigen «kein Schaden». Mit der Maus über der Zeile erscheinen alle Details als Tooltip, bei vielen Zeilen scrollt das Fenster.
   Die Werte stehen nicht in der UI, sondern kommen aus den Effekten: Jede `ISkillEffect` meldet über `Describe(SkillInfoBuilder)` ihre Kennzahlen mit denselben Formeln wie `Apply`. `SkillInfo.Create(skill, stats)` fasst sie zusammen, `OverworldSession.SkillUserStats()` liefert die Werte des Ritters zu Kampfbeginn. Neue Effekte müssen `Describe` umsetzen und erscheinen dann automatisch richtig.
 - 7 Ausrüstungsplätze (Helm, Handschuhe, Brust, Beinschienen, Waffe, Schild, Stiefel). Zweihandwaffen sperren den Schild.
 - 4 Sets mit Boni ab 2 und 3 Teilen: Überlast-Protokoll, Aegis-Firewall, Schrott-Ernter, Phantom-Signal.
@@ -137,13 +165,15 @@ Assets/Betaknight/
 │   │   ├── Arena/         Kampfsimulator: Battle (Tick-Schleife), Combatant, LogicBoard, Conditions/ (Runen-Bedingungen + ConditionRegistry),
 │   │   │                  Effects/ (ISkillEffect), Statuses/, Skills/ (SkillCatalog), BattleModifier, Playback/ (Wiedergabe + Protokolltext),
 │   │   │                  Insight/ (BattleDecision: Gründe je Zeile, BattleReport: Auswertung nach dem Kampf)
-│   │   ├── Gear/          Ausrüstung: EquipmentCatalog, Equipment, Inventory, BoardFactory (Runen-Zeilen → Tafel), Sets/ (SetBonusRegistry)
+│   │   ├── Gear/          Ausrüstung: EquipmentCatalog, Equipment, Inventory, BoardFactory (Runen-Zeilen → Tafel), Sets/ (SetBonusRegistry),
+│   │   │                  Synergies/ (SynergyRegistry: Tags, Schwellen, Duos als Daten; Wirkungen als BattleModifier)
 │   │   ├── Combat/        ICombatResolver, ArenaCombatResolver, EnemyCatalog (Platzhalter-Resolver nur noch für Tests)
 │   │   ├── Shop/          Shop-Bestand und Preise
 │   │   ├── OverworldSession.cs              Fassade: Bewegung, kleine/mittlere Events, Runenwahl
 │   │   ├── OverworldSession.MajorEvents.cs  Fassade: Kampf, Truhe, Goldmine, Shop
 │   │   ├── Skills/        SkillInstance (Exemplar), ISkillHolder (Ort), SkillCollection (Sammlung)
 │   │   ├── OverworldSession.Gear.cs         Fassade: Ausrüstung, Skill-Kennzahlen mit passiven Boni, Tafel umsortieren
+│   │   ├── OverworldSession.Synergies.cs    Fassade: Tag-Zähler, aktive Duos, Rezeptbuch, Vorschau für Angebote
 │   │   ├── OverworldSession.Skills.cs       Fassade: Skill-Sammlung, Einsetzen/Tauschen, Erhalt, Stufe oder zweites Exemplar, Angebote
 │   │   ├── OverworldSession.Inventory.cs    Fassade: Inventar, anlegen/ablegen/tauschen, verwerfen, verkaufen
 │   │   ├── OverworldSession.Progression.cs  Fassade: Tafel-Erweiterung, Stufen, Angebote mit Verbesserung
@@ -196,6 +226,7 @@ Falls der Test Runner fehlt, im Package Manager das Paket **Test Framework** ins
 | Neuer Skill | Eintrag in `SkillCatalog` aus `ISkillEffect`-Bausteinen mit mindestens einer Skill-Art (`kinds:`); neue Wirkung = neue `ISkillEffect`-Klasse mit `Apply` und `Describe` (Kennzahlen für den Tafel-Editor) |
 | Neues Ausrüstungsteil | Eintrag in `EquipmentCatalog` |
 | Neues Set | Teile mit Set-Id + `SetBonusRegistry.Register(id, name, teile => new …Set())` (ein `BattleModifier`) |
+| Neuer Synergie-Tag oder Duo | Eintrag in `SynergyRegistry.CreateDefault` (Text, passive Effekte, `BattleModifier`-Fabrik je Schwelle); Teile bekommen die Tag-Id über `tags:` |
 | Neuer Gegner | Eintrag in `EnemyCatalog` mit Stufenbereich und fester Tafel |
 | Inverter-Rune | `NotCondition` / `condition.Not()` existiert bereits |
 | Akt-spezifische Karten/Gegner | `OverworldSession.CreateNextAct(config, previous)` bekommt die Karten-Konfiguration; `TierAt` und `ActTierBonus` regeln die Stärke pro Akt |

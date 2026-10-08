@@ -67,6 +67,8 @@ namespace Betaknight.Overworld.UI
             GUILayout.Label($"Ausrüstung: {GearList()}", _style);
             string sets = SetList();
             if (sets.Length > 0) GUILayout.Label($"Sets: {sets}", _style);
+            string tags = TagList();
+            if (tags.Length > 0) GUILayout.Label($"Tags: {tags}", _style);
             foreach (MineRaid raid in _session.Raids)
             {
                 string state = raid.IsLost ? "verloren" : $"angegriffen, noch {raid.TurnsLeft(_session.Turns.CurrentTurn)} Züge";
@@ -117,6 +119,20 @@ namespace Betaknight.Overworld.UI
             }
             lines.Add("↓ [Immer] → Basisangriff");
             return string.Join("\n", lines);
+        }
+
+        /// <summary>
+        /// Tag-Zähler «Ladung 3/4» (erreichte Schwelle hervorgehoben) und aktive Duos. Unentdeckte Duos bleiben «???»,
+        /// bis sie im ersten Kampf auslösen.
+        /// </summary>
+        private string TagList()
+        {
+            var parts = new List<string>();
+            foreach (SynergyCounter c in _session.TagCounters())
+                parts.Add(c.Reached > 0 ? $"<color=#ffd75e>{c.Text}</color>" : c.Text);
+            foreach (SynergyDuo duo in _session.ActiveDuos())
+                parts.Add($"<color=#7ddc6f>Duo {_session.DuoName(duo)}</color>");
+            return string.Join(", ", parts);
         }
 
         /// <summary>Getragene Sets mit Teilezahl; aktive Boni (ab 2 Teilen) hervorgehoben.</summary>

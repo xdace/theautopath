@@ -81,7 +81,7 @@ namespace Betaknight.Overworld.UI
                 EquipmentDefinition worn = _session.Gear.Get(item.Slot);
                 string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)} ({_session.Gear.SetPieces(item.SetId)}/3)" : string.Empty;
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]  – {prices.Item} Gold{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}</size>", _plainStyle);
+                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]  – {prices.Item} Gold{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}</size>", _plainStyle);
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _session.CanBuyShopItem(i, ItemPlacement.Equip);
                 if (GUILayout.Button(worn != null ? $"Kaufen und anlegen ({worn.Name} ins Inventar)" : "Kaufen und anlegen", GUILayout.Height(28f)))
