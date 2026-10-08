@@ -73,6 +73,15 @@ namespace Betaknight.Core.Arena
         /// <summary>Zusatzwert nur für die Anzeige: Stapel bei Zuständen, Obergrenze bei Ressourcen (0 = offen).</summary>
         public int Extra { get; internal set; }
 
+        /// <summary>Bei <see cref="BattleEventKind.ActionStarted"/>: Schwierigkeits-Stufe der Ausführung (0 = kein Bonus).</summary>
+        public int Tier { get; internal set; }
+
+        /// <summary>
+        /// Anteil des Schwierigkeits-Bonus: bei Schaden und Heilung die Menge, die er dazugegeben hat; bei
+        /// <see cref="BattleEventKind.ActionStarted"/> die gesparten Cooldown-Ticks.
+        /// </summary>
+        public int Bonus { get; internal set; }
+
         public BattleEvent(int tick, BattleEventKind kind, Combatant source, Combatant target, int amount = 0, string detail = null, int rowIndex = -1)
         {
             Tick = tick;

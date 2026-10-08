@@ -78,7 +78,8 @@ namespace Betaknight.Core.Arena
             r.Register("after_heal", _ => new EventCondition((c, e) => OnSelf(c, e, BattleEventKind.Healed)));
             r.Register("enemy_dies", _ => new EventCondition((c, e) => e.Kind == BattleEventKind.Death && e.Target != null && e.Target.Side != c.Self.Side));
             r.Register("big_hit_taken", p => new EventCondition((c, e) =>
-                OnSelf(c, e, BattleEventKind.Damage) && (long)e.Amount * 100 > (long)p * c.Self.MaxHp, (c, e) => e.Source));
+                OnSelf(c, e, BattleEventKind.Damage)
+                && (long)e.Amount * 100 > (long)Math.Max(1, p - c.Self.Relief(ReliefIds.BigHitLower)) * c.Self.MaxHp, (c, e) => e.Source));
             r.Register("after_own_skill", _ => new EventCondition((c, e) =>
                 Own(c, e, BattleEventKind.ActionExecuted) && e.Detail != SkillDefinition.BasicAttackId && e.RowIndex != c.Row.Index));
             r.Register("battle_start", _ => new BattleStartCondition());

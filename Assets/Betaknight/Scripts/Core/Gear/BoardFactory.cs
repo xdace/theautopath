@@ -103,6 +103,8 @@ namespace Betaknight.Core.Gear
             if (!_conditions.TryCreate(spec.RuneId, parameter, out ICondition condition))
                 return new LogicRow(AlwaysCondition.Instance, null, spec.RuneId ?? "?");
 
+            // Schwierigkeit hängt nur am Baustein (umgekehrt: eigene Stufe), nie an Erleichterungen.
+            int difficulty = rune.DifficultyFor(IsInverted(spec.BlockModules));
             string label = string.Format(rune.NameTemplate, parameter);
             if (spec.Level > 0) label = $"{label} ▲{spec.Level}";
             foreach (ModuleSpec m in spec.BlockModules)
@@ -114,7 +116,7 @@ namespace Betaknight.Core.Gear
 
             // Set-exklusive Runen wirken nur, solange das Set getragen wird.
             if (rune.UnlockSetId != null && (equipment == null || equipment.SetPieces(rune.UnlockSetId) < SetDefinition.FirstBonusPieces))
-                return new LogicRow(condition, null, label);
+                return new LogicRow(condition, null, label, difficulty);
 
             SkillDefinition skill = _skills.TryGet(spec.SkillId, out SkillDefinition s) ? s.AtLevel(spec.SkillLevel, skillLevels) : null;
             skill = GrowthApplier.Apply(skill, _growth.ForSkill(spec.SkillId), spec.SkillGrowth);
@@ -122,7 +124,20 @@ namespace Betaknight.Core.Gear
                 skill = ModuleRules.ApplyToSkill(skill, m, _modules.TryGet(m.ModuleId, out ModuleDefinition d) ? d.Name : m.ModuleId);
             if (skill != null && equipment != null) skill = equipment.Boost(skill, extraPassives);
             else if (skill != null && extraPassives != null) skill = SkillPassive.Apply(skill, extraPassives);
-            return new LogicRow(condition, skill, label);
+            return new LogicRow(condition, skill, label, difficulty);
         }
+
+        /// <summary>Kehrt ein Modul «Umkehren» den Baustein um?</summary>
+        public static bool IsInverted(IReadOnlyList<ModuleSpec> blockModules)
+        {
+            if (blockModules == null) return false;
+            foreach (ModuleSpec m in blockModules)
+                if (m.ModuleId == ModuleIds.Invert) return true;
+            return false;
+        }
+
+        /// <summary>Grundschwierigkeit einer Zeile (0–3), wie sie im Kampf zählt.</summary>
+        public int DifficultyOf(BoardRowSpec spec) =>
+            _runes.TryGet(spec.RuneId, out RuneDefinition rune) ? rune.DifficultyFor(IsInverted(spec.BlockModules)) : 0;
     }
 }

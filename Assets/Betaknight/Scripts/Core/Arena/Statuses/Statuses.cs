@@ -73,6 +73,9 @@ namespace Betaknight.Core.Arena
 
         public override bool Stacks => true;
 
+        public override StatusEffect Scaled(int percent) =>
+            new PoisonStatus(TicksLeft, System.Math.Max(1, DamagePerSecond * (100 + percent) / 100));
+
         public override void OnTick(Battle battle, Combatant owner)
         {
             _elapsed++;

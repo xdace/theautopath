@@ -43,6 +43,42 @@ namespace Betaknight.Core.Arena
         /// <summary>Anteil am Gesamtschaden in Basispunkten.</summary>
         public int DamageShareBp { get; internal set; }
 
+        /// <summary>Grundschwierigkeit des Bausteins (0–3); bestimmt den Bonus.</summary>
+        public int Difficulty { get; internal set; }
+
+        /// <summary>Wie oft die Bedingung erfüllt wurde (Wechsel von «nicht erfüllt» zu «erfüllt»), -1 wenn unbekannt.</summary>
+        public int ConditionMet { get; internal set; } = -1;
+
+        /// <summary>Ausführungen mit Schwierigkeits-Bonus (eigener oder über einen Auslöser mitgebrachter).</summary>
+        public int BonusExecutions { get; internal set; }
+
+        /// <summary>Schaden bzw. Heilung, die der Bonus dazugegeben hat.</summary>
+        public int BonusDamage { get; internal set; }
+        public int BonusHealing { get; internal set; }
+
+        /// <summary>Cooldown, den der Bonus eingespart hat, in Ticks.</summary>
+        public int CooldownSavedTicks { get; internal set; }
+
+        /// <summary>«Bedingung 12× erfüllt · Bonus: 8 Ausführungen, +140 Schaden, 6,0 s Cooldown gespart» oder leer.</summary>
+        public string DifficultyText
+        {
+            get
+            {
+                if (IsFallback) return string.Empty;
+                var parts = new List<string>();
+                if (ConditionMet >= 0) parts.Add($"Bedingung {ConditionMet}× erfüllt");
+                if (BonusExecutions > 0)
+                {
+                    var bonus = new List<string> { $"{BonusExecutions} Ausführungen" };
+                    if (BonusDamage > 0) bonus.Add($"+{BonusDamage} Schaden");
+                    if (BonusHealing > 0) bonus.Add($"+{BonusHealing} Heilung");
+                    if (CooldownSavedTicks > 0) bonus.Add($"{SkillInfo.Seconds(CooldownSavedTicks)} Cooldown gespart");
+                    parts.Add("Bonus: " + string.Join(", ", bonus));
+                }
+                return string.Join(" · ", parts);
+            }
+        }
+
         /// <summary>Wie oft die Zeile übersprungen wurde (über der gewählten Zeile oder «Aktion läuft»).</summary>
         public int Skipped { get; internal set; }
 
@@ -84,6 +120,9 @@ namespace Betaknight.Core.Arena
         /// <summary>Schaden ohne Zeile, z. B. aus Set-Boni oder Rückschlag.</summary>
         public int OtherDamage { get; private set; }
         public int TotalHealing { get; private set; }
+
+        /// <summary>Schaden, den Schwierigkeits-Boni insgesamt dazugegeben haben.</summary>
+        public int BonusDamage { get; private set; }
         public int Decisions { get; private set; }
 
         public static BattleReport Create(BattleResult result)
@@ -99,7 +138,10 @@ namespace Betaknight.Core.Arena
             for (int i = 0; i < count; i++)
             {
                 string skill = i < result.PlayerRowSkills.Count ? result.PlayerRowSkills[i] : "?";
-                _rows.Add(new RowReport(i, result.PlayerRowLabels[i], skill, i == count - 1));
+                var r = new RowReport(i, result.PlayerRowLabels[i], skill, i == count - 1);
+                if (result.PlayerRowDifficulty != null && i < result.PlayerRowDifficulty.Count) r.Difficulty = result.PlayerRowDifficulty[i];
+                if (result.PlayerRowMet != null && i < result.PlayerRowMet.Count) r.ConditionMet = result.PlayerRowMet[i];
+                _rows.Add(r);
             }
 
             Combatant player = result.Fighters.Count > 0 ? result.Fighters[0].Combatant : null;
@@ -113,6 +155,11 @@ namespace Betaknight.Core.Arena
                         if (row == null) break;
                         row.Fired++;
                         if (e.IsRepeat) row.Repeated++;
+                        if (e.Tier > 0)
+                        {
+                            row.BonusExecutions++;
+                            row.CooldownSavedTicks += e.Bonus;
+                        }
                         if (e.IsTriggered)
                         {
                             row.Triggered++;
@@ -125,12 +172,21 @@ namespace Betaknight.Core.Arena
                     case BattleEventKind.Damage:
                         if (e.Target == null || e.Target.Side == player.Side) break;
                         TotalDamage += e.Amount;
-                        if (row != null) row.Damage += e.Amount;
+                        if (row != null)
+                        {
+                            row.Damage += e.Amount;
+                            row.BonusDamage += e.Bonus;
+                            BonusDamage += e.Bonus;
+                        }
                         else OtherDamage += e.Amount;
                         break;
                     case BattleEventKind.Healed:
                         TotalHealing += e.Amount;
-                        if (row != null) row.Healing += e.Amount;
+                        if (row != null)
+                        {
+                            row.Healing += e.Amount;
+                            row.BonusHealing += e.Bonus;
+                        }
                         break;
                 }
             }
@@ -190,6 +246,17 @@ namespace Betaknight.Core.Arena
                 if (row.Triggered > 0) _hints.Add($"{row.Name} ({row.Skill}) wurde {row.Triggered}× ausgelöst, von {row.TriggeredByText}.");
                 if (row.TriggersExpired > 0)
                     _hints.Add($"{row.TriggersExpired} Auslöser auf {row.Name} verfielen: der Skill war nicht bereit (Cooldown oder Aktion lief).");
+            }
+
+            // Schwierigkeits-Bonus: was hat er ausgemacht, und welche schweren Bausteine kamen nie zum Zug?
+            foreach (RowReport row in _rows)
+            {
+                if (row.IsFallback || row.Difficulty == 0) continue;
+                if (row.BonusDamage > 0 && row.Damage > 0)
+                    _hints.Add($"{row.Name}: Bonus {DifficultyText.Symbol(row.Difficulty)} brachte +{row.BonusDamage} Schaden "
+                        + $"({SkillInfo.Percent((int)((long)row.BonusDamage * BasisPoints.Full / row.Damage))} des Zeilenschadens).");
+                else if (row.ConditionMet == 0 && row.Difficulty >= 2)
+                    _hints.Add($"{row.Name}: schwerer Baustein ({DifficultyText.Name(row.Difficulty)}) nie erfüllt. Erleichterer helfen, ohne den Bonus zu senken.");
             }
 
             if (OtherDamage > 0) _hints.Add($"{OtherDamage} Schaden kam ohne Zeile (Set-Boni, Rückschlag).");

@@ -9,7 +9,9 @@ namespace Betaknight.Core.Arena
         public bool IsMet(in ConditionContext c, out Combatant target)
         {
             target = null;
-            return c.Self.HpPercentBp < ThresholdBp;
+            // Erleichterung: HP-Schwellen gelten früher.
+            int threshold = ThresholdBp + BasisPoints.Percent(c.Self.Relief(ReliefIds.HpThresholdUp));
+            return c.Self.HpPercentBp < threshold;
         }
     }
 
@@ -50,7 +52,8 @@ namespace Betaknight.Core.Arena
     {
         public int ThresholdBp { get; }
         public EnemyHpBelowCondition(int thresholdBp) => ThresholdBp = thresholdBp;
-        protected override bool Matches(in ConditionContext c, Combatant enemy) => enemy.HpPercentBp < ThresholdBp;
+        protected override bool Matches(in ConditionContext c, Combatant enemy) =>
+            enemy.HpPercentBp < ThresholdBp + BasisPoints.Percent(c.Self.Relief(ReliefIds.EnemyLowUp));
     }
 
     /// <summary>[Gegner gepanzert]</summary>
@@ -62,7 +65,15 @@ namespace Betaknight.Core.Arena
     /// <summary>[Gegner betäubt]</summary>
     public sealed class EnemyStunnedCondition : OpponentCondition
     {
-        protected override bool Matches(in ConditionContext c, Combatant enemy) => enemy.IsStunned;
+        protected override bool Matches(in ConditionContext c, Combatant enemy)
+        {
+            if (enemy.IsStunned) return true;
+            // Erleichterung: kurz nach einer Betäubung gilt der Gegner noch als betäubt.
+            int afterglow = c.Self.Relief(ReliefIds.StunAfterglow);
+            if (afterglow <= 0) return false;
+            return c.Battle.AnyEvent(c.Tick - afterglow, c.Tick - 1,
+                e => e.Kind == BattleEventKind.StatusExpired && e.Target == enemy && e.Detail == StatusIds.Stun);
+        }
     }
 
     /// <summary>[Gegner lädt auf] – ein Gegner holt eine sichtbare Aufladung aus. Ziel ist dieser Gegner.</summary>
@@ -82,7 +93,9 @@ namespace Betaknight.Core.Arena
     {
         public string StatusId { get; }
         public EnemyHasStatusCondition(string statusId) => StatusId = statusId;
-        protected override bool Matches(in ConditionContext c, Combatant enemy) => enemy.HasStatus(StatusId);
+        protected override bool Matches(in ConditionContext c, Combatant enemy) =>
+            enemy.HasStatus(StatusId)
+            || (StatusId == StatusIds.Burn && c.Self.HasRelief(ReliefIds.BurnCountsPoison) && enemy.HasStatus(StatusIds.Poison));
     }
 
     /// <summary>[In Unterzahl] – mindestens N lebende Gegner.</summary>

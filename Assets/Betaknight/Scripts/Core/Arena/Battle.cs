@@ -25,6 +25,13 @@ namespace Betaknight.Core.Arena
         private Combatant _actor;
         private int _actorRow = -1;
 
+        // Wirkungsbonus (Prozent) der laufenden Ausführung aus dem Schwierigkeits-Bonus, nur für die Auswertung.
+        private int _actorPower;
+
+        // Wie oft die Bedingung jeder Spieler-Zeile erfüllt wurde (Wechsel von nicht erfüllt zu erfüllt).
+        private int[] _metCount;
+        private bool[] _metBefore;
+
         // Zeilen, die während der laufenden Aktion des Spielers schon als «Aktion läuft» festgehalten sind.
         private ActionState _busyAction;
         private readonly HashSet<int> _busyRows = new HashSet<int>();
@@ -56,6 +63,8 @@ namespace Betaknight.Core.Arena
 
             Player = Add(setup.Player, Side.Player);
             foreach (CombatantSetup enemy in setup.Enemies) _enemies.Add(Add(enemy, Side.Enemy));
+            _metCount = new int[Player.Board.Rows.Count + 1];
+            _metBefore = new bool[Player.Board.Rows.Count + 1];
         }
 
         private Combatant Add(CombatantSetup s, Side side)
@@ -88,6 +97,7 @@ namespace Betaknight.Core.Arena
                 UpdateTime();
                 AdvanceActions();
                 ObserveRows();
+                CountConditions();
                 Decide();
                 outcome = CheckEnd();
                 if (outcome.HasValue) break;
@@ -115,8 +125,14 @@ namespace Betaknight.Core.Arena
                 skills.Add(row.Skill?.Name ?? "—");
             }
 
+            var difficulties = new List<int>();
+            for (int i = 0; i <= Player.Board.Rows.Count; i++) difficulties.Add(Player.Board.RowAt(i).Difficulty);
+
             return new BattleResult(outcome.Value, Tick, Math.Max(0, Player.Hp), Player.MaxHp, defeated, BonusGold, _events, labels,
-                skills, fighters) { SurviveTicks = _setup.SurviveTicks, Decisions = _decisions };
+                skills, fighters)
+            {
+                SurviveTicks = _setup.SurviveTicks, Decisions = _decisions, PlayerRowMet = _metCount, PlayerRowDifficulty = difficulties,
+            };
         }
 
         private void UpdateTime()
@@ -137,7 +153,7 @@ namespace Betaknight.Core.Arena
                 {
                     if (i >= c.StatusList.Count) continue;
                     StatusEffect s = c.StatusList[i];
-                    BeginActor(s.Source, s.SourceRow);
+                    BeginActor(s.Source, s.SourceRow, s.SourcePowerPercent);
                     s.OnTick(this, c);
                     EndActor();
                     s.TicksLeft--;
@@ -194,7 +210,7 @@ namespace Betaknight.Core.Arena
             if (!a.Skill.IsBasicAttack && a.Skill.CanBeRepeated) c.LastRepeatableSkill = a.Skill;
 
             var context = new SkillContext(this, c, target, a.Skill, a.RowIndex);
-            BeginActor(c, a.RowIndex);
+            BeginActor(c, a.RowIndex, a.Skill.Difficulty.PowerPercent);
             foreach (ISkillEffect effect in a.Skill.Effects)
             {
                 if (!c.IsAlive) break;
@@ -227,21 +243,47 @@ namespace Betaknight.Core.Arena
                 c.Pending.Insert(0, new PendingAction
                 {
                     Skill = a.Skill, Target = a.Target, Row = a.RowIndex, Cause = ActionCause.Repeat, RepeatsLeft = a.RepeatsLeft - 1,
+                    BonusTier = a.BonusTier,
                 });
             }
-            if (!a.IsRepeat && a.RowIndex >= 0 && a.RowIndex < c.Board.Rows.Count) FireEdges(c, GraphNode.Skill(a.RowIndex));
+            // Der Bonus wandert mit: ausgelöste Ziele bekommen mindestens die Stufe dieser Ausführung.
+            if (!a.IsRepeat && a.RowIndex >= 0 && a.RowIndex < c.Board.Rows.Count) FireEdges(c, GraphNode.Skill(a.RowIndex), a.BonusTier);
         }
 
-        private void BeginActor(Combatant c, int row)
+        private void BeginActor(Combatant c, int row, int powerPercent = 0)
         {
             _actor = c;
             _actorRow = row;
+            _actorPower = powerPercent;
         }
 
         private void EndActor()
         {
             _actor = null;
             _actorRow = -1;
+            _actorPower = 0;
+        }
+
+        /// <summary>Grundschwierigkeit einer Zeile (Fallback und ungültige Zeilen: 0).</summary>
+        private static int RowTier(Combatant c, int row) =>
+            row >= 0 && row < c.Board.Rows.Count ? c.Board.Rows[row].Difficulty : 0;
+
+        /// <summary>Anteil des Wirkungsbonus an einer Menge: bei +50 % ist es ein Drittel des Ergebnisses.</summary>
+        private static int BonusPart(int amount, int powerPercent) =>
+            powerPercent <= 0 || amount <= 0 ? 0 : amount - (int)((long)amount * 100 / (100 + powerPercent));
+
+        /// <summary>Zählt pro Spieler-Zeile, wie oft ihre Bedingung erfüllt wurde. Prüfen ändert nichts am Kampf.</summary>
+        private void CountConditions()
+        {
+            if (!Player.IsAlive) return;
+            RowRuntime[] states = _rows[Player];
+            for (int i = 0; i < Player.Board.Rows.Count; i++)
+            {
+                LogicRow row = Player.Board.Rows[i];
+                bool met = row.Condition.IsMet(new ConditionContext(this, Player, states[i]), out _);
+                if (met && !_metBefore[i]) _metCount[i]++;
+                _metBefore[i] = met;
+            }
         }
 
         private void Finish(Combatant c, ActionState a)
@@ -272,7 +314,7 @@ namespace Betaknight.Core.Arena
                     Emit(new BattleEvent(Tick, BattleEventKind.TriggerExpired, c, null, p.CauseRow, p.Skill.Id, p.Row));
                     continue;
                 }
-                StartAction(c, p.Skill, p.Target, p.Row, p.Cause, p.CauseRow, p.RepeatsLeft);
+                StartAction(c, p.Skill, p.Target, p.Row, p.Cause, p.CauseRow, p.RepeatsLeft, p.BonusTier);
             }
         }
 
@@ -283,24 +325,29 @@ namespace Betaknight.Core.Arena
         public void QueueRepeat(Combatant c, SkillDefinition skill)
         {
             if (c?.Action == null || skill == null || c.Pending.Count >= MaxPendingActions) return;
-            c.Pending.Add(new PendingAction { Skill = skill, Target = c.Action.Target, Row = c.Action.RowIndex, Cause = ActionCause.Repeat });
+            c.Pending.Add(new PendingAction
+            {
+                Skill = skill, Target = c.Action.Target, Row = c.Action.RowIndex, Cause = ActionCause.Repeat, BonusTier = c.Action.BonusTier,
+            });
         }
 
         // ------------------------------------------------------------------ Auslöser (Graph der Tafel)
 
-        /// <summary>Feuert alle Auslöser-Kanten eines Knotens.</summary>
-        private void FireEdges(Combatant c, GraphNode from)
+        /// <summary>Feuert alle Auslöser-Kanten eines Knotens; <paramref name="sourceTier"/> ist die Stufe der auslösenden Ausführung.</summary>
+        private void FireEdges(Combatant c, GraphNode from, int sourceTier)
         {
             foreach (GraphEdge edge in c.Board.Graph.From(from))
-                if (edge.Kind == GraphEdgeKind.Trigger) Trigger(c, edge.To.Row, from.Row);
+                if (edge.Kind == GraphEdgeKind.Trigger) Trigger(c, edge.To.Row, from.Row, sourceTier);
         }
 
         /// <summary>
         /// Löst den Skill einer Zeile aus: ohne deren Bedingung, mit voller Cast-Zeit und Cooldown. Ist er nicht bereit
         /// (Cooldown, verwaist) oder der Kämpfer betäubt, verfällt der Auslöser. Läuft gerade eine Aktion, wartet er dahinter.
         /// </summary>
-        private void Trigger(Combatant c, int row, int sourceRow)
+        private void Trigger(Combatant c, int row, int sourceRow, int sourceTier)
         {
+            // Nicht stapelnd: die höhere Stufe von auslösender Ausführung und eigener Zeile zählt.
+            int tier = Math.Max(sourceTier, RowTier(c, row));
             LogicRow target = row >= 0 && row < c.Board.Rows.Count ? c.Board.Rows[row] : null;
             if (target == null || target.IsOrphaned || !c.IsReady(target.Skill) || !c.IsAlive || c.IsStunned
                 || OpponentsOf(c).Count == 0 || (c.Action != null && c.Pending.Count >= MaxPendingActions))
@@ -311,10 +358,10 @@ namespace Betaknight.Core.Arena
 
             if (c.Action == null)
             {
-                StartAction(c, target.Skill, null, row, ActionCause.Trigger, sourceRow);
+                StartAction(c, target.Skill, null, row, ActionCause.Trigger, sourceRow, null, tier);
                 return;
             }
-            c.Pending.Add(new PendingAction { Skill = target.Skill, Row = row, Cause = ActionCause.Trigger, CauseRow = sourceRow });
+            c.Pending.Add(new PendingAction { Skill = target.Skill, Row = row, Cause = ActionCause.Trigger, CauseRow = sourceRow, BonusTier = tier });
         }
 
         /// <summary>
@@ -337,7 +384,7 @@ namespace Betaknight.Core.Arena
                     bool met = row.Condition.IsMet(context, out _);
                     bool rising = met && !states[i].WasMet;
                     states[i].WasMet = met;
-                    if (rising) FireEdges(c, GraphNode.Block(i));
+                    if (rising) FireEdges(c, GraphNode.Block(i), row.Difficulty);
                 }
             }
         }
@@ -484,9 +531,18 @@ namespace Betaknight.Core.Arena
         /// zählen als Feuern der Zeile. Ohne <paramref name="repeatsLeft"/> gelten die «Mehrfach»-Wiederholungen des Skills.
         /// </summary>
         public void StartAction(Combatant c, SkillDefinition skill, Combatant target, int rowIndex,
-            ActionCause cause = ActionCause.Board, int causeRow = -1, int? repeatsLeft = null)
+            ActionCause cause = ActionCause.Board, int causeRow = -1, int? repeatsLeft = null, int bonusTier = -1)
         {
             bool repeat = cause == ActionCause.Repeat;
+
+            // Schwierigkeits-Bonus: Tafel-Entscheidung = Stufe der eigenen Zeile; Auslöser und Wiederholungen bringen ihre mit.
+            int tier = DifficultyBonusConfig.Clamp(bonusTier >= 0 ? bonusTier : RowTier(c, rowIndex));
+            if (tier > 0 && skill.DifficultyTier == 0)
+            {
+                LogicRow own = rowIndex >= 0 && rowIndex < c.Board.Rows.Count ? c.Board.Rows[rowIndex] : null;
+                skill = own != null && own.Skill == skill ? own.SkillAt(tier, c.Board.Bonus) : c.Board.Bonus.Apply(skill, tier);
+            }
+            if (skill.DifficultyTier == 0) tier = 0;
             ActionTiming(skill, c.AttackIntervalTicks, out int windup, out int recovery, _setup.MinCastTicks);
 
             c.Action = new ActionState
@@ -500,6 +556,7 @@ namespace Betaknight.Core.Arena
                 Cause = cause,
                 CauseRow = causeRow,
                 RepeatsLeft = repeatsLeft ?? (repeat ? 0 : skill.ExtraCasts),
+                BonusTier = tier,
             };
             if (!repeat) c.SetCooldown(skill.Id, skill.CooldownTicks);
 
@@ -511,7 +568,10 @@ namespace Betaknight.Core.Arena
             }
 
             Emit(new BattleEvent(Tick, BattleEventKind.ActionStarted, c, c.Action.Target, windup, skill.Id, rowIndex)
-                { Cause = cause, CauseRow = causeRow });
+            {
+                Cause = cause, CauseRow = causeRow, Tier = tier,
+                Bonus = repeat ? 0 : Math.Max(0, skill.CooldownBeforeDifficulty - skill.CooldownTicks),
+            });
             foreach (BattleModifier m in c.ModifierList.ToArray()) m.OnActionStarted(this, c, skill, rowIndex);
 
             // Modul «kostet HP statt Cooldown».
@@ -616,7 +676,9 @@ namespace Betaknight.Core.Arena
 
             if (hit.IsAttack && hit.Source != null)
                 Emit(new BattleEvent(Tick, BattleEventKind.Hit, hit.Source, target, dealt, hit.SkillId));
-            Emit(new BattleEvent(Tick, hit.IsSelfDamage ? BattleEventKind.SelfDamage : BattleEventKind.Damage, hit.Source, target, dealt, hit.SkillId));
+            int bonus = hit.Source != null && hit.Source == _actor && !hit.IsSelfDamage ? BonusPart(dealt, _actorPower) : 0;
+            Emit(new BattleEvent(Tick, hit.IsSelfDamage ? BattleEventKind.SelfDamage : BattleEventKind.Damage, hit.Source, target, dealt, hit.SkillId)
+                { Bonus = bonus });
 
             if (target.Hp <= 0)
             {
@@ -634,7 +696,8 @@ namespace Betaknight.Core.Arena
             int healed = Math.Min(amount, target.MaxHp - target.Hp);
             if (healed <= 0) return 0;
             target.Hp += healed;
-            Emit(new BattleEvent(Tick, BattleEventKind.Healed, source ?? target, target, healed, detail));
+            int bonus = (source ?? target) == _actor ? BonusPart(healed, _actorPower) : 0;
+            Emit(new BattleEvent(Tick, BattleEventKind.Healed, source ?? target, target, healed, detail) { Bonus = bonus });
             return healed;
         }
 
@@ -643,6 +706,10 @@ namespace Betaknight.Core.Arena
             if (target == null || !target.IsAlive || status == null || status.TicksLeft <= 0) return;
             status.Source = source;
             status.SourceRow = source != null && source == _actor ? _actorRow : -1;
+            status.SourcePowerPercent = source != null && source == _actor ? _actorPower : 0;
+
+            // Erleichterung «Betäubungen dauern länger».
+            if (status.Stuns && source != null && source.Side != target.Side) status.TicksLeft += source.Relief(ReliefIds.StunLonger);
 
             if (!status.Stacks) target.StatusList.RemoveAll(s => s.Id == status.Id);
             target.StatusList.Add(status);

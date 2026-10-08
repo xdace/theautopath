@@ -163,6 +163,9 @@ namespace Betaknight.Core.Arena
                 ExtraTargets = ExtraTargets,
                 HpCostBp = HpCostBp,
                 _modules = new List<string>(_modules),
+                DifficultyTier = DifficultyTier,
+                Difficulty = Difficulty,
+                _cooldownBeforeDifficulty = _cooldownBeforeDifficulty,
             };
 
         // ------------------------------------------------------------------ Module (A-07)
@@ -198,6 +201,48 @@ namespace Betaknight.Core.Arena
             copy.HpCostBp = Math.Max(copy.HpCostBp, hpCostBp);
             copy.CastBonusPercent += castPercent;
             if (!string.IsNullOrEmpty(moduleName)) copy._modules.Add(moduleName);
+            return copy;
+        }
+
+        // ------------------------------------------------------------------ Schwierigkeits-Bonus (A-11)
+
+        /// <summary>Stufe des Schwierigkeits-Bonus, mit dem diese Fassung läuft (0 = keiner).</summary>
+        public int DifficultyTier { get; private set; }
+
+        /// <summary>Der Bonus dieser Fassung (leer bei Stufe 0).</summary>
+        public DifficultyBonus Difficulty { get; private set; }
+
+        /// <summary>Cooldown vor dem Schwierigkeits-Bonus (für Anzeige und Auswertung).</summary>
+        public int CooldownBeforeDifficulty => DifficultyTier > 0 ? _cooldownBeforeDifficulty : CooldownTicks;
+
+        private int _cooldownBeforeDifficulty;
+
+        /// <summary>
+        /// Fassung mit Schwierigkeits-Bonus: Cooldown und Cast-Zeit in Prozent kürzer (Untergrenze bleibt), Wirkung
+        /// (Schaden, Heilung, Schild) stärker, Status-Wirkungen länger. Zählt nicht zu den Ausrüstungs-Boni.
+        /// </summary>
+        public SkillDefinition WithDifficultyBonus(int tier, DifficultyBonus bonus)
+        {
+            if (IsBasicAttack || tier <= 0 || bonus.IsNone) return this;
+            var effects = new List<ISkillEffect>();
+            foreach (ISkillEffect original in Effects)
+            {
+                ISkillEffect e = original;
+                if (bonus.PowerPercent != 0)
+                {
+                    if (e is IBoostableEffect b) e = b.Boosted(bonus.PowerPercent);
+                    else if (e is StatModifierEffect m && !m.OnTarget) e = m.Scaled(bonus.PowerPercent);
+                }
+                if (bonus.ExtraStatusTicks > 0 && e is IDurationEffect d) e = d.Extended(bonus.ExtraStatusTicks);
+                effects.Add(e);
+            }
+
+            int cooldown = (int)((long)CooldownTicks * (100 - bonus.CooldownReductionPercent) / 100);
+            SkillDefinition copy = Clone(effects, cooldown);
+            copy.CastBonusPercent -= bonus.CastReductionPercent;
+            copy.DifficultyTier = tier;
+            copy.Difficulty = bonus;
+            copy._cooldownBeforeDifficulty = CooldownTicks;
             return copy;
         }
 

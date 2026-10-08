@@ -24,7 +24,7 @@ namespace Betaknight.Core.Arena
     }
 
     /// <summary>Betäubt das Ziel (oder alle Gegner). Bricht dessen laufende Aktion ab.</summary>
-    public sealed class StunEffect : ISkillEffect
+    public sealed class StunEffect : ISkillEffect, IDurationEffect
     {
         public int Ticks { get; }
         public bool AllEnemies { get; }
@@ -47,6 +47,8 @@ namespace Betaknight.Core.Arena
             }
         }
 
+        public ISkillEffect Extended(int ticks) => new StunEffect(Ticks + ticks, AllEnemies);
+
         public void Describe(SkillInfoBuilder info) => info.Add(new EffectInfo(EffectInfoKind.Stun,
             $"betäubt {(AllEnemies ? "alle " : string.Empty)}{SkillInfo.Seconds(Ticks)}", durationTicks: Ticks, allEnemies: AllEnemies));
     }
@@ -63,7 +65,7 @@ namespace Betaknight.Core.Arena
     }
 
     /// <summary>Zeitlicher Wertebonus auf den Anwender oder Malus auf das Ziel.</summary>
-    public sealed class StatModifierEffect : ISkillEffect
+    public sealed class StatModifierEffect : ISkillEffect, IDurationEffect
     {
         public string StatusId { get; }
         public StatKind Stat { get; }
@@ -86,12 +88,17 @@ namespace Betaknight.Core.Arena
             if (who != null) c.Battle.ApplyStatus(who, new StatModifierStatus(StatusId, Stat, Amount, Ticks), c.User);
         }
 
+        public ISkillEffect Extended(int ticks) => new StatModifierEffect(StatusId, Stat, Amount, Ticks + ticks, OnTarget);
+
+        /// <summary>Derselbe Wert um <paramref name="percent"/> % stärker (Schild, Buff), für den Schwierigkeits-Bonus.</summary>
+        public StatModifierEffect Scaled(int percent) => new StatModifierEffect(StatusId, Stat, Amount * (100 + percent) / 100, Ticks, OnTarget);
+
         public void Describe(SkillInfoBuilder info) => info.Add(new EffectInfo(EffectInfoKind.StatChange,
             $"{(OnTarget ? "Gegner " : string.Empty)}{SkillInfo.StatChange(Stat, Amount)} für {SkillInfo.Seconds(Ticks)}", durationTicks: Ticks));
     }
 
     /// <summary>Setzt das Ziel in Brand: Schaden pro Sekunde in Prozent des eigenen Waffenschadens.</summary>
-    public sealed class BurnEffect : ISkillEffect, ILevelableEffect, IBoostableEffect
+    public sealed class BurnEffect : ISkillEffect, ILevelableEffect, IBoostableEffect, IDurationEffect
     {
         public int Ticks { get; }
         public int DamageBpPerSecond { get; }
@@ -114,6 +121,8 @@ namespace Betaknight.Core.Arena
 
         public ISkillEffect Boosted(int percent) => new BurnEffect(Ticks, DamageBpPerSecond * (100 + percent) / 100);
 
+        public ISkillEffect Extended(int ticks) => new BurnEffect(Ticks + ticks, DamageBpPerSecond);
+
         /// <summary>Schaden pro Sekunde aus dem Waffenschaden, mindestens 1.</summary>
         public int DamagePerSecondFor(int weaponDamage) => System.Math.Max(1, BasisPoints.Of(weaponDamage, DamageBpPerSecond));
 
@@ -128,33 +137,51 @@ namespace Betaknight.Core.Arena
     }
 
     /// <summary>Legt einen beliebigen Zustand auf Anwender oder Ziel. Die Fabrik erzeugt pro Anwendung einen neuen.</summary>
-    public sealed class ApplyStatusEffect : ISkillEffect
+    public sealed class ApplyStatusEffect : ISkillEffect, IBoostableEffect, IDurationEffect
     {
         private readonly System.Func<StatusEffect> _factory;
         public bool OnTarget { get; }
 
-        public ApplyStatusEffect(System.Func<StatusEffect> factory, bool onTarget = false)
+        /// <summary>Stärke in Prozent (nur Zustände mit Wirkungswert, z. B. Gift) und zusätzliche Dauer.</summary>
+        public int PowerPercent { get; }
+        public int ExtraTicks { get; }
+
+        public ApplyStatusEffect(System.Func<StatusEffect> factory, bool onTarget = false, int powerPercent = 0, int extraTicks = 0)
         {
             _factory = factory ?? throw new System.ArgumentNullException(nameof(factory));
             OnTarget = onTarget;
+            PowerPercent = powerPercent;
+            ExtraTicks = extraTicks;
+        }
+
+        public ISkillEffect Boosted(int percent) => new ApplyStatusEffect(_factory, OnTarget, PowerPercent + percent, ExtraTicks);
+
+        public ISkillEffect Extended(int ticks) => new ApplyStatusEffect(_factory, OnTarget, PowerPercent, ExtraTicks + ticks);
+
+        private StatusEffect Create()
+        {
+            StatusEffect status = _factory();
+            if (PowerPercent != 0) status = status.Scaled(PowerPercent);
+            if (ExtraTicks > 0) status.TicksLeft += ExtraTicks;
+            return status;
         }
 
         public void Apply(in SkillContext c)
         {
             Combatant who = OnTarget ? c.Target : c.User;
-            if (who != null) c.Battle.ApplyStatus(who, _factory(), c.User);
+            if (who != null) c.Battle.ApplyStatus(who, Create(), c.User);
         }
 
         public void Describe(SkillInfoBuilder info)
         {
-            StatusEffect sample = _factory();
+            StatusEffect sample = Create();
             info.Add(new EffectInfo(EffectInfoKind.Status,
                 $"{(OnTarget ? "Gegner: " : string.Empty)}{sample.Summary} ({SkillInfo.Seconds(sample.TicksLeft)})", durationTicks: sample.TicksLeft));
         }
     }
 
     /// <summary>Wendet eine Wirkung nur mit einer Chance an (z. B. 20 % Betäubung).</summary>
-    public sealed class ChanceEffect : ISkillEffect, ILevelableEffect, IBoostableEffect
+    public sealed class ChanceEffect : ISkillEffect, ILevelableEffect, IBoostableEffect, IDurationEffect
     {
         public int ChanceBp { get; }
         public ISkillEffect Inner { get; }
@@ -169,6 +196,8 @@ namespace Betaknight.Core.Arena
             Inner is ILevelableEffect inner && level > 0 ? new ChanceEffect(ChanceBp, inner.AtLevel(level, rules)) : this;
 
         public ISkillEffect Boosted(int percent) => Inner is IBoostableEffect inner ? new ChanceEffect(ChanceBp, inner.Boosted(percent)) : this;
+
+        public ISkillEffect Extended(int ticks) => Inner is IDurationEffect inner ? new ChanceEffect(ChanceBp, inner.Extended(ticks)) : this;
 
         public void Apply(in SkillContext c)
         {
@@ -203,6 +232,26 @@ namespace Betaknight.Core.Arena
             info.Add(new EffectInfo(EffectInfoKind.Resource, $"{SkillInfo.ResourceName(ResourceId)} auf {Value}"));
     }
 
+    /// <summary>Ändert eine eigene Ressource um einen Betrag, z. B. +3 Ladung (bis zur Obergrenze).</summary>
+    public sealed class ChangeResourceEffect : ISkillEffect
+    {
+        public string ResourceId { get; }
+        public int Delta { get; }
+        public int Max { get; }
+
+        public ChangeResourceEffect(string resourceId, int delta, int max = int.MaxValue)
+        {
+            ResourceId = resourceId;
+            Delta = delta;
+            Max = max;
+        }
+
+        public void Apply(in SkillContext c) => c.Battle.ChangeResource(c.User, ResourceId, Delta, Max);
+
+        public void Describe(SkillInfoBuilder info) =>
+            info.Add(new EffectInfo(EffectInfoKind.Resource, $"{(Delta >= 0 ? "+" : "−")}{System.Math.Abs(Delta)} {SkillInfo.ResourceName(ResourceId)}"));
+    }
+
     /// <summary>
     /// Echo: wiederholt den zuletzt ausgeführten eigenen Skill als eigene Ausführung mit dessen Cast-Zeit,
     /// ohne dessen Cooldown zu setzen. Skills, die sich nicht wiederholen lassen (Echo selbst), werden nie als "zuletzt" gemerkt.
@@ -224,11 +273,15 @@ namespace Betaknight.Core.Arena
 namespace Betaknight.Core.Arena
 {
     /// <summary>Wendet eine zielgerichtete Wirkung auf jeden Gegner an (z. B. Brennen oder Gift an allen).</summary>
-    public sealed class AllEnemiesEffect : ISkillEffect
+    public sealed class AllEnemiesEffect : ISkillEffect, IBoostableEffect, IDurationEffect
     {
         public ISkillEffect Inner { get; }
 
         public AllEnemiesEffect(ISkillEffect inner) => Inner = inner ?? throw new System.ArgumentNullException(nameof(inner));
+
+        public ISkillEffect Boosted(int percent) => Inner is IBoostableEffect inner ? new AllEnemiesEffect(inner.Boosted(percent)) : this;
+
+        public ISkillEffect Extended(int ticks) => Inner is IDurationEffect inner ? new AllEnemiesEffect(inner.Extended(ticks)) : this;
 
         public void Apply(in SkillContext c)
         {

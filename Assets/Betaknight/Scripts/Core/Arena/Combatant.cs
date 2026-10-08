@@ -24,6 +24,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Startwerte für Ressourcen wie Ladung oder Hitze.</summary>
         public Dictionary<string, int> Resources = new Dictionary<string, int>();
+
+        /// <summary>Erleichterungen für Bausteine aus Ausrüstung und Modulen (Id → Wert), siehe <see cref="ReliefIds"/>.</summary>
+        public Dictionary<string, int> Reliefs = new Dictionary<string, int>();
     }
 
     /// <summary>Laufende Aktion eines Kämpfers.</summary>
@@ -45,6 +48,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Noch ausstehende Wiederholungen aus «Mehrfach».</summary>
         public int RepeatsLeft { get; internal set; }
+
+        /// <summary>Schwierigkeits-Stufe, mit der diese Ausführung läuft (eigene Zeile oder höhere der auslösenden).</summary>
+        public int BonusTier { get; internal set; }
 
         public bool IsRepeat => Cause == ActionCause.Repeat;
 
@@ -73,6 +79,7 @@ namespace Betaknight.Core.Arena
         public ActionCause Cause;
         public int CauseRow = -1;
         public int RepeatsLeft;
+        public int BonusTier;
     }
 
     /// <summary>Ein Kämpfer im laufenden Kampf: Werte, Leben, Aktion, Cooldowns, Zustände, Ressourcen.</summary>
@@ -122,7 +129,15 @@ namespace Betaknight.Core.Arena
             Hp = setup.StartHp > 0 ? Math.Min(setup.StartHp, _stats[StatKind.MaxHp]) : _stats[StatKind.MaxHp];
             ModifierList.AddRange(setup.Modifiers);
             foreach (KeyValuePair<string, int> r in setup.Resources) _resources[r.Key] = r.Value;
+            foreach (KeyValuePair<string, int> r in setup.Reliefs) _reliefs[r.Key] = r.Value;
         }
+
+        private readonly Dictionary<string, int> _reliefs = new Dictionary<string, int>();
+
+        /// <summary>Wert einer Erleichterung (0 = nicht vorhanden).</summary>
+        public int Relief(string id) => id != null && _reliefs.TryGetValue(id, out int v) ? v : 0;
+
+        public bool HasRelief(string id) => Relief(id) > 0;
 
         public int MaxHp => Math.Max(1, GetStat(StatKind.MaxHp));
 

@@ -15,6 +15,9 @@ namespace Betaknight.Core.Arena
         /// <summary>Tafel-Zeile, deren Aktion den Zustand gesetzt hat, sonst -1 (für die Zuordnung von Brennen).</summary>
         public int SourceRow { get; internal set; } = -1;
 
+        /// <summary>Wirkungsbonus (Prozent) aus dem Schwierigkeits-Bonus der setzenden Ausführung, für die Auswertung.</summary>
+        public int SourcePowerPercent { get; internal set; }
+
         protected StatusEffect(string id, int ticks)
         {
             Id = id;
@@ -37,6 +40,12 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Ein Treffer auf den Träger, vor Ausweichen, Krit, Block und Rüstung.</summary>
         public virtual void ModifyIncomingHit(Battle battle, Combatant owner, HitInfo hit) { }
+
+        /// <summary>
+        /// Derselbe Zustand mit um <paramref name="percent"/> % stärkerer Wirkung (Schwierigkeits-Bonus, Passive).
+        /// Standard: unverändert; Zustände mit Wirkungswert (Gift) überschreiben das.
+        /// </summary>
+        public virtual StatusEffect Scaled(int percent) => this;
 
         public bool IsActive => TicksLeft > 0;
 

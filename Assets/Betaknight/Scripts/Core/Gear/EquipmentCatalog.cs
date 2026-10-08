@@ -131,6 +131,22 @@ namespace Betaknight.Core.Gear
                 P(SkillPassive.Cast(SkillKind.Movement, -20)), tags: T(SynergyTagIds.Tempo, SynergyTagIds.Phantom)),
             new EquipmentDefinition("capacitor_vest", "Kondensator-Weste", EquipmentSlot.Chest, S((StatKind.MaxHp, 3), (StatKind.Block, BasisPoints.Percent(5))),
                 P(SkillPassive.Cast(SkillKind.Shock, -20)), tags: T(SynergyTagIds.Charge, SynergyTagIds.Tempo)),
+
+            // Erleichterer (A-11): machen schwere Bausteine leichter erfüllbar, ihr Bonus bleibt (siehe ReliefCatalog).
+            new EquipmentDefinition(ReliefCarrierIds.NumbingGloves, "Lähmhandschuhe", EquipmentSlot.Gloves, S((StatKind.Damage, 1)), weight: 5,
+                description: "Eigene Betäubungen dauern +1 s.", tags: T(SynergyTagIds.Charge)),
+            new EquipmentDefinition(ReliefCarrierIds.AfterimageVisor, "Nachbild-Visier", EquipmentSlot.Helmet, S((StatKind.MaxHp, 2)), weight: 5,
+                description: "Gegner gilt 0,5 s nach einer Betäubung noch als betäubt.", tags: T(SynergyTagIds.Phantom)),
+            new EquipmentDefinition(ReliefCarrierIds.PrechargedCell, "Vorgeladene Zelle", EquipmentSlot.Chest, S((StatKind.MaxHp, 3)), weight: 5,
+                description: "Ladung startet bei 3.", tags: T(SynergyTagIds.Charge)),
+            new EquipmentDefinition(ReliefCarrierIds.PhantomStep, "Phantomschritt-Stiefel", EquipmentSlot.Boots, S((StatKind.Dodge, BasisPoints.Percent(4))), weight: 5,
+                description: "Ausweicher-Serie bricht erst beim 2. Treffer.", tags: T(SynergyTagIds.Phantom)),
+            new EquipmentDefinition(ReliefCarrierIds.CounterShield, "Konterschild", EquipmentSlot.Shield, S((StatKind.Armor, 1), (StatKind.Block, BasisPoints.Percent(10))),
+                weight: 5, description: "Krit-Chance +15 % für 2 s nach einem Block.", tags: T(SynergyTagIds.Charge, SynergyTagIds.Tempo)),
+            new EquipmentDefinition(ReliefCarrierIds.VenomTorch, "Giftbrenner", EquipmentSlot.Weapon, S((StatKind.Damage, 1)), weight: 5,
+                description: "«Gegner brennt» gilt auch bei Gift.", tags: T(SynergyTagIds.Toxin, SynergyTagIds.Heat)),
+            new EquipmentDefinition(ReliefCarrierIds.PainConductor, "Schmerzleiter-Beinschienen", EquipmentSlot.Legs, S((StatKind.Armor, 1)), weight: 5,
+                description: "«Schwerer Treffer» gilt 5 Prozentpunkte früher.", tags: T(SynergyTagIds.Scrap)),
         });
     }
 }

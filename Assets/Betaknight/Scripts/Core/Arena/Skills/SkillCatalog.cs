@@ -21,6 +21,10 @@ namespace Betaknight.Core.Arena
         public const string ShockStab = "shock_stab";
         public const string Echo = "echo";
 
+        // Erleichterer (A-11): ihre Wirkung führt schwere Bedingungen herbei.
+        public const string ChargeCoil = "charge_coil";
+        public const string NumbingMist = "numbing_mist";
+
         // Evolutionsformen (nie angeboten, siehe EvolutionCatalog).
         public const string Inferno = "inferno";
         public const string LightningLance = "lightning_lance";
@@ -61,6 +65,9 @@ namespace Betaknight.Core.Arena
             if (!TryGet(id, out SkillDefinition skill)) throw new KeyNotFoundException($"Unbekannter Skill {id}.");
             return skill;
         }
+
+        /// <summary>Obergrenze der Ladung (wie beim Aegis-Set).</summary>
+        public const int ChargeMax = 5;
 
         public static SkillCatalog CreateDefault()
         {
@@ -137,6 +144,18 @@ namespace Betaknight.Core.Arena
             {
                 new RepeatLastSkillEffect(),
             }, "Wiederholt den zuletzt ausgeführten eigenen Skill.", canBeRepeated: false, kinds: SkillKind.Attack));
+
+            // Erleichterer: Ladung für «Ladung voll», kurze Massen-Betäubung für «Gegner betäubt».
+            c.Register(new SkillDefinition(SkillIds.ChargeCoil, "Ladungsspule", CastTime.Fast, 2, Ticks.FromSeconds(8), new ISkillEffect[]
+            {
+                new ChangeResourceEffect(ResourceIds.Charge, 3, ChargeMax),
+            }, "+3 Ladung (höchstens 5). Erleichtert «Ladung voll».", kinds: SkillKind.Shield));
+
+            c.Register(new SkillDefinition(SkillIds.NumbingMist, "Lähmnebel", CastTime.Medium, 4, Ticks.FromSeconds(9), new ISkillEffect[]
+            {
+                new DamageEffect(BasisPoints.Percent(20), allEnemies: true),
+                new StunEffect(Ticks.FromTenths(6), allEnemies: true),
+            }, "Wenig Schaden, betäubt alle Gegner 0,6 s. Erleichtert «Gegner betäubt».", kinds: SkillKind.Shock));
 
             RegisterEvolutions(c);
             return c;

@@ -98,11 +98,14 @@ namespace Betaknight.Core.Arena
         {
             target = null;
             int streak = 0;
+            int hits = 0;
             Combatant self = c.Self;
+            // Erleichterung: die Serie übersteht so viele Treffer.
+            int tolerance = self.Relief(ReliefIds.DodgeTolerance);
             c.Battle.AnyEvent(c.Row.LastFiredTick, c.Tick - 1, e =>
             {
                 if (e.Target != self) return false;
-                if (e.Kind == BattleEventKind.Hit) return true; // Serie gebrochen, ältere Ereignisse zählen nicht
+                if (e.Kind == BattleEventKind.Hit && ++hits > tolerance) return true; // Serie gebrochen, ältere Ereignisse zählen nicht
                 if (e.Kind == BattleEventKind.Dodged) streak++;
                 return false;
             });

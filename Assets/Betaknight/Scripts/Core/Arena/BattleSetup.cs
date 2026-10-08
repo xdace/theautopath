@@ -95,6 +95,12 @@ namespace Betaknight.Core.Arena
         /// <summary>Entscheidungen des Spielers mit Gründen je Zeile, siehe <see cref="BattleDecision"/>.</summary>
         public IReadOnlyList<BattleDecision> Decisions { get; internal set; } = new BattleDecision[0];
 
+        /// <summary>Pro Spieler-Zeile (inklusive Fallback): wie oft die Bedingung erfüllt wurde (Wechsel zu erfüllt).</summary>
+        public IReadOnlyList<int> PlayerRowMet { get; internal set; } = new int[0];
+
+        /// <summary>Pro Spieler-Zeile (inklusive Fallback): Grundschwierigkeit des Bausteins.</summary>
+        public IReadOnlyList<int> PlayerRowDifficulty { get; internal set; } = new int[0];
+
         public BattleResult(BattleOutcome outcome, int endTick, int playerHp, int playerMaxHp, int enemiesDefeated, int bonusGold,
             IReadOnlyList<BattleEvent> events, IReadOnlyList<string> playerRowLabels,
             IReadOnlyList<string> playerRowSkills = null, IReadOnlyList<FighterInfo> fighters = null)

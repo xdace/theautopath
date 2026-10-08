@@ -154,12 +154,13 @@ namespace Betaknight.Tests.EditMode
         /// ändern (neue Cast-Zeiten, Echo mit eigener Cast-Zeit, Synergie-Tags) und Angebote anders würfeln (Skills seit A-05).
         /// Mit A-07 erneut aufgenommen: Belohnungen und Shops würfeln zusätzlich seltene Module, die Kämpfe selbst sind unverändert.
         /// Mit A-08 erneut: Skills wachsen aus Kämpfen (z. B. +1 Schaden pro Kill), spätere Kämpfe eines Runs ändern sich daher.
+        /// Mit A-11 erneut: Schwierigkeits-Bonus der Bausteine und neue Erleichterer in den Angeboten.
         /// </summary>
         [TestCase("blade", 5, "2 Kämpfe, 155 Ereignisse, 585C43CE50272DD0")]
-        [TestCase("blade", 21, "2 Kämpfe, 133 Ereignisse, C030CD4FF820E8E2")]
-        [TestCase("shield", 5, "6 Kämpfe, 564 Ereignisse, 2F235A88381041AA")]
+        [TestCase("blade", 21, "2 Kämpfe, 132 Ereignisse, 665200B922293DFD")]
+        [TestCase("shield", 5, "6 Kämpfe, 512 Ereignisse, 855004C05E4FE512")]
         [TestCase("shield", 21, "3 Kämpfe, 191 Ereignisse, F023E0D011A540B7")]
-        [TestCase("spark", 5, "2 Kämpfe, 134 Ereignisse, 4052D2913055051E")]
+        [TestCase("spark", 5, "2 Kämpfe, 136 Ereignisse, 3DE9760BA9F5AA3C")]
         [TestCase("spark", 21, "2 Kämpfe, 146 Ereignisse, 9AEBB76742137BCB")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {

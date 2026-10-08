@@ -92,9 +92,24 @@ namespace Betaknight.Core.Runes
         public IReadOnlyList<int> Levels => _levels;
         public int MaxLevel => Math.Max(0, _levels.Length - 1);
 
+        /// <summary>
+        /// Grundschwierigkeit 0–3 (0 = immer/sehr häufig, 1 = häufig, 2 = selten, 3 = sehr selten). Bestimmt den
+        /// Schwierigkeits-Bonus auf den Skill der Zeile; Erleichterungen ändern sie nicht.
+        /// </summary>
+        public int Difficulty { get; }
+
+        /// <summary>Schwierigkeit der umgekehrten Bedingung (Modul «Umkehren»), eigener Datenwert.</summary>
+        public int InvertedDifficulty { get; }
+
+        /// <summary>Schwierigkeit mit oder ohne «Umkehren».</summary>
+        public int DifficultyFor(bool inverted) => inverted ? InvertedDifficulty : Difficulty;
+
         public RuneDefinition(string id, string name, RuneTag tag, ConditionKind kind, string description,
-            int[] levels = null, int weight = 10, bool exclusive = false, string unlockSetId = null)
+            int[] levels = null, int weight = 10, bool exclusive = false, string unlockSetId = null, int difficulty = 0,
+            int invertedDifficulty = 0)
         {
+            Difficulty = Math.Max(0, Math.Min(3, difficulty));
+            InvertedDifficulty = Math.Max(0, Math.Min(3, invertedDifficulty));
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("Id fehlt.", nameof(id));
             if (weight < 0) throw new ArgumentOutOfRangeException(nameof(weight));
             Id = id;

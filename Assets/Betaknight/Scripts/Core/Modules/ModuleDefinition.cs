@@ -29,6 +29,10 @@ namespace Betaknight.Core.Modules
         public const string Extend = "extend";
         public const string Threshold = "threshold";
         public const string Trigger = "trigger";
+
+        // Erleichterer (A-11): wirken, solange sie an einem Baustein sitzen (siehe ReliefCatalog).
+        public const string AlarmSensor = Arena.ReliefCarrierIds.AlarmSensor;
+        public const string Scent = Arena.ReliefCarrierIds.ScentModule;
     }
 
     /// <summary>Ein Modul als Karte: Name, Art, Wirkung je Stufe als Text. Die Regeln stehen in <see cref="ModuleRules"/>.</summary>
@@ -136,6 +140,14 @@ namespace Betaknight.Core.Modules
                 "Am Skill: nach der Ausführung Ziel auslösen. Am Baustein: wenn er erfüllt wird, Ziel auslösen. "
                 + "Das Ziel castet normal; ist es nicht bereit, verfällt der Auslöser.",
             }, weight: 8));
+            c.Register(new ModuleDefinition(ModuleIds.AlarmSensor, "Alarmfühler", ModuleKind.Block, new[]
+            {
+                "Erleichterer: HP-Schwellen-Bausteine («HP unter x %») gelten 10 Prozentpunkte früher. Ihr Bonus bleibt.",
+            }, weight: 6));
+            c.Register(new ModuleDefinition(ModuleIds.Scent, "Witterung", ModuleKind.Block, new[]
+            {
+                "Erleichterer: «Gegner unter x %» gilt 10 Prozentpunkte früher. Der Bonus bleibt.",
+            }, weight: 6));
             return c;
         }
     }

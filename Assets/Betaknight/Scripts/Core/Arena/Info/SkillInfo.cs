@@ -219,6 +219,12 @@ namespace Betaknight.Core.Arena
             }
         }
 
+        /// <summary>«Baustein ◆◆ Schwer: −30 % Cooldown, +25 % Wirkung (eingerechnet)» oder leer ohne Bonus.</summary>
+        public string DifficultyLine =>
+            Skill.DifficultyTier > 0
+                ? $"Baustein {DifficultyText.Symbol(Skill.DifficultyTier)} {DifficultyText.Name(Skill.DifficultyTier)}: {Skill.Difficulty.Text} (eingerechnet)"
+                : string.Empty;
+
         /// <summary>Alle Details, eine Wirkung pro Zeile (für Tooltips).</summary>
         public string Details
         {
@@ -234,6 +240,8 @@ namespace Betaknight.Core.Arena
                 if (Skill.Kinds != SkillKind.None) sb.Append("\nArt: ").Append(SkillKinds.Names(Skill.Kinds));
                 string bonus = BonusText;
                 if (bonus.Length > 0) sb.Append("\nAusrüstung: ").Append(bonus);
+                string difficulty = DifficultyLine;
+                if (difficulty.Length > 0) sb.Append('\n').Append(difficulty);
                 return sb.ToString();
             }
         }

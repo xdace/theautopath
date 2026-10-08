@@ -23,6 +23,13 @@ namespace Betaknight.Core.Arena
         ISkillEffect Boosted(int percent);
     }
 
+    /// <summary>Eine Wirkung mit Dauer (Betäubung, Brennen, Zustände), die verlängert werden kann.</summary>
+    public interface IDurationEffect
+    {
+        /// <summary>Dieselbe Wirkung mit <paramref name="ticks"/> mehr Dauer.</summary>
+        ISkillEffect Extended(int ticks);
+    }
+
     /// <summary>Eine Wirkung, die mit der Stufe des Skill-Exemplars stärker wird.</summary>
     public interface ILevelableEffect
     {

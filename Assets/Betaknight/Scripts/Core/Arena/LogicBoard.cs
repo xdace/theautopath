@@ -14,11 +14,28 @@ namespace Betaknight.Core.Arena
 
         public bool IsOrphaned => Skill == null;
 
-        public LogicRow(ICondition condition, SkillDefinition skill, string label = null)
+        /// <summary>
+        /// Grundschwierigkeit des Bausteins (0–3, bei «Umkehren» die eigene Stufe der umgekehrten Bedingung). Bestimmt den
+        /// Schwierigkeits-Bonus auf den Skill; Erleichterungen ändern sie nicht.
+        /// </summary>
+        public int Difficulty { get; }
+
+        private readonly SkillDefinition[] _byTier = new SkillDefinition[DifficultyBonusConfig.MaxTier + 1];
+
+        public LogicRow(ICondition condition, SkillDefinition skill, string label = null, int difficulty = 0)
         {
             Condition = condition ?? throw new ArgumentNullException(nameof(condition));
             Skill = skill;
             Label = label ?? condition.GetType().Name;
+            Difficulty = DifficultyBonusConfig.Clamp(difficulty);
+        }
+
+        /// <summary>Der Skill der Zeile mit dem Bonus einer Stufe (zwischengespeichert, je Zeile eine Konfiguration).</summary>
+        public SkillDefinition SkillAt(int tier, DifficultyBonusConfig config)
+        {
+            if (Skill == null) return null;
+            tier = DifficultyBonusConfig.Clamp(tier);
+            return _byTier[tier] ?? (_byTier[tier] = (config ?? DifficultyBonusConfig.Default).Apply(Skill, tier));
         }
 
         public override string ToString() => $"[{Label}] -> [{Skill?.Name ?? "—"}]";
@@ -39,10 +56,15 @@ namespace Betaknight.Core.Arena
         /// <summary>Auslöser zwischen Bausteinen und Skills der Zeilen (Kreise erlaubt).</summary>
         public LogicGraph Graph { get; }
 
-        public LogicBoard(IEnumerable<LogicRow> rows, SkillDefinition fallbackSkill = null, LogicGraph graph = null)
+        /// <summary>Schwierigkeits-Bonus je Stufe für diese Tafel.</summary>
+        public DifficultyBonusConfig Bonus { get; }
+
+        public LogicBoard(IEnumerable<LogicRow> rows, SkillDefinition fallbackSkill = null, LogicGraph graph = null,
+            DifficultyBonusConfig bonus = null)
         {
             Rows = new List<LogicRow>(rows ?? Array.Empty<LogicRow>());
             Graph = graph ?? LogicGraph.Empty;
+            Bonus = bonus ?? DifficultyBonusConfig.Default;
             Fallback = new LogicRow(AlwaysCondition.Instance, fallbackSkill ?? SkillDefinition.BasicAttack, "Immer");
         }
 
