@@ -67,10 +67,14 @@ namespace Betaknight.Core.Arena
 
         public bool IsCharge => !IsBasicAttack && WindupTicks >= ChargeThreshold;
 
+        /// <summary>Skill-Arten (Angriff, Feuer, Schock ...): Ziel passiver Effekte der Ausrüstung und Grundlage der Angebote.</summary>
+        public SkillKind Kinds { get; }
+
         public SkillDefinition(string id, string name, int windupTicks, int recoveryTicks, int cooldownTicks,
             IEnumerable<ISkillEffect> effects, string description = null, bool countsAsAttack = false,
-            bool canBeRepeated = true, bool isBasicAttack = false)
+            bool canBeRepeated = true, bool isBasicAttack = false, SkillKind kinds = SkillKind.None)
         {
+            Kinds = kinds;
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("Id fehlt.", nameof(id));
             if (windupTicks < 0 || recoveryTicks < 0 || cooldownTicks < 0) throw new ArgumentOutOfRangeException(nameof(windupTicks));
 
@@ -91,8 +95,14 @@ namespace Betaknight.Core.Arena
             BasicAttackId, "Basisangriff", 0, 0, 0, new ISkillEffect[] { new DamageEffect(BasisPoints.Full) },
             "Waffenschaden.", isBasicAttack: true);
 
-        /// <summary>Stufe aus dem Ausrüstungsteil (0 = Grundform). Höhere Stufen haben stärkere Wirkungen.</summary>
+        /// <summary>Stufe des Skill-Exemplars (0 = Grundform). Höhere Stufen haben stärkere Wirkungen.</summary>
         public int Level { get; private set; }
+
+        /// <summary>Wirkungsbonus in Prozent aus passiven Effekten der Ausrüstung (nur Anzeige, schon eingerechnet).</summary>
+        public int PowerBonusPercent { get; private set; }
+
+        /// <summary>Cooldown-Änderung in Ticks aus passiven Effekten (nur Anzeige, schon eingerechnet).</summary>
+        public int CooldownBonusTicks { get; private set; }
 
         /// <summary>
         /// Derselbe Skill auf einer Stufe: stufbare Wirkungen werden stärker, Zeiten bleiben gleich.
@@ -103,9 +113,30 @@ namespace Betaknight.Core.Arena
             if (level <= 0 || rules == null || IsBasicAttack) return this;
             var effects = new List<ISkillEffect>();
             foreach (ISkillEffect e in Effects) effects.Add(e is ILevelableEffect l ? l.AtLevel(level, rules) : e);
-            return new SkillDefinition(Id, Name, WindupTicks, RecoveryTicks, CooldownTicks, effects, Description, CountsAsAttack,
-                CanBeRepeated, IsBasicAttack) { Level = level };
+            return Copy(effects, CooldownTicks, level, PowerBonusPercent, CooldownBonusTicks);
         }
+
+        /// <summary>
+        /// Derselbe Skill mit passiven Boni der Ausrüstung: Wirkung (Schaden, Brennen, Heilung) +<paramref name="powerPercent"/> %,
+        /// Cooldown um <paramref name="cooldownTicks"/> verändert (nie unter 0). Ohne Boni derselbe Skill.
+        /// </summary>
+        public SkillDefinition WithBonus(int powerPercent, int cooldownTicks)
+        {
+            if ((powerPercent == 0 && cooldownTicks == 0) || IsBasicAttack) return this;
+            var effects = new List<ISkillEffect>();
+            foreach (ISkillEffect e in Effects) effects.Add(powerPercent != 0 && e is IBoostableEffect b ? b.Boosted(powerPercent) : e);
+            return Copy(effects, Math.Max(0, CooldownTicks + cooldownTicks), Level, PowerBonusPercent + powerPercent,
+                CooldownBonusTicks + cooldownTicks);
+        }
+
+        private SkillDefinition Copy(List<ISkillEffect> effects, int cooldown, int level, int power, int cooldownBonus) =>
+            new SkillDefinition(Id, Name, WindupTicks, RecoveryTicks, cooldown, effects, Description, CountsAsAttack,
+                CanBeRepeated, IsBasicAttack, Kinds)
+            {
+                Level = level,
+                PowerBonusPercent = power,
+                CooldownBonusTicks = cooldownBonus,
+            };
 
         public override string ToString() => Name;
     }

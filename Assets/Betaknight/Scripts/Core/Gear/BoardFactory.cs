@@ -4,24 +4,27 @@ using Betaknight.Core.Runes;
 
 namespace Betaknight.Core.Gear
 {
-    /// <summary>Eine Zeile, wie der Spieler sie baut: Rune mit Stufe und zugeordneter Skill (oder keiner).</summary>
+    /// <summary>Eine Zeile, wie der Spieler sie baut: Rune mit Stufe und Skill mit der Stufe seines Exemplars (oder keiner).</summary>
     public readonly struct BoardRowSpec
     {
         public readonly string RuneId;
         public readonly int Level;
         public readonly string SkillId;
+        public readonly int SkillLevel;
 
-        public BoardRowSpec(string runeId, string skillId, int level = 0)
+        public BoardRowSpec(string runeId, string skillId, int level = 0, int skillLevel = 0)
         {
             RuneId = runeId;
             SkillId = skillId;
             Level = level;
+            SkillLevel = skillLevel;
         }
     }
 
     /// <summary>
-    /// Baut aus Runen-Zeilen und Ausrüstung eine <see cref="LogicBoard"/>. Fehlt der Skill einer Zeile
-    /// (Teil abgelegt, unbekannte Rune), bleibt die Zeile als verwaiste Zeile stehen und wird im Kampf übersprungen.
+    /// Baut aus Runen-Zeilen und Ausrüstung eine <see cref="LogicBoard"/>. Der Skill kommt aus der Zeile (mit der Stufe
+    /// seines Exemplars), die Ausrüstung gibt passive Boni auf passende Skill-Arten. Ohne Skill (bewusst herausgenommen,
+    /// unbekannte Rune, Set-Rune ohne Set) bleibt die Zeile verwaist und wird im Kampf übersprungen.
     /// </summary>
     public sealed class BoardFactory
     {
@@ -38,7 +41,7 @@ namespace Betaknight.Core.Gear
 
         public static BoardFactory CreateDefault() => new BoardFactory(null, null, null);
 
-        /// <param name="skillLevels">Regeln für Skill-Stufen aus der Ausrüstung. Null = alle Skills in Grundform.</param>
+        /// <param name="skillLevels">Regeln für Skill-Stufen. Null = alle Skills in Grundform.</param>
         public LogicBoard Create(IEnumerable<BoardRowSpec> rows, Equipment equipment, SkillLevelRules skillLevels = null)
         {
             var result = new List<LogicRow>();
@@ -61,9 +64,8 @@ namespace Betaknight.Core.Gear
             if (rune.UnlockSetId != null && (equipment == null || equipment.SetPieces(rune.UnlockSetId) < SetDefinition.FirstBonusPieces))
                 return new LogicRow(condition, null, label);
 
-            bool available = equipment != null ? equipment.ProvidesSkill(spec.SkillId) : spec.SkillId == SkillDefinition.BasicAttackId;
-            SkillDefinition skill = available && _skills.TryGet(spec.SkillId, out SkillDefinition s) ? s : null;
-            if (skill != null && equipment != null) skill = skill.AtLevel(equipment.SkillLevel(skill.Id), skillLevels);
+            SkillDefinition skill = _skills.TryGet(spec.SkillId, out SkillDefinition s) ? s.AtLevel(spec.SkillLevel, skillLevels) : null;
+            if (skill != null && equipment != null) skill = equipment.Boost(skill);
             return new LogicRow(condition, skill, label);
         }
     }

@@ -82,7 +82,9 @@ namespace Betaknight.Tests.EditMode
 
             s.Gear.Unequip(EquipmentSlot.Shield);
             setup = resolver.CreateSetup(new CombatRequest(CellContent.Enemy, 1, s.Stats, s.Runes, s.Gear), new List<CombatantSetup> { new CombatantSetup() }, 1);
-            Assert.IsTrue(setup.Player.Board.Rows[0].IsOrphaned);
+            // A-05: Der Skill gehört der Zeile, nicht dem Schild. Ablegen kostet nur die Werte.
+            Assert.AreEqual(SkillIds.ShieldBash, setup.Player.Board.Rows[0].Skill.Id);
+            Assert.AreEqual(0, setup.Player.Stats[StatKind.Armor]);
         }
 
         [Test]
@@ -101,19 +103,24 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(s.TakeItem(0));
             Assert.AreSame(item, s.Gear.Get(item.Slot));
             Assert.IsNull(s.PendingRuneOffer);
-            if (item.SkillIds.Count > 0) Assert.AreEqual(item.SkillIds[0], s.Runes.Rows[0].SkillId);
+            Assert.AreEqual(Kit("shield").StartSkillId, s.Runes.Rows[0].SkillId, "Ein neues Teil ändert keine Skills an der Tafel.");
         }
 
         [Test]
-        public void NewRunesGetAnUnusedSkill()
+        public void NewRunesGetAFreeSkillOrTheBasicAttack()
         {
+            // Begründet angepasst (A-05): Skills kommen nicht mehr aus der Ausrüstung, sondern aus der Sammlung.
             OverworldSession s = Session(Kit("blade"));
-            s.Gear.Equip(s.Items.Get("round_shield"));
+            s.Skills.Add(SkillIds.ShieldBash);
             s.OfferRunes("Test");
             Assert.IsTrue(s.TakeRune(0));
 
             Assert.AreEqual(SkillIds.ArmorBreak, s.Runes.Rows[0].SkillId);
             Assert.AreEqual(SkillIds.ShieldBash, s.Runes.Rows[1].SkillId);
+
+            s.OfferRunes("Test");
+            Assert.IsTrue(s.TakeRune(0));
+            Assert.AreEqual(SkillIds.BasicAttack, s.Runes.Rows[2].SkillId, "Kein freier Skill mehr: Basisangriff statt verwaist.");
         }
 
         [Test]
@@ -126,9 +133,10 @@ namespace Betaknight.Tests.EditMode
 
             Assert.IsTrue(s.MoveRow(1, 0));
             Assert.AreEqual(second, s.Runes.Rows[0].Rune.Id);
-            Assert.IsFalse(s.AssignSkill(0, SkillIds.Drill), "Nur getragene Skills.");
-            Assert.IsTrue(s.AssignSkill(0, SkillIds.BasicAttack));
-            Assert.IsTrue(s.AssignSkill(0, null));
+            Assert.IsFalse(s.PlaceSkill(999, 0), "Nur Exemplare aus der Sammlung.");
+            Assert.IsTrue(s.PlaceBasicAttack(0));
+            Assert.IsTrue(s.RemoveSkill(0));
+            Assert.IsTrue(s.Runes.Rows[0].Skill == null);
         }
 
         [Test]

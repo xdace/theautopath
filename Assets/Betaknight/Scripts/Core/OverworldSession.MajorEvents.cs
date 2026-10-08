@@ -198,7 +198,7 @@ namespace Betaknight.Core
             if (!_shops.TryGetValue(cell.Coord, out ShopInventory inventory))
             {
                 inventory = new ShopInventory(RuneOffer.Create("Shop", RuneCatalog, Runes, _random, isOwned: RuneInventory.Contains).Options,
-                    PickItems(ShopItemCount));
+                    PickItems(ShopItemCount), PickSkills(Progression.ShopSkillCount));
                 _shops.Add(cell.Coord, inventory);
             }
 
@@ -260,13 +260,14 @@ namespace Betaknight.Core
 
         public bool CanRerollShop => PendingShop != null && Stats.Gold >= ShopPrices.Reroll;
 
-        /// <summary>Würfelt die Runen im Shop neu.</summary>
+        /// <summary>Würfelt Runen, Teile und Skills im Shop neu.</summary>
         public bool RerollShop()
         {
             if (!CanRerollShop) return false;
             Stats.TrySpendGold(ShopPrices.Reroll);
             PendingShop.Inventory.Replace(RuneOffer.Create("Shop", RuneCatalog, Runes, _random, isOwned: RuneInventory.Contains).Options);
             PendingShop.Inventory.ReplaceItems(PickItems(ShopItemCount));
+            PendingShop.Inventory.ReplaceSkills(PickSkills(Progression.ShopSkillCount));
             return true;
         }
 

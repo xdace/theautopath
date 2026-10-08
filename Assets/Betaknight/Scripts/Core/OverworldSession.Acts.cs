@@ -78,7 +78,8 @@ namespace Betaknight.Core
                 previous.Gear,
                 previous.Items,
                 previous.Inventory,
-                previous.RuneInventory);
+                previous.RuneInventory,
+                previous.Skills);
             session.Kit = previous.Kit;
             session.Act = act;
             session.Progression = previous.Progression;

@@ -37,7 +37,8 @@ namespace Betaknight.Tests.EditMode
         private static SkillInfo Info(string skillId, Equipment gear, BattleContext context = null)
         {
             SkillUserStats stats = new ArenaCombatResolver().PreviewStats(new PlayerStats(30, 0), Board(skillId), gear, context);
-            return SkillInfo.Create(Skills.Get(skillId ?? SkillIds.BasicAttack), stats);
+            // Wie im Kampf: passive Effekte der Ausrüstung auf passende Tags (A-05) sind eingerechnet.
+            return SkillInfo.Create(gear.Boost(Skills.Get(skillId ?? SkillIds.BasicAttack)), stats);
         }
 
         /// <summary>Gegner, die nur einstecken: viel Leben, keine Rüstung, kein Schaden, kein Ausweichen.</summary>
@@ -98,10 +99,13 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void DrillHitsAllEnemiesForHundredTwentyPercent()
         {
-            SkillInfo info = Info(SkillIds.Drill, Gear("plasma_drill"));
+            SkillInfo plain = Info(SkillIds.Drill, Gear("short_sword"));
+            Assert.AreEqual("120 % Waffenschaden ≈ 7 an allen Gegnern", plain.DamageText);
 
+            // Der Plasma-Bohrer gibt Klinge-Skills +25 % Wirkung (A-05: passive Effekte statt Skills).
+            SkillInfo info = Info(SkillIds.Drill, Gear("plasma_drill"));
             Assert.AreEqual(9, info.Stats.WeaponDamage);
-            Assert.AreEqual("120 % Waffenschaden ≈ 10 an allen Gegnern", info.DamageText);
+            Assert.AreEqual("150 % Waffenschaden ≈ 13 an allen Gegnern", info.DamageText);
             Assert.IsTrue(info.Effects.Single().AllEnemies);
             Assert.AreEqual("CD 5 s · Ausholen 0,5 s · Erholung 0,3 s", info.TimingText);
         }
@@ -114,9 +118,10 @@ namespace Betaknight.Tests.EditMode
             SkillInfo onMine = Info(SkillIds.Drill, gear, new BattleContext { OnGoldMine = true });
             SkillInfo elsewhere = Info(SkillIds.Drill, gear);
 
-            Assert.AreEqual(10, elsewhere.Effects.Single().Amount);
-            Assert.AreEqual(15, onMine.Effects.Single().Amount);
-            StringAssert.StartsWith("120 % Waffenschaden ≈ 15", onMine.DamageText);
+            // 150 % durch den Plasma-Bohrer (Klinge +25 %), auf der Mine noch einmal +50 % Flächenschaden.
+            Assert.AreEqual(13, elsewhere.Effects.Single().Amount);
+            Assert.AreEqual(19, onMine.Effects.Single().Amount);
+            StringAssert.StartsWith("150 % Waffenschaden ≈ 19", onMine.DamageText);
         }
 
         [Test]
@@ -143,7 +148,7 @@ namespace Betaknight.Tests.EditMode
         public void SkillsWithoutDamageSayKeinSchaden()
         {
             SkillInfo flash = Info(SkillIds.Flashbang, Gear("short_sword", "holo_projector"));
-            SkillInfo repair = Info(SkillIds.Repair, Gear("short_sword", "warning_visor"));
+            SkillInfo repair = Info(SkillIds.Repair, Gear("short_sword"));
 
             Assert.IsFalse(flash.DealsDamage);
             Assert.AreEqual("kein Schaden", flash.DamageText);

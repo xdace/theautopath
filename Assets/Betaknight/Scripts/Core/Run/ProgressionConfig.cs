@@ -52,7 +52,41 @@ namespace Betaknight.Core.Run
         /// <summary>Jede Stufe gibt so viel Prozent der Grundwerte dazu (nur vorteilhafte Werte, mindestens 1).</summary>
         public int ItemStatPercentPerLevel = 50;
 
-        /// <summary>Wie stark die Skills eines Teils pro Stufe werden.</summary>
+        /// <summary>Höchste Stufe eines Skill-Exemplars (+3).</summary>
+        public int MaxSkillLevel = 3;
+
+        /// <summary>Wie stark ein Skill-Exemplar pro Stufe wird.</summary>
         public SkillLevelRules SkillLevels = new SkillLevelRules();
+
+        // ------------------------------------------------------------------ Skills als Belohnung
+
+        /// <summary>Chance in Prozent, dass ein Angebot einen Skill statt der letzten Rune enthält, je Quelle.</summary>
+        public int SkillOfferChanceVictory = 35;
+        public int SkillOfferChanceElite = 60;
+        public int SkillOfferChanceTreasure = 50;
+        public int SkillOfferChanceMine = 35;
+
+        /// <summary>Angebote aus Runensplittern (Ereignisse, Kämpfe, Truhen) enthalten so oft einen Skill.</summary>
+        public int SkillOfferChanceShards = 30;
+
+        /// <summary>So viele Skills liegen in jedem Shop.</summary>
+        public int ShopSkillCount = 1;
+
+        /// <summary>Angebotsgewicht eines Skills: Grundwert, ×Faktor bei passenden Skill-Arten im Build.</summary>
+        public int SkillOfferWeight = 10;
+        public int SkillKindMatchFactor = 3;
+
+        public int SkillOfferChance(string source)
+        {
+            switch (source)
+            {
+                case RewardSources.Victory: return SkillOfferChanceVictory;
+                case RewardSources.Elite: return SkillOfferChanceElite;
+                case RewardSources.Treasure: return SkillOfferChanceTreasure;
+                case RewardSources.MineDefended: return SkillOfferChanceMine;
+                case RewardSources.Shards: return SkillOfferChanceShards;
+                default: return 0;
+            }
+        }
     }
 }

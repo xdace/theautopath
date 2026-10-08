@@ -4,10 +4,11 @@ using Betaknight.Core.Arena;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Skills;
 
 namespace Betaknight.Core
 {
-    /// <summary>Ausrüstung: getragene Teile, Ausrüstung als Belohnung und die Zuordnung von Skills zu Runen-Zeilen.</summary>
+    /// <summary>Ausrüstung: getragene Teile (Werte und passive Skill-Boni) und Ausrüstung als Belohnung.</summary>
     public sealed partial class OverworldSession
     {
         /// <summary>Chance in Prozent, dass ein Sieg eine Ausrüstung statt der dritten Rune anbietet.</summary>
@@ -27,16 +28,27 @@ namespace Betaknight.Core
         public SkillUserStats SkillUserStats() =>
             (_combat as ArenaCombatResolver ?? new ArenaCombatResolver()).PreviewStats(Stats, Runes, Gear, null, Progression.SkillLevels);
 
-        /// <summary>Skill mit der Stufe aus der Ausrüstung (z. B. Bohrstoß +1). Null bei unbekannter Id.</summary>
-        public SkillDefinition LeveledSkill(string skillId) =>
-            SkillCatalog.TryGet(skillId, out SkillDefinition skill) ? skill.AtLevel(Gear.SkillLevel(skillId), Progression.SkillLevels) : null;
-
-        /// <summary>Kennzahlen eines Skills mit der aktuellen Ausrüstung und ihrer Stufe. Null bei unbekannter Id.</summary>
-        public SkillInfo DescribeSkill(string skillId, SkillUserStats stats = null)
+        /// <summary>
+        /// Skill auf einer Stufe mit den passiven Boni der getragenen Ausrüstung, so wie er im Kampf wirkt.
+        /// Ohne <paramref name="level"/> gilt die höchste Stufe der eigenen Exemplare. Null bei unbekannter Id.
+        /// </summary>
+        public SkillDefinition LeveledSkill(string skillId, int level = -1)
         {
-            SkillDefinition skill = LeveledSkill(skillId);
+            if (!SkillCatalog.TryGet(skillId, out SkillDefinition skill)) return null;
+            if (level < 0) level = HighestSkillLevel(skillId);
+            return Gear.Boost(skill.AtLevel(level, Progression.SkillLevels));
+        }
+
+        /// <summary>Kennzahlen eines Skills mit der aktuellen Ausrüstung. Ohne Stufe: höchste eigene Stufe. Null bei unbekannter Id.</summary>
+        public SkillInfo DescribeSkill(string skillId, SkillUserStats stats = null, int level = -1)
+        {
+            SkillDefinition skill = LeveledSkill(skillId, level);
             return skill != null ? SkillInfo.Create(skill, stats ?? SkillUserStats()) : null;
         }
+
+        /// <summary>Kennzahlen eines Skill-Exemplars (seine Stufe, passive Boni der Ausrüstung).</summary>
+        public SkillInfo DescribeSkill(SkillInstance skill, SkillUserStats stats = null) =>
+            skill != null ? DescribeSkill(skill.SkillId, stats, skill.Level) : null;
 
         /// <summary>Sets, von denen mindestens ein Teil getragen wird, mit Teilezahl.</summary>
         public List<(SetDefinition set, int pieces)> WornSets()
@@ -80,30 +92,8 @@ namespace Betaknight.Core
             && Items.TryGet(PendingRuneOffer.ItemIds[itemIndex], out EquipmentDefinition item)
             && (placement != ItemPlacement.Equip || Gear.CanEquip(item, out _) || CanUpgradeItem(item.Id));
 
-        /// <summary>Ordnet einer Zeile einen Skill zu. Erlaubt sind getragene Skills, der Basisangriff oder null (leer).</summary>
-        public bool AssignSkill(int row, string skillId)
-        {
-            if (skillId != null && !Gear.ProvidesSkill(skillId)) return false;
-            return Runes.AssignSkill(row, skillId);
-        }
-
         /// <summary>Verschiebt eine Zeile der Logik-Tafel (Priorität).</summary>
         public bool MoveRow(int from, int to) => Runes.Move(from, to);
-
-        /// <summary>Skill für eine neue Zeile: der erste getragene Skill, den noch keine Zeile nutzt, sonst der erste überhaupt.</summary>
-        private string DefaultSkillForNewRow()
-        {
-            IReadOnlyList<string> skills = Gear.SkillIds;
-            if (skills.Count == 0) return SkillDefinition.BasicAttackId;
-
-            foreach (string id in skills)
-            {
-                bool used = false;
-                foreach (RuneSlot row in Runes.Rows) if (row.SkillId == id) used = true;
-                if (!used) return id;
-            }
-            return skills[0];
-        }
 
         /// <summary>Angebotsgewicht: angefangene Sets werden bevorzugt, damit sie sich vervollständigen lassen.</summary>
         public int OfferWeight(EquipmentDefinition item)
@@ -134,18 +124,8 @@ namespace Betaknight.Core
             return true;
         }
 
-        /// <summary>Legt an und gibt verwaisten Zeilen den ersten neuen Skill. Abgelegte Teile kommen zurück.</summary>
-        private List<EquipmentDefinition> EquipItem(EquipmentDefinition item)
-        {
-            List<EquipmentDefinition> removed = Gear.Equip(item);
-            if (removed == null) return null;
-            if (item.SkillIds.Count > 0)
-            {
-                for (int i = 0; i < Runes.Rows.Count; i++)
-                    if (!Gear.ProvidesSkill(Runes.Rows[i].SkillId)) Runes.AssignSkill(i, item.SkillIds[0]);
-            }
-            return removed;
-        }
+        /// <summary>Legt an. Abgelegte Teile kommen zurück. Skills an der Tafel bleiben, wo sie sind.</summary>
+        private List<EquipmentDefinition> EquipItem(EquipmentDefinition item) => Gear.Equip(item);
 
         private List<string> RollRewardItems(string source)
         {

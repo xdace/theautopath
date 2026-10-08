@@ -44,7 +44,8 @@ namespace Betaknight.Core.Gear
     }
 
     /// <summary>
-    /// Ein Ausrüstungsteil: Platz, Wertebonus, Skills (das "Was" für die Logik-Tafel) und optional ein Set.
+    /// Ein Ausrüstungsteil: Platz, Wertebonus, passive Effekte auf Skill-Arten und optional ein Set. Skills liefert es
+    /// nicht mehr, die sind eigene Exemplare in der Skill-Sammlung. Die Waffe bestimmt Waffenschaden und Basisangriff.
     /// Reine Daten; neue Teile sind neue Katalog-Einträge.
     /// </summary>
     public sealed class EquipmentDefinition
@@ -64,7 +65,8 @@ namespace Betaknight.Core.Gear
         public int Level { get; private set; }
         public EquipmentSlot Slot { get; }
         public string Description { get; }
-        public IReadOnlyList<string> SkillIds { get; }
+        /// <summary>Passive Effekte auf Skills bestimmter Arten, z. B. «Schock-Skills +20 % Wirkung».</summary>
+        public IReadOnlyList<SkillPassive> Passives { get; }
         public IReadOnlyDictionary<StatKind, int> Stats => _stats;
 
         /// <summary>Set-Zugehörigkeit oder null.</summary>
@@ -77,7 +79,7 @@ namespace Betaknight.Core.Gear
         public int Weight { get; }
 
         public EquipmentDefinition(string id, string name, EquipmentSlot slot, IDictionary<StatKind, int> stats = null,
-            IEnumerable<string> skillIds = null, string setId = null, bool twoHanded = false, int weight = 10,
+            IEnumerable<SkillPassive> passives = null, string setId = null, bool twoHanded = false, int weight = 10,
             string description = null)
         {
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("Id fehlt.", nameof(id));
@@ -88,7 +90,7 @@ namespace Betaknight.Core.Gear
             Slot = slot;
             _stats = stats != null ? new Dictionary<StatKind, int>(stats) : new Dictionary<StatKind, int>();
             _baseStats = new Dictionary<StatKind, int>(_stats);
-            SkillIds = new List<string>(skillIds ?? Array.Empty<string>());
+            Passives = new List<SkillPassive>(passives ?? Array.Empty<SkillPassive>());
             SetId = setId;
             TwoHanded = twoHanded;
             Weight = Math.Max(0, weight);
@@ -120,7 +122,7 @@ namespace Betaknight.Core.Gear
                 stats[stat.Key] = stat.Value + bonus;
             }
 
-            var copy = new EquipmentDefinition(Id, BaseName, Slot, stats, SkillIds, SetId, TwoHanded, Weight, Description);
+            var copy = new EquipmentDefinition(Id, BaseName, Slot, stats, Passives, SetId, TwoHanded, Weight, Description);
             copy._baseStats.Clear();
             foreach (KeyValuePair<StatKind, int> stat in _baseStats) copy._baseStats[stat.Key] = stat.Value;
             copy.Level = level;

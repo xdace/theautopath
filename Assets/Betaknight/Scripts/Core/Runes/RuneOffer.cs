@@ -17,13 +17,18 @@ namespace Betaknight.Core.Runes
         /// <summary>Bietet zusätzlich «Tafel-Erweiterung: +1 Zeile» an.</summary>
         public bool BoardExpansion { get; }
 
-        public int Count => Options.Count + ItemIds.Count + (BoardExpansion ? 1 : 0);
+        /// <summary>Skills als eigener Belohnungstyp (Ids aus dem Skill-Katalog).</summary>
+        public IReadOnlyList<string> SkillIds { get; }
 
-        public RuneOffer(string source, IReadOnlyList<RuneDefinition> options, IReadOnlyList<string> itemIds = null, bool boardExpansion = false)
+        public int Count => Options.Count + ItemIds.Count + SkillIds.Count + (BoardExpansion ? 1 : 0);
+
+        public RuneOffer(string source, IReadOnlyList<RuneDefinition> options, IReadOnlyList<string> itemIds = null, bool boardExpansion = false,
+            IReadOnlyList<string> skillIds = null)
         {
             Source = source ?? string.Empty;
             Options = options ?? throw new ArgumentNullException(nameof(options));
             ItemIds = itemIds ?? Array.Empty<string>();
+            SkillIds = skillIds ?? Array.Empty<string>();
             BoardExpansion = boardExpansion;
         }
 
@@ -32,15 +37,23 @@ namespace Betaknight.Core.Runes
         {
             if (itemIds == null || itemIds.Count == 0) return this;
             int keep = Math.Max(1, Options.Count - itemIds.Count);
-            return new RuneOffer(Source, Options.Take(keep).ToList(), itemIds, BoardExpansion);
+            return new RuneOffer(Source, Options.Take(keep).ToList(), itemIds, BoardExpansion, SkillIds);
+        }
+
+        /// <summary>Dasselbe Angebot mit Skills anstelle der letzten Runen (mindestens eine Rune bleibt).</summary>
+        public RuneOffer WithSkills(IReadOnlyList<string> skillIds)
+        {
+            if (skillIds == null || skillIds.Count == 0) return this;
+            int keep = Math.Max(1, Options.Count - skillIds.Count);
+            return new RuneOffer(Source, Options.Take(keep).ToList(), ItemIds, BoardExpansion, skillIds);
         }
 
         /// <summary>Dasselbe Angebot mit der Tafel-Erweiterung als zusätzlicher Wahl.</summary>
-        public RuneOffer WithBoardExpansion() => new RuneOffer(Source, Options, ItemIds, true);
+        public RuneOffer WithBoardExpansion() => new RuneOffer(Source, Options, ItemIds, true, SkillIds);
 
-        /// <summary>Dasselbe Angebot mit anderen Runen und Teilen.</summary>
-        public RuneOffer With(IReadOnlyList<RuneDefinition> options, IReadOnlyList<string> itemIds) =>
-            new RuneOffer(Source, options, itemIds, BoardExpansion);
+        /// <summary>Dasselbe Angebot mit anderen Runen, Teilen und Skills (null = Skills unverändert).</summary>
+        public RuneOffer With(IReadOnlyList<RuneDefinition> options, IReadOnlyList<string> itemIds, IReadOnlyList<string> skillIds = null) =>
+            new RuneOffer(Source, options, itemIds, BoardExpansion, skillIds ?? SkillIds);
 
         /// <summary>
         /// Stellt ein Angebot zusammen: keine Doppelten, nichts schon Ausgerüstetes, und wenn möglich

@@ -36,7 +36,7 @@ namespace Betaknight.Tests.EditMode
         /// <summary>Katalog, in dem nur die genannten Teile angeboten werden (alle anderen Gewicht 0).</summary>
         private static EquipmentCatalog Offering(params string[] ids) =>
             new EquipmentCatalog(AllItems.All.Select(i => ids.Contains(i.Id) ? i
-                : new EquipmentDefinition(i.Id, i.BaseName, i.Slot, i.Stats.ToDictionary(p => p.Key, p => p.Value), i.SkillIds, i.SetId, i.TwoHanded, 0)));
+                : new EquipmentDefinition(i.Id, i.BaseName, i.Slot, i.Stats.ToDictionary(p => p.Key, p => p.Value), i.Passives, i.SetId, i.TwoHanded, 0)));
 
         private static OverworldSession Session(EquipmentCatalog items = null, RuneCatalog runes = null, ICombatResolver combat = null,
             int gold = 200, int seed = 11)
@@ -168,7 +168,7 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void DuplicateItemRaisesLevelStatsAndSkillPower()
+        public void DuplicateItemRaisesLevelAndStats()
         {
             // Nur eine Rune im Katalog, damit keine passende neue Rune die Verbesserung schon stellt.
             RuneCatalog runes = new RuneCatalog(new[] { RuneCatalog.CreateDefault().Get("always") });
@@ -188,10 +188,11 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(-3, blade.StatBonus(StatKind.AttackInterval));
             Assert.AreEqual(0, s.Inventory.Count, "Kein zweites Exemplar");
 
+            // A-05: Die Teilstufe hebt nur Werte; die Skill-Stufe gehört dem Skill-Exemplar.
             SkillInfo info = s.DescribeSkill(SkillIds.ArmorBreak);
-            Assert.AreEqual(BasisPoints.Percent(115), info.Effects.First(e => e.IsDamage).DamageBp);
-            StringAssert.Contains("Rüstungsbruch 100 % → 115 %", messages.Last());
+            Assert.AreEqual(BasisPoints.Full, info.Effects.First(e => e.IsDamage).DamageBp);
             StringAssert.Contains("Kurzklinge → Kurzklinge +1", messages.Last());
+            StringAssert.Contains("Waffenschaden 2 → 3", messages.Last());
         }
 
         [Test]
@@ -200,7 +201,7 @@ namespace Betaknight.Tests.EditMode
             var gear = new Equipment();
             gear.Equip(AllItems.Get("short_blade").AtLevel(2, 50));
             var loadout = new RuneLoadout();
-            loadout.TryAdd(RuneCatalog.CreateDefault().Get("always"), SkillIds.ArmorBreak);
+            loadout.TryAdd(RuneCatalog.CreateDefault().Get("always"), new Betaknight.Core.Skills.SkillInstance(SkillIds.ArmorBreak, 2));
             var rules = new SkillLevelRules();
 
             var request = new CombatRequest(CellContent.Enemy, 0, new PlayerStats(30, 0), loadout, gear, null, rules);

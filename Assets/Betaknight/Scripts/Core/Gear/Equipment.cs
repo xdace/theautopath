@@ -5,7 +5,7 @@ using Betaknight.Core.Arena;
 namespace Betaknight.Core.Gear
 {
     /// <summary>
-    /// Getragene Ausrüstung des Ritters. Liefert Werte, verfügbare Skills und Set-Teile.
+    /// Getragene Ausrüstung des Ritters. Liefert Werte, passive Skill-Boni und Set-Teile.
     /// Regel: eine Zweihandwaffe sperrt den Schild-Platz.
     /// </summary>
     public sealed class Equipment
@@ -77,39 +77,48 @@ namespace Betaknight.Core.Gear
             return item;
         }
 
-        /// <summary>Alle Skills der getragenen Teile, ohne Doppelte, in Platz-Reihenfolge.</summary>
-        public IReadOnlyList<string> SkillIds
+        /// <summary>Alle passiven Effekte der getragenen Teile in Platz-Reihenfolge.</summary>
+        public IReadOnlyList<SkillPassive> Passives
         {
             get
             {
-                var ids = new List<string>();
-                foreach (EquipmentDefinition item in Items)
-                    foreach (string id in item.SkillIds)
-                        if (!ids.Contains(id)) ids.Add(id);
-                return ids;
+                var list = new List<SkillPassive>();
+                foreach (EquipmentDefinition item in Items) list.AddRange(item.Passives);
+                return list;
             }
         }
 
-        /// <summary>Der Basisangriff ist immer verfügbar, alle anderen Skills nur über Ausrüstung.</summary>
-        public bool ProvidesSkill(string skillId)
+        /// <summary>Summe der passiven Boni für einen Skill (nur Arten, die er hat).</summary>
+        public void SkillBonus(SkillDefinition skill, out int powerPercent, out int cooldownTicks)
         {
-            if (skillId == SkillDefinition.BasicAttackId) return true;
-            if (skillId == null) return false;
+            powerPercent = 0;
+            cooldownTicks = 0;
             foreach (EquipmentDefinition item in _worn.Values)
-                foreach (string id in item.SkillIds)
-                    if (id == skillId) return true;
-            return false;
+            {
+                foreach (SkillPassive p in item.Passives)
+                {
+                    if (!p.Affects(skill)) continue;
+                    if (p.Effect == SkillPassiveEffect.PowerPercent) powerPercent += p.Value;
+                    else cooldownTicks += p.Value;
+                }
+            }
         }
 
-        /// <summary>Höchste Stufe der getragenen Teile, die diesen Skill liefern (0 = Grundform).</summary>
-        public int SkillLevel(string skillId)
+        /// <summary>Der Skill mit allen passiven Boni der getragenen Ausrüstung.</summary>
+        public SkillDefinition Boost(SkillDefinition skill)
         {
-            int level = 0;
-            if (skillId == null) return 0;
+            if (skill == null) return null;
+            SkillBonus(skill, out int power, out int cooldown);
+            return skill.WithBonus(power, cooldown);
+        }
+
+        /// <summary>Haben getragene Teile passive Effekte auf diesen Tag?</summary>
+        public bool BoostsKind(SkillKind tag)
+        {
             foreach (EquipmentDefinition item in _worn.Values)
-                foreach (string id in item.SkillIds)
-                    if (id == skillId && item.Level > level) level = item.Level;
-            return level;
+                foreach (SkillPassive p in item.Passives)
+                    if (p.Target.Overlaps(tag)) return true;
+            return false;
         }
 
         public int StatBonus(StatKind kind)

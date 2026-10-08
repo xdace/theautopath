@@ -13,6 +13,7 @@ namespace Betaknight.Core.Shop
         public int Slot = 20;
         public int Reroll = 3;
         public int Item = 12;
+        public int Skill = 14;
 
         /// <summary>Verkauf aus dem Inventar: halber Preis.</summary>
         public int SellItem => Item / 2;
@@ -24,6 +25,10 @@ namespace Betaknight.Core.Shop
     {
         private readonly List<RuneDefinition> _runes;
         private readonly List<string> _items = new List<string>();
+        private readonly List<string> _skills = new List<string>();
+
+        /// <summary>Skills im Angebot (Ids aus dem Skill-Katalog).</summary>
+        public IReadOnlyList<string> SkillIds => _skills;
 
         public IReadOnlyList<RuneDefinition> Runes => _runes;
 
@@ -33,10 +38,19 @@ namespace Betaknight.Core.Shop
         /// <summary>Der zusätzliche Runenplatz ist pro Shop nur einmal käuflich.</summary>
         public bool SlotSold { get; internal set; }
 
-        public ShopInventory(IEnumerable<RuneDefinition> runes, IEnumerable<string> itemIds = null)
+        public ShopInventory(IEnumerable<RuneDefinition> runes, IEnumerable<string> itemIds = null, IEnumerable<string> skillIds = null)
         {
             _runes = new List<RuneDefinition>(runes ?? throw new ArgumentNullException(nameof(runes)));
             if (itemIds != null) _items.AddRange(itemIds);
+            if (skillIds != null) _skills.AddRange(skillIds);
+        }
+
+        internal void RemoveSkillAt(int index) => _skills.RemoveAt(index);
+
+        internal void ReplaceSkills(IEnumerable<string> skillIds)
+        {
+            _skills.Clear();
+            _skills.AddRange(skillIds);
         }
 
         internal void RemoveItemAt(int index) => _items.RemoveAt(index);

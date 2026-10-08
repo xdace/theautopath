@@ -165,7 +165,7 @@ namespace Betaknight.Core
         {
             if (!CanChangeLoadout || !RuneInventory.IsValid(inventoryIndex) || Runes.IsFull) return false;
             StoredRune stored = RuneInventory.RemoveAt(inventoryIndex);
-            return Runes.TryAdd(stored.Rune, DefaultSkillForNewRow(), stored.Level);
+            return Runes.TryAdd(stored.Rune, SkillForNewRow(), stored.Level);
         }
 
         /// <summary>Nimmt eine Zeile von der Tafel; die Rune kommt mit Stufe ins Inventar.</summary>
@@ -227,7 +227,7 @@ namespace Betaknight.Core
                 return true;
             }
 
-            if (!Runes.IsFull) return Runes.TryAdd(rune, DefaultSkillForNewRow());
+            if (!Runes.IsFull) return Runes.TryAdd(rune, SkillForNewRow());
             StoreRune(new StoredRune(rune));
             return true;
         }

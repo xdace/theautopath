@@ -33,7 +33,7 @@ namespace Betaknight.Tests.EditMode
         /// <summary>Katalog mit genau einem Teil im Angebot, damit Belohnungen vorhersehbar sind.</summary>
         private static EquipmentCatalog OnlyOffering(string id) =>
             new EquipmentCatalog(AllItems.All.Select(i => i.Id == id ? i
-                : new EquipmentDefinition(i.Id, i.Name, i.Slot, i.Stats.ToDictionary(p => p.Key, p => p.Value), i.SkillIds, i.SetId, i.TwoHanded, 0)));
+                : new EquipmentDefinition(i.Id, i.Name, i.Slot, i.Stats.ToDictionary(p => p.Key, p => p.Value), i.Passives, i.SetId, i.TwoHanded, 0)));
 
         private static void Put(OverworldSession s, params string[] ids)
         {

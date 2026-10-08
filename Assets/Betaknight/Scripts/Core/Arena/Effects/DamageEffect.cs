@@ -1,7 +1,7 @@
 namespace Betaknight.Core.Arena
 {
     /// <summary>Schaden in Prozent des Waffenschadens, auf das Ziel oder alle Gegner.</summary>
-    public sealed class DamageEffect : ISkillEffect, ILevelableEffect
+    public sealed class DamageEffect : ISkillEffect, ILevelableEffect, IBoostableEffect
     {
         public int DamageBp { get; }
         public bool AllEnemies { get; }
@@ -40,6 +40,8 @@ namespace Betaknight.Core.Arena
 
         public ISkillEffect AtLevel(int level, SkillLevelRules rules) => level <= 0 || rules == null ? this
             : new DamageEffect(DamageBp + level * rules.DamageBpPerLevel, AllEnemies, IgnoreArmor);
+
+        public ISkillEffect Boosted(int percent) => new DamageEffect(DamageBp * (100 + percent) / 100, AllEnemies, IgnoreArmor);
 
         public void Describe(SkillInfoBuilder info)
         {

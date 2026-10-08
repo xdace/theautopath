@@ -96,10 +96,7 @@ namespace Betaknight.Core
             EquipmentDefinition old = OwnedItem(itemId);
             EquipmentDefinition upgraded = old.AtLevel(old.Level + 1, Progression.ItemStatPercentPerLevel);
 
-            // Skill-Stärke vorher/nachher für die Meldung, solange das alte Teil noch gilt.
-            var skillsBefore = new Dictionary<string, SkillInfo>();
             bool worn = Gear.Get(old.Slot) == old;
-            if (worn) foreach (string id in old.SkillIds) skillsBefore[id] = DescribeSkill(id);
 
             if (worn) Gear.Equip(upgraded);
             else Inventory.ReplaceAt(Inventory.IndexOf(itemId), upgraded);
@@ -110,15 +107,6 @@ namespace Betaknight.Core
                 int before = old.StatBonus(stat.Key);
                 if (before != stat.Value) parts.Add($"{SkillInfo.StatName(stat.Key)} {StatText(stat.Key, before)} → {StatText(stat.Key, stat.Value)}");
             }
-            if (worn)
-            {
-                foreach (KeyValuePair<string, SkillInfo> before in skillsBefore)
-                {
-                    SkillInfo after = DescribeSkill(before.Key);
-                    string change = PowerChange(before.Value, after);
-                    if (change != null) parts.Add(change);
-                }
-            }
             BuildImproved?.Invoke(string.Join(", ", parts));
             return true;
         }
@@ -127,7 +115,7 @@ namespace Betaknight.Core
             SkillInfo.IsPercentStat(kind) ? SkillInfo.Percent(value) : value.ToString();
 
         /// <summary>«Bohrstoß 120 % → 135 %»: erste Schadens- oder Heilwirkung vorher und nachher.</summary>
-        private static string PowerChange(SkillInfo before, SkillInfo after)
+        internal static string PowerChange(SkillInfo before, SkillInfo after)
         {
             if (before == null || after == null) return null;
             for (int i = 0; i < before.Effects.Count && i < after.Effects.Count; i++)
@@ -199,12 +187,14 @@ namespace Betaknight.Core
         {
             foreach (RuneDefinition r in offer.Options) if (IsImprovement(r)) return true;
             foreach (string id in offer.ItemIds) if (Items.TryGet(id, out EquipmentDefinition item) && IsImprovement(item)) return true;
+            foreach (string id in offer.SkillIds) if (IsImprovementSkill(id)) return true;
             return false;
         }
 
         /// <summary>
         /// Ersetzt die letzte Option durch eine Verbesserung: zuerst eine Stufe für ein getragenes Teil, dann ein fehlendes
-        /// Set-Teil, dann eine Stufe für eine vorhandene Rune, zuletzt eine Rune zu einem vorhandenen Tag.
+        /// Set-Teil, dann eine Stufe für einen eigenen Skill, dann eine Stufe für eine vorhandene Rune, zuletzt eine Rune
+        /// zu einem vorhandenen Tag.
         /// </summary>
         private RuneOffer AddImprovement(RuneOffer offer)
         {
@@ -218,6 +208,16 @@ namespace Betaknight.Core
                 else if (runes.Count > 1) { runes.RemoveAt(runes.Count - 1); items.Add(item); }
                 else items.Add(item);
                 return offer.With(runes, items);
+            }
+
+            var skills = offer.SkillIds.ToList();
+            string skill = PickImprovementSkill(skills);
+            if (skill != null)
+            {
+                if (skills.Count > 0) skills[skills.Count - 1] = skill;
+                else if (runes.Count > 1) { runes.RemoveAt(runes.Count - 1); skills.Add(skill); }
+                else skills.Add(skill);
+                return offer.With(runes, items, skills);
             }
 
             RuneDefinition rune = PickImprovementRune(runes);

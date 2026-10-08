@@ -234,7 +234,7 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void EquipmentAddsStatsSkillsAndSetPieces()
+        public void EquipmentAddsStatsPassivesAndSetPieces()
         {
             var gear = new Equipment();
             gear.Equip(Items.Get("holo_barrier"));
@@ -245,13 +245,16 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(1 + 3 + 2, stats[StatKind.Armor]);
             Assert.AreEqual(BasisPoints.Percent(20), stats[StatKind.Block]);
             Assert.AreEqual(2, gear.SetPieces(SetIds.Aegis));
-            CollectionAssert.AreEqual(new[] { SkillIds.ShieldWall, SkillIds.EmpBash }, gear.SkillIds);
-            Assert.IsTrue(gear.ProvidesSkill(SkillIds.BasicAttack));
+            Assert.AreEqual(2, gear.Passives.Count, "Schock-Absorber und Holo-Barriere geben je einen passiven Effekt.");
+            Assert.IsTrue(gear.BoostsKind(SkillKind.Shield));
+            Assert.IsTrue(gear.BoostsKind(SkillKind.Shock));
         }
 
         [Test]
-        public void RowsWithoutTheirSkillAreOrphanedAndSkipped()
+        public void RowsWithoutASkillAreOrphanedAndSkipped()
         {
+            // Begründet angepasst (A-05): Ein abgelegtes Teil nimmt keinen Skill mehr weg. Verwaist ist nur eine Zeile
+            // ohne Skill (bewusst herausgenommen) oder mit unbekannter Rune.
             var factory = BoardFactory.CreateDefault();
             var gear = new Equipment();
             gear.Equip(Items.Get("round_shield"));
@@ -262,7 +265,9 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(board.Rows[1].IsOrphaned, "Unbekannte Rune bleibt als leere Zeile stehen.");
 
             gear.Unequip(EquipmentSlot.Shield);
-            board = factory.Create(rows, gear);
+            Assert.IsFalse(factory.Create(rows, gear).Rows[0].IsOrphaned, "Teil ablegen nimmt keinen Skill weg.");
+
+            board = factory.Create(new[] { new BoardRowSpec("battle_start", null) }, gear);
             Assert.IsTrue(board.Rows[0].IsOrphaned);
 
             BattleResult r = CombatSimulation.Run(Duel(Fighter("A", 100, 5, board: board), Fighter("B", 20, 1)));
@@ -274,8 +279,8 @@ namespace Betaknight.Tests.EditMode
         public void CatalogsFitTogether()
         {
             foreach (EquipmentDefinition item in Items.All)
-                foreach (string skill in item.SkillIds)
-                    Assert.IsTrue(Skills.Contains(skill), $"{item.Id} → {skill}");
+                foreach (SkillPassive passive in item.Passives)
+                    Assert.IsTrue(Skills.All.Any(s => passive.Affects(s)), $"{item.Id}: {passive.Text} wirkt auf mindestens einen Skill");
 
             foreach (string set in new[] { SetIds.Overload, SetIds.Aegis, SetIds.Scrap, SetIds.Phantom })
             {

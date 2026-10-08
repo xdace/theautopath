@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Encounters;
 using Betaknight.Core.Exploration;
@@ -9,6 +10,7 @@ using Betaknight.Core.Map;
 using Betaknight.Core.Movement;
 using Betaknight.Core.Run;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Skills;
 using Betaknight.Core.Turns;
 
 namespace Betaknight.Core
@@ -91,8 +93,9 @@ namespace Betaknight.Core
         public OverworldSession(HexMap map, PlayerModel player, TurnSystem turns, ExplorationService exploration,
             PlayerStats stats = null, EncounterCatalog encounters = null, RuneLoadout runes = null, RuneCatalog runeCatalog = null,
             ICombatResolver combat = null, Equipment equipment = null, EquipmentCatalog items = null,
-            Inventory inventory = null, RuneInventory runeInventory = null)
+            Inventory inventory = null, RuneInventory runeInventory = null, SkillCollection skills = null)
         {
+            Skills = skills ?? new SkillCollection();
             Inventory = inventory ?? new Inventory();
             RuneInventory = runeInventory ?? new RuneInventory();
             Gear = equipment ?? new Equipment();
@@ -105,6 +108,10 @@ namespace Betaknight.Core
             Encounters = encounters ?? EncounterCatalog.CreateDefault();
             Runes = runes ?? new RuneLoadout();
             RuneCatalog = runeCatalog ?? RuneCatalog.CreateDefault();
+
+            // Exemplare, die beim Aufbau schon an Zeilen sitzen, gehören zur Sammlung; ebenso später direkt gesetzte.
+            AdoptRowSkills();
+            Runes.Changed += AdoptRowSkills;
 
             // Eigener Zufall für Events und Angebote, abgeleitet vom Karten-Seed: gleicher Seed, gleiche Beute.
             _random = new Random(unchecked(Map.Seed * 31 + 7));
@@ -127,12 +134,17 @@ namespace Betaknight.Core
             EquipmentCatalog items = EquipmentCatalog.CreateDefault();
             var runes = new RuneLoadout();
             var gear = new Equipment();
+            var skills = new SkillCollection();
             if (kit != null)
             {
                 foreach (string id in kit.StartItemIds)
                     if (items.TryGet(id, out EquipmentDefinition item)) gear.Equip(item);
+
+                // Start-Skills liegen in der Sammlung; der erste sitzt an der Start-Rune.
+                foreach (string id in kit.StartSkillIds) skills.Add(id);
+                SkillInstance first = kit.StartSkillId != null ? skills.All.FirstOrDefault(s => s.SkillId == kit.StartSkillId) : null;
                 if (runeCatalog.TryGet(kit.StartRuneId, out RuneDefinition startRune))
-                    runes.TryAdd(startRune, gear.ProvidesSkill(kit.StartSkillId) ? kit.StartSkillId : null);
+                    runes.TryAdd(startRune, first ?? SkillInstance.BasicAttack());
             }
 
             var session = new OverworldSession(
@@ -146,7 +158,8 @@ namespace Betaknight.Core
                 runeCatalog,
                 null,
                 gear,
-                items);
+                items,
+                skills: skills);
             session.Kit = kit;
             return session;
         }
@@ -220,7 +233,7 @@ namespace Betaknight.Core
         {
             if (IsBusy) return null;
             RuneOffer offer = RuneOffer.Create(source, RuneCatalog, Runes, _random, isUnlocked: IsRuneUnlocked, isOwned: RuneInventory.Contains);
-            offer = ShapeOffer(offer.WithItems(RollRewardItems(source)));
+            offer = ShapeOffer(offer.WithItems(RollRewardItems(source)).WithSkills(RollRewardSkills(source)));
             if (offer.Count == 0) return null;
 
             PendingRuneOffer = offer;

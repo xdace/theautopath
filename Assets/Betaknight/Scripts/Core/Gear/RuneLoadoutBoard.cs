@@ -10,7 +10,7 @@ namespace Betaknight.Core.Gear
         {
             var specs = new List<BoardRowSpec>();
             if (loadout == null) return specs;
-            foreach (RuneSlot row in loadout.Rows) specs.Add(new BoardRowSpec(row.Rune.Id, row.SkillId, row.Level));
+            foreach (RuneSlot row in loadout.Rows) specs.Add(new BoardRowSpec(row.Rune.Id, row.SkillId, row.Level, row.SkillLevel));
             return specs;
         }
     }

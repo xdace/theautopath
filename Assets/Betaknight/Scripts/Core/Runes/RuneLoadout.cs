@@ -1,23 +1,44 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Betaknight.Core.Skills;
 
 namespace Betaknight.Core.Runes
 {
     /// <summary>
-    /// Eine Zeile der Logik-Tafel aus Spielersicht: Rune (das "Wann") mit Stufe und zugeordnetem Skill (das "Was").
-    /// Ohne Skill ist die Zeile verwaist und wird im Kampf übersprungen.
+    /// Eine Zeile der Logik-Tafel aus Spielersicht: Rune (das "Wann") mit Stufe und ein Skill-Exemplar (das "Was").
+    /// Ohne Skill ist die Zeile verwaist und wird im Kampf übersprungen. Als <see cref="ISkillHolder"/> ist sie ein Ort
+    /// für genau ein Exemplar; belegt wird sie über die <see cref="SkillCollection"/> der Session.
     /// </summary>
-    public sealed class RuneSlot
+    public sealed class RuneSlot : ISkillHolder
     {
+        private readonly RuneLoadout _owner;
+
         public RuneDefinition Rune { get; internal set; }
         public int Level { get; internal set; }
-        public string SkillId { get; internal set; }
 
-        internal RuneSlot(RuneDefinition rune, string skillId)
+        /// <summary>Das Skill-Exemplar der Zeile oder null (verwaist).</summary>
+        public SkillInstance Skill { get; private set; }
+
+        /// <summary>Id des Skills der Zeile oder null.</summary>
+        public string SkillId => Skill?.SkillId;
+
+        /// <summary>Stufe des Skill-Exemplars (0 ohne Skill).</summary>
+        public int SkillLevel => Skill?.Level ?? 0;
+
+        internal RuneSlot(RuneLoadout owner, RuneDefinition rune, SkillInstance skill)
         {
+            _owner = owner;
             Rune = rune;
-            SkillId = skillId;
+            Skill = skill;
+        }
+
+        public string HolderName => $"Zeile {_owner.IndexOfRow(this) + 1}";
+
+        void ISkillHolder.Hold(SkillInstance skill)
+        {
+            Skill = skill;
+            _owner.NotifyChanged();
         }
 
         public string Name => Rune.NameAt(Level);
@@ -57,13 +78,28 @@ namespace Betaknight.Core.Runes
 
         public bool HasTag(RuneTag tag) => _rows.Any(r => r.Rune.Tag == tag);
 
-        public bool TryAdd(RuneDefinition rune, string skillId = null, int level = 0)
+        /// <summary>
+        /// Neue Zeile mit einem neuen Exemplar dieses Skills (oder ohne Skill). Die Session übernimmt das Exemplar
+        /// in ihre Sammlung. Für Aufbau und Tests; im Spiel setzt die Session vorhandene Exemplare ein.
+        /// </summary>
+        public bool TryAdd(RuneDefinition rune, string skillId = null, int level = 0) =>
+            TryAdd(rune, skillId != null ? new SkillInstance(skillId) : null, level);
+
+        /// <summary>Neue Zeile mit diesem Exemplar. Es darf noch nirgends sitzen.</summary>
+        public bool TryAdd(RuneDefinition rune, SkillInstance skill, int level = 0)
         {
             if (rune == null || IsFull || Contains(rune)) return false;
-            _rows.Add(new RuneSlot(rune, skillId) { Level = Math.Max(0, Math.Min(level, rune.MaxLevel)) });
+            if (skill != null && !skill.IsBasicAttack && skill.Holder != null) return false;
+            var row = new RuneSlot(this, rune, skill) { Level = Math.Max(0, Math.Min(level, rune.MaxLevel)) };
+            if (skill != null && !skill.IsBasicAttack) skill.Holder = row;
+            _rows.Add(row);
             Changed?.Invoke();
             return true;
         }
+
+        internal int IndexOfRow(RuneSlot row) => _rows.IndexOf(row);
+
+        internal void NotifyChanged() => Changed?.Invoke();
 
         /// <summary>
         /// Tauscht die Rune einer Zeile gegen eine andere mit deren Stufe. Der zugeordnete Skill bleibt an der Zeile.
@@ -85,11 +121,14 @@ namespace Betaknight.Core.Runes
             return true;
         }
 
-        /// <summary>Entfernt eine Zeile und gibt sie zurück (Rune, Stufe, Skill). Null bei ungültigem Index.</summary>
+        /// <summary>
+        /// Entfernt eine Zeile und gibt sie zurück (Rune, Stufe). Ihr Skill-Exemplar wird frei. Null bei ungültigem Index.
+        /// </summary>
         public RuneSlot RemoveAt(int index)
         {
             if (!IsValid(index)) return null;
             RuneSlot row = _rows[index];
+            if (row.Skill != null) row.Skill.Holder = null;
             _rows.RemoveAt(index);
             Changed?.Invoke();
             return row;
@@ -101,14 +140,6 @@ namespace Betaknight.Core.Runes
             if (rune == null || !IsValid(index) || Contains(rune)) return false;
             _rows[index].Rune = rune;
             _rows[index].Level = 0;
-            Changed?.Invoke();
-            return true;
-        }
-
-        public bool AssignSkill(int index, string skillId)
-        {
-            if (!IsValid(index)) return false;
-            _rows[index].SkillId = skillId;
             Changed?.Invoke();
             return true;
         }

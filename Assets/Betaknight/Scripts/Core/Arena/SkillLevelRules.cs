@@ -1,7 +1,7 @@
 namespace Betaknight.Core.Arena
 {
     /// <summary>
-    /// Wie stark ein Skill pro Stufe seines Ausrüstungsteils wird (+1, +2, +3). Werte stehen in der
+    /// Wie stark ein Skill pro Stufe seines Exemplars wird (+1, +2, +3). Werte stehen in der
     /// <see cref="Run.ProgressionConfig"/>; Effekte, die stärker werden können, setzen <see cref="ILevelableEffect"/> um.
     /// </summary>
     public sealed class SkillLevelRules
@@ -16,7 +16,14 @@ namespace Betaknight.Core.Arena
         public int HealBpPerLevel = 500;
     }
 
-    /// <summary>Eine Wirkung, die mit der Stufe des Ausrüstungsteils stärker wird.</summary>
+    /// <summary>Eine Wirkung, die durch passive Effekte der Ausrüstung prozentual stärker wird (z. B. «Schock-Skills +20 %»).</summary>
+    public interface IBoostableEffect
+    {
+        /// <summary>Dieselbe Wirkung mit +<paramref name="percent"/> % Stärke (Schaden, Brennen, Heilung).</summary>
+        ISkillEffect Boosted(int percent);
+    }
+
+    /// <summary>Eine Wirkung, die mit der Stufe des Skill-Exemplars stärker wird.</summary>
     public interface ILevelableEffect
     {
         /// <summary>Dieselbe Wirkung auf Stufe <paramref name="level"/> (0 = unverändert).</summary>
