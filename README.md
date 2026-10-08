@@ -22,8 +22,9 @@ Es sind keine Prefabs, Sprites oder Fonts nötig. Hexfelder, Spielfigur und Labe
 | Klick auf ein «?»-Nachbarfeld | Erkunden: 1 Schritt, 1 Zug |
 | Klick auf ein entferntes, erforschtes Feld | Reise über bekannte Routen, Schritt für Schritt, jeder Schritt kostet einen Zug |
 | Fenster bei mittleren Events | Eine der Optionen wählen (ausgegraute sind nicht bezahlbar) |
-| Runenwahl | Eine Rune oder ein Ausrüstungsteil nehmen (★ = passt zu einem vorhandenen Tag) oder für 3 Gold verzichten |
-| Button «Tafel bearbeiten» | Zeilen der Logik-Tafel umsortieren (▲▼) und jeder Rune einen Skill aus der Ausrüstung zuordnen (◀▶) |
+| Runenwahl | Eine Rune oder ein Ausrüstungsteil nehmen (★ = passt zu einem vorhandenen Tag) oder für 3 Gold verzichten. Teile: «Anlegen» oder «Ins Inventar»; Runen bei voller Tafel: «Ins Runen-Inventar» oder eine Zeile tauschen |
+| Button «Tafel bearbeiten» | Zeilen der Logik-Tafel umsortieren (▲▼), jeder Rune einen Skill aus der Ausrüstung zuordnen (◀▶), Runen ablegen («ab») und aus dem Runen-Inventar einsetzen oder tauschen (↔) |
+| Button «Inventar» | Links die 7 Ausrüstungsplätze, rechts das Inventar, darunter Runentafel und Runen-Inventar. Klick auf ein Teil zeigt Werte, Skills, Set und den Vergleich mit dem angelegten Teil (grün besser, rot schlechter) |
 | Arena nach jedem Kampf | Spielt den Kampf ab: Tempo 1×/2×/4×, Pause, «Überspringen», danach das ganze Protokoll und «Weiter» |
 | Button «Shop öffnen» | Erscheint auf einem bereits besuchten Shop-Feld |
 | Button «Neuer Run» | Zurück zur Kit-Auswahl, neue Karte |
@@ -36,7 +37,8 @@ Eine Reise stoppt automatisch auf feindlichen Feldern (Gegner, Boss), auf neu en
 2. **Ring 1** um den Start hat nur kleine Events (Münzen, Kräuter, Runensplitter, Wegweiser). Sie wirken sofort und melden sich unten links.
 3. **Ab Ring 2** kommen mittlere Events mit einer Entscheidung und die ersten Kämpfe. Truhen sind selten, Shops gibt es erst ab Ring 3.
 4. **3 Runensplitter** öffnen eine Runenwahl, ebenso jeder gewonnene Kampf und jede Truhe. Es gibt 3 Runenplätze, ein vierter ist im Shop käuflich.
-5. Fällt der Ritter in einem Kampf, ist der Run vorbei. Events auf der Oberwelt töten nie.
+5. **Sammeln statt ersetzen:** Ausrüstung (12 Plätze) und Runen (6 Plätze) haben ein Inventar. Neue Teile werden angelegt, wenn ihr Platz frei ist, sonst kommen sie ins Inventar; verdrängte Teile (auch der Schild bei einer Zweihandwaffe) wandern ins Inventar. Eine neue Rune bei voller Tafel kommt ins Runen-Inventar. Runen behalten ihre Lagerfeuer-Stufe, beim Tauschen bleibt der Skill an der Zeile. Ist ein Inventar voll, wird gefragt: ein vorhandenes verwerfen oder das neue ablehnen. Wechseln geht jederzeit ausserhalb von Kampf und offenen Fenstern; Set-Boni, verwaiste Zeilen und Set-Runen folgen sofort. Im Shop lässt sich das Inventar für den halben Preis verkaufen. Das Inventar wandert durch die Akte mit.
+6. Fällt der Ritter in einem Kampf, ist der Run vorbei. Events auf der Oberwelt töten nie.
 
 ### Kampf: die Logik-Tafel
 
@@ -98,15 +100,16 @@ Assets/Betaknight/
 │   │   ├── Movement/      PlayerModel, MovementRules, Pathfinder
 │   │   ├── Encounters/    Kleine und mittlere Events: Katalog, Optionen, Wirkungen, Resolver
 │   │   ├── Run/           PlayerStats (HP, Gold, Splitter), KnightKit
-│   │   ├── Runes/         Runen (Bedingungen der Logik-Tafel), Loadout, Runenwahl
+│   │   ├── Runes/         Runen (Bedingungen der Logik-Tafel), Loadout, Runenwahl, RuneInventory
 │   │   ├── Arena/         Kampfsimulator: Battle (Tick-Schleife), Combatant, LogicBoard, Conditions/ (Runen-Bedingungen + ConditionRegistry),
 │   │   │                  Effects/ (ISkillEffect), Statuses/, Skills/ (SkillCatalog), BattleModifier, Playback/ (Wiedergabe + Protokolltext)
-│   │   ├── Gear/          Ausrüstung: EquipmentCatalog, Equipment, BoardFactory (Runen-Zeilen → Tafel), Sets/ (SetBonusRegistry)
+│   │   ├── Gear/          Ausrüstung: EquipmentCatalog, Equipment, Inventory, BoardFactory (Runen-Zeilen → Tafel), Sets/ (SetBonusRegistry)
 │   │   ├── Combat/        ICombatResolver, ArenaCombatResolver, EnemyCatalog (Platzhalter-Resolver nur noch für Tests)
 │   │   ├── Shop/          Shop-Bestand und Preise
 │   │   ├── OverworldSession.cs              Fassade: Bewegung, kleine/mittlere Events, Runenwahl
 │   │   ├── OverworldSession.MajorEvents.cs  Fassade: Kampf, Truhe, Goldmine, Shop
 │   │   ├── OverworldSession.Gear.cs         Fassade: Ausrüstung, Skill-Zuordnung, Tafel umsortieren
+│   │   ├── OverworldSession.Inventory.cs    Fassade: Inventar, anlegen/ablegen/tauschen, verwerfen, verkaufen
 │   │   ├── OverworldSession.Mines.cs        Fassade: Goldminen-Raids und Verteidigung
 │   │   ├── OverworldSession.Boss.cs         Fassade: Boss alle 25 Züge, Flucht durchs Portal
 │   │   └── OverworldSession.Acts.cs         Fassade: Portal, Akte, Gegnerstufe pro Akt
@@ -115,7 +118,7 @@ Assets/Betaknight/
 │       ├── Views/         HexGridView, HexCellView, PlayerView, ProceduralSprites
 │       ├── Controllers/   OverworldController, CameraFollow2D
 │       ├── Input/         PointerInput (neues Input System und alter Input Manager)
-│       ├── UI/            OverworldHud, Kit-Auswahl, Event-, Runen-, Shop-, Game-Over-Fenster, ArenaWindow, BoardEditorWindow (IMGUI-Platzhalter)
+│       ├── UI/            OverworldHud, Kit-Auswahl, Event-, Runen-, Shop-, Game-Over-Fenster, ArenaWindow, BoardEditorWindow, InventoryWindow, InventoryFullWindow (IMGUI-Platzhalter)
 │       └── OverworldBootstrapper.cs
 └── Tests/EditMode/  Unit-Tests für die Core-Logik
 ```

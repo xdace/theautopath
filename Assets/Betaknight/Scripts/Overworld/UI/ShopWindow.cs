@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Betaknight.Overworld.UI
 {
-    /// <summary>Shop-Fenster: Runen kaufen, heilen, Runenplatz kaufen, Angebot neu würfeln.</summary>
+    /// <summary>Shop-Fenster: Runen und Teile kaufen (anlegen oder ins Inventar), Inventar verkaufen, heilen, Runenplatz, neu würfeln.</summary>
     public sealed class ShopWindow : MonoBehaviour
     {
         private OverworldSession _session;
@@ -15,6 +15,8 @@ namespace Betaknight.Overworld.UI
         private GUIStyle _titleStyle;
         private GUIStyle _textStyle;
         private GUIStyle _itemStyle;
+        private GUIStyle _plainStyle;
+        private Vector2 _scroll;
 
         public void Initialize(OverworldSession session)
         {
@@ -37,7 +39,7 @@ namespace Betaknight.Overworld.UI
             EnsureStyles();
 
             const float width = 540f;
-            const float height = 640f;
+            float height = Mathf.Min(Screen.height - 40f, 720f);
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUILayout.BeginArea(rect, GUI.skin.box);
 
@@ -55,6 +57,7 @@ namespace Betaknight.Overworld.UI
             GUILayout.Label("<b>Shop</b>", _titleStyle);
             GUILayout.Label($"Gold: {_session.Stats.Gold}   HP: {_session.Stats.Hp}/{_session.Stats.MaxHp}   Runen: {_session.Runes.Runes.Count}/{_session.Runes.Slots}", _textStyle);
             GUILayout.Space(6f);
+            _scroll = GUILayout.BeginScrollView(_scroll);
 
             IReadOnlyList<RuneDefinition> runes = shop.Inventory.Runes;
             if (runes.Count == 0) GUILayout.Label("Ausverkauft.", _textStyle);
@@ -77,11 +80,20 @@ namespace Betaknight.Overworld.UI
                 if (!_session.Items.TryGet(items[i], out EquipmentDefinition item)) continue;
                 EquipmentDefinition worn = _session.Gear.Get(item.Slot);
                 string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)} ({_session.Gear.SetPieces(item.SetId)}/3)" : string.Empty;
-                string replaces = worn != null ? $"  ersetzt {worn.Name}" : string.Empty;
-                GUI.enabled = _session.CanBuyShopItem(i);
-                string label = $"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]  – {prices.Item} Gold{set}\n{ItemText.Describe(item)}{replaces}";
-                if (GUILayout.Button(label, _itemStyle, GUILayout.Height(58f))) _session.BuyShopItem(i);
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]  – {prices.Item} Gold{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}</size>", _plainStyle);
+                GUILayout.BeginHorizontal();
+                GUI.enabled = _session.CanBuyShopItem(i, ItemPlacement.Equip);
+                if (GUILayout.Button(worn != null ? $"Kaufen und anlegen ({worn.Name} ins Inventar)" : "Kaufen und anlegen", GUILayout.Height(28f)))
+                    _session.BuyShopItem(i, ItemPlacement.Equip);
+                GUI.enabled = _session.CanBuyShopItem(i, ItemPlacement.Inventory);
+                if (GUILayout.Button("Kaufen, ins Inventar", GUILayout.Height(28f))) _session.BuyShopItem(i, ItemPlacement.Inventory);
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
+                GUILayout.EndVertical();
             }
+
+            DrawSell(prices);
 
             GUILayout.Space(8f);
             GUI.enabled = _session.CanBuyHeal;
@@ -94,8 +106,35 @@ namespace Betaknight.Overworld.UI
             if (GUILayout.Button($"Runen neu würfeln – {prices.Reroll} Gold", GUILayout.Height(30f))) _session.RerollShop();
 
             GUI.enabled = true;
-            GUILayout.FlexibleSpace();
+            GUILayout.EndScrollView();
             if (GUILayout.Button("Shop verlassen", GUILayout.Height(32f))) _session.LeaveShop();
+        }
+
+        /// <summary>Verkauf aus dem Inventar für den halben Preis. Angelegtes muss erst abgelegt werden.</summary>
+        private void DrawSell(ShopPrices prices)
+        {
+            if (_session.Inventory.Count == 0 && _session.RuneInventory.Count == 0) return;
+
+            GUILayout.Space(8f);
+            GUILayout.Label($"<b>Verkaufen</b> (halber Preis: Teil {prices.SellItem} Gold, Rune {prices.SellRune} Gold)", _plainStyle);
+            IReadOnlyList<EquipmentDefinition> items = _session.Inventory.Items;
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (GUILayout.Button($"{items[i].Name} [{items[i].Slot.DisplayName()}] verkaufen  +{prices.SellItem} Gold", GUILayout.Height(26f)))
+                {
+                    _session.SellItem(i);
+                    return;
+                }
+            }
+            IReadOnlyList<StoredRune> runes = _session.RuneInventory.Runes;
+            for (int i = 0; i < runes.Count; i++)
+            {
+                if (GUILayout.Button($"Rune {runes[i].Name} verkaufen  +{prices.SellRune} Gold", GUILayout.Height(26f)))
+                {
+                    _session.SellRune(i);
+                    return;
+                }
+            }
         }
 
         private void DrawReplace()
@@ -107,8 +146,16 @@ namespace Betaknight.Overworld.UI
                 return;
             }
 
-            GUILayout.Label($"<b>{stock[_runeAwaitingSlot].Name}</b> ersetzt …", _titleStyle);
+            GUILayout.Label($"<b>{stock[_runeAwaitingSlot].Name}</b>: Tafel ist voll", _titleStyle);
             GUILayout.Space(6f);
+
+            if (GUILayout.Button("Kaufen, ins Runen-Inventar", GUILayout.Height(32f)))
+            {
+                _session.BuyShopRune(_runeAwaitingSlot);
+                _runeAwaitingSlot = -1;
+                return;
+            }
+            GUILayout.Label("… oder eine Zeile tauschen (die alte Rune wandert mit ihrer Stufe ins Inventar, der Skill bleibt):", _plainStyle);
 
             IReadOnlyList<RuneDefinition> equipped = _session.Runes.Runes;
             for (int slot = 0; slot < equipped.Count; slot++)
@@ -131,6 +178,7 @@ namespace Betaknight.Overworld.UI
             if (_titleStyle != null) return;
             _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, richText = true };
             _textStyle = new GUIStyle(GUI.skin.label) { fontSize = 15 };
+            _plainStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, richText = true, wordWrap = true };
             _itemStyle = new GUIStyle(GUI.skin.button)
             {
                 fontSize = 15,

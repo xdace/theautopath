@@ -48,7 +48,7 @@ namespace Betaknight.Overworld.UI
             }
 
             const float width = 700f;
-            float content = 112f * (_session.Runes.Rows.Count + 1) + 90f * _session.WornSets().Count;
+            float content = 112f * (_session.Runes.Rows.Count + 1) + 90f * _session.WornSets().Count + 44f * (_session.RuneInventory.Count + 1);
             float height = Mathf.Min(Screen.height - 40f, 150f + content);
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUILayout.BeginArea(rect, GUI.skin.box);
@@ -69,6 +69,7 @@ namespace Betaknight.Overworld.UI
             DrawSkillInfo(SkillDefinition.BasicAttackId);
             GUILayout.EndVertical();
 
+            DrawRuneInventory(rows.Count);
             DrawSets();
             GUILayout.EndScrollView();
 
@@ -97,6 +98,10 @@ namespace Betaknight.Overworld.UI
             if (GUILayout.Button("◀", GUILayout.Width(28f))) Assign(index, options, current - 1);
             GUILayout.Label(current >= 0 ? SkillLabel(options[current]) : "<color=#888888>— (leer)</color>", _text, GUILayout.Width(190f));
             if (GUILayout.Button("▶", GUILayout.Width(28f))) Assign(index, options, current + 1);
+            GUI.enabled = _session.CanChangeLoadout && !_session.RuneInventory.IsFull;
+            if (GUILayout.Button(new GUIContent("ab", "Rune ablegen (ins Runen-Inventar, behält ihre Stufe)"), GUILayout.Width(32f)))
+                _session.UnequipRune(index);
+            GUI.enabled = true;
 
             GUILayout.EndHorizontal();
             DrawSkillInfo(current >= 0 ? options[current] : null);
@@ -130,6 +135,42 @@ namespace Betaknight.Overworld.UI
             float x = Mathf.Min(mouse.x + 16f, Screen.width - tipWidth - 8f);
             float y = Mathf.Min(mouse.y + 16f, Screen.height - tipHeight - 8f);
             GUI.Label(new Rect(x, y, tipWidth, tipHeight), content, _tooltip);
+        }
+
+        /// <summary>Runen-Inventar: als neue Zeile einsetzen oder mit einer Zeile tauschen (der Skill bleibt an der Zeile).</summary>
+        private void DrawRuneInventory(int rowCount)
+        {
+            IReadOnlyList<StoredRune> stored = _session.RuneInventory.Runes;
+            GUILayout.Space(4f);
+            GUILayout.Label($"<b>Runen-Inventar</b> ({stored.Count}/{_session.RuneInventory.Capacity})"
+                + (stored.Count == 0 ? "  <color=#888888>leer</color>" : string.Empty), _text);
+
+            for (int i = 0; i < stored.Count; i++)
+            {
+                GUILayout.BeginHorizontal(GUI.skin.box);
+                GUILayout.Label($"<b>{stored[i].Name}</b>\n<size=12>{stored[i].Description}</size>", _info, GUILayout.Width(300f));
+                GUI.enabled = _session.CanChangeLoadout && !_session.Runes.IsFull;
+                if (GUILayout.Button("einsetzen", GUILayout.Width(80f)))
+                {
+                    _session.EquipRuneFromInventory(i);
+                    GUI.enabled = true;
+                    GUILayout.EndHorizontal();
+                    return;
+                }
+                GUI.enabled = _session.CanChangeLoadout;
+                for (int row = 0; row < rowCount; row++)
+                {
+                    if (GUILayout.Button(new GUIContent($"↔{row + 1}", $"Mit Zeile {row + 1} tauschen"), GUILayout.Width(40f)))
+                    {
+                        _session.SwapRune(row, i);
+                        GUI.enabled = true;
+                        GUILayout.EndHorizontal();
+                        return;
+                    }
+                }
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
+            }
         }
 
         private void DrawSets()

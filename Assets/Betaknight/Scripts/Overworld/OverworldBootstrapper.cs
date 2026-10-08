@@ -34,6 +34,8 @@ namespace Betaknight.Overworld
         private ArenaWindow _arenaWindow;
         private BoardEditorWindow _boardWindow;
         private PortalWindow _portalWindow;
+        private InventoryWindow _inventoryWindow;
+        private InventoryFullWindow _inventoryFullWindow;
         private MapGenerationConfig _config;
         private KnightKit _kit;
 
@@ -56,6 +58,8 @@ namespace Betaknight.Overworld
             _arenaWindow = gameObject.AddComponent<ArenaWindow>();
             _boardWindow = gameObject.AddComponent<BoardEditorWindow>();
             _portalWindow = gameObject.AddComponent<PortalWindow>();
+            _inventoryWindow = gameObject.AddComponent<InventoryWindow>();
+            _inventoryFullWindow = gameObject.AddComponent<InventoryFullWindow>();
 
             // Die Arena spielt zuerst ab; Runenwahl, Events, Shop und Game Over warten so lange.
             System.Func<bool> arenaOpen = () => _arenaWindow.IsOpen;
@@ -64,7 +68,9 @@ namespace Betaknight.Overworld
             _shopWindow.Hidden = arenaOpen;
             _gameOverWindow.Hidden = arenaOpen;
             _portalWindow.Hidden = arenaOpen;
+            _inventoryFullWindow.Hidden = arenaOpen;
             _hud.OnEditBoard = () => _boardWindow.Toggle();
+            _hud.OnOpenInventory = () => _inventoryWindow.Toggle();
         }
 
         private void Start() => StartNewRun();
@@ -79,6 +85,8 @@ namespace Betaknight.Overworld
             _arenaWindow.Initialize(null);
             _boardWindow.Initialize(null);
             _portalWindow.Initialize(null);
+            _inventoryWindow.Initialize(null);
+            _inventoryFullWindow.Initialize(null);
             SetRunWindowsEnabled(false);
 
             _kitWindow.Open(KnightKit.Defaults, RuneCatalog.CreateDefault(), kit =>
@@ -126,7 +134,7 @@ namespace Betaknight.Overworld
 
             OverworldController controller = _root.AddComponent<OverworldController>();
             controller.Initialize(Session, grid, player, cam);
-            controller.InputBlocked = () => _arenaWindow.IsOpen || _boardWindow.IsOpen;
+            controller.InputBlocked = () => _arenaWindow.IsOpen || _boardWindow.IsOpen || _inventoryWindow.IsOpen;
 
             _hud.Initialize(Session, controller, _config.Encounters, StartNewRun);
             _encounterWindow.Initialize(Session);
@@ -136,6 +144,8 @@ namespace Betaknight.Overworld
             _arenaWindow.Initialize(Session);
             _boardWindow.Initialize(Session);
             _portalWindow.Initialize(Session);
+            _inventoryWindow.Initialize(Session);
+            _inventoryFullWindow.Initialize(Session);
 
             Debug.Log($"[Betaknight] Akt {Session.Act}: {Session.Map.Count} Felder, Seed {Session.Map.Seed}, Kit {_kit?.Name ?? "keins"}.");
         }

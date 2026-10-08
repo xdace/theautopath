@@ -20,6 +20,45 @@ namespace Betaknight.Overworld.UI
             return parts.Count > 0 ? string.Join(", ", parts) : item.Description;
         }
 
+        /// <summary>
+        /// Wertevergleich mit dem angelegten Teil im selben Platz: grün = besser, rot = schlechter.
+        /// Ohne angelegtes Teil zählt alles als Gewinn.
+        /// </summary>
+        public static string Compare(EquipmentDefinition item, EquipmentDefinition worn)
+        {
+            if (worn == item) return "<color=#888888>angelegt</color>";
+            var kinds = new List<StatKind>();
+            foreach (StatKind k in item.Stats.Keys) if (!kinds.Contains(k)) kinds.Add(k);
+            if (worn != null) foreach (StatKind k in worn.Stats.Keys) if (!kinds.Contains(k)) kinds.Add(k);
+
+            var parts = new List<string>();
+            foreach (StatKind kind in kinds)
+            {
+                int diff = item.StatBonus(kind) - (worn?.StatBonus(kind) ?? 0);
+                if (diff == 0) continue;
+                // Beim Angriffsintervall ist weniger besser.
+                bool better = kind == StatKind.AttackInterval ? diff < 0 : diff > 0;
+                parts.Add($"<color={(better ? "#7ddc6f" : "#ff7a6b")}>{Stat(kind, diff)}</color>");
+            }
+            if (parts.Count == 0) return worn != null ? $"gleiche Werte wie {worn.Name}" : "keine Werte";
+            return (worn != null ? $"statt {worn.Name}: " : "Platz frei: ") + string.Join(", ", parts);
+        }
+
+        /// <summary>Alle Angaben zu einem Teil: Platz, Werte, Skills mit Kurzbeschreibung, Set.</summary>
+        public static string Details(EquipmentDefinition item, SetBonusRegistry sets)
+        {
+            var lines = new List<string> { $"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{(item.TwoHanded ? ", zweihändig" : string.Empty)}" };
+            var stats = new List<string>();
+            foreach (KeyValuePair<StatKind, int> stat in item.Stats)
+                if (stat.Value != 0) stats.Add(Stat(stat.Key, stat.Value));
+            lines.Add(stats.Count > 0 ? "Werte: " + string.Join(", ", stats) : "Werte: keine");
+            foreach (string id in item.SkillIds)
+                lines.Add(Skills.TryGet(id, out SkillDefinition skill) ? $"Skill: <b>{skill.Name}</b> – {skill.Description}" : $"Skill: {id}");
+            if (item.SetId != null) lines.Add($"Set: {sets?.NameOf(item.SetId) ?? item.SetId}");
+            if (item.Description.Length > 0) lines.Add($"<i>{item.Description}</i>");
+            return string.Join("\n", lines);
+        }
+
         public static string Stat(StatKind kind, int value)
         {
             string sign = value > 0 ? "+" : "−";

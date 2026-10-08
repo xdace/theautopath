@@ -26,6 +26,9 @@ namespace Betaknight.Overworld.UI
         /// <summary>Öffnet den Tafel-Editor. Ohne Zuweisung gibt es keinen Knopf.</summary>
         public Action OnEditBoard;
 
+        /// <summary>Öffnet das Inventar. Ohne Zuweisung gibt es keinen Knopf.</summary>
+        public Action OnOpenInventory;
+
         public void Initialize(OverworldSession session, OverworldController controller, EncounterCatalog encounters, Action onNewMap)
         {
             _session = session;
@@ -83,6 +86,11 @@ namespace Betaknight.Overworld.UI
             if (OnEditBoard != null && !_session.IsBusy && !_session.IsGameOver && GUILayout.Button("Tafel bearbeiten"))
             {
                 OnEditBoard();
+            }
+            if (OnOpenInventory != null && !_session.IsGameOver
+                && GUILayout.Button($"Inventar ({_session.Inventory.Count}/{_session.Inventory.Capacity})"))
+            {
+                OnOpenInventory();
             }
             if (_session.CanOpenShop && GUILayout.Button("Shop öffnen"))
             {

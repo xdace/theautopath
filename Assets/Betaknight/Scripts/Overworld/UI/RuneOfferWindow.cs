@@ -8,8 +8,9 @@ using UnityEngine;
 namespace Betaknight.Overworld.UI
 {
     /// <summary>
-    /// Fenster für eine Runenwahl: eine von drei Runen nehmen oder verzichten.
-    /// Sind alle Plätze belegt, wählt der Spieler danach, welche Rune ersetzt wird.
+    /// Fenster für eine Belohnung: eine Rune oder ein Teil nehmen oder verzichten. Teile werden angelegt oder kommen
+    /// ins Inventar; bei voller Tafel kommt eine Rune ins Runen-Inventar oder tauscht eine Zeile (die alte Rune wandert
+    /// ins Inventar). Nichts geht verloren.
     /// </summary>
     public sealed class RuneOfferWindow : MonoBehaviour
     {
@@ -19,6 +20,7 @@ namespace Betaknight.Overworld.UI
         private GUIStyle _titleStyle;
         private GUIStyle _nameStyle;
         private GUIStyle _textStyle;
+        private GUIStyle _plainStyle;
 
         public void Initialize(OverworldSession session)
         {
@@ -46,7 +48,7 @@ namespace Betaknight.Overworld.UI
             EnsureStyles();
 
             const float width = 520f;
-            const float height = 480f;
+            const float height = 520f;
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUILayout.BeginArea(rect, GUI.skin.box);
 
@@ -59,7 +61,8 @@ namespace Betaknight.Overworld.UI
         private void DrawOptions(RuneOffer offer)
         {
             GUILayout.Label($"<b>Runenwahl</b> – {offer.Source}", _titleStyle);
-            GUILayout.Label($"Plätze: {_session.Runes.Runes.Count}/{_session.Runes.Slots}", _textStyle);
+            GUILayout.Label($"Tafel: {_session.Runes.Runes.Count}/{_session.Runes.Slots}   Inventar: {_session.Inventory.Count}/{_session.Inventory.Capacity} Teile, "
+                + $"{_session.RuneInventory.Count}/{_session.RuneInventory.Capacity} Runen", _textStyle);
             GUILayout.Space(6f);
 
             IReadOnlyList<RuneDefinition> options = offer.Options;
@@ -79,12 +82,18 @@ namespace Betaknight.Overworld.UI
             {
                 if (!_session.Items.TryGet(offer.ItemIds[i], out EquipmentDefinition item)) continue;
                 EquipmentDefinition worn = _session.Gear.Get(item.Slot);
-                string replaces = worn != null ? $"  (ersetzt {worn.Name})" : string.Empty;
                 string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)} ({_session.Gear.SetPieces(item.SetId)}/3)" : string.Empty;
-                string label = $"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}{replaces}\n{ItemText.Describe(item)}";
-                GUI.enabled = _session.CanTakeItem(i);
-                if (GUILayout.Button(label, _nameStyle, GUILayout.Height(64f))) _session.TakeItem(i);
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}</size>", _plainStyle);
+                GUILayout.BeginHorizontal();
+                GUI.enabled = _session.CanTakeItem(i, ItemPlacement.Equip);
+                string equip = worn != null ? $"Anlegen ({worn.Name} ins Inventar)" : "Anlegen";
+                if (GUILayout.Button(equip, GUILayout.Height(28f))) _session.TakeItem(i, ItemPlacement.Equip);
+                GUI.enabled = _session.CanTakeItem(i, ItemPlacement.Inventory);
+                if (GUILayout.Button("Ins Inventar", GUILayout.Height(28f))) _session.TakeItem(i, ItemPlacement.Inventory);
                 GUI.enabled = true;
+                GUILayout.EndHorizontal();
+                GUILayout.EndVertical();
             }
 
             GUILayout.FlexibleSpace();
@@ -96,14 +105,23 @@ namespace Betaknight.Overworld.UI
 
         private void DrawReplace(RuneDefinition incoming)
         {
-            GUILayout.Label($"<b>{incoming.Name}</b> ersetzt …", _titleStyle);
+            GUILayout.Label($"<b>{incoming.Name}</b>: Tafel ist voll", _titleStyle);
             GUILayout.Space(6f);
+
+            if (GUILayout.Button("Ins Runen-Inventar legen", GUILayout.Height(32f)))
+            {
+                _session.TakeRune(_choiceAwaitingSlot);
+                _choiceAwaitingSlot = -1;
+                return;
+            }
+            GUILayout.Label("… oder eine Zeile tauschen (die alte Rune wandert mit ihrer Stufe ins Inventar, der Skill bleibt):", _plainStyle);
 
             IReadOnlyList<RuneDefinition> equipped = _session.Runes.Runes;
             for (int slot = 0; slot < equipped.Count; slot++)
             {
                 RuneDefinition rune = equipped[slot];
-                if (GUILayout.Button($"<b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]\n{rune.Description}", _nameStyle, GUILayout.Height(56f)))
+                RuneSlot row = _session.Runes.Rows[slot];
+                if (GUILayout.Button($"statt <b>{row.Name}</b>  [{rune.Tag.DisplayName()}]\n{row.Description}", _nameStyle, GUILayout.Height(56f)))
                 {
                     _session.TakeRune(_choiceAwaitingSlot, slot);
                     _choiceAwaitingSlot = -1;
@@ -119,6 +137,7 @@ namespace Betaknight.Overworld.UI
             if (_titleStyle != null) return;
             _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, richText = true };
             _textStyle = new GUIStyle(GUI.skin.label) { fontSize = 15 };
+            _plainStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, richText = true, wordWrap = true };
             _nameStyle = new GUIStyle(GUI.skin.button)
             {
                 fontSize = 15,
