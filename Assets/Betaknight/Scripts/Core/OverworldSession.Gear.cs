@@ -53,6 +53,29 @@ namespace Betaknight.Core
             skill != null ? DescribeSkill(skill.SkillId, stats, skill.Growth) : null;
 
         /// <summary>Sets, von denen mindestens ein Teil getragen wird, mit Teilezahl.</summary>
+        /// <summary>Getragene Teile eines Sets, wenn <paramref name="item"/> zusätzlich angelegt würde (ersetzt das Teil im selben Platz).</summary>
+        public int SetPiecesWith(EquipmentDefinition item)
+        {
+            if (item?.SetId == null) return 0;
+            int pieces = Gear.SetPieces(item.SetId);
+            EquipmentDefinition worn = Gear.Get(item.Slot);
+            if (worn == item) return pieces;
+            if (worn != null && worn.SetId == item.SetId) return pieces;
+            return pieces + 1;
+        }
+
+        /// <summary>Aktive Set-Boni aller getragenen Sets mit Wirkung, eine Zeile je Bonus, für Tooltips.</summary>
+        public string ActiveSetBonusText()
+        {
+            var lines = new List<string>();
+            foreach ((SetDefinition set, int pieces) in WornSets())
+            {
+                string active = set.ActiveText(pieces);
+                if (active.Length > 0) lines.Add($"{set.Name} {pieces}/{set.MaxPieces}\n{active}");
+            }
+            return string.Join("\n\n", lines);
+        }
+
         public List<(SetDefinition set, int pieces)> WornSets()
         {
             var result = new List<(SetDefinition, int)>();

@@ -97,7 +97,8 @@ namespace Betaknight.Overworld.UI
             {
                 if (!_session.Items.TryGet(offer.ItemIds[i], out EquipmentDefinition item)) continue;
                 EquipmentDefinition worn = _session.Gear.Get(item.Slot);
-                string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)} ({_session.Gear.SetPieces(item.SetId)}/3)" : string.Empty;
+                string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)}" : string.Empty;
+                string setBlock = ItemText.SetBlock(_session, item);
                 if (_session.CanUpgradeItem(item.Id))
                 {
                     // Doppeltes Teil: das vorhandene wird aufgewertet (Werte und passive Effekte).
@@ -107,7 +108,7 @@ namespace Betaknight.Overworld.UI
                     continue;
                 }
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}{RuneText.Eases(_session, item.Id)}\n<size=13>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>", _plainStyle);
+                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}{RuneText.Eases(_session, item.Id)}\n<size=13>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>{(setBlock.Length > 0 ? $"\n<size=13>{setBlock}</size>" : string.Empty)}", _plainStyle);
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _session.CanTakeItem(i, ItemPlacement.Equip);
                 string equip = worn != null ? $"Anlegen ({worn.Name} ins Inventar)" : "Anlegen";

@@ -183,7 +183,7 @@ namespace Betaknight.Overworld.UI
             string text = $"<color=#9aa4b2>{slot.DisplayName()}</color>\n{name}";
             GUIStyle style = _selectedSlot == slot ? UiTheme.CellSelected : item != null ? UiTheme.Cell : UiTheme.EmptyCell;
             var cell = new GUIStyle(style) { wordWrap = true, alignment = TextAnchor.MiddleCenter };
-            GUI.Box(rect, new GUIContent(text, item != null ? ItemText.Details(item, _session.Sets) : null), cell);
+            GUI.Box(rect, new GUIContent(text, item != null ? ItemText.Details(item, _session) : null), cell);
 
             if (item != null)
             {
@@ -224,8 +224,7 @@ namespace Betaknight.Overworld.UI
 
         private void DrawSelection(EquipmentDefinition item)
         {
-            GUILayout.Label(ItemText.Details(item, _session.Sets) + RuneText.Eases(_session, item.Id), UiTheme.Text);
-            if (item.SetId != null) GUILayout.Label($"Set getragen: {_session.Gear.SetPieces(item.SetId)}/3 Teile", UiTheme.Small);
+            GUILayout.Label(ItemText.Details(item, _session) + RuneText.Eases(_session, item.Id), UiTheme.Text);
             GUILayout.Label(ItemText.Compare(item, _session.Gear.Get(item.Slot)), UiTheme.Small);
             if (!_selectedSlot.HasValue)
             {
@@ -267,15 +266,13 @@ namespace Betaknight.Overworld.UI
                 parts.Add($"<color={UiTheme.Hex(UiTheme.Good)}>Duo {_session.DuoName(duo)}</color>");
             GUILayout.Label(parts.Count > 0 ? string.Join(", ", parts) : "<color=#888888>keine Tags getragen</color>", UiTheme.Small);
 
-            foreach ((SetDefinition set, int pieces) in _session.WornSets())
+            // Alle Sets mit ihren Boni, auch ohne getragenes Teil: so ist sichtbar, wofür man sammelt.
+            GUILayout.Space(4f);
+            foreach (SetDefinition set in _session.Sets.All)
             {
-                var bonuses = new List<string>();
-                foreach (KeyValuePair<int, string> bonus in set.Bonuses)
-                {
-                    string line = $"{bonus.Key}: {bonus.Value}";
-                    bonuses.Add(pieces >= bonus.Key ? $"<color=#ffd75e>{line}</color>" : $"<color=#888888>{line}</color>");
-                }
-                GUILayout.Label($"<b>{set.Name}</b> {pieces}/{set.MaxPieces}\n{string.Join("\n", bonuses)}", UiTheme.Small);
+                int pieces = _session.Gear.SetPieces(set.Id);
+                string block = ItemText.SetBlock(set, pieces, true);
+                GUILayout.Label(pieces > 0 ? block : $"<color={UiTheme.Hex(UiTheme.MutedColor)}>{block}</color>", UiTheme.Small);
             }
         }
 
@@ -315,7 +312,7 @@ namespace Betaknight.Overworld.UI
             {
                 string set = item.SetId != null ? $"\n<color=#ffd75e>{_session.Sets.NameOf(item.SetId)}</color>" : string.Empty;
                 text = $"<b>{item.Name}</b>\n<color=#9aa4b2>{item.Slot.DisplayName()}</color>{set}";
-                tip = ItemText.Details(item, _session.Sets);
+                tip = ItemText.Details(item, _session);
             }
             else
             {

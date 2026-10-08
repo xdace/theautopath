@@ -45,7 +45,7 @@ namespace Betaknight.Overworld.UI
         private void DrawItem(EquipmentDefinition incoming)
         {
             GUILayout.Label("<b>Inventar voll</b>", _title);
-            GUILayout.Label($"Neu: {ItemText.Details(incoming, _session.Sets)}", _text);
+            GUILayout.Label($"Neu: {ItemText.Details(incoming, _session)}", _text);
             GUILayout.Label("Ein Teil verwerfen, damit das neue hineinpasst:", _text);
 
             _scroll = GUILayout.BeginScrollView(_scroll);

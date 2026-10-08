@@ -42,8 +42,40 @@ namespace Betaknight.Overworld.UI
             return (worn != null ? $"statt {worn.Name}: " : "Platz frei: ") + string.Join(", ", parts);
         }
 
-        /// <summary>Alle Angaben zu einem Teil: Platz, Werte, passive Effekte auf Skill-Arten, Set.</summary>
-        public static string Details(EquipmentDefinition item, SetBonusRegistry sets)
+        /// <summary>
+        /// Set eines Teils mit allen Boni: aktive gelb mit ✔, noch nicht erreichte grau mit ○. Wird der Bonus erst mit
+        /// diesem Teil aktiv, steht er grün mit «neu». <paramref name="pieces"/> = Teile mit diesem Teil angelegt.
+        /// </summary>
+        public static string SetBlock(SetDefinition set, int pieces, bool worn)
+        {
+            int before = worn ? pieces : pieces - 1;
+            string head = worn ? $"{pieces}/{set.MaxPieces} getragen" : $"mit diesem Teil {pieces}/{set.MaxPieces}";
+            var lines = new List<string> { $"Set <b>{set.Name}</b> ({head})" };
+            foreach (KeyValuePair<int, string> bonus in set.Bonuses)
+            {
+                bool active = SetDefinition.IsActive(bonus.Key, pieces);
+                bool fresh = active && !SetDefinition.IsActive(bonus.Key, before);
+                string line = $"{(active ? "●" : "○")} {bonus.Key} Teile: {bonus.Value}";
+                string color = fresh ? UiTheme.Hex(UiTheme.Good) : active ? UiTheme.Hex(UiTheme.Accent) : UiTheme.Hex(UiTheme.MutedColor);
+                lines.Add($"<color={color}>{line}{(fresh ? "  (neu)" : string.Empty)}</color>");
+            }
+            return string.Join("\n", lines);
+        }
+
+        /// <summary>Set-Block für ein Teil in der Session (getragen oder als Vorschau beim Anlegen), leer ohne Set.</summary>
+        public static string SetBlock(Betaknight.Core.OverworldSession session, EquipmentDefinition item)
+        {
+            if (item?.SetId == null || !session.Sets.TryGet(item.SetId, out SetDefinition set)) return string.Empty;
+            bool worn = session.Gear.Get(item.Slot) == item;
+            return SetBlock(set, worn ? session.Gear.SetPieces(item.SetId) : session.SetPiecesWith(item), worn);
+        }
+
+        /// <summary>Alle Angaben zu einem Teil: Platz, Werte, passive Effekte auf Skill-Arten, Set mit allen Boni.</summary>
+        public static string Details(EquipmentDefinition item, Betaknight.Core.OverworldSession session) =>
+            Details(item, session.Sets, SetBlock(session, item));
+
+        /// <summary>Alle Angaben zu einem Teil; ohne Session stehen die Set-Boni ohne Teilezahl da.</summary>
+        public static string Details(EquipmentDefinition item, SetBonusRegistry sets, string setBlock = null)
         {
             var lines = new List<string> { $"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{(item.TwoHanded ? ", zweihändig" : string.Empty)}" };
             var stats = new List<string>();
@@ -52,7 +84,9 @@ namespace Betaknight.Overworld.UI
             lines.Add(stats.Count > 0 ? "Werte: " + string.Join(", ", stats) : "Werte: keine");
             foreach (SkillPassive passive in item.Passives) lines.Add($"Passiv: <color=#ffd75e>{passive.Text}</color>");
             if (item.Tags.Count > 0) lines.Add($"Tags: {TagNames(item)}");
-            if (item.SetId != null) lines.Add($"Set: {sets?.NameOf(item.SetId) ?? item.SetId}");
+            if (!string.IsNullOrEmpty(setBlock)) lines.Add(setBlock);
+            else if (item.SetId != null && sets != null && sets.TryGet(item.SetId, out SetDefinition set)) lines.Add(SetBlock(set, 1, false));
+            else if (item.SetId != null) lines.Add($"Set: {item.SetId}");
             if (item.Description.Length > 0) lines.Add($"<i>{item.Description}</i>");
             return string.Join("\n", lines);
         }

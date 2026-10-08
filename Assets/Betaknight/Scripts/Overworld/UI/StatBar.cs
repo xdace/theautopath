@@ -61,7 +61,10 @@ namespace Betaknight.Overworld.UI
                     if (c.Sign > 0 && c.Before == "–") bonuses.Add($"<color={UiTheme.Hex(UiTheme.Good)}><b>+ {c.Label}</b></color>");
             string bonusText = bonuses.Count > 0 ? string.Join(", ", bonuses) : $"<color={UiTheme.Hex(UiTheme.MutedColor)}>keine aktiven Set-Boni oder Tag-Stufen</color>";
             string title = string.IsNullOrEmpty(previewTitle) ? string.Empty : $"<b>Vorschau {previewTitle}:</b>  ";
-            GUILayout.Label($"{title}<color={UiTheme.Hex(UiTheme.MutedColor)}>Boni</color> {bonusText}", UiTheme.Small);
+            // Maus über den Boni zeigt, was die aktiven Set-Boni bewirken.
+            string setTip = session.ActiveSetBonusText();
+            GUILayout.Label(new GUIContent($"{title}<color={UiTheme.Hex(UiTheme.MutedColor)}>Boni</color> {bonusText}",
+                setTip.Length > 0 ? setTip : "Set-Boni greifen ab 2 Teilen desselben Sets. Alle Sets stehen im Inventar."), UiTheme.Small);
             GUILayout.EndVertical();
         }
     }

@@ -77,7 +77,13 @@ namespace Betaknight.Overworld.UI
             GUILayout.Label($"<size=13>{BuildSummary()}</size>", _style);
             GUILayout.Label($"Ausrüstung: {GearList()}", _style);
             string sets = SetList();
-            if (sets.Length > 0) GUILayout.Label($"Sets: {sets}", _style);
+            if (sets.Length > 0)
+            {
+                // Maus darüber: was jedes getragene Set bei 2 und 3 Teilen bewirkt.
+                var tip = new List<string>();
+                foreach ((SetDefinition set, int pieces) in _session.WornSets()) tip.Add(set.Describe(pieces));
+                GUILayout.Label(new GUIContent($"Sets: {sets}", string.Join("\n\n", tip)), _style);
+            }
             string tags = TagList();
             if (tags.Length > 0) GUILayout.Label($"Tags: {tags}", _style);
             foreach (MineRaid raid in _session.Raids)

@@ -152,5 +152,40 @@ namespace Betaknight.Tests.EditMode
                 Assert.AreNotEqual(BattleOutcome.Timeout, r.Outcome);
             }
         }
+
+        // ------------------------------------------------------------------ Anzeige der Set-Boni
+
+        [Test]
+        public void SetBonusesAreDescribedWithTheirPieces()
+        {
+            SetBonusRegistry sets = SetBonusRegistry.CreateDefault();
+            Assert.IsTrue(sets.TryGet(SetIds.Aegis, out SetDefinition aegis));
+            string text = aegis.Describe(2);
+            StringAssert.StartsWith("Aegis-Firewall 2/3", text);
+            StringAssert.Contains("● 2 Teile: Jeder Block: +1 Ladung", text);
+            StringAssert.Contains("○ 3 Teile: Skills aus «Ladung voll»-Zeilen entladen", text);
+            Assert.AreEqual(string.Empty, aegis.ActiveText(1));
+            StringAssert.StartsWith("2 Teile: ", aegis.ActiveText(2));
+            foreach (SetDefinition set in sets.All)
+                Assert.AreEqual(2, set.Bonuses.Count, $"{set.Name}: Boni für 2 und 3 Teile");
+        }
+
+        [Test]
+        public void TheSessionPreviewsSetPiecesAndActiveBonuses()
+        {
+            Betaknight.Core.OverworldSession s = Betaknight.Core.OverworldSession.Create(new Betaknight.Core.Map.MapGenerationConfig { Radius = 4, Seed = 3 });
+            Assert.AreEqual(string.Empty, s.ActiveSetBonusText());
+            EquipmentDefinition barrier = Items.Get("holo_barrier"), absorber = Items.Get("shock_absorber");
+            Assert.AreEqual(1, s.SetPiecesWith(barrier), "mit diesem Teil 1/3");
+
+            s.Gear.Equip(barrier);
+            Assert.AreEqual(1, s.SetPiecesWith(barrier), "schon getragen");
+            Assert.AreEqual(2, s.SetPiecesWith(absorber));
+            Assert.AreEqual(string.Empty, s.ActiveSetBonusText(), "ein Teil: noch kein Bonus");
+
+            s.Gear.Equip(absorber);
+            StringAssert.Contains("Aegis-Firewall 2/3", s.ActiveSetBonusText());
+            StringAssert.Contains("2 Teile: Jeder Block", s.ActiveSetBonusText());
+        }
     }
 }
