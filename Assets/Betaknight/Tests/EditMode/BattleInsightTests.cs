@@ -212,13 +212,14 @@ namespace Betaknight.Tests.EditMode
         /// Schild mit Bohrstoß an der Start-Rune: Seed 5 des Schildritters erneut aufgenommen.
         /// Mit A-19 erneut: Platine statt Tafel, keine Cooldowns, Relais lösen bei Ereignissen bzw. steigender Flanke aus,
         /// Skills nach Grösse neu eingestellt, Gegner mit Takt-Relais.
+        /// Mit A-20 erneut: Relais und Gatter melden «an/aus» (neue Ereignisse), Pins verbinden berührende Komponenten mit Pulsen.
         /// </summary>
-        [TestCase("blade", 5, "3 Kämpfe, 268 Ereignisse, 3AD0920C43ADA63A")]
-        [TestCase("blade", 21, "3 Kämpfe, 192 Ereignisse, 86B5A1950A926B32")]
-        [TestCase("shield", 5, "6 Kämpfe, 659 Ereignisse, DD0BA36073CDDD91")]
-        [TestCase("shield", 21, "2 Kämpfe, 241 Ereignisse, BA6101FE6AAF1A1C")]
-        [TestCase("spark", 5, "3 Kämpfe, 285 Ereignisse, 808777C913A56248")]
-        [TestCase("spark", 21, "2 Kämpfe, 166 Ereignisse, BCBED52BC40C3DF6")]
+        [TestCase("blade", 5, "3 Kämpfe, 279 Ereignisse, D614982A797F1C50")]
+        [TestCase("blade", 21, "3 Kämpfe, 200 Ereignisse, 6AA6D61B866A2137")]
+        [TestCase("shield", 5, "6 Kämpfe, 698 Ereignisse, 20429A318F3B1822")]
+        [TestCase("shield", 21, "2 Kämpfe, 256 Ereignisse, 34999B421D745B99")]
+        [TestCase("spark", 5, "3 Kämpfe, 329 Ereignisse, 916715A88FC2B019")]
+        [TestCase("spark", 21, "2 Kämpfe, 176 Ereignisse, 06219AA6E9CF142E")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {
             Assert.AreEqual(fingerprint, Fingerprint(BotBattles(KnightKit.Defaults.Single(k => k.Id == kit), seed)));

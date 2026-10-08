@@ -285,9 +285,11 @@ namespace Betaknight.Tests.EditMode
             LogicBoard board = BoardFactory.CreateDefault().Create(spec, null);
 
             CollectionAssert.AreEqual(new[] { SkillIds.ShockStab, SkillIds.Drill, SkillIds.Repair }, board.Rows.Select(r => r.Skill.Id).ToArray());
-            Assert.AreEqual(new[] { GraphNode.Skill(1) }, board.Graph.From(GraphNode.Skill(0)).Select(e => e.To).ToArray());
-            Assert.AreEqual(new[] { GraphNode.Skill(0) }, board.Graph.From(GraphNode.Block(1)).Select(e => e.To).ToArray());
-            Assert.IsFalse(board.Graph.HasEdgesFrom(GraphNode.Skill(2)), "Ziele ausserhalb der Platine oder ohne Ziel ergeben keine Kante");
+            // Seit A-20 enthält der Graph auch Versorgung, Pins und Pulse; geprüft werden die Auslöser-Kanten.
+            IEnumerable<GraphNode> Triggers(GraphNode from) => board.Graph.From(from).Where(e => e.Kind == GraphEdgeKind.Trigger).Select(e => e.To);
+            Assert.AreEqual(new[] { GraphNode.Skill(1) }, Triggers(GraphNode.Skill(0)).ToArray());
+            Assert.AreEqual(new[] { GraphNode.Skill(0) }, Triggers(GraphNode.Block(1)).ToArray());
+            Assert.IsEmpty(Triggers(GraphNode.Skill(2)), "Ziele ausserhalb der Platine oder ohne Ziel ergeben keine Kante");
         }
 
         [Test]

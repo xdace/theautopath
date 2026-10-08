@@ -41,7 +41,8 @@ namespace Betaknight.Tests.EditMode
 
         /// <summary>
         /// Platine aus Paaren: links das Relais, rechts daneben die Komponente, Paar für Paar untereinander. So versorgt jedes
-        /// Relais nur seine Komponente, und die Lesereihenfolge bleibt die Reihenfolge der Paare.
+        /// Relais nur seine Komponente, und die Lesereihenfolge bleibt die Reihenfolge der Paare. Seit A-20 liegt eine leere Zeile
+        /// zwischen den Paaren, damit sich keine Pins berühren (sonst schicken sich die Komponenten Pulse).
         /// </summary>
         private static CircuitSpec Circuit(params Line[] lines)
         {
@@ -51,9 +52,9 @@ namespace Betaknight.Tests.EditMode
             {
                 spec.Relays.Add(new RelaySpec(l.Rune, new Cell(0, y), l.Level));
                 spec.Components.Add(new ComponentSpec(l.Skill, new Cell(1, y)));
-                y += Skills.TryGet(l.Skill, out SkillDefinition s) ? s.Shape.Height : 1;
+                y += (Skills.TryGet(l.Skill, out SkillDefinition s) ? s.Shape.Height : 1) + 1;
             }
-            spec.Height = System.Math.Max(1, y);
+            spec.Height = System.Math.Max(1, y - 1);
             return spec;
         }
 
