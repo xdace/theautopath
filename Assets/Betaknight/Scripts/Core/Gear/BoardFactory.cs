@@ -104,6 +104,7 @@ namespace Betaknight.Core.Gear
                 return new LogicRow(AlwaysCondition.Instance, null, spec.RuneId ?? "?");
 
             string label = string.Format(rune.NameTemplate, parameter);
+            if (spec.Level > 0) label = $"{label} ▲{spec.Level}";
             foreach (ModuleSpec m in spec.BlockModules)
             {
                 condition = ModuleRules.ApplyToCondition(condition, m);

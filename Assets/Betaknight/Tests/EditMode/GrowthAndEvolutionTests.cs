@@ -144,7 +144,8 @@ namespace Betaknight.Tests.EditMode
             BoardFactory factory = BoardFactory.CreateDefault();
             Assert.AreEqual("HP unter 45 %", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, blockGrowth: 15), null).Label);
             Assert.AreEqual("HP unter 50 %", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, blockGrowth: 40), null).Label);
-            Assert.AreEqual("HP unter 50 %", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, level: 2, blockGrowth: 40), null).Label,
+            // Das Stufen-Abzeichen «▲2» kommt aus dem Runen-Stufen-Hotfix.
+            Assert.AreEqual("HP unter 50 % ▲2", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, level: 2, blockGrowth: 40), null).Label,
                 "Ein höherer Grundwert bleibt");
             Assert.AreEqual("HP unter 60 %", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, blockGrowth: 40,
                 blockModules: new[] { new ModuleSpec(ModuleIds.Threshold) }), null).Label, "Das Modul «Schwelle» kommt obendrauf");

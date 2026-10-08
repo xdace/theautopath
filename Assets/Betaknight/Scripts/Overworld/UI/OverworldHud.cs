@@ -121,7 +121,7 @@ namespace Betaknight.Overworld.UI
                     if (link.From == i) marks += $" <color=#ffae42>↪{link.To + 1}</color>";
                 if (_session.IsEvolutionReady(row)) marks += " <color=#d29bff>✦</color>";
                 string block = row.Growth > 0 ? $"{row.Name} +{row.Growth}" : row.Name;
-                lines.Add($"{i + 1}. [{block}] → {skill}{marks}");
+                lines.Add($"{i + 1}. [{block}]{RuneText.LevelBadge(row.Rune, row.Level)} → {skill}{marks}");
             }
             lines.Add("↓ [Immer] → Basisangriff");
             return string.Join("\n", lines);

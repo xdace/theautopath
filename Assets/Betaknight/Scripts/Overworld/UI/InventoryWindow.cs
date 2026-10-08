@@ -213,7 +213,7 @@ namespace Betaknight.Overworld.UI
             for (int i = 0; i < rows.Count; i++)
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Label($"{i + 1}. <b>{rows[i].Name}</b>", _small);
+                GUILayout.Label($"{i + 1}. <b>{rows[i].Name}</b>{RuneText.LevelBadge(rows[i].Rune, rows[i].Level)}", _small);
                 GUI.enabled = _session.CanChangeLoadout && _selectedRune >= 0;
                 if (GUILayout.Button("↔ tauschen", GUILayout.Width(90f)))
                 {
@@ -235,7 +235,7 @@ namespace Betaknight.Overworld.UI
             {
                 GUILayout.BeginHorizontal();
                 bool selected = _selectedRune == i;
-                if (GUILayout.Button($"{(selected ? "▶ " : string.Empty)}<b>{stored[i].Name}</b>  <size=11>{stored[i].Description}</size>", _cell))
+                if (GUILayout.Button($"{(selected ? "▶ " : string.Empty)}<b>{stored[i].Name}</b>{RuneText.LevelBadge(stored[i].Rune, stored[i].Level)}  <size=11>{stored[i].Description}</size>", _cell))
                     _selectedRune = selected ? -1 : i;
                 GUI.enabled = _session.CanChangeLoadout && !_session.Runes.IsFull;
                 if (GUILayout.Button("einsetzen", GUILayout.Width(80f)))
