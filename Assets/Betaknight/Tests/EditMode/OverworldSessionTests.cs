@@ -108,6 +108,79 @@ namespace Betaknight.Tests.EditMode
                 Assert.AreEqual(CellVisibility.Explored, s.Map.GetCell(route[i]).Visibility);
         }
 
+        /// <summary>Reist eine geplante Route wie die Oberwelt-Steuerung und gibt die Zahl der gegangenen Schritte zurück.</summary>
+        private static int Travel(OverworldSession s, HexCoord target)
+        {
+            List<HexCoord> route = s.PlanRoute(target);
+            int steps = 0;
+            for (int i = 0; i < route.Count; i++)
+            {
+                if (!s.CanStepTo(route[i])) break;
+                StepResult r = s.TryTravelStep(route[i], i == route.Count - 1);
+                if (r.Success) steps++;
+                if (r.InterruptsTravel || s.IsBusy) break;
+            }
+            s.FinishTravel();
+            return steps;
+        }
+
+        [Test]
+        public void ATripOverVisitedCellsCostsOneTurn()
+        {
+            OverworldSession s = EmptySession();
+            s.TryStep(new HexCoord(1, 0));
+            s.TryStep(new HexCoord(2, 0));
+            s.TryStep(new HexCoord(1, 0));
+            s.TryStep(HexCoord.Zero);
+            Assert.AreEqual(4, s.Turns.CurrentTurn, "Einzelschritte kosten weiter je einen Zug");
+
+            // Zurück über besuchte Felder zu (2,0): zwei Schritte, ein Zug.
+            Assert.AreEqual(2, Travel(s, new HexCoord(2, 0)));
+            Assert.AreEqual(new HexCoord(2, 0), s.Player.Position);
+            Assert.AreEqual(5, s.Turns.CurrentTurn);
+
+            // Zurück zum Start und dann bis auf ein neues Feld dahinter: je ein Zug, die Reise endet auf dem neuen Feld.
+            Assert.AreEqual(2, Travel(s, HexCoord.Zero));
+            Assert.AreEqual(3, Travel(s, new HexCoord(3, 0)));
+            Assert.AreEqual(7, s.Turns.CurrentTurn);
+            Assert.AreEqual(new HexCoord(3, 0), s.Player.Position);
+            Assert.IsFalse(s.FinishTravel(), "nichts mehr offen");
+        }
+
+        [Test]
+        public void ATripStoppedOnTheWayStillCostsATurn()
+        {
+            OverworldSession s = EmptySession();
+            s.TryStep(new HexCoord(1, 0));
+            s.TryStep(new HexCoord(2, 0));
+            s.TryStep(new HexCoord(1, 0));
+            s.TryStep(HexCoord.Zero);
+            int turn = s.Turns.CurrentTurn;
+
+            // Ein Schritt ohne Zugende, dann bricht die Reise ab (z. B. Entscheidung offen): FinishTravel schliesst den Zug.
+            Assert.IsTrue(s.TryTravelStep(new HexCoord(1, 0), lastStep: false).Success);
+            Assert.AreEqual(turn, s.Turns.CurrentTurn);
+            Assert.IsTrue(s.FinishTravel());
+            Assert.AreEqual(turn + 1, s.Turns.CurrentTurn);
+        }
+
+        [Test]
+        public void ATripStopsAndEndsTheTurnOnAnEnemy()
+        {
+            OverworldSession s = EmptySession();
+            s.TryStep(new HexCoord(1, 0));
+            s.TryStep(new HexCoord(2, 0));
+            s.TryStep(new HexCoord(1, 0));
+            s.TryStep(HexCoord.Zero);
+            s.Map.SetContent(new HexCoord(1, 0), CellContent.Enemy);
+            int turn = s.Turns.CurrentTurn;
+
+            StepResult r = s.TryTravelStep(new HexCoord(1, 0), lastStep: false);
+            Assert.IsTrue(r.InterruptsTravel);
+            Assert.AreEqual(turn + 1, s.Turns.CurrentTurn, "Gegner auf dem Weg: Zug endet dort");
+            Assert.IsFalse(s.FinishTravel());
+        }
+
         [Test]
         public void NoRouteThroughUnknownTerritory()
         {

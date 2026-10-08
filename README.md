@@ -20,7 +20,7 @@ Es sind keine Prefabs, Sprites oder Fonts nötig. Hexfelder, Spielfigur und Labe
 |---|---|
 | Maus über ein Feld | Zeigt die geplante Route (gelb) oder rot, wenn das Feld nicht erreichbar ist |
 | Klick auf ein «?»-Nachbarfeld | Erkunden: 1 Schritt, 1 Zug |
-| Klick auf ein entferntes, erforschtes Feld | Reise über bekannte Routen, Schritt für Schritt, jeder Schritt kostet einen Zug |
+| Klick auf ein entferntes Feld, das über besuchte Felder erreichbar ist | Reise über bekannte Routen, Schritt für Schritt; die ganze Reise kostet **einen Zug**. Sie hält an einem neuen Feld, bei Gegnern und angegriffenen Minen an, auch dann zählt sie als ein Zug |
 | Fenster bei mittleren Events | Eine der Optionen wählen (ausgegraute sind nicht bezahlbar) |
 | Runenwahl | Eine Rune oder ein Ausrüstungsteil nehmen (★ = passt zu einem vorhandenen Tag) oder für 3 Gold verzichten. Teile: «Anlegen» oder «Ins Inventar»; Runen bei voller Tafel: «Ins Runen-Inventar» oder eine Zeile tauschen |
 | Taste **B** / Button «Build (B)» | Fenster «Build» (ersetzt den Tafel-Editor): Mitte die Logik-Tafel, eine Zeile pro Rune + Skill (Rune mit Stufen-Abzeichen und Wachstum, Skill mit Kurzwerten, Details im Tooltip). Links das Skill-Inventar, rechts Module und Runen-Inventar oder das Rezeptbuch, oben die Stat-Leiste |
@@ -344,7 +344,7 @@ Assets/Betaknight/
 **Leitprinzipien**
 
 - **Logik und Darstellung sind getrennt.** `Betaknight.Core` hat `noEngineReferences: true` und weiss nichts von Unity. Die Darstellung beobachtet die Logik nur über Events (`HexMap.CellChanged`, `PlayerModel.Moved`, `TurnSystem.TurnEnded`, `PlayerStats.Changed`, `OverworldSession.CellEntered`, `EncounterResolved`, `MajorEventResolved`, `RunEnded`).
-- **Eine Fassade.** `OverworldSession` ist der einzige Einstieg für Spielaktionen. Die wichtigste Methode ist `TryStep(HexCoord)`: Sie prüft die Regeln, bewegt den Spieler, deckt den Nebel auf, beendet den Zug und löst das Feld-Event aus. Entscheidungen laufen über `ChooseEncounterOption`, `TakeRune`/`SkipRuneOffer` und die Shop-Methoden. Solange eine Entscheidung offen ist (`IsBusy`), ist Bewegung gesperrt.
+- **Eine Fassade.** `OverworldSession` ist der einzige Einstieg für Spielaktionen. Die wichtigste Methode ist `TryStep(HexCoord)`: Sie prüft die Regeln, bewegt den Spieler, deckt den Nebel auf, beendet den Zug und löst das Feld-Event aus. Reisen laufen über `TryTravelStep(HexCoord, lastStep)` und `FinishTravel()`: nur der letzte (oder anhaltende) Schritt beendet den Zug, `FinishTravel` schliesst einen abgebrochenen ab. Entscheidungen laufen über `ChooseEncounterOption`, `TakeRune`/`SkipRuneOffer` und die Shop-Methoden. Solange eine Entscheidung offen ist (`IsBusy`), ist Bewegung gesperrt.
 - **Reproduzierbar.** Gleicher Seed ergibt die gleiche Karte. Der Seed steht im HUD.
 - **Keine Singletons.** Der Bootstrapper erzeugt alle Objekte und übergibt Abhängigkeiten explizit.
 

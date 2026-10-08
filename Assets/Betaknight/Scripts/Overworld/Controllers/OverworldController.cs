@@ -106,15 +106,18 @@ namespace Betaknight.Overworld.Controllers
         {
             _grid.ShowRoute(route);
 
-            foreach (HexCoord step in route)
+            // Die ganze Reise kostet einen Zug (Schritte über besuchte Felder zählen nicht einzeln).
+            for (int i = 0; i < route.Count; i++)
             {
+                HexCoord step = route[i];
                 if (!_session.CanStepTo(step)) break;
 
                 yield return _player.AnimateStep(_grid.ToWorld(step));
 
-                StepResult result = _session.TryStep(step);
+                StepResult result = _session.TryTravelStep(step, i == route.Count - 1);
                 if (result.InterruptsTravel || _session.IsBusy) break;
             }
+            _session.FinishTravel();
 
             // Sicherheitsnetz: Darstellung exakt auf die logische Position setzen.
             _player.SnapTo(_grid.ToWorld(_session.Player.Position));

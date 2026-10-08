@@ -474,7 +474,28 @@ namespace Betaknight.Core.Autoplay
             if (target == s.Player.Position) return null;
             List<HexCoord> route = s.PlanRoute(target);
             if (route == null || route.Count == 0 || route.Count > maxLength) return null;
-            return StepTo(s, route[0], why);
+            if (route.Count == 1) return StepTo(s, route[0], why);
+            return TravelTo(s, route, why);
+        }
+
+        /// <summary>Reist wie der Spieler die ganze Route in einem Zug, bis ein Feld die Reise anhält.</summary>
+        private BotAction TravelTo(OverworldSession s, List<HexCoord> route, string why)
+        {
+            HexCoord last = route[route.Count - 1];
+            if (!s.CanStepTo(route[0])) return null;
+            return Try(BotActionKind.Move, $"Reise nach ({last.Q},{last.R}), {route.Count} Felder: {why}", () =>
+            {
+                bool moved = false;
+                for (int i = 0; i < route.Count; i++)
+                {
+                    if (!s.CanStepTo(route[i])) break;
+                    StepResult result = s.TryTravelStep(route[i], i == route.Count - 1);
+                    moved |= result.Success;
+                    if (result.InterruptsTravel || s.IsBusy || s.IsGameOver) break;
+                }
+                s.FinishTravel();
+                return moved;
+            }, step: route[0]);
         }
 
         private BotAction StepTo(OverworldSession s, HexCoord step, string why)

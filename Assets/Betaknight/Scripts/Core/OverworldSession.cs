@@ -184,7 +184,39 @@ namespace Betaknight.Core
         /// Ein Schritt auf ein Nachbarfeld: bewegt den Spieler, deckt auf, beendet den Zug und löst das Feld-Event aus
         /// (kleine/mittlere Events hier, grosse in OverworldSession.MajorEvents.cs).
         /// </summary>
-        public StepResult TryStep(HexCoord target)
+        public StepResult TryStep(HexCoord target) => Step(target, endsTurn: true);
+
+        /// <summary>
+        /// Ein Schritt einer Reise über eine geplante Route (<see cref="PlanRoute"/>): Die ganze Reise kostet nur einen Zug.
+        /// Der Zug endet beim letzten Schritt (<paramref name="lastStep"/>) oder bei einem Schritt, der die Reise anhält
+        /// (neues Feld, Gegner, angegriffene Mine). Endet die Reise anders (Entscheidung offen, Weg gesperrt), schliesst
+        /// <see cref="FinishTravel"/> den Zug ab; das sollte nach jeder Reise aufgerufen werden.
+        /// </summary>
+        public StepResult TryTravelStep(HexCoord target, bool lastStep)
+        {
+            if (CheckStep(target) == MoveFailure.None && Map.TryGetCell(target, out HexCell next))
+            {
+                bool interrupts = next.VisitCount == 0 || next.Content.IsHostile() || next.IsUnderAttack;
+                return Step(target, endsTurn: lastStep || interrupts);
+            }
+            return Step(target, endsTurn: true);
+        }
+
+        /// <summary>Beendet den Zug einer Reise, falls noch Schritte ohne Zug offen sind. Gibt true zurück, wenn ein Zug endete.</summary>
+        public bool FinishTravel()
+        {
+            if (_openTravelSteps == 0) return false;
+            _openTravelSteps = 0;
+            if (IsGameOver) return false;
+            Turns.EndTurn();
+            TriggerBossIfDue();
+            return true;
+        }
+
+        /// <summary>Schritte der laufenden Reise, die noch keinen Zug gekostet haben.</summary>
+        private int _openTravelSteps;
+
+        private StepResult Step(HexCoord target, bool endsTurn)
         {
             MoveFailure failure = CheckStep(target);
             if (failure != MoveFailure.None) return StepResult.Fail(failure);
@@ -195,7 +227,15 @@ namespace Betaknight.Core
             Player.MoveTo(target);
             Map.RegisterVisit(cell);
             Exploration.RevealAround(target);
-            Turns.EndTurn();
+            if (endsTurn)
+            {
+                _openTravelSteps = 0;
+                Turns.EndTurn();
+            }
+            else
+            {
+                _openTravelSteps++;
+            }
 
             TriggerEncounter(cell);
             TriggerMajorEvent(cell, firstVisit);
