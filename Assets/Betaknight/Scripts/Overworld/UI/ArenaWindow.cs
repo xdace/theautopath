@@ -16,6 +16,9 @@ namespace Betaknight.Overworld.UI
     /// des Gegners. Nach dem Kampf folgt eine Auswertung pro Komponente. Platzhalter-Grafik aus Rechtecken, gerechnet wird nichts.
     /// A-20: Pins, Logik-Chips und Pulsverbindungen auf der Platine; Pulse laufen als Punkte die Verbindung entlang, Gatter
     /// zeigen offen/geschlossen (Sicherung: durchgebrannt), Kondensatoren ihre Ladung als Punkte, Relais ihren Zustand als Lämpchen.
+    /// A-21: Effekt-Symbole an Komponenten, Hitze-Balken (Overclock), Rekursions-Tiefe und Verstärkung der laufenden Ausführung,
+    /// «+15%» an verstärkten Pulsen, gehackte Relais und Komponenten flackern (mit Schild und Tooltip), Hacks gegen Gegner als
+    /// Schilder unter dem Gegner, Stufe des Thermal Throttling über der Bühne. Zustand aus <see cref="ArenaEffects"/>.
     /// </summary>
     public sealed class ArenaWindow : MonoBehaviour
     {
@@ -52,13 +55,36 @@ namespace Betaknight.Overworld.UI
             public int Link;
             public float Start;
             public float Duration;
+
+            /// <summary>A-21: Verstärkung in Prozent (0 = keine).</summary>
+            public int Power;
         }
+
+        /// <summary>Kurzer Hinweis an einer Komponente (A-21), in Echtzeit sichtbar.</summary>
+        private sealed class ActiveFlash
+        {
+            public ArenaEffects.Flash Flash;
+            public float Start;
+        }
+
+        private const float FlashSeconds = 0.9f;
+        private const float ThermalFlashSeconds = 1.6f;
+
+        /// <summary>Der Spieler ist der erste Kämpfer der Wiedergabe.</summary>
+        private const int PlayerFighter = 0;
 
         private const float MinPulseSeconds = 0.45f;
 
         private OverworldSession _session;
         private readonly Queue<CombatResult> _queue = new Queue<CombatResult>();
         private BattlePlayback _playback;
+        private ArenaEffects _fx;
+        private readonly List<ActiveFlash> _effectFlashes = new List<ActiveFlash>();
+        private int _seenOverheat;
+        private float _overheatFlashUntil;
+        private readonly List<LogEntry> _mergedLog = new List<LogEntry>();
+        private int _mergedA = -1;
+        private int _mergedB = -1;
         private CombatResult _current;
         private int _speedIndex;
         private bool _paused;
@@ -86,6 +112,8 @@ namespace Betaknight.Overworld.UI
         private GUIStyle _text;
         private GUIStyle _small;
         private GUIStyle _row;
+        private GUIStyle _thermal;
+        private GUIStyle _thermalFlash;
         private Texture2D _white;
 
         /// <summary>Solange die Arena offen ist, warten Oberwelt und andere Fenster.</summary>
@@ -141,6 +169,12 @@ namespace Betaknight.Overworld.UI
             }
             _current = _queue.Dequeue();
             _playback = new BattlePlayback(_current.Battle);
+            _fx = new ArenaEffects(_current.Battle);
+            _effectFlashes.Clear();
+            _seenOverheat = 0;
+            _overheatFlashUntil = 0f;
+            _mergedLog.Clear();
+            _mergedA = _mergedB = -1;
             _report = null;
             _paused = false;
             _tickBuffer = 0f;
@@ -161,6 +195,7 @@ namespace Betaknight.Overworld.UI
             if (_playback == null) return;
             _popups.RemoveAll(p => Time.unscaledTime - p.Start > PopupSeconds);
             _pulses.RemoveAll(p => Time.unscaledTime - p.Start > p.Duration);
+            _effectFlashes.RemoveAll(f => Time.unscaledTime - f.Start > FlashSeconds);
             if (_paused || _playback.IsFinished) return;
             _tickBuffer += Time.unscaledDeltaTime * Ticks.PerSecond * Speeds[_speedIndex] * Mathf.Max(0.01f, SpeedFactor);
             int ticks = Mathf.FloorToInt(_tickBuffer);
@@ -174,6 +209,13 @@ namespace Betaknight.Overworld.UI
         private void TrackHighlights()
         {
             float now = Time.unscaledTime;
+            _fx.Advance(_playback.Tick);
+            foreach (ArenaEffects.Flash f in _fx.TakeFlashes()) _effectFlashes.Add(new ActiveFlash { Flash = f, Start = now });
+            if (_fx.OverheatLevel != _seenOverheat)
+            {
+                _seenOverheat = _fx.OverheatLevel;
+                _overheatFlashUntil = now + ThermalFlashSeconds;
+            }
             float gameSeconds = BattlePlayback.RowHighlightTicks / (float)Ticks.PerSecond / (Speeds[_speedIndex] * Mathf.Max(0.01f, SpeedFactor));
             if (_playback.LastPlayerRowTick != _seenRowTick)
             {
@@ -195,7 +237,7 @@ namespace Betaknight.Overworld.UI
             {
                 if (!_seenPulses.Add((p.Link, p.StartTick))) continue;
                 float seconds = (p.ArriveTick - p.StartTick) / (float)Ticks.PerSecond / speed;
-                _pulses.Add(new ActivePulse { Link = p.Link, Start = now, Duration = Mathf.Max(MinPulseSeconds, seconds) });
+                _pulses.Add(new ActivePulse { Link = p.Link, Start = now, Duration = Mathf.Max(MinPulseSeconds, seconds), Power = _fx.PulsePower(p.Link, p.StartTick) });
             }
 
             // Viele Zahlen im selben Moment fächern sich leicht auf, statt sich zu überdecken.
@@ -236,6 +278,7 @@ namespace Betaknight.Overworld.UI
             }
             GUI.Label(new Rect(pad, 12f, Screen.width - pad * 2, 36f),
                 UiTexts.Arena.Title(enemy, BattleLogText.Time(_playback.Tick), portal), _title);
+            DrawThermal(new Rect(pad, 34f, Screen.width - boardWidth - pad * 3, 22f));
 
             if (_playback.IsFinished)
             {
@@ -251,6 +294,27 @@ namespace Betaknight.Overworld.UI
             DrawLog(log);
             DrawControls(controls);
             DrawTooltip();
+        }
+
+        // ------------------------------------------------------------------ Thermal Throttling (A-21)
+
+        /// <summary>«Thermal Throttling 2: +20% computing time, +32% damage», blinkt kurz bei jeder neuen Stufe.</summary>
+        private void DrawThermal(Rect area)
+        {
+            int level = _fx.OverheatLevel;
+            if (level <= 0) return;
+            ThermalConfig thermal = ThermalConfig.Default;
+            long factor = 100;
+            for (int i = 0; i < level && factor < 10_000_000; i++) factor = factor * (100 + thermal.DamagePercentPerStep) / 100;
+            string text = UiTexts.Effects.Thermal(level, level * thermal.CastPercentPerStep, (int)(factor - 100));
+            bool flash = Time.unscaledTime < _overheatFlashUntil && Mathf.Repeat(Time.unscaledTime * 5f, 1f) < 0.5f;
+            Color hot = new Color(1f, 0.42f, 0.18f);
+            var content = new GUIContent($"<b>{text}</b>", UiTexts.Effects.ThermalTip);
+            float width = Mathf.Min(area.width, _small.CalcSize(content).x + 24f);
+            var banner = new Rect(area.x, area.y, width, area.height);
+            Fill(banner, flash ? new Color(hot.r, hot.g, hot.b, 0.85f) : new Color(0.30f, 0.10f, 0.04f, 0.95f));
+            Fill(new Rect(banner.x, banner.yMax - 2f, banner.width * Mathf.Clamp01(level / 8f), 2f), hot);
+            GUI.Label(banner, content, flash ? _thermalFlash : _thermal);
         }
 
         // ------------------------------------------------------------------ Bühne
@@ -317,7 +381,9 @@ namespace Betaknight.Overworld.UI
                 y += 28f;
 
                 y = DrawResources(f, barX, y, barW);
+                y = DrawHacks(index, barX, y, barW);
                 DrawStatuses(f, barX, y, barW);
+                if (f.Info.Side != Side.Player) DrawFighterFlashes(index, body);
             }
         }
 
@@ -335,6 +401,67 @@ namespace Betaknight.Overworld.UI
             }
             return y;
         }
+
+        /// <summary>
+        /// A-21: aktive Hacks auf der Platine eines Kämpfers als flackernde Schilder (Bit Flip, Jam, Hijack) und Firewall-Ladungen.
+        /// Beim Spieler stehen die Hacks auch auf der Platine selbst.
+        /// </summary>
+        private float DrawHacks(int fighter, float x, float y, float width)
+        {
+            LogicBoard board = _playback.Fighters[fighter].Info.Combatant?.Board;
+            var tags = new List<(string id, string text, string tip)>();
+            foreach (int relay in _fx.FlippedRelays(fighter))
+            {
+                string left = RowStateText.Seconds(_fx.FlippedLeft(fighter, relay));
+                tags.Add((CircuitEffectIds.BitFlip, UiTexts.Effects.Flipped(left), UiTexts.Effects.FlippedTip(RelayNameOf(board, relay), left)));
+            }
+            foreach (int relay in _fx.JammedRelays(fighter))
+            {
+                int left = _fx.JamLeft(fighter, relay);
+                tags.Add((CircuitEffectIds.Jam, UiTexts.Effects.Jammed(left), UiTexts.Effects.JammedTip(RelayNameOf(board, relay), left)));
+            }
+            foreach (int row in _fx.HijackedRows(fighter))
+                tags.Add((CircuitEffectIds.Hijack, UiTexts.Effects.HijackMark, UiTexts.Effects.HijackedTip(ComponentNameOf(board, row))));
+            int firewall = _fx.Firewall(fighter);
+            if (firewall > 0) tags.Add((CircuitEffectIds.Firewall, UiTexts.Effects.Firewall(firewall), UiTexts.Effects.FirewallTip(firewall)));
+            if (tags.Count == 0) return y;
+
+            const float h = 18f;
+            float w = Mathf.Min(width, 96f);
+            int perRow = Mathf.Max(1, Mathf.FloorToInt((width + 4f) / (w + 4f)));
+            for (int i = 0; i < tags.Count; i++)
+            {
+                var box = new Rect(x + i % perRow * (w + 4f), y + i / perRow * (h + 3f), w, h);
+                Color c = EffectText.ColourOf(tags[i].id);
+                bool steady = tags[i].id == CircuitEffectIds.Firewall;
+                bool on = steady || CircuitGrid.FlickerOn;
+                Fill(box, new Color(c.r * 0.3f, c.g * 0.3f, c.b * 0.3f, on ? 0.95f : 0.5f));
+                if (on) UiTheme.Outline(box, c, 1f);
+                GUI.Label(box, new GUIContent($"<size=12><b><color={UiTheme.Hex(c)}>{EffectText.Icon(tags[i].id)} {tags[i].text}</color></b></size>", tags[i].tip), _cell);
+            }
+            return y + Mathf.CeilToInt(tags.Count / (float)perRow) * (h + 3f) + 2f;
+        }
+
+        /// <summary>Blitze (Overheat, Short Circuit …) eines Gegners über seinem Körper; Gegner-Platinen werden nicht gezeichnet.</summary>
+        private void DrawFighterFlashes(int fighter, Rect body)
+        {
+            float now = Time.unscaledTime;
+            int n = 0;
+            foreach (ActiveFlash a in _effectFlashes)
+            {
+                if (a.Flash.Fighter != fighter) continue;
+                float t = Mathf.Clamp01((now - a.Start) / FlashSeconds);
+                var rect = new Rect(body.x, body.y + 14f + n * 18f, body.width, body.height * 0.3f);
+                CircuitGrid.DrawFlash(rect, a.Flash.Text, EffectText.ColourOf(a.Flash.EffectId), 1f - t * t);
+                n++;
+            }
+        }
+
+        private static string RelayNameOf(LogicBoard board, int relay) =>
+            board != null && relay >= 0 && relay < board.Relays.Count ? ArenaTexts.RelayName(relay, board.Relays[relay].Label) : $"Relay {relay + 1}";
+
+        private static string ComponentNameOf(LogicBoard board, int row) =>
+            ArenaTexts.ComponentName(row, board != null && row >= 0 && row < board.Rows.Count ? board.Rows[row].Skill?.Name ?? "?" : "?");
 
         /// <summary>Aktive Zustände als kleine Kästchen: Kürzel, Restdauer als Balken und Sekunden, Stapel.</summary>
         private void DrawStatuses(FighterView f, float x, float y, float width)
@@ -393,6 +520,13 @@ namespace Betaknight.Overworld.UI
             LogicBoard board = r.PlayerBoard;
             string legend = board != null && board.Links.Count > 0 ? $"{UiTexts.Arena.BoardLegend} · {UiTexts.Circuit.PulseLegend}" : UiTexts.Arena.BoardLegend;
             GUILayout.Label(new GUIContent($"{UiTexts.Arena.BoardTitle}  <size=13><color=#9aa4b2>{legend}</color></size>", QueueRule), _text);
+            string rules = EffectText.BoardRules(board);
+            if (rules.Length > 0)
+            {
+                int firewall = _fx.Firewall(PlayerFighter);
+                if (board.HasBoardEffect(CircuitEffectIds.Firewall)) rules += $"  <color=#9aa4b2>({UiTexts.Effects.Firewall(firewall)})</color>";
+                GUILayout.Label(new GUIContent($"<size=13>{UiTexts.Effects.Board(rules)}</size>", EffectText.BoardRulesTip(board)), _row);
+            }
             if (board?.Layout != null && board.Rows.All(x => x.Rect.HasValue) && board.Relays.All(x => x.Rect.HasValue))
                 DrawCircuit(board, area.width - 16f, area.height * 0.5f);
             else
@@ -457,6 +591,8 @@ namespace Betaknight.Overworld.UI
 
             // A-20: Logik-Chips (Gatter mit Zustand, Kondensator mit Ladung) und Pulsverbindungen unter den Komponenten.
             for (int i = 0; i < board.Chips.Count; i++) DrawLogicChip(board, grid, size, i, style);
+            for (int i = 0; i < board.Relays.Count; i++)
+                if (board.Relays[i].Gate.HasValue) DrawRelayHack(board, CircuitGrid.RectOf(grid, size, board.Relays[i].Rect.Value), i);
             DrawLinks(board, grid, size);
 
             for (int i = 0; i < board.Relays.Count; i++)
@@ -474,6 +610,7 @@ namespace Betaknight.Overworld.UI
                 var lampRect = new Rect(rect.xMax - lamp - 3f, rect.y + 3f, lamp, lamp);
                 UiTheme.Fill(lampRect, _playback.IsRelayOn(i) ? CircuitGrid.GateOpen : new Color(0f, 0f, 0f, 0.55f));
                 UiTheme.Outline(lampRect, CircuitGrid.GateOpen, 1f);
+                DrawRelayHack(board, rect, i);
             }
 
             for (int i = 0; i < board.Rows.Count; i++)
@@ -491,10 +628,76 @@ namespace Betaknight.Overworld.UI
                 if (lit) text = $"<color=#ffd75e>{text}</color>";
                 CircuitGrid.DrawChip(rect, fill, border, lit ? 3f : 2f, text, RowTooltip(i, state), style);
                 Fill(new Rect(rect.x + 2f, rect.y + 2f, 4f, rect.height - 4f), RowColorFor(i));
+                DrawRowEffects(board, rect, size, i, state);
             }
 
             DrawPins(board, grid, size);
             DrawPulses(board, grid, size);
+            DrawRowFlashes(board, grid, size);
+        }
+
+        // ------------------------------------------------------------------ Eigene Effekte auf der Platine (A-21)
+
+        /// <summary>
+        /// Effekte einer Komponente: Symbole oben rechts, Hitze-Balken unten, Rekursions-Tiefe und Verstärkung der laufenden
+        /// Ausführung oben links, flackernd bei Hijack.
+        /// </summary>
+        private void DrawRowEffects(LogicBoard board, Rect rect, float size, int row, RowDisplay state)
+        {
+            LogicRow r = board.Rows[row];
+            CircuitGrid.DrawEffectBadges(rect, EffectText.Of(r), size);
+
+            int max = board.EffectConfig.HeatSkipAt;
+            int heat = _fx.Heat(PlayerFighter, row);
+            bool skip = _effectFlashes.Exists(f => f.Flash.Fighter == PlayerFighter && f.Flash.Row == row && f.Flash.EffectId == CircuitEffectIds.Overclock);
+            CircuitGrid.DrawHeatBar(rect, heat, max, skip, UiTexts.Effects.HeatTip(heat, max));
+
+            if (state == RowDisplay.Firing)
+            {
+                int depth = _fx.Depth(PlayerFighter, row);
+                int power = _fx.Power(PlayerFighter, row);
+                CircuitGrid.DrawDepth(rect, depth, UiTexts.Effects.DepthTip(depth, depth * board.EffectConfig.RecursionPowerPercentPerDepth));
+                if (power > 0)
+                {
+                    var tag = new Rect(rect.x + (depth > 0 ? 40f : 8f), rect.y + 2f, 40f, 16f);
+                    Color c = EffectText.ColourOf(CircuitEffectIds.Amplifier);
+                    Fill(tag, new Color(0f, 0f, 0f, 0.75f));
+                    UiTheme.Outline(tag, c, 1f);
+                    GUI.Label(tag, new GUIContent($"<b><color={UiTheme.Hex(c)}>{UiTexts.Effects.Power(power)}</color></b>", UiTexts.Effects.PowerTip(power)), CircuitGrid.Tiny);
+                }
+            }
+
+            if (_fx.IsHijacked(PlayerFighter, row))
+                CircuitGrid.DrawHack(rect, CircuitEffectIds.Hijack, UiTexts.Effects.HijackMark, UiTexts.Effects.HijackedTip(ComponentNameOf(board, row)));
+        }
+
+        /// <summary>Gehacktes Relais des Spielers: Bit Flip (mit Restzeit) oder Jam (mit Rest-Auslösungen) flackern.</summary>
+        private void DrawRelayHack(LogicBoard board, Rect rect, int relay)
+        {
+            int flipped = _fx.FlippedLeft(PlayerFighter, relay);
+            int jam = _fx.JamLeft(PlayerFighter, relay);
+            if (flipped > 0)
+            {
+                string left = RowStateText.Seconds(flipped);
+                CircuitGrid.DrawHack(rect, CircuitEffectIds.BitFlip, UiTexts.Effects.Flipped(left), UiTexts.Effects.FlippedTip(RelayNameOf(board, relay), left));
+            }
+            else if (jam > 0)
+            {
+                CircuitGrid.DrawHack(rect, CircuitEffectIds.Jam, UiTexts.Effects.Jammed(jam), UiTexts.Effects.JammedTip(RelayNameOf(board, relay), jam));
+            }
+        }
+
+        /// <summary>Blitze an Komponenten des Spielers (Overheat, Parallel Thread, Interrupt, Overflow, Stack Limit …).</summary>
+        private void DrawRowFlashes(LogicBoard board, Rect grid, float size)
+        {
+            float now = Time.unscaledTime;
+            foreach (ActiveFlash a in _effectFlashes)
+            {
+                if (a.Flash.Fighter != PlayerFighter || a.Flash.Row < 0 || a.Flash.Row >= board.Rows.Count) continue;
+                float t = Mathf.Clamp01((now - a.Start) / FlashSeconds);
+                CircuitGrid.DrawFlash(CircuitGrid.RectOf(grid, size, board.Rows[a.Flash.Row].Rect.Value), a.Flash.Text,
+                    EffectText.ColourOf(a.Flash.EffectId), 1f - t * t);
+            }
         }
 
         // ------------------------------------------------------------------ Logik-Chips, Pins und Pulse (A-20)
@@ -540,6 +743,7 @@ namespace Betaknight.Overworld.UI
             }
             List<string> carried = board.Links.Where(l => l.Path.Contains(chip.Rect.Origin)).Select(l => LinkText(board, l)).ToList();
             if (carried.Count > 0) lines.Add(UiTexts.Circuit.CarriesLinks(string.Join(", ", carried)));
+            if (chip.Kind == ChipKind.Effect && EffectText.TryGet(chip.Definition.EffectId, out CircuitEffectDefinition fx)) lines[0] = EffectText.Tip(fx);
             return string.Join("\n", lines);
         }
 
@@ -586,12 +790,19 @@ namespace Betaknight.Overworld.UI
                 float t = p.Duration <= 0f ? 1f : Mathf.Clamp01((now - p.Start) / p.Duration);
                 Vector2 at = CircuitGrid.PointOnLink(CircuitGrid.LinkPoints(grid, size, link), t);
                 CircuitGrid.DrawPulse(at, size, Color.Lerp(LinkColorFor(link), CircuitGrid.PulseColor, 0.5f));
+                CircuitGrid.DrawPulseGain(at, size, p.Power);
             }
         }
 
         private static string NodeName(PulseNode node) => node.IsCapacitor ? ArenaTexts.CapacitorName(node.Index) : $"#{node.Index + 1}";
 
-        private static string LinkText(LogicBoard board, PulseLink link) => UiTexts.Circuit.Link(NodeName(link.From), NodeName(link.To), link.Delay);
+        private static string LinkText(LogicBoard board, PulseLink link)
+        {
+            string text = UiTexts.Circuit.Link(NodeName(link.From), NodeName(link.To), link.Delay);
+            if (link.Amplifiers > 0)
+                text += $" <color={EffectText.ColourHex(CircuitEffectIds.Amplifier)}>({UiTexts.Circuit.AmplifiedLink(link.Amplifiers, link.Amplifiers * board.EffectConfig.AmplifierPowerPercent)})</color>";
+            return text;
+        }
 
         /// <summary>Weg eines Pulses ausgeschrieben: «#1 → Trace (2, 1) → Diode (3, 1) → #2».</summary>
         private static string PathText(LogicBoard board, PulseLink link)
@@ -692,6 +903,11 @@ namespace Betaknight.Overworld.UI
             FighterView f = _playback.Fighters[fighter];
             LogicBoard board = f.Info.Combatant?.Board ?? LogicBoard.FallbackOnly;
             string text = UiTexts.Arena.EnemyTip(f.Info.Name, string.Join("\n", EnemyBoard.Lines(board).Select(l => $"• {l}")));
+            // A-21: eigene Effekte und Hacks des Gegners mit Symbol und Text aus den Daten.
+            List<string> effects = board.Rows.Where(r => r.Skill != null).SelectMany(r => r.Skill.CircuitEffects).Distinct().ToList();
+            foreach (string tip in EffectText.Tips(effects)) text += "\n" + tip;
+            string rules = EffectText.BoardRules(board);
+            if (rules.Length > 0) text += "\n" + UiTexts.Effects.Board(rules);
             _enemyTips[fighter] = text;
             return text;
         }
@@ -733,6 +949,13 @@ namespace Betaknight.Overworld.UI
             string text = skipped != null ? UiTexts.Arena.NowAndLast(now, skipped) : UiTexts.Arena.Now(now);
             List<string> pulses = PulseLines(board, row, state);
             if (pulses.Count > 0) text += "\n" + string.Join("\n", pulses);
+            if (board != null && row >= 0 && row < board.Rows.Count)
+            {
+                // A-21: Effekte der Komponente und Hitze.
+                foreach (string tip in EffectText.Tips(EffectText.Of(board.Rows[row]))) text += "\n" + tip;
+                int heat = _fx.Heat(PlayerFighter, row);
+                if (heat > 0) text += "\n" + UiTexts.Effects.HeatTip(heat, board.EffectConfig.HeatSkipAt);
+            }
             return $"{head}{text}\n{QueueRule}";
         }
 
@@ -873,7 +1096,7 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndHorizontal();
 
             var lines = new List<LogEntry>();
-            foreach (LogEntry e in _playback.Entries) if (e.Matches(_filter)) lines.Add(e);
+            foreach (LogEntry e in MergedLog()) if (e.Matches(_filter)) lines.Add(e);
 
             if (_playback.IsFinished)
             {
@@ -887,6 +1110,24 @@ namespace Betaknight.Overworld.UI
                 for (int i = Mathf.Max(0, lines.Count - visible); i < lines.Count; i++) GUILayout.Label(LogText(lines[i]), _logLine);
             }
             GUILayout.EndArea();
+        }
+
+        /// <summary>Protokoll der Wiedergabe und Zeilen der eigenen Effekte (A-21), nach Zeit zusammengeführt (zwischengespeichert).</summary>
+        private List<LogEntry> MergedLog()
+        {
+            IReadOnlyList<LogEntry> a = _playback.Entries;
+            IReadOnlyList<LogEntry> b = _fx.Entries;
+            if (a.Count == _mergedA && b.Count == _mergedB) return _mergedLog;
+            _mergedLog.Clear();
+            int i = 0, j = 0;
+            while (i < a.Count || j < b.Count)
+            {
+                if (j >= b.Count || (i < a.Count && a[i].Tick <= b[j].Tick)) _mergedLog.Add(a[i++]);
+                else _mergedLog.Add(b[j++]);
+            }
+            _mergedA = a.Count;
+            _mergedB = b.Count;
+            return _mergedLog;
         }
 
         private void FilterButton(LogFilter filter, string label)
@@ -933,6 +1174,9 @@ namespace Betaknight.Overworld.UI
                     _playback.TakePopups();
                     _popups.Clear();
                     _pulses.Clear();
+                    _fx.Advance(_playback.Tick);
+                    _fx.TakeFlashes();
+                    _effectFlashes.Clear();
                 }
             }
             GUILayout.EndHorizontal();
@@ -1033,6 +1277,7 @@ namespace Betaknight.Overworld.UI
                 case StatusIds.Blinded: return UiTexts.Arena.StatusBlind;
                 case StatusIds.Anchor: return UiTexts.Arena.StatusAnchor;
                 case StatusIds.Thrusters: return UiTexts.Arena.StatusThrusters;
+                case StatusIds.Latency: return UiTexts.Arena.StatusLatency;
                 default: return id;
             }
         }
@@ -1086,6 +1331,10 @@ namespace Betaknight.Overworld.UI
             _cell.normal.textColor = Color.white;
             _tooltip = new GUIStyle(GUI.skin.label) { fontSize = 13, richText = true, wordWrap = true };
             _tooltip.normal.textColor = new Color(0.92f, 0.94f, 0.98f);
+            _thermal = new GUIStyle(_small) { alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            _thermal.normal.textColor = new Color(1f, 0.62f, 0.35f);
+            _thermalFlash = new GUIStyle(_thermal);
+            _thermalFlash.normal.textColor = Color.white;
         }
     }
 }

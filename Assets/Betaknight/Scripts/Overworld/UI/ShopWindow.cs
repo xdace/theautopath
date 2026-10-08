@@ -11,6 +11,8 @@ namespace Betaknight.Overworld.UI
     /// <summary>
     /// Shop-Fenster: Runen und Teile kaufen (anlegen oder ins Inventar), Logik-Chips (A-20, ins Chip-Inventar), Inventar
     /// verkaufen, heilen, Platinen-Erweiterung, neu würfeln.
+    /// A-21: Reroll mit steigendem Preis je Besuch; jedes Angebot hat einen Lock-Knopf (gesperrt bleibt es beim Reroll und im
+    /// nächsten Shop), gesperrte Angebote sind gold markiert, der Knopf ist aus, wenn alle Lock-Plätze belegt sind.
     /// </summary>
     public sealed class ShopWindow : MonoBehaviour
     {
@@ -20,6 +22,7 @@ namespace Betaknight.Overworld.UI
         private GUIStyle _textStyle;
         private GUIStyle _itemStyle;
         private GUIStyle _plainStyle;
+        private GUIStyle _lockStyle;
         private Vector2 _scroll;
 
         public void Initialize(OverworldSession session)
@@ -62,6 +65,7 @@ namespace Betaknight.Overworld.UI
 
             GUILayout.Label(UiTexts.Shop.Title, _titleStyle);
             GUILayout.Label(UiTexts.Shop.Status(_session.Stats.Gold, _session.Stats.Hp, _session.Stats.MaxHp, _session.BoardSize, _session.Board.Relays.Count), _textStyle);
+            GUILayout.Label(new GUIContent($"<color=#ffd75e>{UiTexts.Shop.Locks(_session.LockedOffers.Count, prices.LockSlots)}</color>", UiTexts.Shop.LockTip(prices.LockSlots)), _plainStyle);
             GUILayout.Space(6f);
             _scroll = GUILayout.BeginScrollView(_scroll);
 
@@ -71,10 +75,17 @@ namespace Betaknight.Overworld.UI
             for (int i = 0; i < runes.Count; i++)
             {
                 RuneDefinition rune = runes[i];
-                GUI.enabled = _session.CanBuyShopRune(i);
                 string hints = SkillText.EvolutionHints(_session.EvolutionHintsForRune(rune.Id));
-                string label = UiTexts.Shop.RuneLabel(RuneText.DifficultyBadge(rune), rune.Name, rune.Tag.DisplayName(), prices.Rune, rune.Description, hints);
-                if (GUILayout.Button(new GUIContent(label, RuneText.DifficultyTip(rune)), _itemStyle, GUILayout.Height(58f + 18f * (hints.Split('\n').Length - 1))))
+                string label = UiTexts.Shop.RuneLabel(RuneText.DifficultyBadge(rune), rune.Name, rune.Tag.DisplayName(), prices.Rune, rune.Description, hints)
+                    + LockedMark(ShopOfferKind.Rune, i);
+                float height = 58f + 18f * (hints.Split('\n').Length - 1);
+                GUILayout.BeginHorizontal();
+                GUI.enabled = _session.CanBuyShopRune(i);
+                bool buy = GUILayout.Button(new GUIContent(label, RuneText.DifficultyTip(rune)), _itemStyle, GUILayout.Height(height));
+                GUI.enabled = true;
+                DrawLock(ShopOfferKind.Rune, i, prices, height);
+                GUILayout.EndHorizontal();
+                if (buy)
                 {
                     if (_session.Board.IsFull) _runeAwaitingSlot = i;
                     else _session.BuyShopRune(i);
@@ -89,7 +100,7 @@ namespace Betaknight.Overworld.UI
                 string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)}" : string.Empty;
                 string setBlock = ItemText.SynergyBlock(_session, item);
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label($"{UiTexts.Shop.ItemHead(item.Name, item.Slot.DisplayName(), prices.Item, set)}\n{ItemText.Describe(item)}{RuneText.Eases(_session, item.Id)}\n<size=13>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>{(setBlock.Length > 0 ? $"\n<size=13>{setBlock}</size>" : string.Empty)}", _plainStyle);
+                GUILayout.Label($"{UiTexts.Shop.ItemHead(item.Name, item.Slot.DisplayName(), prices.Item, set)}{LockedMark(ShopOfferKind.Item, i)}\n{ItemText.Describe(item)}{RuneText.Eases(_session, item.Id)}\n<size=13>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>{(setBlock.Length > 0 ? $"\n<size=13>{setBlock}</size>" : string.Empty)}", _plainStyle);
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _session.CanBuyShopItem(i, ItemPlacement.Equip);
                 if (GUILayout.Button(worn != null ? UiTexts.Shop.BuyAndEquipSwap(worn.Name) : UiTexts.Shop.BuyAndEquip, GUILayout.Height(28f)))
@@ -97,6 +108,7 @@ namespace Betaknight.Overworld.UI
                 GUI.enabled = _session.CanBuyShopItem(i, ItemPlacement.Inventory);
                 if (GUILayout.Button(UiTexts.Shop.BuyToInventory, GUILayout.Height(28f))) _session.BuyShopItem(i, ItemPlacement.Inventory);
                 GUI.enabled = true;
+                DrawLock(ShopOfferKind.Item, i, prices, 28f);
                 GUILayout.EndHorizontal();
                 GUILayout.EndVertical();
             }
@@ -106,8 +118,11 @@ namespace Betaknight.Overworld.UI
             {
                 int index = i;
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label(SkillText.Describe(_session, skills[i], UiTexts.PriceTag(prices.Skill)), _plainStyle);
+                GUILayout.Label(SkillText.Describe(_session, skills[i], UiTexts.PriceTag(prices.Skill) + LockedMark(ShopOfferKind.Skill, i)), _plainStyle);
+                GUILayout.BeginHorizontal();
                 SkillText.DrawChoice(_session, skills[i], _session.CanBuyShopSkill(i), UiTexts.Shop.BuySkill, choice => _session.BuyShopSkill(index, choice));
+                DrawLock(ShopOfferKind.Skill, i, prices, 28f);
+                GUILayout.EndHorizontal();
                 GUILayout.EndVertical();
             }
 
@@ -116,8 +131,11 @@ namespace Betaknight.Overworld.UI
             {
                 int index = i;
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label(ModuleText.Describe(_session, modules[i], UiTexts.PriceTag(prices.Module)), _plainStyle);
+                GUILayout.Label(ModuleText.Describe(_session, modules[i], UiTexts.PriceTag(prices.Module) + LockedMark(ShopOfferKind.Module, i)), _plainStyle);
+                GUILayout.BeginHorizontal();
                 ModuleText.DrawChoice(_session, modules[i], _session.CanBuyShopModule(i), UiTexts.Shop.BuyModule, choice => _session.BuyShopModule(index, choice));
+                DrawLock(ShopOfferKind.Module, i, prices, 28f);
+                GUILayout.EndHorizontal();
                 GUILayout.EndVertical();
             }
 
@@ -134,8 +152,11 @@ namespace Betaknight.Overworld.UI
                 : UiTexts.Shop.BoardExpansion(_session.BoardSize, NextBoardSize(), _session.BoardExpansionPrice);
             if (GUILayout.Button(expansion, GUILayout.Height(30f))) _session.BuyBoardExpansion();
 
+            // A-21: Preis steigt mit jedem Reroll dieses Besuchs.
             GUI.enabled = _session.CanRerollShop;
-            if (GUILayout.Button(UiTexts.Shop.Reroll(prices.Reroll), GUILayout.Height(30f))) _session.RerollShop();
+            int reroll = _session.ShopRerollPrice;
+            if (GUILayout.Button(new GUIContent(UiTexts.Shop.Reroll(reroll), UiTexts.Shop.RerollTip(reroll + prices.RerollStep)), GUILayout.Height(30f)))
+                _session.RerollShop();
 
             GUI.enabled = true;
             GUILayout.EndScrollView();
@@ -149,10 +170,17 @@ namespace Betaknight.Overworld.UI
             for (int i = 0; i < chips.Count; i++)
             {
                 if (!_session.ChipCatalog.TryGet(chips[i], out ChipDefinition chip)) continue;
+                // A-21: Effekt-Chips mit Symbol und Farbe ihres Effekts.
+                string label = UiTexts.Shop.ChipLabel(chip.Name, prices.Chip, chip.Description);
+                if (EffectText.TryGet(chip.EffectId, out CircuitEffectDefinition effect))
+                    label = $"{EffectText.Icon(effect)} {label}";
+                label += LockedMark(ShopOfferKind.Chip, i);
+                GUILayout.BeginHorizontal();
                 GUI.enabled = _session.CanBuyShopChip(i);
-                bool bought = GUILayout.Button(new GUIContent(UiTexts.Shop.ChipLabel(chip.Name, prices.Chip, chip.Description), UiTexts.Shop.ChipTip),
-                    _itemStyle, GUILayout.Height(58f));
+                bool bought = GUILayout.Button(new GUIContent(label, UiTexts.Shop.ChipTip), _itemStyle, GUILayout.Height(58f));
                 GUI.enabled = true;
+                DrawLock(ShopOfferKind.Chip, i, prices, 58f);
+                GUILayout.EndHorizontal();
                 if (bought)
                 {
                     _session.BuyShopChip(i);
@@ -161,6 +189,24 @@ namespace Betaknight.Overworld.UI
             }
             GUI.enabled = true;
         }
+
+        /// <summary>
+        /// Lock-Knopf eines Angebots (A-21): «Lock» bzw. gold «■ Locked»; aus, wenn alle Lock-Plätze belegt sind (CanLock).
+        /// </summary>
+        private void DrawLock(ShopOfferKind kind, int index, ShopPrices prices, float height)
+        {
+            bool locked = _session.IsLockedAt(kind, index);
+            bool can = _session.CanLock(kind, index);
+            string tip = locked ? UiTexts.Shop.UnlockTip : can ? UiTexts.Shop.LockTip(prices.LockSlots) : UiTexts.Shop.LockFullTip(prices.LockSlots);
+            bool old = GUI.enabled;
+            GUI.enabled = can;
+            if (GUILayout.Button(new GUIContent(locked ? UiTexts.Shop.Locked : UiTexts.Shop.Lock, tip), _lockStyle, GUILayout.Width(84f), GUILayout.Height(height)))
+                _session.ToggleLock(kind, index);
+            GUI.enabled = old;
+        }
+
+        /// <summary>Goldene Markierung «■ locked» hinter einem gesperrten Angebot, sonst leer.</summary>
+        private string LockedMark(ShopOfferKind kind, int index) => _session.IsLockedAt(kind, index) ? UiTexts.Shop.LockedMark : string.Empty;
 
         /// <summary>«4×4»: Grösse nach der nächsten Erweiterung.</summary>
         private string NextBoardSize() => _session.Board.Config.SizeAt(_session.Board.Step + 1).ToString();
@@ -244,6 +290,7 @@ namespace Betaknight.Overworld.UI
                 alignment = TextAnchor.MiddleLeft,
                 padding = new RectOffset(10, 10, 6, 6),
             };
+            _lockStyle = new GUIStyle(GUI.skin.button) { fontSize = 13, richText = true, alignment = TextAnchor.MiddleCenter };
         }
     }
 }

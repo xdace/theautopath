@@ -21,6 +21,10 @@ namespace Betaknight.Overworld.UI
             string kinds = SkillKinds.Names(skill.Kinds);
             string text = $"{UiTexts.Skill.Title(skill.Name)}{(kinds.Length > 0 ? $"  [{kinds}]" : string.Empty)}{suffix}\n<size=13>{skill.Description}";
             if (info != null) text += $"\n<color=#ffd75e>{info.Summary}</color>";
+            // A-21: eigene Effekte des Skills (Hacks …) mit Symbol, Farbe und Text aus den Daten.
+            foreach (string id in skill.CircuitEffects)
+                if (EffectText.TryGet(id, out CircuitEffectDefinition effect))
+                    text += $"\n{UiTexts.Effects.SkillLine(EffectText.Icon(effect), $"<color={effect.Colour}><b>{effect.Name}</b></color>")}: {effect.Description}";
             GrowthRule rule = session.GrowthCatalog.ForSkill(skillId);
             if (rule != null) text += $"\n<color=#b5e48c>{UiTexts.Grows(rule.Text)}</color>";
             string owned = Owned(session, skillId);

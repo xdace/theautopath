@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Betaknight.Core;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Modules;
 using UnityEngine;
 
@@ -25,6 +26,9 @@ namespace Betaknight.Overworld.UI
         {
             if (!session.ModuleCatalog.TryGet(moduleId, out ModuleDefinition module)) return moduleId;
             string text = $"{UiTexts.Module.Title(module.Name, KindName(module.Kind))}{suffix}\n<size=13>{module.Description}";
+            // A-21: Effekt-Modul mit Symbol und Farbe aus den Daten.
+            if (EffectText.TryGet(moduleId, out CircuitEffectDefinition effect))
+                text += $"\n{UiTexts.Effects.ModuleLine(EffectText.Icon(effect), $"<color={effect.Colour}><b>{effect.Name}</b></color>")}";
             string owned = Owned(session, moduleId);
             if (owned.Length > 0) text += $"\n<color=#9fc7ff>{UiTexts.Owned(owned)}</color>";
             text += RuneText.Eases(session, moduleId);
@@ -47,6 +51,8 @@ namespace Betaknight.Overworld.UI
             string name = module.NameFrom(session.ModuleCatalog);
             string tip = (d != null ? d.DescriptionAt(module.Level) : string.Empty) + RuneText.Eases(session, module.ModuleId);
             if (module.ModuleId == ModuleIds.Trigger) return new GUIContent($"↪ {session.DescribeTrigger(module)}", tip);
+            // A-21: Effekt-Module mit farbigem Symbol, Tooltip «Name: Text».
+            if (EffectText.TryGet(module.ModuleId, out CircuitEffectDefinition effect)) return new GUIContent(name, EffectText.Tip(effect));
             return new GUIContent(name, tip);
         }
 

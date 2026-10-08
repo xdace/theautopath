@@ -23,6 +23,8 @@ namespace Betaknight.Overworld.UI
     /// A-20: Pins als Kerben an den Komponenten (typisiert in der Farbe der Art, passend hervorgehoben), Logik-Chips auf dem
     /// Raster und als Leiste unter dem Raster (ziehen = legen/verschieben, Rechtsklick = drehen, zurück auf die Leiste =
     /// abnehmen) und die Pulsverbindungen der kompilierten Platine als Linien.
+    /// A-21: Effekt-Symbole (Farbe aus den Daten) an Komponenten, Skills und Modulen, mit «Name: Text» im Tooltip; Verstärker,
+    /// Watchdog und Effekt-Chips in der Farbe ihres Effekts; Regeln der ganzen Platine (Overflow, Firewall) unter dem Raster.
     /// </summary>
     public sealed class BuildWindow : MonoBehaviour
     {
@@ -234,7 +236,8 @@ namespace Betaknight.Overworld.UI
                 ? $"<color={StateHex(slot)}>{UiTexts.OnBoard(Board.IndexOf(slot) + 1)}</color>"
                 : skill.IsFree ? $"<color={UiTheme.Hex(UiTheme.Good)}>{UiTexts.Free}</color>" : $"<color=#9aa4b2>{skill.Holder.HolderName}</color>";
             string modules = skill.Modules.Count > 0 ? $" <color=#ffd75e>◆{skill.Modules.Count}</color>" : string.Empty;
-            string text = $"<b>{name}</b>{modules}  {where}\n<color=#ffd75e>{ShortStats(info)}</color>";
+            string icons = _session.SkillCatalog.TryGet(skill.SkillId, out SkillDefinition def) ? EffectText.Icons(def.CircuitEffects) : string.Empty;
+            string text = $"{(icons.Length > 0 ? icons + " " : string.Empty)}<b>{name}</b>{modules}  {where}\n<color=#ffd75e>{ShortStats(info)}</color>";
             GUIStyle style = slot != null && slot == _selected ? UiTheme.CellSelected : skill.IsFree ? UiTheme.Cell : UiTheme.EmptyCell;
             GUILayout.Box(new GUIContent(text, SkillTip(skill, info, slot)), style, GUILayout.Height(42f));
             Rect r = GUILayoutUtility.GetLastRect();
@@ -275,6 +278,12 @@ namespace Betaknight.Overworld.UI
 
             SkillInfo basic = _session.DescribeSkill(SkillInstance.BasicAttack(), _skillStats);
             GUILayout.Label($"<color=#9aa4b2>↓ {UiTexts.FallbackLine} · {Effect(basic)}</color>", UiTheme.SmallLine);
+            string rules = EffectText.BoardRules(_compiled);
+            if (rules.Length > 0)
+            {
+                GUILayout.Label(new GUIContent(UiTexts.Effects.Board(rules), EffectText.BoardRulesTip(_compiled)), UiTheme.SmallLine);
+                Hover(GUILayoutUtility.GetLastRect(), EffectText.BoardRulesTip(_compiled));
+            }
             DrawChipStrip(inner);
 
             _partsScroll = GUILayout.BeginScrollView(_partsScroll);
@@ -369,6 +378,7 @@ namespace Betaknight.Overworld.UI
             Color fill = focus ? Color.Lerp(CircuitGrid.ComponentColor, UiTheme.CellHover, 0.8f) : CircuitGrid.ComponentColor;
             Color border = c == _selected ? SelectedColor : StateColor(c);
             CircuitGrid.DrawChip(rect, fill, border, focus ? 3f : 2f, text, ComponentTip(c, index, info), size < 60f ? CircuitGrid.Tiny : CircuitGrid.Label);
+            CircuitGrid.DrawEffectBadges(rect, EffectText.Of(CompiledRow(index)), size);
 
             // Gepackte Zelle merken, damit die Komponente beim Verschieben unter der Maus bleibt.
             Event e = Event.current;
@@ -653,7 +663,9 @@ namespace Betaknight.Overworld.UI
                 GUIContent chip = ModuleText.Chip(_session, m);
                 bool trigger = m.ModuleId == ModuleIds.Trigger;
                 if (trigger) chip.tooltip = chip.tooltip + UiTexts.Build.TriggerClick;
-                chip.text = $"<color=#ffd75e>◆</color>{Shorten(chip.text, trigger ? 14 : 9)}";
+                // A-21: Effekt-Module zeigen ihr Symbol statt ◆.
+                string mark = EffectText.Icon(m.ModuleId);
+                chip.text = $"{(mark.Length > 0 ? mark : "<color=#ffd75e>◆</color>")}{Shorten(chip.text, trigger ? 14 : 9)}";
                 GUILayout.Label(chip, UiTheme.SmallLine, GUILayout.Width(trigger ? 112f : 76f), GUILayout.Height(LineHeight - 8f));
                 Rect r = GUILayoutUtility.GetLastRect();
                 int id = m.InstanceId;
@@ -707,7 +719,8 @@ namespace Betaknight.Overworld.UI
                 string name = m.NameFrom(_session.ModuleCatalog);
                 string where = m.IsFree ? $"<color={UiTheme.Hex(UiTheme.Good)}>{UiTexts.Free}</color>" : $"<color=#9aa4b2>{_session.ModuleWhere(m)}</color>";
                 string kind = d != null ? ModuleText.KindName(d.Kind) : "?";
-                GUILayout.Box(new GUIContent($"<b>{name}</b> <color=#9aa4b2>[{kind}]</color>  {where}", d?.DescriptionAt(m.Level)),
+                string icon = EffectText.Icon(m.ModuleId);
+                GUILayout.Box(new GUIContent($"{(icon.Length > 0 ? icon + " " : string.Empty)}<b>{name}</b> <color=#9aa4b2>[{kind}]</color>  {where}", d?.DescriptionAt(m.Level)),
                     m.IsFree ? UiTheme.Cell : UiTheme.EmptyCell, GUILayout.Height(26f));
                 Rect r = GUILayoutUtility.GetLastRect();
                 int id = m.InstanceId;
@@ -894,7 +907,7 @@ namespace Betaknight.Overworld.UI
                 ChipDefinition chip = chips[i];
                 var rect = new Rect(strip.x + gap + i % perRow * (tile + gap), strip.y + gap + i / perRow * (tile + gap), tile, tile);
                 var look = new CircuitGrid.ChipLook { Capacity = chip.Kind == ChipKind.Capacitor ? capacity : 0 };
-                string tip = $"{UiTexts.Circuit.ChipTip(chip.Name, chip.Description)}\n{UiTexts.Circuit.InventoryDragHint}";
+                string tip = $"{ChipHead(chip)}\n{UiTexts.Circuit.InventoryDragHint}";
                 CircuitGrid.DrawLogicChip(rect, chip, 0, look, tip, CircuitGrid.Tiny);
                 int index = i;
                 _drag.Source(rect, new DragItem(DragKind.LogicChip, index, chip.Name), shortcut: () => QuickPlaceChip(index));
@@ -915,7 +928,7 @@ namespace Betaknight.Overworld.UI
         /// <summary>Tooltip eines Chips auf der Platine: Name, Text, Diode-Richtung, Gatter-Eingänge, Kondensator, Verbindungen.</summary>
         private string ChipTip(BoardChip chip, LogicRelay gate)
         {
-            var lines = new List<string> { UiTexts.Circuit.ChipTip(chip.Name, chip.Definition.Description) };
+            var lines = new List<string> { ChipHead(chip.Definition) };
             if (chip.Kind == ChipKind.Diode)
                 lines.Add(UiTexts.Circuit.DiodeDirection(UiTexts.Circuit.SideName((int)ChipDefinition.DiodeIn(chip.Turns)),
                     UiTexts.Circuit.SideName((int)ChipDefinition.DiodeOut(chip.Turns))));
@@ -934,6 +947,22 @@ namespace Betaknight.Overworld.UI
                 if (carried.Count > 0) lines.Add(UiTexts.Circuit.CarriesLinks(string.Join(", ", carried)));
             }
             return string.Join("\n", lines);
+        }
+
+        /// <summary>Erste Tooltip-Zeile eines Chips; bei Effekt-Chips (A-21) mit Symbol und Farbe des Effekts.</summary>
+        private static string ChipHead(ChipDefinition chip)
+        {
+            if (EffectText.TryGet(chip.EffectId, out CircuitEffectDefinition e))
+                return UiTexts.Effects.Tip(EffectText.Icon(e), $"<color={e.Colour}>{chip.Name}</color>", chip.Description);
+            return UiTexts.Circuit.ChipTip(chip.Name, chip.Description);
+        }
+
+        /// <summary>Komponente der kompilierten Platine zur Komponente <paramref name="index"/> des Builds, sonst null.</summary>
+        private LogicRow CompiledRow(int index)
+        {
+            if (_compiled == null || index < 0 || index >= _compiled.Rows.Count || index >= Board.Components.Count) return null;
+            LogicRow row = _compiled.Rows[index];
+            return row.Rect?.Origin == Board.Components[index].Origin ? row : null;
         }
 
         /// <summary>Pins und Pulse einer Komponente für ihren Tooltip.</summary>
@@ -960,7 +989,13 @@ namespace Betaknight.Overworld.UI
 
         private static string NodeName(PulseNode node) => node.IsCapacitor ? ArenaTexts.CapacitorName(node.Index) : $"#{node.Index + 1}";
 
-        private static string LinkText(PulseLink link) => UiTexts.Circuit.Link(NodeName(link.From), NodeName(link.To), link.Delay);
+        private string LinkText(PulseLink link)
+        {
+            string text = UiTexts.Circuit.Link(NodeName(link.From), NodeName(link.To), link.Delay);
+            if (link.Amplifiers > 0 && _compiled != null)
+                text += $" <color={EffectText.ColourHex(CircuitEffectIds.Amplifier)}>({UiTexts.Circuit.AmplifiedLink(link.Amplifiers, link.Amplifiers * _compiled.EffectConfig.AmplifierPowerPercent)})</color>";
+            return text;
+        }
 
         // ------------------------------------------------------------------ Zustand und Texte
 
@@ -1045,6 +1080,9 @@ namespace Betaknight.Overworld.UI
             }
             if (Board.TouchesCore(c)) lines.Add($"<color=#b18cff>{UiTexts.Build.CoreTip(Board.Config.CoreBonusPercent)}</color>");
             lines.AddRange(PinAndPulseLines(index));
+            // A-21: Effekte aus Skill, Modulen und berührten Effekt-Chips (SkillInfo nennt die des Skills schon).
+            IReadOnlyList<string> effects = EffectText.Of(CompiledRow(index));
+            if (effects.Count > 0) lines.Add(UiTexts.Effects.Line(string.Join(" ", effects.Select(id => $"{EffectText.Icon(id)} {ArenaTexts.EffectName(id)}"))));
             GrowthRule rule = _session.SkillGrowthRule(c.Skill);
             if (rule != null)
             {

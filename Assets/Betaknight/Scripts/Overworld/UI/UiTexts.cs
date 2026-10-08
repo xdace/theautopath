@@ -249,6 +249,17 @@ namespace Betaknight.Overworld.UI
             public static string ChipLabel(string name, int price, string description) =>
                 $"<color=#ffd75e>▣</color>  <b>{name}</b>  [Logic Chip]  – {price} Gold\n{description}";
             public const string ChipTip = "Logic chip (rare): goes to your logic chip inventory. Place, move and rotate it in Build (B).";
+
+            // A-21: Lock und steigender Reroll-Preis.
+            public const string Lock = "Lock";
+            public const string Locked = "<color=#ffd75e><b>■ Locked</b></color>";
+            public const string LockedMark = "  <color=#ffd75e>■ locked</color>";
+            public static string LockTip(int slots) =>
+                $"Lock this offer: it stays when you reroll and comes back in your next shop until you buy or unlock it. Up to {slots} locks at once.";
+            public static string LockFullTip(int slots) => $"All {slots} locks are in use – unlock another offer first.";
+            public const string UnlockTip = "Locked: stays on reroll and in your next shop. Click to unlock.";
+            public static string Locks(int used, int slots) => $"Locks: {used}/{slots}";
+            public static string RerollTip(int next) => $"Rerolls runes, items, skills, modules and chips. Locked offers stay. Each reroll this visit costs more (next after this: {next} Gold).";
         }
 
         // ------------------------------------------------------------------ Belohnung (Angebot)
@@ -403,6 +414,7 @@ namespace Betaknight.Overworld.UI
             public const string NoInputs = "no touching relay yet – place it next to a relay";
             public const string PlainPin = "Pin";
             public const string PulseLegend = "⚡ pulses run along the lines";
+            public const string Watchdog = "WDOG";
 
             public static string ChipTip(string name, string description) => $"<b>{name}</b>: {description}";
             public static string GateInputs(string inputs) => $"Inputs: {inputs}";
@@ -431,6 +443,49 @@ namespace Betaknight.Overworld.UI
             public static string SideName(int side) => side == 0 ? "top" : side == 1 ? "right" : side == 2 ? "bottom" : "left";
             public static string FiredByPulse(string path) => $"Why: fired by a pulse ({path})";
             public static string Why(string text) => $"Why: {text}";
+            public static string AmplifierGain(int percent) => $"+{percent}%";
+            public static string AmplifiedLink(int amplifiers, int percent) =>
+                $"amplified ×{amplifiers}: +{percent} % effect";
+        }
+
+        // ------------------------------------------------------------------ Eigene Effekte der Platine (A-21)
+
+        public static class Effects
+        {
+            public static string Tip(string icon, string name, string description) => $"<b>{icon} {name}</b>: {description}";
+            public static string Line(string icons) => $"Effects: {icons}";
+            public static string SkillLine(string icon, string name) => $"Circuit effect: {icon} {name}";
+            public static string ModuleLine(string icon, string name) => $"Effect module: {icon} {name}";
+            public static string Board(string effects) => $"Board rules: {effects}";
+
+            public static string Heat(int heat, int max) => $"Heat {heat}/{max}";
+            public static string HeatTip(int heat, int max) =>
+                $"Heat {heat}/{max} (Overclock). At {max} Heat this component skips one execution, then its Heat resets.";
+            public const string HeatSkip = "OVERHEAT";
+            public static string Depth(int depth) => $"↻{depth}";
+            public static string DepthTip(int depth, int percent) => $"Recursion depth {depth}: +{percent} % effect";
+            public static string Power(int percent) => $"+{percent}%";
+            public static string PowerTip(int percent) => $"Amplified: +{percent} % effect";
+            public const string Parallel = "parallel";
+            public const string QueueJump = "interrupt";
+            public const string Overflow = "overflow";
+            public const string StackLimit = "stack limit";
+            public const string ShortCircuit = "short circuit";
+            public const string Hijacked = "hijacked";
+
+            public static string Flipped(string left) => $"FLIP {left}";
+            public static string Jammed(int left) => $"JAM ×{left}";
+            public const string HijackMark = "HIJACK";
+            public static string FlippedTip(string relay, string left) => $"<b>Hacked: Bit Flip</b> – {relay} is inverted for {left} more (its condition flips).";
+            public static string JammedTip(string relay, int left) => $"<b>Hacked: Jam</b> – {relay} ignores its next {left} trigger{(left == 1 ? "" : "s")}.";
+            public static string HijackedTip(string component) => $"<b>Hacked: Hijack</b> – the next execution of {component} happens for the hacker.";
+            public static string Firewall(int charges) => $"Firewall ×{charges}";
+            public static string FirewallTip(int charges) => $"<b>Firewall</b>: blocks the next {charges} enemy hack{(charges == 1 ? "" : "s")}.";
+
+            public static string Thermal(int level, int castPercent, int damagePercent) =>
+                $"Thermal Throttling {level}: +{castPercent}% computing time, +{damagePercent}% damage";
+            public const string ThermalTip =
+                "Thermal Throttling: the fight ran long, both boards heat up. Each step makes computing times longer and damage higher for everyone, so every fight ends.";
         }
 
         // ------------------------------------------------------------------ Arena
@@ -503,6 +558,7 @@ namespace Betaknight.Overworld.UI
             public const string StatusBlind = "Blind";
             public const string StatusAnchor = "Anchor";
             public const string StatusThrusters = "Thrust";
+            public const string StatusLatency = "Lag";
 
             public static string Title(string enemy, string time, string portal) =>
                 $"<b>Arena</b> – Knight vs {enemy}   <color=#9aa4b2>{time}</color>{portal}";

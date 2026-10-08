@@ -8,7 +8,9 @@ namespace Betaknight.Overworld.UI
     /// <summary>
     /// Zeichen-Hilfen für die Platine (A-19), gemeinsam für Build-Fenster und Arena: Zellgrösse, Rechteck einer Zelle oder
     /// Form, Zelle unter der Maus, Hintergrund-Raster, Kern und Chips. A-20: Pins als Kerben, Logik-Chips (Leiterbahnen, Diode,
-    /// Gatter, Kondensator, Sicherung), Pulsverbindungen und Pulse. Gerechnet wird nichts; die Fenster entscheiden, was wo liegt.
+    /// Gatter, Kondensator, Sicherung), Pulsverbindungen und Pulse. A-21: Verstärker, Watchdog und Effekt-Chips in der Farbe
+    /// ihres Effekts, Effekt-Symbole an Komponenten, Hitze-Balken, Rekursions-Tiefe, Verstärkung an Pulsen und flackernde
+    /// Markierungen gehackter Teile. Gerechnet wird nichts; die Fenster entscheiden, was wo liegt.
     /// </summary>
     public static class CircuitGrid
     {
@@ -230,6 +232,7 @@ namespace Betaknight.Overworld.UI
                 case ChipKind.Or: return UiTexts.Circuit.Or;
                 case ChipKind.Not: return UiTexts.Circuit.Not;
                 case ChipKind.Fuse: return UiTexts.Circuit.Fuse;
+                case ChipKind.Watchdog: return UiTexts.Circuit.Watchdog;
                 default: return null;
             }
         }
@@ -262,7 +265,11 @@ namespace Betaknight.Overworld.UI
         {
             if (chip == null) return;
             bool gate = chip.IsGate;
+            // A-21: Chips eines eigenen Effekts tragen dessen Farbe (Verstärker, Watchdog, Effekt-Chip).
+            EffectText.TryGet(chip.EffectId, out CircuitEffectDefinition effect);
+            Color effectColour = EffectText.ColourOf(effect);
             Color fill = gate ? GateColor : ChipColor;
+            if (effect != null) fill = Color.Lerp(fill, effectColour, gate ? 0.18f : 0.22f);
             if (gate && look.ShowState && look.Open) fill = Color.Lerp(GateColor, GateOpen, 0.55f);
             if (gate && look.Blown) fill = BlownColor;
             if (look.Focus) fill = Color.Lerp(fill, UiTheme.CellHover, 0.6f);
@@ -303,6 +310,24 @@ namespace Betaknight.Overworld.UI
                     if (look.Capacity > 0) DrawPips(rect, look.Charge, look.Capacity);
                     break;
                 }
+                case ChipKind.Amplifier:
+                {
+                    // Verstärker: Dreieck über der Bahn, Gewinn darunter («+15%»).
+                    float length = Mathf.Max(8f, rect.width * 0.34f);
+                    DrawArrowHead(new Vector2(c.x, c.y - length * 0.55f), Edge.Up, length, effectColour);
+                    int gain = CircuitEffectConfig.Default.AmplifierPowerPercent;
+                    var caption = new Rect(rect.x, rect.yMax - Mathf.Max(14f, rect.height * 0.34f), rect.width, Mathf.Max(14f, rect.height * 0.34f));
+                    GUI.Label(caption, $"<color={effect?.Colour ?? "#ffb03d"}><b>{UiTexts.Circuit.AmplifierGain(gain)}</b></color>", style ?? Label);
+                    break;
+                }
+                case ChipKind.Effect:
+                {
+                    // Effekt-Chip: grosses Symbol in der Farbe des Effekts, Name darunter.
+                    string name = effect != null ? effect.Name : chip.Name;
+                    GUI.Label(rect, $"<size={Mathf.RoundToInt(Mathf.Clamp(rect.height * 0.38f, 12f, 30f))}>{EffectText.Icon(effect)}</size>\n<size=10>{name}</size>",
+                        style ?? Label);
+                    break;
+                }
             }
 
             if (gate)
@@ -321,7 +346,7 @@ namespace Betaknight.Overworld.UI
                 GUI.Label(rect, new GUIContent(string.Empty, tooltip), style ?? Label);
             }
 
-            Color border = look.Border ?? (gate ? GateBorder : new Color(ChipTrace.r, ChipTrace.g, ChipTrace.b, 0.6f));
+            Color border = look.Border ?? (effect != null ? effectColour : gate ? GateBorder : new Color(ChipTrace.r, ChipTrace.g, ChipTrace.b, 0.6f));
             UiTheme.Outline(rect, border, look.Focus ? 3f : 1f);
         }
 
@@ -439,6 +464,107 @@ namespace Betaknight.Overworld.UI
             UiTheme.Fill(new Rect(at.x - glow * 0.5f, at.y - glow * 0.5f, glow, glow), new Color(color.r, color.g, color.b, 0.35f));
             UiTheme.Fill(new Rect(at.x - core * 0.5f, at.y - core * 0.5f, core, core), color);
             UiTheme.Outline(new Rect(at.x - core * 0.5f, at.y - core * 0.5f, core, core), Color.white, 1f);
+        }
+
+        /// <summary>
+        /// A-21: Verstärkung eines Pulses als kleines Schild neben dem Punkt («+15%»). <paramref name="alpha"/> blendet aus.
+        /// </summary>
+        public static void DrawPulseGain(Vector2 at, float size, int percent, float alpha = 1f)
+        {
+            if (percent <= 0) return;
+            Color c = EffectText.ColourOf(CircuitEffectIds.Amplifier);
+            var tag = new Rect(at.x + Mathf.Clamp(size * 0.18f, 6f, 12f), at.y - 18f, 44f, 16f);
+            UiTheme.Fill(tag, new Color(0f, 0f, 0f, 0.75f * alpha));
+            UiTheme.Outline(tag, new Color(c.r, c.g, c.b, alpha), 1f);
+            GUI.Label(tag, $"<color=#{ColorUtility.ToHtmlStringRGBA(new Color(c.r, c.g, c.b, alpha))}><b>{UiTexts.Effects.Power(percent)}</b></color>", Tiny);
+        }
+
+        // ------------------------------------------------------------------ A-21: Effekte an Komponenten
+
+        /// <summary>
+        /// Effekt-Symbole einer Komponente als kleine farbige Kästchen oben rechts (je mit Tooltip «Name: Text»).
+        /// Gibt die Höhe der Leiste zurück (0 ohne Effekte).
+        /// </summary>
+        public static float DrawEffectBadges(Rect rect, IEnumerable<string> ids, float size)
+        {
+            if (ids == null) return 0f;
+            float box = Mathf.Clamp(size * 0.24f, 12f, 20f);
+            float x = rect.xMax - box - 2f;
+            float y = rect.y + 2f;
+            int n = 0;
+            foreach (string id in ids)
+            {
+                if (!EffectText.TryGet(id, out CircuitEffectDefinition e)) continue;
+                if (x < rect.x + 8f) break;
+                var badge = new Rect(x, y, box, box);
+                Color c = EffectText.ColourOf(e);
+                UiTheme.Fill(badge, new Color(c.r * 0.25f, c.g * 0.25f, c.b * 0.25f, 0.95f));
+                UiTheme.Outline(badge, c, 1f);
+                GUI.Label(badge, new GUIContent($"<color={e.Colour}>{EffectText.Glyph(e)}</color>", EffectText.Tip(e)), Tiny);
+                x -= box + 2f;
+                n++;
+            }
+            return n > 0 ? box + 2f : 0f;
+        }
+
+        /// <summary>Hitze-Balken (Overclock) am unteren Rand einer Komponente: Segmente bis zur Grenze, rot blinkend beim Überspringen.</summary>
+        public static void DrawHeatBar(Rect rect, int heat, int max, bool flash, string tooltip = null)
+        {
+            if (max <= 0 || (heat <= 0 && !flash)) return;
+            float h = Mathf.Clamp(rect.height * 0.08f, 4f, 7f);
+            var bar = new Rect(rect.x + 8f, rect.yMax - h - 3f, rect.width - 12f, h);
+            UiTheme.Fill(bar, new Color(0f, 0f, 0f, 0.65f));
+            float seg = bar.width / max;
+            Color hot = EffectText.ColourOf(CircuitEffectIds.Overclock);
+            for (int i = 0; i < max; i++)
+            {
+                bool on = flash || i < heat;
+                Color c = flash ? (Mathf.Repeat(Time.unscaledTime * 10f, 1f) < 0.5f ? Color.white : new Color(1f, 0.2f, 0.15f))
+                    : Color.Lerp(new Color(1f, 0.85f, 0.3f), hot, max <= 1 ? 1f : i / (float)(max - 1));
+                if (on) UiTheme.Fill(new Rect(bar.x + i * seg + 1f, bar.y + 1f, seg - 2f, bar.height - 2f), c);
+            }
+            if (!string.IsNullOrEmpty(tooltip)) GUI.Label(new Rect(bar.x, bar.y - 4f, bar.width, bar.height + 8f), new GUIContent(string.Empty, tooltip));
+        }
+
+        /// <summary>Rekursions-Tiefe als Schild oben links («↻2»), in der Farbe von Recursion.</summary>
+        public static void DrawDepth(Rect rect, int depth, string tooltip)
+        {
+            if (depth <= 0) return;
+            Color c = EffectText.ColourOf(CircuitEffectIds.Recursion);
+            var tag = new Rect(rect.x + 8f, rect.y + 2f, 30f, 16f);
+            UiTheme.Fill(tag, new Color(c.r * 0.3f, c.g * 0.3f, c.b * 0.3f, 0.95f));
+            UiTheme.Outline(tag, c, 1f);
+            GUI.Label(tag, new GUIContent($"<b><color=#{ColorUtility.ToHtmlStringRGB(c)}>{UiTexts.Effects.Depth(depth)}</color></b>", tooltip), Tiny);
+        }
+
+        /// <summary>Flackern für gehackte Teile: an/aus etwa 6× pro Sekunde.</summary>
+        public static bool FlickerOn => Mathf.Repeat(Time.unscaledTime * 6f, 1f) < 0.55f;
+
+        /// <summary>
+        /// Gehacktes Teil (Bit Flip, Jam, Hijack): flackernder Rahmen und Schleier in der Farbe des Hacks, kurzes Schild unten
+        /// («FLIP 1.2 s», «JAM ×2», «HIJACK») mit Tooltip.
+        /// </summary>
+        public static void DrawHack(Rect rect, string effectId, string label, string tooltip)
+        {
+            Color c = EffectText.ColourOf(effectId);
+            bool on = FlickerOn;
+            UiTheme.Fill(rect, new Color(c.r, c.g, c.b, on ? 0.28f : 0.08f));
+            UiTheme.Outline(rect, on ? c : new Color(c.r, c.g, c.b, 0.35f), on ? 3f : 1f);
+            var tag = new Rect(rect.x + 2f, rect.yMax - 17f, Mathf.Min(rect.width - 4f, 74f), 15f);
+            UiTheme.Fill(tag, new Color(0f, 0f, 0f, 0.8f));
+            GUI.Label(tag, new GUIContent($"<b><color=#{ColorUtility.ToHtmlStringRGB(c)}>{EffectText.Glyph(EffectOf(effectId))} {label}</color></b>", tooltip), Tiny);
+        }
+
+        private static CircuitEffectDefinition EffectOf(string id) => EffectText.TryGet(id, out CircuitEffectDefinition e) ? e : null;
+
+        /// <summary>Kurzes Wort über einer Komponente (Overheat, Parallel, Interrupt …), blendet mit <paramref name="alpha"/> aus.</summary>
+        public static void DrawFlash(Rect rect, string text, Color colour, float alpha)
+        {
+            if (alpha <= 0f) return;
+            UiTheme.Outline(rect, new Color(colour.r, colour.g, colour.b, alpha), 3f);
+            var tag = new Rect(rect.center.x - 46f, rect.y - 9f, 92f, 16f);
+            UiTheme.Fill(tag, new Color(0f, 0f, 0f, 0.8f * alpha));
+            GUI.Label(tag, $"<b><color=#{ColorUtility.ToHtmlStringRGBA(new Color(colour.r, colour.g, colour.b, alpha))}>{text}</color></b>", Tiny);
         }
 
         /// <summary>«(2, 1)» – Zelle für Texte, 1-basiert wie die Nummern der Komponenten.</summary>
