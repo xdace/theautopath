@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Betaknight.Core.Arena
 {
@@ -122,12 +123,33 @@ namespace Betaknight.Core.Arena
         // ------------------------------------------------------------------ Kampfprotokoll
 
         public static string LogTriggeredBy(int causeRow) => $"  ↪ triggered by #{causeRow + 1}";
+        public static string LogPulsedBy(int causeRow) => $"  ⚡ pulse from #{causeRow + 1}";
         public const string LogRepeat = "  ↻ Repeat";
         public static string LogFromQueue(string waited) => $"  ⏳ from the queue after {waited}";
         public static string LogQueued(string who, string component) => $"{who}: {component} queued";
         public static string LogMissed(string who, string component, string reason) => $"{who}: missed trigger on {component} ({reason})";
         public static string LogRelay(string who, string relay) => $"{who}: {relay} triggers";
         public static string LogFrozen(string who, string component, string time) => $"{who}: {component} frozen for {time}";
+
+        // ------------------------------------------------------------------ Pulse und Chips (A-20)
+
+        /// <summary>«AND (On Hit + HP Full)», ohne Eingänge «AND (no relay)».</summary>
+        public static string GateLabel(string gate, IReadOnlyList<string> inputs) =>
+            inputs == null || inputs.Count == 0 ? $"{gate} (no relay)" : $"{gate} ({string.Join(" + ", inputs)})";
+
+        public static string LogPulse(string who, string from, string to, int hops) =>
+            hops <= 1 ? $"{who}: pulse {from} → {to}" : $"{who}: pulse {from} → {to} via {hops - 1} trace{(hops - 1 == 1 ? "" : "s")}";
+        public static string LogPulseQueued(string who, string component, string from, string relay) =>
+            $"{who}: {component} queued by pulse from {from} (powered by {relay})";
+        public static string LogCapacitorStored(string who, string capacitor, int stored, int capacity) =>
+            $"{who}: {capacitor} stores a pulse ({stored}/{capacity})";
+        public static string LogCapacitorReleased(string who, string capacitor, int pulses) =>
+            $"{who}: {capacitor} releases {pulses} pulse{(pulses == 1 ? "" : "s")}";
+        public static string LogPulseLost(string who, string capacitor) => $"{who}: {capacitor} is full, pulse lost";
+        public static string LogFuseBlown(string who, string fuse) => $"{who}: {fuse} blows (once per fight)";
+        public static string LogRelayState(string who, string relay, bool on) => $"{who}: {relay} {(on ? "on" : "off")}";
+        public const string PulseCause = "pulse";
+        public static string CapacitorName(int index) => $"Capacitor {index + 1}";
         public static string LogInterrupted(string who, string skill) => $"{who}: {skill} interrupted";
         public static string LogHealed(string whom, int amount) => $"{whom} heals {amount}";
         public static string LogDeath(string whom) => $"{whom} falls";
@@ -191,6 +213,7 @@ namespace Betaknight.Core.Arena
         public static string HintMissedQueued(string component, int count) =>
             $"{component} missed {count} triggers because it was still queued. A faster cast or a less eager relay helps.";
         public static string HintTriggered(string component, int count, string by) => $"{component} was triggered {count}× by {by}.";
+        public static string HintPulsed(string component, int count, string by) => $"{component} fired {count}× from pulses ({by}).";
         public static string HintBonus(string component, string symbol, int damage, string share) =>
             $"{component}: Bonus {symbol} added +{damage} damage ({share} of its damage).";
         public static string HintLongWait(string component, string wait) =>

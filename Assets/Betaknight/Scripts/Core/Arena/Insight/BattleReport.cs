@@ -21,6 +21,26 @@ namespace Betaknight.Core.Arena
         /// <summary>Davon durch Auslöser-Module gestartet.</summary>
         public int FromTriggerModule { get; internal set; }
 
+        /// <summary>Davon über Pulse gestartet (A-20).</summary>
+        public int FromPulse { get; internal set; }
+
+        /// <summary>Wie viele Pulse diese Komponente geschickt hat.</summary>
+        public int PulsesSent { get; internal set; }
+
+        /// <summary>Welche Komponenten diese über Pulse gestartet haben (Index, Anzahl).</summary>
+        internal readonly SortedDictionary<int, int> PulsedBy = new SortedDictionary<int, int>();
+
+        /// <summary>«#1 ×3» oder leer.</summary>
+        public string PulsedByText
+        {
+            get
+            {
+                var parts = new List<string>();
+                foreach (KeyValuePair<int, int> p in PulsedBy) parts.Add(ArenaTexts.TriggeredByPart(p.Key, p.Value));
+                return string.Join(", ", parts);
+            }
+        }
+
         /// <summary>Davon Wiederholungen (Echo, Modul «Multicast»).</summary>
         public int Repeated { get; internal set; }
 
@@ -220,6 +240,14 @@ namespace Betaknight.Core.Arena
                             row.FromTriggerModule++;
                             row.TriggeredBy[e.CauseRow] = (row.TriggeredBy.TryGetValue(e.CauseRow, out int n) ? n : 0) + 1;
                         }
+                        if (e.IsPulse && e.CauseRow >= 0)
+                        {
+                            row.FromPulse++;
+                            row.PulsedBy[e.CauseRow] = (row.PulsedBy.TryGetValue(e.CauseRow, out int p) ? p : 0) + 1;
+                        }
+                        break;
+                    case BattleEventKind.PulseSent:
+                        if (row != null) row.PulsesSent++;
                         break;
                     case BattleEventKind.RowQueued:
                         if (row != null) row.Queued++;
@@ -296,9 +324,12 @@ namespace Betaknight.Core.Arena
                 if (queued >= 3 && queued * 2 >= row.Triggered) _hints.Add(ArenaTexts.HintMissedQueued(row.Name, queued));
             }
 
-            // Auslöser-Ketten: wer startet wen über ein Modul.
+            // Auslöser-Ketten und Pulse: wer startet wen über ein Modul oder eine Verbindung.
             foreach (RowReport row in _rows)
+            {
                 if (row.FromTriggerModule > 0) _hints.Add(ArenaTexts.HintTriggered(row.Name, row.FromTriggerModule, row.TriggeredByText));
+                if (row.FromPulse > 0) _hints.Add(ArenaTexts.HintPulsed(row.Name, row.FromPulse, row.PulsedByText));
+            }
 
             // Schwierigkeits-Bonus: was hat er ausgemacht?
             foreach (RowReport row in _rows)

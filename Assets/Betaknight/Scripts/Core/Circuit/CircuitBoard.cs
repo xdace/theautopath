@@ -139,6 +139,7 @@ namespace Betaknight.Core.Circuit
         private static SkillCatalog _defaultSkills;
         private readonly List<RelayChip> _relays = new List<RelayChip>();
         private readonly List<ComponentSlot> _components = new List<ComponentSlot>();
+        private readonly List<BoardChip> _chips = new List<BoardChip>();
         private readonly Func<string, Shape> _shapeOf;
         private int _nextId = 1;
 
@@ -156,6 +157,9 @@ namespace Betaknight.Core.Circuit
 
         /// <summary>Komponenten in Lesereihenfolge (= Priorität und Index im Kampf).</summary>
         public IReadOnlyList<ComponentSlot> Components => _components;
+
+        /// <summary>Logik-Chips (A-20): Leiterbahnen, Dioden, Gatter, Kondensatoren, Sicherungen, in Lesereihenfolge.</summary>
+        public IReadOnlyList<BoardChip> Chips => _chips;
 
         /// <summary>Nur die Runen der Relais, in Lesereihenfolge.</summary>
         public IReadOnlyList<RuneDefinition> Runes => _relays.Select(r => r.Rune).ToList();
@@ -188,6 +192,7 @@ namespace Betaknight.Core.Circuit
 
         public int IndexOf(RelayChip relay) => _relays.IndexOf(relay);
         public int IndexOf(ComponentSlot component) => _components.IndexOf(component);
+        public int IndexOf(BoardChip chip) => _chips.IndexOf(chip);
 
         internal void NotifyChanged() => Changed?.Invoke();
 
@@ -200,6 +205,8 @@ namespace Betaknight.Core.Circuit
             foreach (RelayChip r in _relays)
                 if (!ReferenceEquals(r, ignore) && rect.Overlaps(r.Rect)) return false;
             foreach (ComponentSlot c in _components)
+                if (!ReferenceEquals(c, ignore) && rect.Overlaps(c.Rect)) return false;
+            foreach (BoardChip c in _chips)
                 if (!ReferenceEquals(c, ignore) && rect.Overlaps(c.Rect)) return false;
             return true;
         }
@@ -238,11 +245,12 @@ namespace Betaknight.Core.Circuit
             return false;
         }
 
-        /// <summary>Was liegt auf der Zelle? Relais, Komponente oder null (frei oder Kern).</summary>
+        /// <summary>Was liegt auf der Zelle? Relais, Komponente, Chip oder null (frei oder Kern).</summary>
         public object At(Cell cell)
         {
             foreach (RelayChip r in _relays) if (r.Position == cell) return r;
             foreach (ComponentSlot c in _components) if (c.Rect.Contains(cell)) return c;
+            foreach (BoardChip c in _chips) if (c.Position == cell) return c;
             return null;
         }
 
@@ -436,6 +444,56 @@ namespace Betaknight.Core.Circuit
             if (_components.Remove(component)) Changed?.Invoke();
         }
 
+        // ------------------------------------------------------------------ Logik-Chips (A-20)
+
+        public BoardChip ChipById(int chipId) => _chips.FirstOrDefault(c => c.ChipId == chipId);
+
+        /// <summary>Legt einen Chip auf eine freie Zelle (gedreht um <paramref name="turns"/> Viertel im Uhrzeigersinn).</summary>
+        public BoardChip AddChip(ChipDefinition chip, Cell at, int turns = 0)
+        {
+            if (chip == null || !IsFree(new CellRect(at, Shape.One))) return null;
+            var placed = new BoardChip(_nextId++, chip, at, turns);
+            _chips.Add(placed);
+            Sort();
+            Changed?.Invoke();
+            return placed;
+        }
+
+        public bool MoveChip(BoardChip chip, Cell to)
+        {
+            if (chip == null || !_chips.Contains(chip)) return false;
+            if (chip.Position == to) return true;
+            if (!IsFree(new CellRect(to, Shape.One), chip)) return false;
+            chip.Position = to;
+            Sort();
+            Changed?.Invoke();
+            return true;
+        }
+
+        /// <summary>Rechtsklick: dreht einen Chip um 90° im Uhrzeigersinn.</summary>
+        public bool RotateChip(BoardChip chip)
+        {
+            if (chip == null || !_chips.Contains(chip)) return false;
+            chip.Turns = (chip.Turns + 1) % 4;
+            Changed?.Invoke();
+            return true;
+        }
+
+        public bool RemoveChip(BoardChip chip)
+        {
+            if (chip == null || !_chips.Remove(chip)) return false;
+            Changed?.Invoke();
+            return true;
+        }
+
+        /// <summary>Pins einer Komponente auf der Platine (A-20).</summary>
+        public List<PlacedPin> PinsOf(ComponentSlot component, PinCatalog pins = null) =>
+            component?.Skill == null ? new List<PlacedPin>()
+                : (pins ?? DefaultPins).Place(component.Skill.SkillId, component.BaseShape, component.Origin, component.Rotated);
+
+        private static PinCatalog _defaultPins;
+        internal static PinCatalog DefaultPins => _defaultPins ?? (_defaultPins = PinCatalog.CreateDefault());
+
         // ------------------------------------------------------------------ Wachstum der Platine
 
         /// <summary>Eine Erweiterung: die Platine wächst nach rechts bzw. unten, alles bleibt liegen.</summary>
@@ -451,6 +509,7 @@ namespace Betaknight.Core.Circuit
         {
             _relays.Sort((a, b) => Cell.CompareReading(a.Position, b.Position));
             _components.Sort((a, b) => Cell.CompareReading(a.Origin, b.Origin));
+            _chips.Sort((a, b) => Cell.CompareReading(a.Position, b.Position));
         }
     }
 }

@@ -71,6 +71,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Auslöser-Modul: normaler Cast, ohne Relais der Ziel-Komponente.</summary>
         Trigger,
+
+        /// <summary>Puls über Pins und Leiterbahnen (A-20): normaler Cast, mit Grenze und Bonus des ursprünglichen Relais.</summary>
+        Pulse,
     }
 
     /// <summary>Vorgemerkte Aktion, die nach der laufenden startet (Wiederholung oder Auslöser).</summary>

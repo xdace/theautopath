@@ -22,6 +22,7 @@ namespace Betaknight.Core.Gear
                 spec.Relays.Add(new RelaySpec(r.Rune.Id, r.Position, r.Level, Specs(board, r.Modules), r.Growth));
             foreach (ComponentSlot c in board.Components)
                 spec.Components.Add(new ComponentSpec(c.Skill?.SkillId, c.Origin, c.Rotated, Specs(board, c.Skill?.Modules), c.Skill?.Growth ?? 0));
+            foreach (BoardChip c in board.Chips) spec.Chips.Add(new ChipSpec(c.Definition.Id, c.Position, c.Turns));
             return spec;
         }
 

@@ -51,6 +51,21 @@ namespace Betaknight.Core.Gear
         }
     }
 
+    /// <summary>Ein Logik-Chip, wie der Spieler ihn gelegt hat (A-20): Chip-Id, Zelle, Vierteldrehungen.</summary>
+    public readonly struct ChipSpec
+    {
+        public readonly string ChipId;
+        public readonly Cell Position;
+        public readonly int Turns;
+
+        public ChipSpec(string chipId, Cell position, int turns = 0)
+        {
+            ChipId = chipId;
+            Position = position;
+            Turns = turns;
+        }
+    }
+
     /// <summary>
     /// Bauplan einer Platine für den Kampf: Grösse, Kern, Relais und Komponenten. Auslöser-Ziele in den Modulen sind
     /// Komponenten-Indizes in Lesereihenfolge (wie <see cref="LogicBoard.Rows"/>).
@@ -63,6 +78,7 @@ namespace Betaknight.Core.Gear
         public int CoreBonusPercent { get; set; }
         public List<RelaySpec> Relays { get; } = new List<RelaySpec>();
         public List<ComponentSpec> Components { get; } = new List<ComponentSpec>();
+        public List<ChipSpec> Chips { get; } = new List<ChipSpec>();
 
         public IEnumerable<ModuleSpec> AllModules => Relays.SelectMany(r => r.Modules).Concat(Components.SelectMany(c => c.Modules));
     }
@@ -79,12 +95,16 @@ namespace Betaknight.Core.Gear
         private readonly SkillCatalog _skills;
         private readonly ModuleCatalog _modules;
         private readonly GrowthCatalog _growth;
+        private readonly PinCatalog _pins;
+        private readonly ChipCatalog _chips;
 
         public DifficultyBonusConfig Bonus { get; }
 
         public BoardFactory(RuneCatalog runes, ConditionRegistry conditions, SkillCatalog skills, ModuleCatalog modules = null,
-            GrowthCatalog growth = null, DifficultyBonusConfig bonus = null)
+            GrowthCatalog growth = null, DifficultyBonusConfig bonus = null, PinCatalog pins = null, ChipCatalog chips = null)
         {
+            _pins = pins ?? PinCatalog.CreateDefault();
+            _chips = chips ?? ChipCatalog.CreateDefault();
             _growth = growth ?? GrowthCatalog.CreateDefault();
             _modules = modules ?? ModuleCatalog.CreateDefault();
             _runes = runes ?? RuneCatalog.CreateDefault();
@@ -110,9 +130,14 @@ namespace Betaknight.Core.Gear
             for (int i = 0; i < componentSpecs.Count; i++) AddTriggers(edges, componentSpecs[i].Modules, GraphNode.Skill(i), components.Count);
             for (int i = 0; i < relaySpecs.Count; i++) AddTriggers(edges, relaySpecs[i].Modules, GraphNode.Block(i), components.Count);
 
+            var chips = new List<LogicChip>();
+            foreach (ChipSpec c in spec.Chips)
+                if (_chips.TryGet(c.ChipId, out ChipDefinition chip)) chips.Add(new LogicChip(chip, c.Position, c.Turns));
+
             SkillDefinition basic = _skills.TryGet(SkillDefinition.BasicAttackId, out SkillDefinition b) ? b : null;
             return LogicBoard.Compile(new BoardLayout(spec.Width, spec.Height, spec.Core), components, relays, basic, Bonus,
-                spec.CoreBonusPercent, edges.Count > 0 ? (_, __) => new LogicGraph(edges) : (Func<IReadOnlyList<LogicRow>, IReadOnlyList<LogicRelay>, LogicGraph>)null);
+                spec.CoreBonusPercent, edges.Count > 0 ? (_, __) => new LogicGraph(edges) : (Func<IReadOnlyList<LogicRow>, IReadOnlyList<LogicRelay>, LogicGraph>)null,
+                chips, _chips.Config, _pins.Config);
         }
 
         /// <summary>Auslöser werden zu Kanten: vom Skill bzw. Relais zur Ziel-Komponente.</summary>
@@ -150,7 +175,8 @@ namespace Betaknight.Core.Gear
             if (rune.UnlockSetId != null && (equipment == null || equipment.SetPieces(rune.UnlockSetId) < SetDefinition.FirstBonusPieces))
                 condition = AlwaysCondition.Instance.Not();
 
-            return new LogicRelay(condition, label, difficulty, Bonus.MaxCells(difficulty), rect, repeat, rune.Id);
+            return new LogicRelay(condition, label, difficulty, Bonus.MaxCells(difficulty), rect, repeat, rune.Id,
+                rune.DifficultyFor(!IsInverted(spec.Modules)));
         }
 
         private LogicRelay Dead(string label, CellRect rect) =>
@@ -167,7 +193,8 @@ namespace Betaknight.Core.Gear
                 skill = ModuleRules.ApplyToSkill(skill, m, _modules.TryGet(m.ModuleId, out ModuleDefinition d) ? d.Name : m.ModuleId);
             if (skill != null && equipment != null) skill = equipment.Boost(skill, extraPassives);
             else if (skill != null && extraPassives != null) skill = SkillPassive.Apply(skill, extraPassives);
-            return new LogicRow(skill, new CellRect(spec.Origin, shape));
+            Shape baseShape = _skills.TryGet(spec.SkillId, out SkillDefinition d0) ? d0.Shape : Shape.One;
+            return new LogicRow(skill, new CellRect(spec.Origin, shape), null, _pins.Place(spec.SkillId, baseShape, spec.Origin, spec.Rotated));
         }
 
         /// <summary>Kehrt ein Modul «Umkehren» das Relais um?</summary>

@@ -236,6 +236,24 @@ namespace Betaknight.Core.Arena
     /// Spielt ein Kampfprotokoll ab, ohne neu zu rechnen: Leben, laufende Aktionen, feuernde Zeile, Protokollzeilen.
     /// Unity-frei, die Arena-Ansicht liest nur den Zustand.
     /// </summary>
+    /// <summary>Ein Puls des Spielers unterwegs (A-20): Verbindung, Start und Ankunft für die Anzeige.</summary>
+    public readonly struct PulseView
+    {
+        public readonly int Link;
+        public readonly int StartTick;
+        public readonly int ArriveTick;
+
+        public PulseView(int link, int startTick, int arriveTick)
+        {
+            Link = link;
+            StartTick = startTick;
+            ArriveTick = arriveTick;
+        }
+
+        /// <summary>0 = am Start, 1 = angekommen.</summary>
+        public float Progress(int tick) => ArriveTick <= StartTick ? 1f : Math.Max(0f, Math.Min(1f, (tick - StartTick) / (float)(ArriveTick - StartTick)));
+    }
+
     public sealed class BattlePlayback
     {
         /// <summary>So lange leuchtet eine Zeile nach dem Auslösen.</summary>
@@ -254,6 +272,10 @@ namespace Betaknight.Core.Arena
         private readonly int[] _relayTicks;
         private readonly int[] _relayCounts;
         private readonly List<QueueView> _queue = new List<QueueView>();
+        private readonly bool[] _relayOn;
+        private readonly int[] _capacitorCharge;
+        private readonly bool[] _fuseBlown;
+        private readonly List<PulseView> _pulses = new List<PulseView>();
 
         public int Tick { get; private set; }
         public int EndTick => _result.EndTick;
@@ -287,7 +309,22 @@ namespace Betaknight.Core.Arena
             _relayCounts = new int[_relayTicks.Length];
             for (int i = 0; i < _skipTicks.Length; i++) _skipTicks[i] = -1;
             for (int i = 0; i < _relayTicks.Length; i++) _relayTicks[i] = -1000;
+            _relayOn = new bool[_relayTicks.Length];
+            _fuseBlown = new bool[_relayTicks.Length];
+            _capacitorCharge = new int[result.PlayerBoard?.Chips.Count ?? 0];
         }
+
+        /// <summary>Ist das Relais bzw. Gatter gerade «an» (offen)? Zustand erfüllt oder Ereignis gerade eben (A-20).</summary>
+        public bool IsRelayOn(int relay) => relay >= 0 && relay < _relayOn.Length && _relayOn[relay];
+
+        /// <summary>Hat die Sicherung (Gatter-Relais) schon ausgelöst?</summary>
+        public bool IsFuseBlown(int relay) => relay >= 0 && relay < _fuseBlown.Length && _fuseBlown[relay];
+
+        /// <summary>Gespeicherte Pulse eines Kondensators (Index in den Chips der Platine).</summary>
+        public int CapacitorCharge(int chip) => chip >= 0 && chip < _capacitorCharge.Length ? _capacitorCharge[chip] : 0;
+
+        /// <summary>Pulse des Spielers, die gerade unterwegs sind.</summary>
+        public IReadOnlyList<PulseView> Pulses => _pulses;
 
         /// <summary>Holt die schwebenden Zahlen, die seit dem letzten Aufruf entstanden sind.</summary>
         public List<Popup> TakePopups()
@@ -358,6 +395,7 @@ namespace Betaknight.Core.Arena
             Tick = Math.Min(_result.EndTick, Tick + ticks);
             while (_next < _result.Events.Count && _result.Events[_next].Tick <= Tick)
                 Apply(_result.Events[_next++]);
+            _pulses.RemoveAll(p => p.ArriveTick < Tick);
             foreach (FighterView f in _fighters)
             {
                 if (f.StunnedUntil > 0 && Tick >= f.StunnedUntil) f.StunnedUntil = 0;
@@ -434,6 +472,35 @@ namespace Betaknight.Core.Arena
                         _relayTicks[e.Relay] = e.Tick;
                         _relayCounts[e.Relay]++;
                     }
+                    break;
+
+                case BattleEventKind.RelayState:
+                    if (source == null || source.Info.Side != Side.Player) break;
+                    if (e.Extra >= 0 && e.Extra < _relayOn.Length) _relayOn[e.Extra] = e.Amount == 1;
+                    break;
+
+                case BattleEventKind.FuseBlown:
+                    if (source == null || source.Info.Side != Side.Player) break;
+                    if (e.Relay >= 0 && e.Relay < _fuseBlown.Length) _fuseBlown[e.Relay] = true;
+                    Log(e, LogCategory.None);
+                    break;
+
+                case BattleEventKind.PulseSent:
+                    if (source == null || source.Info.Side != Side.Player) break;
+                    _pulses.Add(new PulseView(e.Extra, e.Tick, e.Tick + e.Amount));
+                    Log(e, LogCategory.None, classic: false);
+                    break;
+
+                case BattleEventKind.CapacitorStored:
+                case BattleEventKind.CapacitorReleased:
+                case BattleEventKind.PulseLost:
+                    if (source == null || source.Info.Side != Side.Player) break;
+                    if (e.Extra >= 0 && e.Extra < _capacitorCharge.Length)
+                    {
+                        if (e.Kind == BattleEventKind.CapacitorStored) _capacitorCharge[e.Extra] = e.Amount;
+                        else if (e.Kind == BattleEventKind.CapacitorReleased) _capacitorCharge[e.Extra] = 0;
+                    }
+                    Log(e, LogCategory.None);
                     break;
 
                 case BattleEventKind.Frozen:

@@ -20,6 +20,12 @@ namespace Betaknight.Core.Arena
         /// <summary>Flanken-Gedächtnis der Teile einer ODER-Bedingung.</summary>
         internal bool[] PartWasMet;
 
+        /// <summary>Gilt das Relais gerade als «an»? Zustand: erfüllt; Ereignis: kurz nach dem Auslösen (für Gatter, A-20).</summary>
+        public bool Active { get; internal set; }
+
+        /// <summary>Hat das Relais in diesem Tick ausgelöst?</summary>
+        public bool TriggeredNow { get; internal set; }
+
         /// <summary>Komponenten, die das Relais versorgt (für «Chain» und «After Own Skill»).</summary>
         public IReadOnlyList<int> Powered { get; internal set; } = System.Array.Empty<int>();
 

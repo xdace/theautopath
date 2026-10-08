@@ -53,6 +53,27 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Eine Komponente wurde eingefroren (Freeze). RowIndex = Komponente des Ziels, Amount = Dauer in Ticks.</summary>
         Frozen,
+
+        /// <summary>
+        /// Ein Puls läuft los (A-20). Extra = Index der Verbindung in <see cref="LogicBoard.Links"/>, Amount = Laufzeit in Ticks,
+        /// RowIndex = Komponente, deren Ausführung ihn geschickt hat, <see cref="BattleEvent.Relay"/> = ursprüngliches Relais.
+        /// </summary>
+        PulseSent,
+
+        /// <summary>Ein Kondensator speichert einen Puls. Extra = Chip, Amount = gespeicherte Pulse.</summary>
+        CapacitorStored,
+
+        /// <summary>Ein Kondensator gibt ab. Extra = Chip, Amount = Zahl der Pulse.</summary>
+        CapacitorReleased,
+
+        /// <summary>Ein voller Kondensator verliert einen Puls. Extra = Chip.</summary>
+        PulseLost,
+
+        /// <summary>Eine Sicherung brennt durch (einmal pro Kampf). Amount = Index des Relais (Gatter), Extra = Chip.</summary>
+        FuseBlown,
+
+        /// <summary>Ein Relais oder Gatter geht an (Amount = 1) oder aus (0). Extra = Index des Relais.</summary>
+        RelayState,
     }
 
     /// <summary>Ein Eintrag im Kampfprotokoll. Bedingungen und Set-Boni lesen dieselben Einträge.</summary>
@@ -87,6 +108,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Durch ein Auslöser-Modul gestartet.</summary>
         public bool IsTriggered => Cause == ActionCause.Trigger;
+
+        /// <summary>Über einen Puls gestartet bzw. eingereiht (A-20); <see cref="CauseRow"/> = sendende Komponente.</summary>
+        public bool IsPulse => Cause == ActionCause.Pulse;
 
         /// <summary>Zusatzwert nur für die Anzeige: Stapel bei Zuständen, Obergrenze bei Ressourcen (0 = offen).</summary>
         public int Extra { get; internal set; }

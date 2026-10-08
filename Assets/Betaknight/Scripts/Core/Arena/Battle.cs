@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ChipKind = Betaknight.Core.Circuit.ChipKind;
 
 namespace Betaknight.Core.Arena
 {
@@ -30,6 +31,10 @@ namespace Betaknight.Core.Arena
         private int _actorPower;
 
         private readonly QueueConfig _queue;
+
+        // Pulse unterwegs und Kondensator-Ladung je Kämpfer (A-20).
+        private readonly Dictionary<Combatant, List<PulseInFlight>> _pulses = new Dictionary<Combatant, List<PulseInFlight>>();
+        private readonly Dictionary<Combatant, CapacitorState[]> _capacitors = new Dictionary<Combatant, CapacitorState[]>();
 
         public int Tick { get; private set; }
         public Random Random { get; }
@@ -66,6 +71,10 @@ namespace Betaknight.Core.Arena
             var relays = new RowRuntime[c.Board.Relays.Count];
             for (int i = 0; i < relays.Length; i++) relays[i] = new RowRuntime(i) { Powered = c.Board.Relays[i].Powered };
             _relays.Add(c, relays);
+            _pulses.Add(c, new List<PulseInFlight>());
+            var caps = new CapacitorState[c.Board.Chips.Count];
+            for (int i = 0; i < caps.Length; i++) caps[i] = new CapacitorState();
+            _capacitors.Add(c, caps);
             return c;
         }
 
@@ -89,6 +98,7 @@ namespace Betaknight.Core.Arena
                 UpdateTime();
                 AdvanceActions();
                 TriggerRelays();
+                DeliverPulses();
                 Decide();
                 outcome = CheckEnd();
                 if (outcome.HasValue) break;
@@ -100,8 +110,12 @@ namespace Betaknight.Core.Arena
                 outcome = BattleOutcome.Timeout;
             }
 
-            // Die Warteschlange leert sich am Kampfende.
-            foreach (Combatant c in _all) c.QueueList.Clear();
+            // Die Warteschlange leert sich am Kampfende, Pulse unterwegs verfallen.
+            foreach (Combatant c in _all)
+            {
+                c.QueueList.Clear();
+                _pulses[c].Clear();
+            }
             Emit(new BattleEvent(Tick, BattleEventKind.BattleEnd, null, null, (int)outcome.Value));
             foreach (Combatant c in _all)
                 foreach (BattleModifier m in c.ModifierList.ToArray()) m.OnBattleEnd(this, c, outcome.Value);
@@ -244,6 +258,8 @@ namespace Betaknight.Core.Arena
             LogicRelay relay = a.Relay >= 0 && a.Relay < c.Board.Relays.Count ? c.Board.Relays[a.Relay] : null;
             // Der Bonus und die Grenze wandern mit: ausgelöste Ziele laufen mit Stufe und Grenze dieser Ausführung.
             FireEdges(c, GraphNode.Skill(a.RowIndex), a.BonusTier, a.Relay, relay?.MaxCells ?? int.MaxValue);
+            // A-20: die Komponente schickt Pulse über ihre Verbindungen; Ziele zählen als versorgt vom ursprünglichen Relais.
+            SendPulses(c, PulseNode.Component(a.RowIndex), a.RowIndex, a.Relay, a.BonusTier, relay?.MaxCells ?? int.MaxValue);
 
             if (relay != null && relay.RepeatWhileTrue && relay.Condition.IsMet(new ConditionContext(this, c, _relays[c][a.Relay]), out Combatant target))
                 Enqueue(c, a.RowIndex, a.Relay, ActionCause.Board, -1, a.BonusTier, relay.MaxCells, target);
@@ -320,21 +336,196 @@ namespace Betaknight.Core.Arena
             {
                 if (!c.IsAlive || OpponentsOf(c).Count == 0) continue;
                 RowRuntime[] states = _relays[c];
+                int hold = c.Board.ChipConfig.GateHoldTicks;
+
+                // Erst die Relais mit eigener Bedingung, dann die Gatter (A-20), die deren Zustand lesen.
                 for (int i = 0; i < states.Length; i++)
                 {
                     LogicRelay relay = c.Board.Relays[i];
+                    states[i].TriggeredNow = false;
+                    if (relay.Gate != null) continue;
                     var context = new ConditionContext(this, c, states[i]);
                     if (relay.Condition is IObservingCondition observing) observing.Observe(context);
-                    if (!Triggers(relay.Condition, context, states[i], out Combatant target)) continue;
+                    bool fired = Triggers(relay.Condition, context, states[i], out Combatant target);
+                    if (fired) Fire(c, i, target);
+                    bool active = relay.IsEventTrigger ? states[i].FireCount > 0 && Tick - states[i].LastFiredTick < hold : states[i].WasMet;
+                    SetActive(c, i, active);
+                }
+                for (int i = 0; i < states.Length; i++)
+                {
+                    LogicRelay gate = c.Board.Relays[i];
+                    if (gate.Gate == null || !gate.IsGateReady) continue;
+                    if (GateTriggers(c, gate, states, out bool level)) Fire(c, i, null);
+                    SetActive(c, i, level);
+                }
+                ReleaseCapacitorsOnTimeout(c);
+            }
+        }
 
-                    states[i].LastFiredTick = Tick;
-                    states[i].FireCount++;
-                    Emit(new BattleEvent(Tick, BattleEventKind.RelayTriggered, c, target, i, relay.Label) { Extra = relay.Powered.Count, Relay = i });
-                    foreach (int row in relay.Powered) Enqueue(c, row, i, ActionCause.Board, -1, relay.Difficulty, relay.MaxCells, target);
-                    foreach (int row in relay.TooLarge) Missed(c, row, i, MissReason.TooLarge);
-                    FireEdges(c, GraphNode.Block(i), relay.Difficulty, i, relay.MaxCells);
+        /// <summary>Ein Relais oder Gatter löst aus: versorgte Komponenten einreihen, zu grosse verpassen, Auslöser und Kondensatoren.</summary>
+        private void Fire(Combatant c, int i, Combatant target)
+        {
+            RowRuntime state = _relays[c][i];
+            LogicRelay relay = c.Board.Relays[i];
+            state.LastFiredTick = Tick;
+            state.FireCount++;
+            state.TriggeredNow = true;
+            Emit(new BattleEvent(Tick, BattleEventKind.RelayTriggered, c, target, i, relay.Label) { Extra = relay.Powered.Count, Relay = i });
+            if (relay.OncePerFight) Emit(new BattleEvent(Tick, BattleEventKind.FuseBlown, c, null, i, relay.Label) { Extra = relay.ChipIndex, Relay = i });
+            foreach (int row in relay.Powered) Enqueue(c, row, i, ActionCause.Board, -1, relay.Difficulty, relay.MaxCells, target);
+            foreach (int row in relay.TooLarge) Missed(c, row, i, MissReason.TooLarge);
+            FireEdges(c, GraphNode.Block(i), relay.Difficulty, i, relay.MaxCells);
+            foreach (LogicChip chip in c.Board.Chips)
+                if (chip.Kind == ChipKind.Capacitor && chip.ReleaseList.Contains(i)) ReleaseCapacitor(c, chip.Index);
+        }
+
+        private void SetActive(Combatant c, int i, bool active)
+        {
+            RowRuntime state = _relays[c][i];
+            if (state.Active == active) return;
+            state.Active = active;
+            Emit(new BattleEvent(Tick, BattleEventKind.RelayState, c, null, active ? 1 : 0, c.Board.Relays[i].Label) { Extra = i, Relay = i });
+        }
+
+        /// <summary>
+        /// Gatter (A-20): UND löst bei der steigenden Flanke von «beide an» aus, ODER bei jedem Auslösen eines Eingangs,
+        /// NICHT bei der steigenden Flanke von «Eingang aus», die Sicherung beim ersten Auslösen ihres Eingangs.
+        /// </summary>
+        private bool GateTriggers(Combatant c, LogicRelay gate, RowRuntime[] states, out bool level)
+        {
+            RowRuntime own = states[gate.Index];
+            bool rising;
+            switch (gate.Gate.Value)
+            {
+                case ChipKind.And:
+                    level = true;
+                    foreach (int input in gate.Inputs) level &= states[input].Active;
+                    rising = level && !own.WasMet;
+                    own.WasMet = level;
+                    return rising;
+                case ChipKind.Or:
+                    level = false;
+                    bool any = false;
+                    foreach (int input in gate.Inputs)
+                    {
+                        level |= states[input].Active;
+                        any |= states[input].TriggeredNow;
+                    }
+                    return any;
+                case ChipKind.Not:
+                    level = !states[gate.Inputs[0]].Active;
+                    rising = level && !own.WasMet;
+                    own.WasMet = level;
+                    return rising;
+                case ChipKind.Fuse:
+                    level = own.FireCount == 0;
+                    return own.FireCount == 0 && states[gate.Inputs[0]].TriggeredNow;
+                default:
+                    level = false;
+                    return false;
+            }
+        }
+
+        // ------------------------------------------------------------------ Pulse (A-20)
+
+        /// <summary>Schickt einen Puls über jede Verbindung des Knotens; er kommt nach der Laufzeit der Verbindung an.</summary>
+        private void SendPulses(Combatant c, PulseNode from, int sourceRow, int relay, int tier, int maxCells)
+        {
+            IReadOnlyList<PulseLink> links = c.Board.Links;
+            for (int i = 0; i < links.Count; i++)
+            {
+                PulseLink link = links[i];
+                if (!link.From.Equals(from)) continue;
+                _pulses[c].Add(new PulseInFlight
+                {
+                    Link = i, ArriveTick = Tick + link.Delay, SourceRow = sourceRow, Relay = relay, Tier = tier, MaxCells = maxCells,
+                });
+                Emit(new BattleEvent(Tick, BattleEventKind.PulseSent, c, null, link.Delay, null, sourceRow) { Extra = i, Relay = relay, Tier = tier });
+            }
+        }
+
+        /// <summary>Angekommene Pulse reihen ihr Ziel ein oder laden einen Kondensator.</summary>
+        private void DeliverPulses()
+        {
+            foreach (Combatant c in _all)
+            {
+                List<PulseInFlight> flying = _pulses[c];
+                if (flying.Count == 0) continue;
+                if (!c.IsAlive || OpponentsOf(c).Count == 0)
+                {
+                    flying.Clear();
+                    continue;
+                }
+                var arrived = new List<PulseInFlight>();
+                for (int i = flying.Count - 1; i >= 0; i--)
+                {
+                    if (flying[i].ArriveTick > Tick) continue;
+                    arrived.Add(flying[i]);
+                    flying.RemoveAt(i);
+                }
+                arrived.Reverse();
+                foreach (PulseInFlight p in arrived)
+                {
+                    PulseLink link = c.Board.Links[p.Link];
+                    if (link.To.IsCapacitor) Store(c, link.To.Index, p);
+                    else Enqueue(c, link.To.Index, p.Relay, ActionCause.Pulse, p.SourceRow, p.Tier, p.MaxCells, null);
                 }
             }
+        }
+
+        private void Store(Combatant c, int chip, PulseInFlight pulse)
+        {
+            CapacitorState cap = _capacitors[c][chip];
+            int capacity = Math.Max(1, c.Board.ChipConfig.CapacitorCapacity);
+            if (cap.Stored.Count >= capacity)
+            {
+                Emit(new BattleEvent(Tick, BattleEventKind.PulseLost, c, null, cap.Stored.Count) { Extra = chip, Relay = pulse.Relay });
+                return;
+            }
+            if (cap.Stored.Count == 0) cap.FirstStoredTick = Tick;
+            cap.Stored.Add(pulse);
+            Emit(new BattleEvent(Tick, BattleEventKind.CapacitorStored, c, null, cap.Stored.Count) { Extra = chip, Relay = pulse.Relay });
+        }
+
+        private void ReleaseCapacitorsOnTimeout(Combatant c)
+        {
+            CapacitorState[] caps = _capacitors[c];
+            int after = Math.Max(1, c.Board.ChipConfig.CapacitorReleaseTicks);
+            for (int i = 0; i < caps.Length; i++)
+                if (caps[i].Stored.Count > 0 && Tick - caps[i].FirstStoredTick >= after) ReleaseCapacitor(c, i);
+        }
+
+        /// <summary>Der Kondensator gibt alle gespeicherten Pulse ab, jeder mit Grenze und Bonus seines ursprünglichen Relais.</summary>
+        private void ReleaseCapacitor(Combatant c, int chip)
+        {
+            CapacitorState cap = _capacitors[c][chip];
+            if (cap.Stored.Count == 0) return;
+            var stored = new List<PulseInFlight>(cap.Stored);
+            cap.Stored.Clear();
+            Emit(new BattleEvent(Tick, BattleEventKind.CapacitorReleased, c, null, stored.Count) { Extra = chip });
+            foreach (PulseInFlight p in stored) SendPulses(c, PulseNode.Capacitor(chip), p.SourceRow, p.Relay, p.Tier, p.MaxCells);
+        }
+
+        /// <summary>Gespeicherte Pulse eines Kondensators (Anzeige, Tests).</summary>
+        public int CapacitorCharge(Combatant c, int chip) => _capacitors[c][chip].Stored.Count;
+
+        /// <summary>Pulse, die gerade unterwegs sind.</summary>
+        public int PulsesInFlight(Combatant c) => _pulses[c].Count;
+
+        private sealed class PulseInFlight
+        {
+            public int Link;
+            public int ArriveTick;
+            public int SourceRow;
+            public int Relay;
+            public int Tier;
+            public int MaxCells;
+        }
+
+        private sealed class CapacitorState
+        {
+            public readonly List<PulseInFlight> Stored = new List<PulseInFlight>();
+            public int FirstStoredTick;
         }
 
         /// <summary>
