@@ -5,6 +5,7 @@ using Betaknight.Core.Run;
 using Betaknight.Core.Runes;
 using Betaknight.Overworld.Config;
 using Betaknight.Overworld.Controllers;
+using Betaknight.Overworld.Persistence;
 using Betaknight.Overworld.UI;
 using Betaknight.Overworld.Views;
 using UnityEngine;
@@ -38,6 +39,7 @@ namespace Betaknight.Overworld
         private InventoryFullWindow _inventoryFullWindow;
         private MapGenerationConfig _config;
         private KnightKit _kit;
+        private readonly PlayerPrefsRecipeBookStore _recipeStore = new PlayerPrefsRecipeBookStore();
 
         public OverworldSession Session { get; private set; }
 
@@ -119,6 +121,7 @@ namespace Betaknight.Overworld
             SetRunWindowsEnabled(true);
 
             Session = session;
+            Session.UseRecipeStore(_recipeStore);
             Session.ActCompleted += OnActCompleted;
 
             _root = new GameObject($"Overworld (Akt {Session.Act})");

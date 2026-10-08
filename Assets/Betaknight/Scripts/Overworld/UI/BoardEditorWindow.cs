@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
 using Betaknight.Core.Gear;
+using Betaknight.Core.Growth;
 using Betaknight.Core.Modules;
 using Betaknight.Core.Runes;
 using Betaknight.Core.Skills;
@@ -121,6 +122,7 @@ namespace Betaknight.Overworld.UI
 
             GUILayout.EndHorizontal();
             DrawSkillInfo(row.Skill);
+            DrawGrowth(row);
             DrawModuleSlots("Baustein", row);
             if (row.Skill != null && !row.Skill.IsBasicAttack) DrawModuleSlots("Skill", row.Skill);
             GUILayout.EndVertical();
@@ -244,6 +246,28 @@ namespace Betaknight.Overworld.UI
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
             }
+        }
+
+        /// <summary>
+        /// Wachstum der Zeile: Regel, aktuelle Wirkung und nächster Meilenstein für Skill und Baustein,
+        /// dazu der Fortschritt zu Evolutionen (violett).
+        /// </summary>
+        private void DrawGrowth(RuneSlot row)
+        {
+            var lines = new List<string>();
+            SkillInstance skill = row.Skill;
+            GrowthRule skillRule = _session.SkillGrowthRule(skill);
+            if (skillRule != null) lines.Add(GrowthLine("Skill", skillRule, skill.Growth, _session.GrowthEffectText(skillRule, skill.Growth), true));
+            GrowthRule rowRule = _session.RowGrowthRule(row);
+            if (rowRule != null) lines.Add(GrowthLine("Baustein", rowRule, row.Growth, _session.GrowthEffectText(rowRule, row.Growth, row), false));
+            foreach (string evolution in _session.EvolutionProgressFor(row)) lines.Add($"<color=#d29bff>{evolution}</color>");
+            if (lines.Count > 0) GUILayout.Label($"<size=12>{string.Join("\n", lines)}</size>", _info);
+        }
+
+        private string GrowthLine(string label, GrowthRule rule, int growth, string effect, bool skill)
+        {
+            string now = effect.Length > 0 ? $" · jetzt {effect}" : string.Empty;
+            return $"<color=#b5e48c>{label} wächst: {rule.Text}{now}</color> <color=#888888>({_session.MilestoneText(growth, skill)})</color>";
         }
 
         /// <summary>Infozeile unter dem Skill: Wirkung, Schaden (Prozent und konkret), CD, Ausholen, Erholung. Tooltip mit allen Details.</summary>

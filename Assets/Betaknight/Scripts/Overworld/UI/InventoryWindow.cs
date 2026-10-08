@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Evolution;
 using Betaknight.Core.Gear;
+using Betaknight.Core.Growth;
 using Betaknight.Core.Runes;
 using Betaknight.Core.Modules;
 using Betaknight.Core.Skills;
@@ -163,6 +165,8 @@ namespace Betaknight.Overworld.UI
             {
                 string preview = ItemText.TagPreview(_session, item);
                 if (preview.Length > 0) GUILayout.Label(preview, _small);
+                string evolutions = SkillText.EvolutionHints(_session.EvolutionHintsForItem(item));
+                if (evolutions.Length > 0) GUILayout.Label($"<size=12>{evolutions.TrimStart('\n')}</size>", _small);
             }
 
             GUILayout.BeginHorizontal();
@@ -258,8 +262,8 @@ namespace Betaknight.Overworld.UI
         // ------------------------------------------------------------------ Synergie-Tags
 
         /// <summary>
-        /// Tag-Zähler mit allen Stufen (erreichte hervorgehoben, nächste Schwelle) und das Rezeptbuch der Duos:
-        /// unentdeckte als Silhouette «???», aktive grün.
+        /// Tag-Zähler mit allen Stufen (erreichte hervorgehoben, nächste Schwelle) und das Rezeptbuch mit Duos und
+        /// Evolutionen: unentdeckte als Silhouette «???» mit Hinweis, entdeckte mit Rezept, aktive Duos grün.
         /// </summary>
         private void DrawTags()
         {
@@ -286,9 +290,17 @@ namespace Betaknight.Overworld.UI
                 bool active = registry.IsDuoActive(duo, _session.Gear);
                 bool known = _session.IsDuoDiscovered(duo.Id);
                 string pair = $"{registry.NameOf(duo.TagA)} {_session.Gear.TagCount(duo.TagA)}/4 + {registry.NameOf(duo.TagB)} {_session.Gear.TagCount(duo.TagB)}/4";
-                string text = known ? $"<b>{duo.Name}</b> ({pair}): {duo.Effect.Text}" : $"<b>???</b> ({pair})";
+                string text = known ? $"<b>Duo {duo.Name}</b> ({pair}): {duo.Effect.Text}" : $"<b>Duo ???</b> ({pair})  <color=#888888>{_session.DuoHint(duo)}</color>";
                 GUILayout.Label(active ? $"<color=#7ddc6f>{text}</color>" : text, _small);
             }
+            foreach (EvolutionRecipe recipe in _session.EvolutionCatalog.All)
+            {
+                bool known = _session.RecipeBook.HasEvolution(recipe.Id);
+                string head = $"<b>Evolution {_session.EvolutionName(recipe)}</b>";
+                string text = known ? $"{head}: {_session.RecipeText(recipe)}" : $"{head}  <color=#888888>{recipe.Hint}</color>";
+                GUILayout.Label($"<color=#d29bff>{text}</color>", _small);
+            }
+            GUILayout.Label("<size=11>Das Rezeptbuch bleibt über Runs erhalten: es merkt sich nur, was du schon entdeckt hast.</size>", _small);
             GUILayout.EndVertical();
         }
 
@@ -307,8 +319,10 @@ namespace Betaknight.Overworld.UI
                 SkillInfo info = _session.DescribeSkill(skill, stats);
                 string kinds = info != null ? SkillKinds.Names(info.Skill.Kinds) : string.Empty;
                 string where = skill.IsFree ? "<color=#7ddc6f>frei</color>" : SkillText.Where(_session, skill);
+                GrowthRule rule = _session.SkillGrowthRule(skill);
+                string growth = rule != null ? $"\n<color=#b5e48c>{rule.Text}</color> <color=#888888>({_session.MilestoneText(skill.Growth, true)})</color>" : string.Empty;
                 string text = $"<b>{skill.NameFrom(_session.SkillCatalog)}</b>  Stufe {skill.Level}/{_session.Progression.MaxSkillLevel}"
-                    + $"  [{kinds}]  {where}\n<size=11>{info?.Summary}</size>";
+                    + $"  [{kinds}]  {where}\n<size=11>{info?.Summary}{growth}</size>";
                 GUILayout.Label(new GUIContent(text, info?.Details), _small);
             }
             if (_session.Skills.Free.Count > 0)

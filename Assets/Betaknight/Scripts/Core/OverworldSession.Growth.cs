@@ -211,10 +211,38 @@ namespace Betaknight.Core
             List<string> missing = recipe.Subject == EvolutionSubject.Skill
                 ? EvolutionMissing(recipe, BestCandidate(recipe))
                 : EvolutionMissing(recipe, BestRowCandidate(recipe));
+            return ProgressText(recipe, missing);
+        }
+
+        private string ProgressText(EvolutionRecipe recipe, List<string> missing)
+        {
             string name = EvolutionName(recipe);
             return missing.Count == 0
                 ? $"Evolution {name}: bereit, nach dem nächsten Boss"
                 : $"Evolution {name}: fehlt {string.Join(", ", missing)}";
+        }
+
+        /// <summary>Fortschritt der Evolutionen genau dieser Zeile (ihr Skill und ihr Baustein), für Tafel und Karte.</summary>
+        public List<string> EvolutionProgressFor(RuneSlot row)
+        {
+            var lines = new List<string>();
+            if (row == null) return lines;
+            if (row.Skill != null && !row.Skill.IsBasicAttack)
+                foreach (EvolutionRecipe r in EvolutionCatalog.From(EvolutionSubject.Skill, row.Skill.SkillId))
+                    lines.Add(ProgressText(r, EvolutionMissing(r, row.Skill)));
+            foreach (EvolutionRecipe r in EvolutionCatalog.From(EvolutionSubject.Block, row.Rune.Id))
+                lines.Add(ProgressText(r, EvolutionMissing(r, row)));
+            return lines;
+        }
+
+        /// <summary>True, wenn sich der Skill oder der Baustein dieser Zeile nach dem nächsten Boss entwickelt.</summary>
+        public bool IsEvolutionReady(RuneSlot row)
+        {
+            if (row == null) return false;
+            if (row.Skill != null && !row.Skill.IsBasicAttack
+                && EvolutionCatalog.From(EvolutionSubject.Skill, row.Skill.SkillId).Any(r => EvolutionMissing(r, row.Skill).Count == 0))
+                return true;
+            return EvolutionCatalog.From(EvolutionSubject.Block, row.Rune.Id).Any(r => EvolutionMissing(r, row).Count == 0);
         }
 
         /// <summary>Fortschritt zu Evolutionen, die ein angebotener Skill, ein Modul, eine Rune oder ein Teil voranbringt.</summary>

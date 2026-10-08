@@ -119,7 +119,9 @@ namespace Betaknight.Overworld.UI
                 string marks = modules > 0 ? $" <color=#ffd75e>◆{modules}</color>" : string.Empty;
                 foreach (OverworldSession.TriggerLink link in _session.TriggerLinks())
                     if (link.From == i) marks += $" <color=#ffae42>↪{link.To + 1}</color>";
-                lines.Add($"{i + 1}. [{row.Name}] → {skill}{marks}");
+                if (_session.IsEvolutionReady(row)) marks += " <color=#d29bff>✦</color>";
+                string block = row.Growth > 0 ? $"{row.Name} +{row.Growth}" : row.Name;
+                lines.Add($"{i + 1}. [{block}] → {skill}{marks}");
             }
             lines.Add("↓ [Immer] → Basisangriff");
             return string.Join("\n", lines);

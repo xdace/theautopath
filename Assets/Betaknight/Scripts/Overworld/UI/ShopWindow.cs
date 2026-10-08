@@ -66,8 +66,9 @@ namespace Betaknight.Overworld.UI
             {
                 RuneDefinition rune = runes[i];
                 GUI.enabled = _session.CanBuyShopRune(i);
-                string label = $"<b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]  – {prices.Rune} Gold\n{rune.Description}";
-                if (GUILayout.Button(label, _itemStyle, GUILayout.Height(58f)))
+                string hints = SkillText.EvolutionHints(_session.EvolutionHintsForRune(rune.Id));
+                string label = $"<b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]  – {prices.Rune} Gold\n{rune.Description}{hints}";
+                if (GUILayout.Button(label, _itemStyle, GUILayout.Height(58f + 18f * (hints.Split('\n').Length - 1))))
                 {
                     if (_session.Runes.IsFull) _runeAwaitingSlot = i;
                     else _session.BuyShopRune(i);
@@ -81,7 +82,7 @@ namespace Betaknight.Overworld.UI
                 EquipmentDefinition worn = _session.Gear.Get(item.Slot);
                 string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)} ({_session.Gear.SetPieces(item.SetId)}/3)" : string.Empty;
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]  – {prices.Item} Gold{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}</size>", _plainStyle);
+                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]  – {prices.Item} Gold{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>", _plainStyle);
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _session.CanBuyShopItem(i, ItemPlacement.Equip);
                 if (GUILayout.Button(worn != null ? $"Kaufen und anlegen ({worn.Name} ins Inventar)" : "Kaufen und anlegen", GUILayout.Height(28f)))

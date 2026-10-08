@@ -47,7 +47,7 @@ Eine Reise stoppt automatisch auf feindlichen Feldern (Gegner, Boss), auf neu en
 |---|---|---|
 | Rune | Runenwahl (Sieg, Truhe, 3 Splitter), Shop | Neue Rune auf eine freie Zeile oder ins Runen-Inventar; schon vorhandene Rune: +1 Stufe |
 | Ausrüstung | Sieg (50 %), Truhe, Shop | Anlegen oder ins Inventar; schon vorhandenes Teil: +1 Stufe (bis +3), jede Stufe +50 % der Grundwerte |
-| Skill | Sieg (35 %), Elite (60 %), Truhe (50 %), Mine (35 %), Runensplitter (30 %), Shop (1 Skill, 14 Gold) | Neues Exemplar frei in die Sammlung. Schon vorhanden: «Stufe erhöhen» (bis +3; jede Stufe +15 % Waffenschaden, +10 % Brennen pro Sekunde, +5 % Heilung) oder «Zweites Exemplar» für eine weitere Zeile |
+| Skill | Sieg (35 %), Elite (60 %), Truhe (50 %), Mine (35 %), Runensplitter (30 %), Shop (1 Skill, 14 Gold) | Neues Exemplar frei in die Sammlung. Schon vorhanden: «Wachstum +5» für das vorhandene Exemplar (siehe Wachsen und Evolution) oder «Zweites Exemplar» für eine weitere Zeile |
 | Tafel-Erweiterung: +1 Zeile | Garantiert bei jeder Boss-Flucht und beim Akt-Wechsel, als Wahl bei Elite-Siegen (50 %) und seltenen Truhen (10 %), Shop-Platz (20, 35, 50 … Gold pro Run, einer pro Shop) | Bis höchstens 8 Zeilen |
 | Modul (selten) | Elite (35 %), Truhe (15 %), garantiert bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 30 Gold) | Neues Exemplar frei in die Sammlung; schon vorhanden: «Stufe erhöhen» (+1, wo das Modul Stufen hat) oder «Weiteres Exemplar» |
 | Gold, Splitter | Kämpfe, Events, Minen, Boss-Flucht | Elite-Siege geben +4 Gold |
@@ -58,7 +58,7 @@ Kampfbelohnungen bieten bevorzugt Verbesserungen an: Stufe für einen eigenen Sk
 
 Kämpfe laufen automatisch in festen Ticks (20 pro Sekunde). Jede Zeile der Tafel ist **Rune + Skill**: **Rune = Wann** (Bedingung), **Skill = Was** (ein Exemplar aus der Skill-Sammlung). Von oben nach unten feuert die erste Zeile, deren Bedingung erfüllt und deren Skill bereit ist. Ganz unten steht fest `[Immer] → Basisangriff`. Eine Zeile ohne Skill wird grau und übersprungen; das passiert nur, wenn man den Skill bewusst herausnimmt.
 
-- **Skills sind eigene Exemplare** (`Core/Skills/`: `SkillInstance`, `SkillCollection`): Skill-Id, Stufe, Instanz-Id. Jedes Exemplar sitzt an höchstens einem Ort (`ISkillHolder`, heute eine Tafelzeile, später ein Ausrüstungs-Sockel). Die Stufe gehört dem Exemplar, nicht dem Skill. Die Sammlung hat keine Obergrenze und wandert durch die Akte mit. Den Basisangriff gibt es ohne Exemplar beliebig oft.
+- **Skills sind eigene Exemplare** (`Core/Skills/`: `SkillInstance`, `SkillCollection`): Skill-Id, Wachstum (daraus die Stufe), Instanz-Id. Jedes Exemplar sitzt an höchstens einem Ort (`ISkillHolder`, heute eine Tafelzeile, später ein Ausrüstungs-Sockel). Wachstum und Stufe gehören dem Exemplar, nicht dem Skill. Die Sammlung hat keine Obergrenze und wandert durch die Akte mit. Den Basisangriff gibt es ohne Exemplar beliebig oft.
 - **Ausrüstung = Werte + passive Effekte.** Teile liefern keine Skills mehr. Die Waffe bestimmt Waffenschaden und Basisangriff, alle Teile geben Werte und manche passive Effekte auf eine Skill-Art, z. B. «Schock-Skills +20 % Wirkung» (Schaden, Brennen, Heilung, Chancen) oder «Schild-Skills −1 s Cooldown». Ablegen eines Teils nimmt keinen Skill weg.
 - **Skill-Arten** stehen im `SkillCatalog` (Angriff, Schild, Feuer, Schock, Heilung, Bewegung; ein Skill kann mehrere haben) und im Tooltip. Sie dienen nur als Ziel der passiven Effekte und für passende Angebote.
 - **Gegner** haben feste Tafeln wie bisher.
@@ -85,7 +85,7 @@ Jedes Teil trägt 1–2 Tags (vorläufig, als Daten in `SynergyRegistry.CreateDe
 | Toxin | Skill-Treffer vergiften (bis 5 Stapel, 1 Schaden/s je Stapel) | +1 Schaden je Gift-Stapel | Auch Basisangriffe vergiften |
 | Schrott | +1 Gold je Gegner | +3 Rüstung | Angriffe ignorieren Rüstung |
 
-**Duos:** Haben zwei Tags gleichzeitig mindestens 4, greift ihr Duo: Glutrhythmus (Hitze + Takt), Phasenschild (Ladung + Phantom), Brandgift (Hitze + Toxin), Schrottkondensator (Schrott + Ladung), Geisterschritt (Phantom + Takt), Säurefraß (Toxin + Schrott). Bis ein Duo einmal in einem Kampf aktiv war, zeigt das Spiel es als Silhouette «???»; danach steht es mit Namen und Wirkung im **Rezeptbuch** (Inventar). Das Rezeptbuch gilt für den Run und wandert durch die Akte mit.
+**Duos:** Haben zwei Tags gleichzeitig mindestens 4, greift ihr Duo: Glutrhythmus (Hitze + Takt), Phasenschild (Ladung + Phantom), Brandgift (Hitze + Toxin), Schrottkondensator (Schrott + Ladung), Geisterschritt (Phantom + Takt), Säurefraß (Toxin + Schrott). Bis ein Duo einmal in einem Kampf aktiv war, zeigt das Spiel es als Silhouette «???»; danach steht es mit Namen und Wirkung im **Rezeptbuch** (Inventar). Das Rezeptbuch wandert durch die Akte mit und bleibt über Runs gespeichert (siehe Wachsen und Evolution).
 
 **Sets bleiben.** Sie behalten ihre Boni und die Rune «Ladung voll»; ihre Teile tragen zusätzlich passende Tags (Überlast → Hitze/Takt, Aegis → Ladung, Schrott-Ernter → Schrott, Phantom-Signal → Phantom). Grund: Die Set-Boni sind eigene Mechaniken (Tempo-Stapel, Entladung, Minen, Ausweich-Obergrenze), die als Tag-Stufen zu speziell wären, und ein Set ist mit 3 Teilen erreichbar, eine Tag-Stufe 6 erst mit fast voller Ausrüstung. So zahlen Set-Teile auf beide Systeme ein.
 
@@ -106,7 +106,7 @@ Konzept: `/mnt/project-files/design/kampfsystem-konzept.md` im Projekt.
 
 #### Module und Auslöser
 
-Module sind wie Skills eigene Exemplare (`Core/Modules/`: `ModuleInstance`, `ModuleCollection`, Katalog und Regeln) mit Stufe und Sammlung, die durch die Akte mitwandert. Skill-Exemplare und Logikbausteine (Tafel-Zeilen) haben je **1 Modul-Platz**; ein Modul sitzt an genau einem Ort (`IModuleHolder`). Der Basisangriff hat keinen Platz. Verschwindet ein Ort (Zeile abgelegt), wird sein Modul wieder frei.
+Module sind wie Skills eigene Exemplare (`Core/Modules/`: `ModuleInstance`, `ModuleCollection`, Katalog und Regeln) mit Stufe und Sammlung, die durch die Akte mitwandert. Skill-Exemplare und Logikbausteine (Tafel-Zeilen) haben je **1 Modul-Platz**, durch Wachstum bis zu 3; ein Modul sitzt an genau einem Ort (`IModuleHolder`). Der Basisangriff hat keinen Platz. Verschwindet ein Ort (Zeile abgelegt), wird sein Modul wieder frei.
 
 | Modul | Art | Wirkung (Stufe 0 / +1) |
 |---|---|---|
@@ -125,6 +125,39 @@ Module sind wie Skills eigene Exemplare (`Core/Modules/`: `ModuleInstance`, `Mod
 Datenmodell: Die Tafel im Kampf ist ein Graph (`Arena/Graph/LogicGraph.cs`): Knoten sind Baustein und Skill jeder Zeile, Kanten sind Auslöser (`GraphEdgeKind.Trigger`; UND/ODER können später als weitere Kantenarten dazukommen). Der Kampf bleibt deterministisch: gleiche Seeds ergeben dieselben Kämpfe, auch mit Kreisen.
 
 Tafel-Editor: Unter jeder Zeile stehen die Modul-Plätze von Baustein und Skill. «+ Name» setzt ein freies passendes Modul ein, «×» nimmt es ab. Ein Klick auf einen Auslöser wählt das nächste Ziel (alle Zeilen, dann «kein Ziel»). Rechts an den Zeilen sind Auslöser als Linien gezeichnet (orange vom Skill, türkis vom Baustein, Pfeil am Ziel), jede Verbindung auf eigener Spur, sodass Kreise sichtbar bleiben. Das HUD zeigt pro Zeile ◆ (Module) und ↪ (Auslöser-Ziel), das Inventar alle Module mit Ort und Ziel.
+
+#### Wachsen und Evolution
+
+**Wachstum** ist ein Zähler pro Exemplar: jedes Skill-Exemplar und jeder Logikbaustein (die Rune einer Zeile) zählt selbst mit. Er gilt für den ganzen Run, wandert durch die Akte, bleibt beim Umsetzen eines Skills und beim Ablegen einer Rune ins Runen-Inventar. Gezählt wird nach jedem Kampf aus dem Kampfprotokoll (`Growth/GrowthTally`), nur für Zeilen, die gefeuert haben. Was wächst, steht als Daten in `GrowthCatalog.CreateDefault`:
+
+| Regel | Wirkung | Skills / Bausteine |
+|---|---|---|
+| Pro Kill | +1 Schaden (max. +30) | Rüstungsbruch, Bohrstoß, Schockstich, Blitzlanze, Säurebohrer |
+| Pro Betäubung | +0,1 s Betäubung (max. +2 s) | Schildschlag, EMP-Schildschlag, Schrottramme |
+| Pro Heilung | +1 % Heilung (max. +50 %) | Not-Reparatur, Kühlmittel-Injektion |
+| Pro gewonnenem Kampf | +1 % Wirkung (max. +50 %) | Entzünden, Feuersturm |
+| Pro gewonnenem Kampf | nur Zähler (Stufen, Modul-Plätze) | Notfall-Schildwall, Blendgranate, Bodenanker, Schubdüsen, Echo-Protokoll, Resonanz |
+| Pro gewonnenem Kampf | +1 Prozentpunkt Schwelle (max. 50 %) | Bausteine «HP unter … %» (beide), «Gegner unter … %», «HP unter … % oder ausgewichen» |
+| Pro gewonnenem Kampf | nur Zähler | alle anderen Bausteine |
+
+**Meilensteine:** Wachstum 5 / 15 / 30 ergibt Skill-Stufe 1 / 2 / 3 (Höchststufe). Wachstum 10 und 25 öffnet je einen weiteren Modul-Platz, für Skills und Bausteine (also bis 3 Plätze). Die Karte zeigt das Wachstum am Namen («Bohrstoß +7», «[HP unter 30 % +4] → Bohrstoß +7»), der Tafel-Editor unter jeder Zeile die Regel, die aktuelle Wirkung und den nächsten Meilenstein.
+
+**Zusammenführung mit den Stufen +1…+3 (A-03).** Früher gab ein doppelter Skill eine Stufe, und jede Stufe hatte eigene Werte (+15 % Waffenschaden usw.). Jetzt gibt es **nur noch eine Zahl pro Exemplar, das Wachstum**: Die Stufe ist ein Meilenstein daraus und bringt selbst keine Werte mehr; ein doppelter Skill aus einer Belohnung gibt **+5 Wachstum** (genau eine Stufe, wenn man auf einer Schwelle steht). Die ganze Kraft kommt aus der Wachstums-Regel des Skills. Grund: Hätten Stufe und Wachstum beide Werte, zählte jeder Punkt doppelt (der Stufensprung durch Wachstum und das Wachstum selbst), und ein Duplikat wäre gegenüber Kämpfen unvergleichbar. So bleibt sichtbar, woher ein Wert kommt, Duplikate und Kämpfe zahlen auf dasselbe Konto ein, und Stufe 3 bleibt das Tor für Evolutionen. Lagerfeuer-Stufen von Runen bleiben unverändert (sie verschieben die Schwelle in festen Schritten); das Schwellen-Wachstum legt Prozentpunkte darauf, nie über 50 % und nie unter den Grundwert.
+
+**Evolution:** Ein Exemplar auf Höchststufe (Skill: Stufe 3 aus Wachstum 30, Baustein: höchste Lagerfeuer-Stufe der Rune) plus eine Rezeptbedingung entwickelt sich **nach dem nächsten überlebten Boss** zur Evolutionsform. Wachstum, Instanz-Id, Ort und Module bleiben. Die Bedingung ist eines von: ein bestimmtes Modul am Skill bzw. Baustein, ein bestimmter Baustein in derselben Zeile, oder ein Ausrüstungs-Tag auf Schwelle 4. Sechs Rezepte als Daten (`Evolution/EvolutionCatalog.CreateDefault`), eines pro Tag:
+
+| Tag | Aus | Bedingung | Evolution |
+|---|---|---|---|
+| Hitze | Entzünden | Modul Fläche | Feuersturm: 60 % an alle Gegner, alle brennen 5 s |
+| Ladung | Schockstich | Tag Ladung 4 | Blitzlanze: 100 %, 50 % Chance auf 1,5 s Betäubung, Cooldown 3 s |
+| Phantom | Baustein «HP unter 30/40/50 %» | Modul Verlängern | «HP unter 50 % oder ausgewichen» (gilt auch direkt nach einem Ausweichen) |
+| Takt | Echo-Protokoll | Modul Mehrfach | Resonanz: wiederholt den letzten Skill zweimal, Cooldown 10 s |
+| Toxin | Bohrstoß | Baustein «Gegner unter … %» in derselben Zeile | Säurebohrer: 120 % an alle Gegner, doppeltes Gift |
+| Schrott | Schildschlag | Tag Schrott 4 | Schrottramme: 120 % durch Rüstung, unterbricht, 2 s Betäubung |
+
+Evolutionsformen werden nie angeboten, man erreicht sie nur über ein Rezept. Angebote, Shop und Inventar zeigen den Fortschritt («Evolution ???: fehlt Modul Fläche», «→ Ladung 3/4 für Evolution von Schockstich»), der Tafel-Editor pro Zeile, das HUD ein ✦ an Zeilen, die nach dem nächsten Boss evolvieren.
+
+**Rezeptbuch:** Unentdeckte Evolutionen und Duos stehen als Silhouette «???» mit einem Hinweis im Inventar, entdeckte mit ihrem Rezept. Das Buch wird über Runs gespeichert (in Unity in den PlayerPrefs, `Overworld/Persistence/PlayerPrefsRecipeBookStore`, im Core hinter `IRecipeBookStore`). Es ist reines Wissen: Gespeichert werden nur Einträge wie «evo:evo_inferno», nie Werte oder Boni.
 
 ### Die Arena lesen
 
@@ -197,10 +230,13 @@ Assets/Betaknight/
 │   │   ├── OverworldSession.MajorEvents.cs  Fassade: Kampf, Truhe, Goldmine, Shop
 │   │   ├── Skills/        SkillInstance (Exemplar), ISkillHolder (Ort), SkillCollection (Sammlung)
 │   │   ├── Modules/       ModuleDefinition + ModuleCatalog, ModuleInstance (Exemplar, Ziel), IModuleHolder (Ort), ModuleCollection, ModuleRules
+│   │   ├── Growth/        GrowthRule + GrowthCatalog (Regeln als Daten), GrowthStages (Meilensteine), GrowthApplier, GrowthTally (Zählen aus dem Protokoll)
+│   │   ├── Evolution/     EvolutionRecipe + EvolutionCatalog (6 Rezepte), RecipeBook + IRecipeBookStore (Wissen über Runs)
 │   │   ├── OverworldSession.Gear.cs         Fassade: Ausrüstung, Skill-Kennzahlen mit passiven Boni, Tafel umsortieren
 │   │   ├── OverworldSession.Synergies.cs    Fassade: Tag-Zähler, aktive Duos, Rezeptbuch, Vorschau für Angebote
 │   │   ├── OverworldSession.Skills.cs       Fassade: Skill-Sammlung, Einsetzen/Tauschen, Erhalt, Stufe oder zweites Exemplar, Angebote
 │   │   ├── OverworldSession.Modules.cs      Fassade: Modul-Sammlung, Einsetzen/Abnehmen, Auslöser-Ziele, seltener Erhalt
+│   │   ├── OverworldSession.Growth.cs       Fassade: Wachstum nach Kämpfen, Meilensteine, Evolution nach dem Boss, Fortschritt für Angebote
 │   │   ├── OverworldSession.Inventory.cs    Fassade: Inventar, anlegen/ablegen/tauschen, verwerfen, verkaufen
 │   │   ├── OverworldSession.Progression.cs  Fassade: Tafel-Erweiterung, Stufen, Angebote mit Verbesserung
 │   │   ├── OverworldSession.Mines.cs        Fassade: Goldminen-Raids und Verteidigung
@@ -211,6 +247,7 @@ Assets/Betaknight/
 │       ├── Views/         HexGridView, HexCellView, PlayerView, ProceduralSprites
 │       ├── Controllers/   OverworldController, CameraFollow2D
 │       ├── Input/         PointerInput (neues Input System und alter Input Manager)
+│       ├── Persistence/   PlayerPrefsRecipeBookStore (Rezeptbuch über Runs)
 │       ├── UI/            OverworldHud, Kit-Auswahl, Event-, Runen-, Shop-, Game-Over-Fenster, ArenaWindow, BoardEditorWindow, InventoryWindow, InventoryFullWindow (IMGUI-Platzhalter)
 │       └── OverworldBootstrapper.cs
 └── Tests/EditMode/  Unit-Tests für die Core-Logik
@@ -254,6 +291,8 @@ Falls der Test Runner fehlt, im Package Manager das Paket **Test Framework** ins
 | Neues Set | Teile mit Set-Id + `SetBonusRegistry.Register(id, name, teile => new …Set())` (ein `BattleModifier`) |
 | Neuer Synergie-Tag oder Duo | Eintrag in `SynergyRegistry.CreateDefault` (Text, passive Effekte, `BattleModifier`-Fabrik je Schwelle); Teile bekommen die Tag-Id über `tags:` |
 | Neues Modul | Eintrag in `ModuleCatalog.CreateDefault` (Name, Art, Text je Stufe) und Regel in `ModuleRules` (`ApplyToSkill` bzw. `ApplyToCondition`) |
+| Neue Wachstums-Regel | `GrowthCatalog.CreateDefault`: `SetSkill`/`SetRune` mit einer `GrowthRule` (Auslöser, Wirkung, pro Punkt, Obergrenze, Text) |
+| Neues Evolutions-Rezept | Eintrag in `EvolutionCatalog.CreateDefault`; die Evolutionsform als Skill mit `isEvolution: true` bzw. als Rune mit Gewicht 0 |
 | Neuer Gegner | Eintrag in `EnemyCatalog` mit Stufenbereich und fester Tafel |
 | Inverter-Rune | `NotCondition` / `condition.Not()` existiert bereits |
 | Akt-spezifische Karten/Gegner | `OverworldSession.CreateNextAct(config, previous)` bekommt die Karten-Konfiguration; `TierAt` und `ActTierBonus` regeln die Stärke pro Akt |

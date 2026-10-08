@@ -73,16 +73,18 @@ namespace Betaknight.Overworld.UI
                 if (_session.OwnsRune(rune))
                 {
                     // Doppelte Rune: die vorhandene steigt eine Stufe.
-                    string upgrade = $"<color=#7ddc6f>▲ Stufe erhöhen</color>  <b>{RuneLevelText(rune)}</b>\n{rune.Description}";
+                    string hints = SkillText.EvolutionHints(_session.EvolutionHintsForRune(rune.Id));
+                    string upgrade = $"<color=#7ddc6f>▲ Stufe erhöhen</color>  <b>{RuneLevelText(rune)}</b>\n{rune.Description}{hints}";
                     GUI.enabled = _session.CanUpgradeRune(rune);
-                    if (GUILayout.Button(upgrade, _nameStyle, GUILayout.Height(64f))) _session.TakeRune(i);
+                    if (GUILayout.Button(upgrade, _nameStyle, GUILayout.Height(RuneHeight(hints)))) _session.TakeRune(i);
                     GUI.enabled = true;
                     continue;
                 }
 
                 bool synergy = _session.Runes.HasTag(rune.Tag);
-                string label = $"<b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]{(synergy ? "  ★" : string.Empty)}\n{rune.Description}";
-                if (GUILayout.Button(label, _nameStyle, GUILayout.Height(64f)))
+                string runeHints = SkillText.EvolutionHints(_session.EvolutionHintsForRune(rune.Id));
+                string label = $"<b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]{(synergy ? "  ★" : string.Empty)}\n{rune.Description}{runeHints}";
+                if (GUILayout.Button(label, _nameStyle, GUILayout.Height(RuneHeight(runeHints))))
                 {
                     if (_session.Runes.IsFull) _choiceAwaitingSlot = i;
                     else _session.TakeRune(i);
@@ -103,7 +105,7 @@ namespace Betaknight.Overworld.UI
                     continue;
                 }
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}</size>", _plainStyle);
+                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>", _plainStyle);
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _session.CanTakeItem(i, ItemPlacement.Equip);
                 string equip = worn != null ? $"Anlegen ({worn.Name} ins Inventar)" : "Anlegen";
@@ -149,6 +151,9 @@ namespace Betaknight.Overworld.UI
                 _session.SkipRuneOffer();
             }
         }
+
+        /// <summary>Knopfhöhe einer Rune: eine Zeile mehr pro Evolutions-Hinweis.</summary>
+        private static float RuneHeight(string hints) => 64f + 18f * (hints.Split('\n').Length - 1);
 
         private string RuneLevelText(RuneDefinition rune)
         {

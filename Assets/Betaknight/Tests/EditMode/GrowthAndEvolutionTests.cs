@@ -234,6 +234,20 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
+        public void EachRowShowsItsOwnEvolutionProgress()
+        {
+            OverworldSession s = EmptySession();
+            SkillInstance ignite = AddRow(s, "always", SkillIds.Ignite);
+            RuneSlot row = s.Runes.Rows[0];
+            Assert.AreEqual(new[] { "Evolution ???: fehlt Stufe 3 (Wachstum 0/30), Modul Fläche" }, s.EvolutionProgressFor(row));
+            Assert.IsFalse(s.IsEvolutionReady(row));
+
+            (OverworldSession ready, SkillInstance _) = ReadyForInferno(true);
+            Assert.IsTrue(ready.IsEvolutionReady(ready.Runes.Rows[0]));
+            StringAssert.Contains("bereit", ready.EvolutionProgressFor(ready.Runes.Rows[0]).Single());
+        }
+
+        [Test]
         public void EvolutionNeedsEveryCondition()
         {
             (OverworldSession s, SkillInstance ignite) = ReadyForInferno(false);
