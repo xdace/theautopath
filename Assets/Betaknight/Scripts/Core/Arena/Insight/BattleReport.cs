@@ -93,11 +93,23 @@ namespace Betaknight.Core.Arena
             }
         }
 
-        /// <summary>Wie oft die Zeile übersprungen wurde (über der gewählten Zeile oder «Aktion läuft»).</summary>
+        /// <summary>Wie oft die Zeile nicht drankam (über der gewählten Zeile oder «Aktion läuft»), alle Gründe zusammen.</summary>
         public int Skipped { get; internal set; }
 
-        /// <summary>Häufigster Grund beim Überspringen, null wenn nie übersprungen.</summary>
+        /// <summary>
+        /// H-04 «Missed Trigger»: wie oft die Bedingung nicht erfüllt war, während eine tiefere Zeile oder der Basisangriff
+        /// feuerte. Seit der Warteschlange (A-13) der Normalfall des Nicht-Drankommens.
+        /// </summary>
+        public int MissedTrigger => SkipCount(RowCheckState.ConditionFalse);
+
+        /// <summary>Häufigster Grund beim Nicht-Drankommen, null wenn nie.</summary>
         public RowCheckState? MainReason { get; internal set; }
+
+        /// <summary>
+        /// Häufigster Grund ausser «Bedingung nicht erfüllt» und Cooldown (z. B. verwaist, Aktion läuft), null ohne.
+        /// Nur solche Gründe bekommen in der Auswertung eine eigene Spalte.
+        /// </summary>
+        public RowCheckState? OtherReason { get; internal set; }
 
         internal readonly Dictionary<RowCheckState, int> SkipReasons = new Dictionary<RowCheckState, int>();
         internal readonly Dictionary<RowCheckState, int> AllStates = new Dictionary<RowCheckState, int>();
@@ -149,6 +161,15 @@ namespace Betaknight.Core.Arena
         /// <summary>Schaden, den Schwierigkeits-Boni insgesamt dazugegeben haben.</summary>
         public int BonusDamage { get; private set; }
         public int Decisions { get; private set; }
+
+        /// <summary>Gibt es Gründe ausser «Bedingung nicht erfüllt» (z. B. verwaist)? Nur dann zeigt die Auswertung die Grund-Spalte.</summary>
+        public bool HasOtherReasons { get; private set; }
+
+        /// <summary>Gründe, die mehr erklären als ein verpasster Auslöser: verwaist oder eine laufende Aktion.</summary>
+        public static bool IsOtherReason(RowCheckState state) => state == RowCheckState.Orphaned || state == RowCheckState.ActionRunning;
+
+        /// <summary>Bis zu so vielen erfüllten Bedingungen gilt eine Zeile als selten ausgelöst (Hinweis).</summary>
+        public const int RarelyTriggered = 1;
 
         public static BattleReport Create(BattleResult result)
         {
@@ -243,6 +264,8 @@ namespace Betaknight.Core.Arena
             {
                 row.DamageShareBp = TotalDamage > 0 ? (int)((long)row.Damage * BasisPoints.Full / TotalDamage) : 0;
                 row.MainReason = Most(row.SkipReasons);
+                row.OtherReason = Most(row.SkipReasons, IsOtherReason);
+                if (row.OtherReason.HasValue) HasOtherReasons = true;
             }
 
             BuildHints();
@@ -252,7 +275,16 @@ namespace Betaknight.Core.Arena
         {
             foreach (RowReport row in _rows)
             {
-                if (row.IsFallback || row.Fired > 0) continue;
+                if (row.IsFallback) continue;
+                // H-04: Wie oft wurde die Bedingung erfüllt? Selten erfüllte Bausteine brauchen Erleichterer oder einen anderen Baustein.
+                if (row.ConditionMet >= 0 && row.ConditionMet <= RarelyTriggered && row.Triggered == 0 && !OnlyOrphaned(row) && row.AllStates.Count > 0)
+                {
+                    string how = row.ConditionMet == 0 ? "never triggered" : $"triggered only {row.ConditionMet}×";
+                    string symbol = row.Difficulty > 0 ? $" ({DifficultyText.Name(row.Difficulty)} block)" : string.Empty;
+                    _hints.Add($"Row {row.Index + 1}: {how}{symbol} – try an easer or a different block.");
+                    continue;
+                }
+                if (row.Fired > 0) continue;
                 _hints.Add($"{row.Name} hat nie gefeuert: {NeverFiredReason(row)}.");
             }
 
@@ -290,8 +322,6 @@ namespace Betaknight.Core.Arena
                 if (row.BonusDamage > 0 && row.Damage > 0)
                     _hints.Add($"{row.Name}: Bonus {DifficultyText.Symbol(row.Difficulty)} brachte +{row.BonusDamage} Schaden "
                         + $"({SkillInfo.Percent((int)((long)row.BonusDamage * BasisPoints.Full / row.Damage))} des Zeilenschadens).");
-                else if (row.ConditionMet == 0 && row.Difficulty >= 2)
-                    _hints.Add($"{row.Name}: schwerer Baustein ({DifficultyText.Name(row.Difficulty)}) nie erfüllt. Erleichterer helfen, ohne den Bonus zu senken.");
             }
 
             // Warteschlange: welche Zeile wartet am längsten?
@@ -303,6 +333,13 @@ namespace Betaknight.Core.Arena
                     + "Höhere Zeilen oder lange Casts halten sie auf.");
 
             if (OtherDamage > 0) _hints.Add($"{OtherDamage} Schaden kam ohne Zeile (Set-Boni, Rückschlag).");
+        }
+
+        private static bool OnlyOrphaned(RowReport row)
+        {
+            int total = 0;
+            foreach (int n in row.AllStates.Values) total += n;
+            return total > 0 && row.AllStates.TryGetValue(RowCheckState.Orphaned, out int orphaned) && orphaned == total;
         }
 
         private static string NeverFiredReason(RowReport row)
@@ -325,13 +362,14 @@ namespace Betaknight.Core.Arena
         private static void Add(Dictionary<RowCheckState, int> counts, RowCheckState state) =>
             counts[state] = (counts.TryGetValue(state, out int n) ? n : 0) + 1;
 
-        private static RowCheckState? Most(Dictionary<RowCheckState, int> counts)
+        private static RowCheckState? Most(Dictionary<RowCheckState, int> counts, System.Func<RowCheckState, bool> only = null)
         {
             RowCheckState? best = null;
             int max = 0;
             // Feste Reihenfolge, damit Gleichstände immer gleich ausgehen.
             foreach (RowCheckState s in new[] { RowCheckState.ConditionFalse, RowCheckState.Cooldown, RowCheckState.Orphaned, RowCheckState.ActionRunning, RowCheckState.Queued, RowCheckState.Ready })
             {
+                if (only != null && !only(s)) continue;
                 if (counts.TryGetValue(s, out int n) && n > max)
                 {
                     max = n;

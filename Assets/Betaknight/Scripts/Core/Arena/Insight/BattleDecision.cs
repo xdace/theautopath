@@ -95,12 +95,12 @@ namespace Betaknight.Core.Arena
         {
             switch (check.State)
             {
-                case RowCheckState.ConditionFalse: return "Bedingung nicht erfüllt";
+                case RowCheckState.ConditionFalse: return "missed trigger (condition not met)";
                 case RowCheckState.Cooldown: return check.CooldownLeft > 0 ? $"Skill im Cooldown (noch {Seconds(check.CooldownLeft)})" : "Skill im Cooldown";
-                case RowCheckState.Orphaned: return "verwaist (kein Skill)";
+                case RowCheckState.Orphaned: return "skipped (no skill)";
                 case RowCheckState.ActionRunning: return "Bedingung erfüllt, aber Aktion läuft";
                 case RowCheckState.Queued:
-                    return check.CooldownLeft > 0 ? $"eingereiht, wartet (Cooldown noch {Seconds(check.CooldownLeft)})" : "eingereiht, wartet (Aktion läuft)";
+                    return check.CooldownLeft > 0 ? $"queued, waiting for cooldown ({Seconds(check.CooldownLeft)} left)" : "queued, waiting (action running)";
                 default: return "bereit";
             }
         }

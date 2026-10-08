@@ -56,13 +56,28 @@ namespace Betaknight.Tests.EditMode
                 Assert.AreEqual(1, d.ChosenRow);
                 Assert.AreEqual(RowCheckState.ConditionFalse, d.Rows[0].State);
             }
-            Assert.AreEqual("Bedingung nicht erfüllt", RowStateText.Reason(r.Decisions[0].Rows[0]));
+            Assert.AreEqual("missed trigger (condition not met)", RowStateText.Reason(r.Decisions[0].Rows[0]));
 
             BattleReport report = BattleReport.Create(r);
             Assert.AreEqual(0, report.Rows[0].Fired);
             Assert.AreEqual(r.Decisions.Count, report.Rows[0].Skipped);
             Assert.AreEqual(RowCheckState.ConditionFalse, report.Rows[0].MainReason);
-            CollectionAssert.Contains(report.Hints, "Zeile 1 hat nie gefeuert: Bedingung nie erfüllt.");
+            // H-04: «Missed Trigger» zählt genau die Entscheidungen mit nicht erfüllter Bedingung; sonst kein Grund, keine Grund-Spalte.
+            Assert.AreEqual(r.Decisions.Count, report.Rows[0].MissedTrigger);
+            Assert.IsNull(report.Rows[0].OtherReason);
+            Assert.IsFalse(report.HasOtherReasons);
+            Assert.AreEqual(0, report.Rows[0].ConditionMet, "Triggered");
+            CollectionAssert.Contains(report.Hints, "Row 1: never triggered – try an easer or a different block.");
+        }
+
+        [Test]
+        public void ARarelyTriggeredRowGetsAHint()
+        {
+            // «Kampfbeginn» wird genau einmal wahr: «triggered only 1×».
+            BattleResult r = Run(new LogicBoard(new[] { Row("battle_start", SkillIds.Repair, 0, "Kampfbeginn") }), Fighter("Puppe", 60, 0, 1000));
+            BattleReport report = BattleReport.Create(r);
+            Assert.AreEqual(1, report.Rows[0].ConditionMet);
+            CollectionAssert.Contains(report.Hints, "Row 1: triggered only 1× – try an easer or a different block.");
         }
 
         [Test]
@@ -70,7 +85,13 @@ namespace Betaknight.Tests.EditMode
         {
             BattleResult r = Run(new LogicBoard(new[] { Row("always", null, label: "Immer") }), Fighter("Puppe", 30, 0, 1000));
             Assert.AreEqual(RowCheckState.Orphaned, r.Decisions[0].Rows[0].State);
-            CollectionAssert.Contains(BattleReport.Create(r).Hints, "Zeile 1 hat nie gefeuert: verwaist, kein Skill zugeordnet.");
+            BattleReport report = BattleReport.Create(r);
+            CollectionAssert.Contains(report.Hints, "Zeile 1 hat nie gefeuert: verwaist, kein Skill zugeordnet.");
+            // H-04: «skipped» nur für verwaiste Zeilen; sie sind ein anderer Grund als ein verpasster Auslöser.
+            Assert.AreEqual("skipped (no skill)", RowStateText.Reason(r.Decisions[0].Rows[0]));
+            Assert.AreEqual(RowCheckState.Orphaned, report.Rows[0].OtherReason);
+            Assert.IsTrue(report.HasOtherReasons);
+            Assert.AreEqual(0, report.Rows[0].MissedTrigger);
         }
 
         [Test]

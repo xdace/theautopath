@@ -409,9 +409,9 @@ namespace Betaknight.Overworld.UI
             switch (state)
             {
                 case RowDisplay.Ready: now = "Bedingung erfüllt, Skill bereit"; break;
-                case RowDisplay.ConditionFalse: now = "Bedingung nicht erfüllt"; break;
+                case RowDisplay.ConditionFalse: now = "condition not met"; break;
                 case RowDisplay.Cooldown: now = $"Skill im Cooldown (noch {RowStateText.Seconds(_playback.CooldownLeft(row))})"; break;
-                case RowDisplay.Orphaned: now = "verwaist (kein Skill)"; break;
+                case RowDisplay.Orphaned: now = "skipped (no skill)"; break;
                 case RowDisplay.Queued:
                     int left = _playback.CooldownLeft(row);
                     now = left > 0 ? $"eingereiht, wartet auf Cooldown (noch {RowStateText.Seconds(left)})" : "eingereiht, wartet (Aktion läuft)";
@@ -419,7 +419,7 @@ namespace Betaknight.Overworld.UI
                 default: now = "noch keine Entscheidung"; break;
             }
             string skipped = _playback.LastSkipReason(row);
-            string text = skipped != null ? $"Jetzt: {now}\nZuletzt bei {skipped}" : $"Jetzt: {now}";
+            string text = skipped != null ? $"Jetzt: {now}\nLast: {skipped}" : $"Jetzt: {now}";
             return $"{text}\n{QueueRule}";
         }
 
@@ -441,19 +441,39 @@ namespace Betaknight.Overworld.UI
 
             _reportScroll = GUILayout.BeginScrollView(_reportScroll);
             float w = area.width - 40f;
-            float[] cols = { w * 0.24f, w * 0.08f, w * 0.06f, w * 0.07f, w * 0.06f, w * 0.06f, w * 0.11f, w * 0.12f, w * 0.07f, w * 0.13f };
-            ReportRow(cols, Color.clear, "<b>Zeile</b>", "<b>gefeuert</b>", "<b>erfüllt</b>", "<b>Schaden</b>", "<b>Heilung</b>", "<b>Anteil</b>",
-                "<b>Bonus</b>", "<b>eingereiht</b>", "<b>übersprungen</b>", "<b>häufigster Grund</b>");
+            // H-04: «Missed Trigger» statt «übersprungen»; die Grund-Spalte nur, wenn es andere Gründe gibt (z. B. verwaist).
+            bool reasons = _report.HasOtherReasons;
+            float[] cols = reasons
+                ? new[] { w * 0.23f, w * 0.08f, w * 0.07f, w * 0.07f, w * 0.06f, w * 0.06f, w * 0.10f, w * 0.11f, w * 0.09f, w * 0.13f }
+                : new[] { w * 0.27f, w * 0.09f, w * 0.08f, w * 0.08f, w * 0.07f, w * 0.07f, w * 0.12f, w * 0.12f, w * 0.10f };
+            var header = new List<GUIContent>
+            {
+                new GUIContent("<b>Row</b>"),
+                new GUIContent("<b>Fired</b>", "How often this row started an action (↪ by a trigger, ↻ repeated)."),
+                new GUIContent("<b>Triggered</b>", "How often this row's condition was met. Hard blocks need easers or a build that makes them happen."),
+                new GUIContent("<b>Damage</b>"),
+                new GUIContent("<b>Healing</b>"),
+                new GUIContent("<b>Share</b>", "Share of total damage."),
+                new GUIContent("<b>Bonus</b>", "Extra damage, healing and saved cooldown from the block's difficulty bonus."),
+                new GUIContent("<b>Queued</b>", "How often this row was queued, and the average wait until it started."),
+                new GUIContent("<b>Missed Trigger</b>", MissedTriggerTip),
+            };
+            if (reasons) header.Add(new GUIContent("<b>Other reason</b>", "Most common reason besides a missed trigger, e.g. no skill (orphaned) or another action running."));
+            ReportRow(cols, Color.clear, header.ToArray());
             foreach (RowReport row in _report.Rows)
             {
                 string prefix = row.IsFallback ? "↓" : $"{row.Index + 1}. {RuneText.Difficulty(row.Difficulty)}";
-                string reason = row.MainReason.HasValue ? RowStateText.Reason(row.MainReason.Value) : "–";
                 string met = row.IsFallback || row.ConditionMet < 0 ? "–" : $"{row.ConditionMet}×";
-                ReportRow(cols, RowColorFor(row.Index), $"{prefix} [{row.Label}] → {row.Skill}", FiredText(row), met, row.Damage.ToString(),
-                    row.Healing.ToString(), SkillInfo.Percent(row.DamageShareBp), BonusText(row), QueueCell(row), row.Skipped > 0 ? $"{row.Skipped}×" : "–", reason);
+                var cells = new List<string>
+                {
+                    $"{prefix} [{row.Label}] → {row.Skill}", FiredText(row), met, row.Damage.ToString(), row.Healing.ToString(),
+                    SkillInfo.Percent(row.DamageShareBp), BonusText(row), QueueCell(row), row.MissedTrigger > 0 ? $"{row.MissedTrigger}×" : "–",
+                };
+                if (reasons) cells.Add(row.OtherReason.HasValue ? $"{RowStateText.Reason(row.OtherReason.Value)} ({row.SkipCount(row.OtherReason.Value)}×)" : "–");
+                ReportRow(cols, RowColorFor(row.Index), cells.ToArray());
             }
             if (_report.OtherDamage > 0)
-                ReportRow(cols, Color.clear, "<color=#9aa4b2>ohne Zeile (Set-Boni, Rückschlag)</color>", "", "", _report.OtherDamage.ToString(), "", "", "", "", "", "");
+                ReportRow(cols, Color.clear, "<color=#9aa4b2>ohne Zeile (Set-Boni, Rückschlag)</color>", "", "", _report.OtherDamage.ToString());
 
             GUILayout.Space(8f);
             foreach (string hint in _report.Hints) GUILayout.Label($"• {hint}", _row);
@@ -489,7 +509,17 @@ namespace Betaknight.Overworld.UI
             return text;
         }
 
+        /// <summary>H-04: Erklärung der Spalte «Missed Trigger» (Kopf der Auswertung).</summary>
+        private const string MissedTriggerTip = "How often this row's condition was not met while a lower row or the basic attack fired.";
+
         private void ReportRow(float[] cols, Color color, params string[] cells)
+        {
+            var content = new GUIContent[cells.Length];
+            for (int i = 0; i < cells.Length; i++) content[i] = new GUIContent(cells[i]);
+            ReportRow(cols, color, content);
+        }
+
+        private void ReportRow(float[] cols, Color color, params GUIContent[] cells)
         {
             Rect line = GUILayoutUtility.GetRect(new GUIContent(" "), _row, GUILayout.MinHeight(24f));
             if (color.a > 0f) Fill(new Rect(line.x, line.y + 3f, 4f, line.height - 6f), color);

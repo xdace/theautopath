@@ -329,7 +329,7 @@ namespace Betaknight.Tests.EditMode
             foreach (BattleDecision d in r.Decisions.Where(d => d.Queued(0)))
             {
                 Assert.IsFalse(d.IsBusy ? false : d.ChosenRow == 0);
-                StringAssert.StartsWith("eingereiht", RowStateText.Reason(d.Rows[0]));
+                StringAssert.StartsWith("queued", RowStateText.Reason(d.Rows[0]));
             }
         }
     }
