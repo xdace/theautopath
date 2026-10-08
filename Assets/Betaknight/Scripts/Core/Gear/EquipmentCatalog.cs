@@ -68,6 +68,8 @@ namespace Betaknight.Core.Gear
                 Skills(SkillIds.ShieldBash)),
             new EquipmentDefinition("echo_helm", "Echo-Helm", EquipmentSlot.Helmet, null, Skills(SkillIds.Echo), weight: 2,
                 description: "Selten. Wiederholt den letzten Skill."),
+            new EquipmentDefinition("incendiary_gloves", "Brandhandschuhe", EquipmentSlot.Gloves, null, Skills(SkillIds.Ignite), weight: 6,
+                description: "Entzünden ohne Waffe, für Ketten-Builds."),
             new EquipmentDefinition("leather_gloves", "Lederhandschuhe", EquipmentSlot.Gloves, S((StatKind.Crit, BasisPoints.Percent(10)))),
             new EquipmentDefinition("iron_greaves", "Eisenbeinschienen", EquipmentSlot.Legs, S((StatKind.Armor, 2))),
             new EquipmentDefinition("padded_vest", "Gepolsterte Weste", EquipmentSlot.Chest, S((StatKind.MaxHp, 5))),

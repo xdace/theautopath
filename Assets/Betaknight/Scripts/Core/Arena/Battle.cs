@@ -84,6 +84,8 @@ namespace Betaknight.Core.Arena
             }
 
             Emit(new BattleEvent(Tick, BattleEventKind.BattleEnd, null, null, (int)outcome.Value));
+            foreach (Combatant c in _all)
+                foreach (BattleModifier m in c.ModifierList.ToArray()) m.OnBattleEnd(this, c, outcome.Value);
 
             int defeated = 0;
             foreach (Combatant e in _enemies) if (!e.IsAlive) defeated++;

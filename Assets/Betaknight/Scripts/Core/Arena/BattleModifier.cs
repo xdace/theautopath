@@ -11,6 +11,9 @@ namespace Betaknight.Core.Arena
 
         public virtual void OnBattleStart(Battle battle, Combatant owner) { }
 
+        /// <summary>Nach dem Ende, bevor das Ergebnis gebaut wird (z. B. Gold pro besiegtem Gegner). Kein Schaden mehr.</summary>
+        public virtual void OnBattleEnd(Battle battle, Combatant owner, BattleOutcome outcome) { }
+
         /// <summary>Ein Ereignis aus dem vorherigen Tick.</summary>
         public virtual void OnEvent(Battle battle, Combatant owner, BattleEvent e) { }
 
