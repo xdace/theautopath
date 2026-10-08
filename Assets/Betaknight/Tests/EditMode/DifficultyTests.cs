@@ -47,13 +47,15 @@ namespace Betaknight.Tests.EditMode
         }
 
         private static BattleResult Solo(LogicBoard board, int seconds = 20, System.Action<CombatantSetup> player = null,
-            System.Action<CombatantSetup> enemy = null)
+            System.Action<CombatantSetup> enemy = null, RowQueueConfig queue = null)
         {
             CombatantSetup a = Fighter("A", 1000, 100, 1000, board: board);
             CombatantSetup b = Fighter("B", 100000, 0, 1000);
             player?.Invoke(a);
             enemy?.Invoke(b);
-            return Run(Duel(a, b), seconds);
+            BattleSetup setup = Duel(a, b);
+            if (queue != null) setup.Queue = queue;
+            return Run(setup, seconds);
         }
 
         private static List<BattleEvent> Starts(BattleResult r, string skillId) =>
@@ -291,12 +293,12 @@ namespace Betaknight.Tests.EditMode
         }
 
         private static BattleResult WithRelief(LogicBoard board, string relief, int value, int seconds = 10,
-            System.Action<CombatantSetup> player = null, System.Action<CombatantSetup> enemy = null) =>
+            System.Action<CombatantSetup> player = null, System.Action<CombatantSetup> enemy = null, RowQueueConfig queue = null) =>
             Solo(board, seconds, a =>
             {
                 if (relief != null) a.Reliefs[relief] = value;
                 player?.Invoke(a);
-            }, enemy);
+            }, enemy, queue);
 
         [Test]
         public void Relief_StunsLastLonger()
@@ -314,7 +316,8 @@ namespace Betaknight.Tests.EditMode
             LogicBoard Board() => new LogicBoard(new[] { Row("enemy_stunned", Ping()), Row("always", Stunner(10)) });
             int PingsAfterStun(string relief)
             {
-                BattleResult r = WithRelief(Board(), relief, 10, 3);
+                // Ohne Warteschlange (A-13): gemessen wird nur, wie lange die Bedingung gilt.
+                BattleResult r = WithRelief(Board(), relief, 10, 3, queue: RowQueueConfig.Off);
                 int expired = r.Events.First(e => e.Kind == BattleEventKind.StatusExpired && e.Detail == StatusIds.Stun).Tick;
                 return Starts(r, "ping").Count(e => e.Tick >= expired);
             }

@@ -134,6 +134,16 @@ namespace Betaknight.Core.Arena
 
         private readonly Dictionary<string, int> _reliefs = new Dictionary<string, int>();
 
+        internal readonly List<QueuedRow> QueueList = new List<QueuedRow>();
+
+        /// <summary>Wartende Zeilen (A-13), in der Reihenfolge des Einreihens. Gestartet wird nach Priorität der Tafel.</summary>
+        public IReadOnlyList<QueuedRow> Queue => QueueList;
+
+        public bool IsQueued(int row) => QueueList.Exists(q => q.Row == row);
+
+        /// <summary>Wie oft eine Zeile gerade in der Warteschlange steht.</summary>
+        public int QueuedCount(int row) => QueueList.FindAll(q => q.Row == row).Count;
+
         /// <summary>Wert einer Erleichterung (0 = nicht vorhanden).</summary>
         public int Relief(string id) => id != null && _reliefs.TryGetValue(id, out int v) ? v : 0;
 

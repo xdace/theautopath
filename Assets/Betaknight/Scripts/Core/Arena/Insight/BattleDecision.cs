@@ -19,6 +19,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Bedingung erfüllt und Skill bereit, aber eine andere Aktion lief und liess sich nicht abbrechen.</summary>
         ActionRunning,
+
+        /// <summary>Eingereiht (A-13): die Zeile wartet, bis sie dran ist (Aktion läuft oder Skill im Cooldown).</summary>
+        Queued,
     }
 
     /// <summary>Eine Zeile bei einer Entscheidung: Zustand und Cooldown des Skills danach.</summary>
@@ -76,7 +79,11 @@ namespace Betaknight.Core.Arena
         public bool IsBusy => ChosenRow < 0;
 
         /// <summary>Wurde die Zeile bei dieser Entscheidung übersprungen? Dann steht der Grund in <see cref="Rows"/>.</summary>
-        public bool Skipped(int row) => IsBusy ? Rows[row].State == RowCheckState.ActionRunning : row < ChosenRow;
+        public bool Skipped(int row) =>
+            IsBusy ? Rows[row].State == RowCheckState.ActionRunning || Rows[row].State == RowCheckState.Queued : row < ChosenRow;
+
+        /// <summary>Stand die Zeile bei dieser Entscheidung in der Warteschlange? Dann ist sie nicht übersprungen, sondern wartet.</summary>
+        public bool Queued(int row) => Rows[row].State == RowCheckState.Queued;
     }
 
     /// <summary>Lesbare Gründe für die Arena-Ansicht und die Auswertung.</summary>
@@ -92,6 +99,8 @@ namespace Betaknight.Core.Arena
                 case RowCheckState.Cooldown: return check.CooldownLeft > 0 ? $"Skill im Cooldown (noch {Seconds(check.CooldownLeft)})" : "Skill im Cooldown";
                 case RowCheckState.Orphaned: return "verwaist (kein Skill)";
                 case RowCheckState.ActionRunning: return "Bedingung erfüllt, aber Aktion läuft";
+                case RowCheckState.Queued:
+                    return check.CooldownLeft > 0 ? $"eingereiht, wartet (Cooldown noch {Seconds(check.CooldownLeft)})" : "eingereiht, wartet (Aktion läuft)";
                 default: return "bereit";
             }
         }

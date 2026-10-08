@@ -38,6 +38,12 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Ein Auslöser verfällt, weil die Zielzeile nicht bereit ist. RowIndex = Ziel, Amount = auslösende Zeile.</summary>
         TriggerExpired,
+
+        /// <summary>
+        /// Eine Zeile wurde eingereiht (Warteschlange, A-13): Bedingung erfüllt oder Auslöser, aber der Skill kann gerade
+        /// nicht starten. RowIndex = Zeile, Detail = Skill, Amount = Rest-Cooldown in Ticks.
+        /// </summary>
+        RowQueued,
     }
 
     /// <summary>Ein Eintrag im Kampfprotokoll. Bedingungen und Set-Boni lesen dieselben Einträge.</summary>
@@ -81,6 +87,12 @@ namespace Betaknight.Core.Arena
         /// <see cref="BattleEventKind.ActionStarted"/> die gesparten Cooldown-Ticks.
         /// </summary>
         public int Bonus { get; internal set; }
+
+        /// <summary>Bei <see cref="BattleEventKind.ActionStarted"/>: Wartezeit in der Warteschlange in Ticks, -1 = nicht eingereiht.</summary>
+        public int QueuedTicks { get; internal set; } = -1;
+
+        /// <summary>Kam die Aktion aus der Warteschlange?</summary>
+        public bool FromQueue => QueuedTicks >= 0;
 
         public BattleEvent(int tick, BattleEventKind kind, Combatant source, Combatant target, int amount = 0, string detail = null, int rowIndex = -1)
         {

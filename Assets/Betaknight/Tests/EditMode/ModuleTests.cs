@@ -161,8 +161,13 @@ namespace Betaknight.Tests.EditMode
         public void ExtendHoldsTheConditionOneSecondLonger()
         {
             SkillDefinition stab = Skills.Get(SkillIds.ShockStab).WithBonus(0, -Ticks.FromSeconds(100), 0);
-            BattleResult Fight(ICondition condition) =>
-                Run(Duel(Fighter("A", 1000, 0, 20, board: new LogicBoard(new[] { new LogicRow(condition, stab, "Fenster") })), Fighter("B", 100000, 0, 1000)), 5);
+            // Ohne Warteschlange (A-13), damit nur das Fenster der Bedingung zählt und keine eingereihte Ausführung danach.
+            BattleResult Fight(ICondition condition)
+            {
+                BattleSetup setup = Duel(Fighter("A", 1000, 0, 20, board: new LogicBoard(new[] { new LogicRow(condition, stab, "Fenster") })), Fighter("B", 100000, 0, 1000));
+                setup.Queue = RowQueueConfig.Off;
+                return Run(setup, 5);
+            }
 
             int LastStart(BattleResult r) => r.Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Source.Name == "A" && e.Detail == SkillIds.ShockStab)
                 .Select(e => e.Tick).DefaultIfEmpty(-1).Max();
@@ -225,16 +230,25 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void ATriggerOnCooldownExpires()
+        public void ATriggerOnCooldownIsQueuedInsteadOfExpiring()
         {
-            // Schockstich fast ohne Cooldown, Bohrstoß mit langem: die meisten Auslöser verfallen.
-            SkillDefinition stab = Skills.Get(SkillIds.ShockStab).WithBonus(0, -Ticks.FromSeconds(100), 0);
+            // Schockstich (3 s) löst Bohrstoß (5 s Cooldown) aus: Auslöser im Cooldown reihen den Bohrstoß ein (A-13).
+            SkillDefinition stab = Skills.Get(SkillIds.ShockStab);
             BattleResult r = Run(Duel(Fighter("A", 1000, 0, 20, board: TriggerBoard(stab, Skills.Get(SkillIds.Drill))), Fighter("B", 100000, 0, 1000)), 20);
 
-            List<BattleEvent> expired = r.Events.Where(e => e.Kind == BattleEventKind.TriggerExpired).ToList();
+            Assert.IsEmpty(r.Events.Where(e => e.Kind == BattleEventKind.TriggerExpired));
+            List<BattleEvent> queued = r.Events.Where(e => e.Kind == BattleEventKind.RowQueued && e.RowIndex == 1).ToList();
+            Assert.Greater(queued.Count, 0);
+            Assert.IsTrue(queued.All(e => e.IsTriggered && e.CauseRow == 0));
+            Assert.Greater(r.Events.Count(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.Drill && e.FromQueue), 0,
+                "Wenn bereit, startet er aus der Warteschlange");
+
+            // Ohne Warteschlange gilt die alte Regel: der Auslöser verfällt.
+            BattleSetup old = Duel(Fighter("A", 1000, 0, 20, board: TriggerBoard(stab, Skills.Get(SkillIds.Drill))), Fighter("B", 100000, 0, 1000));
+            old.Queue = RowQueueConfig.Off;
+            List<BattleEvent> expired = Run(old, 20).Events.Where(e => e.Kind == BattleEventKind.TriggerExpired).ToList();
             Assert.Greater(expired.Count, 0);
             Assert.IsTrue(expired.All(e => e.Detail == SkillIds.Drill && e.Amount == 0 && e.RowIndex == 1));
-            Assert.Greater(Executions(r, SkillIds.Drill).Count, 0, "Wenn bereit, löst er aus");
         }
 
         [Test]
@@ -255,9 +269,15 @@ namespace Betaknight.Tests.EditMode
         public void ACircleOfTwoTriggersRunsAndStaysStable()
         {
             // Beide fast ohne Cooldown und Cast: der Kreis feuert so oft es geht, bleibt aber endlich und deterministisch.
+            // Seit A-13 startet ihn der Kampfbeginn; eine Zeile «Immer» darüber hätte in der Warteschlange immer Vorrang.
             SkillDefinition stab = Skills.Get(SkillIds.ShockStab).WithBonus(0, -Ticks.FromSeconds(100), -1000);
             SkillDefinition bash = Skills.Get(SkillIds.ShieldBash).WithBonus(0, -Ticks.FromSeconds(100), -1000);
-            BattleSetup Setup() => Duel(Fighter("A", 1000, 0, 20, board: TriggerBoard(stab, bash, circle: true)), Fighter("B", 100000, 0, 1000));
+            LogicBoard Circle()
+            {
+                var edges = new List<GraphEdge> { new GraphEdge(GraphNode.Skill(0), GraphNode.Skill(1)), new GraphEdge(GraphNode.Skill(1), GraphNode.Skill(0)) };
+                return new LogicBoard(new[] { Row("battle_start", stab), Row(Never, bash) }, null, new LogicGraph(edges));
+            }
+            BattleSetup Setup() => Duel(Fighter("A", 1000, 0, 20, board: Circle()), Fighter("B", 100000, 0, 1000));
 
             BattleResult r = null;
             Assert.DoesNotThrow(() => r = Run(Setup(), 10));
@@ -294,14 +314,16 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void TheReportShowsTheChain()
         {
-            SkillDefinition stab = Skills.Get(SkillIds.ShockStab).WithBonus(0, -Ticks.FromSeconds(100), 0);
+            SkillDefinition stab = Skills.Get(SkillIds.ShockStab);
             BattleSetup setup = Duel(Fighter("A", 1000, 0, 20, board: TriggerBoard(stab, Skills.Get(SkillIds.Drill))), Fighter("B", 100000, 0, 1000));
             BattleReport report = BattleReport.Create(Run(setup));
 
             RowReport drill = report.Rows[1];
             Assert.Greater(drill.Triggered, 0);
             Assert.AreEqual(drill.Fired, drill.Triggered, "Die Zeile startet nur über den Auslöser");
-            Assert.Greater(drill.TriggersExpired, 0);
+            // Seit A-13 verfällt kein Auslöser mehr: das Ziel im Cooldown wird eingereiht.
+            Assert.AreEqual(0, drill.TriggersExpired);
+            Assert.Greater(drill.Queued, 0);
             Assert.AreEqual($"Zeile 1 ×{drill.Triggered}", drill.TriggeredByText);
             Assert.IsTrue(report.Hints.Any(h => h.StartsWith("Zeile 2 (") && h.Contains("ausgelöst, von Zeile 1 ×")));
         }

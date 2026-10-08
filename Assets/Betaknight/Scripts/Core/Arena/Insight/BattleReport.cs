@@ -43,6 +43,20 @@ namespace Betaknight.Core.Arena
         /// <summary>Anteil am Gesamtschaden in Basispunkten.</summary>
         public int DamageShareBp { get; internal set; }
 
+        /// <summary>Wie oft die Zeile eingereiht wurde (A-13: erfüllt, aber gerade nicht startbar).</summary>
+        public int Queued { get; internal set; }
+
+        /// <summary>Starts aus der Warteschlange und ihre gesamte Wartezeit in Ticks.</summary>
+        public int StartedFromQueue { get; internal set; }
+        public int WaitTicksTotal { get; internal set; }
+
+        /// <summary>Mittlere Wartezeit der Starts aus der Warteschlange in Ticks (0 ohne solche Starts).</summary>
+        public int AverageWaitTicks => StartedFromQueue > 0 ? WaitTicksTotal / StartedFromQueue : 0;
+
+        /// <summary>«4× eingereiht, Ø 1,2 s gewartet» oder leer.</summary>
+        public string QueueText => Queued == 0 ? string.Empty
+            : StartedFromQueue > 0 ? $"{Queued}× eingereiht, Ø {SkillInfo.Seconds(AverageWaitTicks)} gewartet" : $"{Queued}× eingereiht";
+
         /// <summary>Grundschwierigkeit des Bausteins (0–3); bestimmt den Bonus.</summary>
         public int Difficulty { get; internal set; }
 
@@ -165,6 +179,11 @@ namespace Betaknight.Core.Arena
                     case BattleEventKind.ActionStarted:
                         if (row == null) break;
                         row.Fired++;
+                        if (e.FromQueue)
+                        {
+                            row.StartedFromQueue++;
+                            row.WaitTicksTotal += e.QueuedTicks;
+                        }
                         if (e.IsRepeat) row.Repeated++;
                         if (e.Tier > 0)
                         {
@@ -176,6 +195,9 @@ namespace Betaknight.Core.Arena
                             row.Triggered++;
                             row.TriggeredBy[e.CauseRow] = (row.TriggeredBy.TryGetValue(e.CauseRow, out int n) ? n : 0) + 1;
                         }
+                        break;
+                    case BattleEventKind.RowQueued:
+                        if (row != null) row.Queued++;
                         break;
                     case BattleEventKind.TriggerExpired:
                         if (row != null) row.TriggersExpired++;
@@ -210,7 +232,8 @@ namespace Betaknight.Core.Arena
                 {
                     RowCheckState state = d.Rows[i].State;
                     Add(_rows[i].AllStates, state);
-                    if (!d.Skipped(i)) continue;
+                    // Eingereiht ist nicht übersprungen: die Zeile wartet und kommt dran (A-13).
+                    if (!d.Skipped(i) || d.Queued(i)) continue;
                     _rows[i].Skipped++;
                     Add(_rows[i].SkipReasons, state);
                 }
@@ -271,6 +294,14 @@ namespace Betaknight.Core.Arena
                     _hints.Add($"{row.Name}: schwerer Baustein ({DifficultyText.Name(row.Difficulty)}) nie erfüllt. Erleichterer helfen, ohne den Bonus zu senken.");
             }
 
+            // Warteschlange: welche Zeile wartet am längsten?
+            RowReport waiting = null;
+            foreach (RowReport row in _rows)
+                if (row.StartedFromQueue > 0 && (waiting == null || row.AverageWaitTicks > waiting.AverageWaitTicks)) waiting = row;
+            if (waiting != null && waiting.AverageWaitTicks >= Ticks.PerSecond)
+                _hints.Add($"{waiting.Name} ({waiting.Skill}) wartete im Schnitt {SkillInfo.Seconds(waiting.AverageWaitTicks)} in der Warteschlange. "
+                    + "Höhere Zeilen oder lange Casts halten sie auf.");
+
             if (OtherDamage > 0) _hints.Add($"{OtherDamage} Schaden kam ohne Zeile (Set-Boni, Rückschlag).");
         }
 
@@ -299,7 +330,7 @@ namespace Betaknight.Core.Arena
             RowCheckState? best = null;
             int max = 0;
             // Feste Reihenfolge, damit Gleichstände immer gleich ausgehen.
-            foreach (RowCheckState s in new[] { RowCheckState.ConditionFalse, RowCheckState.Cooldown, RowCheckState.Orphaned, RowCheckState.ActionRunning, RowCheckState.Ready })
+            foreach (RowCheckState s in new[] { RowCheckState.ConditionFalse, RowCheckState.Cooldown, RowCheckState.Orphaned, RowCheckState.ActionRunning, RowCheckState.Queued, RowCheckState.Ready })
             {
                 if (counts.TryGetValue(s, out int n) && n > max)
                 {

@@ -29,6 +29,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Überlebens-Kampf: lebt der Spieler nach so vielen Ticks noch, entkommt er. 0 = aus.</summary>
         public int SurviveTicks;
+
+        /// <summary>Warteschlange für erfüllte Zeilen (A-13). Null = Standard.</summary>
+        public RowQueueConfig Queue = RowQueueConfig.Default;
     }
 
     public enum BattleOutcome

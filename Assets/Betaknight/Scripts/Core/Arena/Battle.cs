@@ -33,6 +33,11 @@ namespace Betaknight.Core.Arena
         private bool[] _metBefore;
 
         // Zeilen, die während der laufenden Aktion des Spielers schon als «Aktion läuft» festgehalten sind.
+        private readonly RowQueueConfig _queue;
+
+        // Warteschlange: war die Bedingung einer Zeile im letzten Tick erfüllt (für «neu erfüllt»)?
+        private readonly Dictionary<Combatant, bool[]> _queueMet = new Dictionary<Combatant, bool[]>();
+
         private ActionState _busyAction;
         private readonly HashSet<int> _busyRows = new HashSet<int>();
 
@@ -60,6 +65,7 @@ namespace Betaknight.Core.Arena
 
             Random = new Random(setup.Seed);
             Context = setup.Context ?? new BattleContext();
+            _queue = setup.Queue ?? RowQueueConfig.Default;
 
             Player = Add(setup.Player, Side.Player);
             foreach (CombatantSetup enemy in setup.Enemies) _enemies.Add(Add(enemy, Side.Enemy));
@@ -75,6 +81,7 @@ namespace Betaknight.Core.Arena
             var rows = new RowRuntime[c.Board.Rows.Count + 1];
             for (int i = 0; i < rows.Length; i++) rows[i] = new RowRuntime(i);
             _rows.Add(c, rows);
+            _queueMet.Add(c, new bool[rows.Length]);
             return c;
         }
 
@@ -99,6 +106,7 @@ namespace Betaknight.Core.Arena
                 ObserveRows();
                 CountConditions();
                 Decide();
+                QueueRows();
                 outcome = CheckEnd();
                 if (outcome.HasValue) break;
             }
@@ -109,6 +117,8 @@ namespace Betaknight.Core.Arena
                 outcome = BattleOutcome.Timeout;
             }
 
+            // Die Warteschlange leert sich am Kampfende.
+            foreach (Combatant c in _all) c.QueueList.Clear();
             Emit(new BattleEvent(Tick, BattleEventKind.BattleEnd, null, null, (int)outcome.Value));
             foreach (Combatant c in _all)
                 foreach (BattleModifier m in c.ModifierList.ToArray()) m.OnBattleEnd(this, c, outcome.Value);
@@ -361,6 +371,22 @@ namespace Betaknight.Core.Arena
             // Nicht stapelnd: die höhere Stufe von auslösender Ausführung und eigener Zeile zählt.
             int tier = Math.Max(sourceTier, RowTier(c, row));
             LogicRow target = row >= 0 && row < c.Board.Rows.Count ? c.Board.Rows[row] : null;
+
+            // Warteschlange: ein Auslöser verfällt nicht mehr, sein Ziel wird eingereiht, wenn es gerade nicht starten kann.
+            if (_queue.QueueTriggers && _queue.AppliesTo(c))
+            {
+                if (target == null || target.IsOrphaned || !c.IsAlive || OpponentsOf(c).Count == 0)
+                {
+                    Emit(new BattleEvent(Tick, BattleEventKind.TriggerExpired, c, null, sourceRow, target?.Skill?.Id, row));
+                    return;
+                }
+                if (c.Action == null && !c.IsStunned && c.IsReady(target.Skill))
+                    StartAction(c, target.Skill, null, row, ActionCause.Trigger, sourceRow, null, tier);
+                else
+                    Enqueue(c, row, ActionCause.Trigger, sourceRow, tier, null);
+                return;
+            }
+
             if (target == null || target.IsOrphaned || !c.IsReady(target.Skill) || !c.IsAlive || c.IsStunned
                 || OpponentsOf(c).Count == 0 || (c.Action != null && c.Pending.Count >= MaxPendingActions))
             {
@@ -425,10 +451,21 @@ namespace Betaknight.Core.Arena
             for (int i = 0; i <= board.Rows.Count; i++)
             {
                 LogicRow row = board.RowAt(i);
+                QueuedRow queued = QueuedAt(c, i);
                 if (row.IsOrphaned || !c.IsReady(row.Skill))
                 {
-                    if (states != null) states[i] = row.IsOrphaned ? RowCheckState.Orphaned : RowCheckState.Cooldown;
+                    if (states != null) states[i] = row.IsOrphaned ? RowCheckState.Orphaned : queued != null ? RowCheckState.Queued : RowCheckState.Cooldown;
                     continue;
+                }
+
+                // Eingereiht ist eingereiht: die Bedingung wird beim Start nicht erneut geprüft.
+                if (queued != null)
+                {
+                    if (basicWindup && row.Skill.IsBasicAttack) return;
+                    if (c.Action != null) Interrupt(c);
+                    StartQueued(c, queued);
+                    if (states != null) RecordDecision(c, i, states);
+                    return;
                 }
 
                 RowRuntime state = _rows[c][i];
@@ -445,6 +482,89 @@ namespace Betaknight.Core.Arena
                 StartAction(c, row.Skill, target, i);
                 if (states != null) RecordDecision(c, i, states);
                 return;
+            }
+        }
+
+        // ------------------------------------------------------------------ Warteschlange (A-13)
+
+        private static QueuedRow QueuedAt(Combatant c, int row)
+        {
+            foreach (QueuedRow q in c.QueueList)
+                if (q.Row == row) return q;
+            return null;
+        }
+
+        /// <summary>
+        /// Reiht eine Zeile ein. Steht sie schon (so oft, wie die Konfiguration erlaubt), ändert erneutes Erfüllen nichts;
+        /// ein Auslöser mit höherer Stufe hebt nur den Bonus der wartenden Ausführung (nicht stapelnd).
+        /// </summary>
+        private void Enqueue(Combatant c, int row, ActionCause cause, int causeRow, int tier, Combatant target)
+        {
+            int entries = 0;
+            QueuedRow existing = null;
+            foreach (QueuedRow q in c.QueueList)
+            {
+                if (q.Row != row) continue;
+                entries++;
+                existing = existing ?? q;
+            }
+            if (entries >= Math.Max(1, _queue.MaxEntriesPerRow))
+            {
+                existing.BonusTier = Math.Max(existing.BonusTier, tier);
+                // Der Auslöser-Ursprung geht mit: eine wartende Tafel-Zeile merkt sich, wer sie zusätzlich ausgelöst hat.
+                if (cause == ActionCause.Trigger && existing.Cause == ActionCause.Board)
+                {
+                    existing.Cause = ActionCause.Trigger;
+                    existing.CauseRow = causeRow;
+                }
+                return;
+            }
+
+            LogicRow r = c.Board.Rows[row];
+            c.QueueList.Add(new QueuedRow
+            {
+                Row = row, SinceTick = Tick, Cause = cause, CauseRow = causeRow, BonusTier = Math.Max(tier, r.Difficulty), Target = target,
+            });
+            Emit(new BattleEvent(Tick, BattleEventKind.RowQueued, c, target, c.Cooldown(r.Skill.Id), r.Skill.Id, row)
+                { Cause = cause, CauseRow = causeRow, Tier = tier });
+        }
+
+        /// <summary>Startet eine wartende Zeile ohne erneute Prüfung ihrer Bedingung, mit dem Bonus, den sie verdient hat.</summary>
+        private void StartQueued(Combatant c, QueuedRow q)
+        {
+            c.QueueList.Remove(q);
+            LogicRow row = c.Board.Rows[q.Row];
+            Combatant target = q.Target != null && q.Target.IsAlive ? q.Target : null;
+            StartAction(c, row.Skill, target, q.Row, q.Cause, q.CauseRow, null, q.BonusTier, q.WaitedTicks(Tick));
+        }
+
+        /// <summary>
+        /// Nach den Entscheidungen: Zeilen, deren Bedingung erfüllt ist, die aber gerade nicht starten konnten, reihen sich
+        /// ein. Eine durchgehend erfüllte Bedingung reiht während des Cooldowns nicht erneut ein (siehe Konfiguration).
+        /// </summary>
+        private void QueueRows()
+        {
+            foreach (Combatant c in _all)
+            {
+                if (!c.IsAlive || !_queue.AppliesTo(c) || OpponentsOf(c).Count == 0) continue;
+                RowRuntime[] states = _rows[c];
+                bool[] before = _queueMet[c];
+                for (int i = 0; i < c.Board.Rows.Count; i++)
+                {
+                    LogicRow row = c.Board.Rows[i];
+                    if (row.IsOrphaned) continue;
+                    bool met = row.Condition.IsMet(new ConditionContext(this, c, states[i]), out Combatant target);
+                    bool fresh = met && !before[i];
+                    before[i] = met;
+                    if (!met || c.QueuedCount(i) >= Math.Max(1, _queue.MaxEntriesPerRow)) continue;
+                    // Gerade gestartet oder läuft noch: ein Zustand reiht die eigene laufende Zeile nicht ein, ein neues Ereignis schon.
+                    bool running = c.Action != null && c.Action.RowIndex == i && c.Action.Cause != ActionCause.Repeat;
+                    if (running && (c.Action.StartTick == Tick || !fresh)) continue;
+
+                    bool ready = c.IsReady(row.Skill);
+                    if (!ready && _queue.OnlyNewFulfilmentDuringCooldown && !fresh) continue;
+                    Enqueue(c, i, ActionCause.Board, -1, -1, target);
+                }
             }
         }
 
@@ -477,13 +597,15 @@ namespace Betaknight.Core.Arena
             int above = Math.Min(c.Action.RowIndex, c.Board.Rows.Count + 1);
             for (int i = 0; i < above; i++)
             {
-                if (_busyRows.Contains(i) || Probe(c, i) != RowCheckState.Ready) continue;
+                if (_busyRows.Contains(i)) continue;
+                RowCheckState probe = Probe(c, i);
+                if (probe != RowCheckState.Ready && probe != RowCheckState.Queued) continue;
                 if (states == null)
                 {
                     states = new RowCheckState[c.Board.Rows.Count + 1];
                     for (int j = 0; j < states.Length; j++) states[j] = Probe(c, j);
                 }
-                states[i] = RowCheckState.ActionRunning;
+                states[i] = probe == RowCheckState.Queued ? RowCheckState.Queued : RowCheckState.ActionRunning;
                 _busyRows.Add(i);
             }
             if (states == null) return;
@@ -495,6 +617,7 @@ namespace Betaknight.Core.Arena
         {
             LogicRow row = c.Board.RowAt(index);
             if (row.IsOrphaned) return RowCheckState.Orphaned;
+            if (c.IsQueued(index)) return RowCheckState.Queued;
             if (!c.IsReady(row.Skill)) return RowCheckState.Cooldown;
             return row.Condition.IsMet(new ConditionContext(this, c, _rows[c][index]), out _) ? RowCheckState.Ready : RowCheckState.ConditionFalse;
         }
@@ -543,7 +666,7 @@ namespace Betaknight.Core.Arena
         /// zählen als Feuern der Zeile. Ohne <paramref name="repeatsLeft"/> gelten die «Mehrfach»-Wiederholungen des Skills.
         /// </summary>
         public void StartAction(Combatant c, SkillDefinition skill, Combatant target, int rowIndex,
-            ActionCause cause = ActionCause.Board, int causeRow = -1, int? repeatsLeft = null, int bonusTier = -1)
+            ActionCause cause = ActionCause.Board, int causeRow = -1, int? repeatsLeft = null, int bonusTier = -1, int queuedTicks = -1)
         {
             bool repeat = cause == ActionCause.Repeat;
 
@@ -581,7 +704,7 @@ namespace Betaknight.Core.Arena
 
             Emit(new BattleEvent(Tick, BattleEventKind.ActionStarted, c, c.Action.Target, windup, skill.Id, rowIndex)
             {
-                Cause = cause, CauseRow = causeRow, Tier = tier,
+                Cause = cause, CauseRow = causeRow, Tier = tier, QueuedTicks = queuedTicks,
                 Bonus = repeat ? 0 : Math.Max(0, skill.CooldownBeforeDifficulty - skill.CooldownTicks),
             });
             foreach (BattleModifier m in c.ModifierList.ToArray()) m.OnActionStarted(this, c, skill, rowIndex);
@@ -697,6 +820,7 @@ namespace Betaknight.Core.Arena
                 target.Hp = 0;
                 target.Action = null;
                 target.StatusList.Clear();
+                target.QueueList.Clear();
                 Emit(new BattleEvent(Tick, BattleEventKind.Death, hit.Source, target, 0, hit.SkillId));
             }
         }
