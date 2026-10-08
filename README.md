@@ -164,6 +164,43 @@ Evolutionsformen werden nie angeboten, man erreicht sie nur über ein Rezept. An
 
 **Rezeptbuch:** Unentdeckte Evolutionen und Duos stehen als Silhouette «???» mit einem Hinweis im Inventar, entdeckte mit ihrem Rezept. Das Buch wird über Runs gespeichert (in Unity in den PlayerPrefs, `Overworld/Persistence/PlayerPrefsRecipeBookStore`, im Core hinter `IRecipeBookStore`). Es ist reines Wissen: Gespeichert werden nur Einträge wie «evo:evo_inferno», nie Werte oder Boni.
 
+#### Schwierigkeit und Bonus der Bausteine
+
+Jeder Logikbaustein hat eine feste **Grundschwierigkeit 0–3** (Daten im `RuneCatalog`, Parameter `difficulty` und `invertedDifficulty`). Je seltener eine Bedingung von selbst eintritt, desto stärker wird der Skill ihrer Zeile. Die Bonus-Tabelle steht als Daten in `Arena/Difficulty.cs` (`DifficultyBonusConfig.Default`):
+
+| Stufe | Symbol | Beispiele | Bonus auf den Skill der Zeile |
+|---|---|---|---|
+| 0 Leicht | ◇ | Immer, Kampfbeginn | keiner |
+| 1 Mittel | ◆ | Bei Treffer, Jeder 3. Angriff, Alle 5 Sekunden | −15 % Cooldown |
+| 2 Schwer | ◆◆ | Nach Krit, Gegner betäubt, Nach Block, HP unter 30 % | −30 % Cooldown, +25 % Wirkung |
+| 3 Sehr schwer | ◆◆◆ | Ladung voll, 3 Ausweicher in Folge, HP unter 15 %, Alle 20 Sekunden, Gegen Boss | −50 % Cooldown, +50 % Wirkung, −30 % Cast-Zeit (nie unter 0,1 s), +1 s Dauer von Status-Wirkungen |
+
+«Wirkung» heisst Schaden, Heilung (auch Brennen, Gift, Heilung über Zeit) und Schild bzw. eigene Buffs. Der Basisangriff bekommt nie einen Bonus.
+
+- **Der Bonus sinkt nie.** Ausrüstung, Module, Wachstum, Tags oder Skills, die eine Bedingung leichter erfüllbar machen, ändern die Stufe nicht. Genau das ist der gewollte Weg zu starken Builds.
+- **Umkehren** hat eine eigene Stufe: «NICHT Immer» ist ◆◆◆, «NICHT alle 20 Sekunden» ist ◇.
+- **Der Bonus wandert mit:** Löst eine Zeile per Auslöser ein Ziel aus, läuft diese Ausführung mit der Stufe der auslösenden Zeile, wenn sie höher ist (nicht stapelnd, die höhere zählt). Wiederholungen («Mehrfach», Echo) behalten die Stufe.
+
+**Erleichterer** (`Arena/Reliefs.cs`, `ReliefCatalog.CreateDefault`) sind neue Inhalte, die schwere Bausteine öfter erfüllen:
+
+| Erleichterer | Art | Wirkung | Macht leichter |
+|---|---|---|---|
+| Lähmhandschuhe | Ausrüstung (Hände), Ladung | Eigene Betäubungen dauern +1 s | Gegner betäubt |
+| Nachbild-Visier | Ausrüstung (Kopf), Phantom | Gegner gilt 0,5 s nach einer Betäubung noch als betäubt | Gegner betäubt |
+| Vorgeladene Zelle | Ausrüstung (Brust), Ladung | Ladung startet bei 3 | Ladung voll |
+| Phantomschritt-Stiefel | Ausrüstung (Füsse), Phantom | Ausweicher-Serie bricht erst beim 2. Treffer | 3 Ausweicher in Folge |
+| Konterschild | Ausrüstung (Schild), Ladung | Krit-Chance +15 % für 2 s nach einem Block | Nach Krit |
+| Giftbrenner | Ausrüstung (Waffe), Toxin | «Gegner brennt» gilt auch bei Gift | Gegner brennt |
+| Schmerzleiter-Beinschienen | Ausrüstung (Beine), Schrott | «Schwerer Treffer» gilt 5 Prozentpunkte früher | Schwerer Treffer |
+| Alarmfühler | Baustein-Modul | HP-Schwellen-Bausteine gelten 10 Prozentpunkte früher | HP unter 30 %, HP unter 15 %, HP unter … oder ausgewichen |
+| Witterung | Baustein-Modul | «Gegner unter x %» gilt 10 Prozentpunkte früher | Gegner unter 25 % |
+| Ladungsspule | Skill (Schild) | +3 Ladung (höchstens 5) | Ladung voll |
+| Lähmnebel | Skill (Schock) | 20 % Schaden und 0,6 s Betäubung an alle Gegner | Gegner betäubt |
+
+Module wirken, solange sie an irgendeinem Baustein sitzen. Eine «Barriere» gibt es im Spiel nicht; statt «HP-Schwellen zählen die Barriere nicht mit» verschiebt der Alarmfühler die HP-Schwellen.
+
+**Anzeige:** Build-Fenster, Runen-Inventar, HUD, Runen-Angebote und Shop zeigen das Symbol farbig am Baustein (◇ grau, ◆ blau, ◆◆ orange, ◆◆◆ rot), der Tooltip den Bonus. Die Infozeile des Skills in einer Zeile zeigt die Werte **inklusive** Bonus (Cooldown, Cast-Zeit, Schaden) und im Tooltip «Baustein ◆◆ Schwer: … (eingerechnet)». Angebote von Teilen, Modulen und Skills nennen, welche Bausteine sie leichter machen («Erleichtert: «Gegner betäubt» ◆◆ (Eigene Betäubungen dauern +1 s)»).
+
 ### Die Arena lesen
 
 Die Arena zeigt nicht nur, *welche* Zeile feuert, sondern auch *warum* die anderen nicht.
@@ -174,6 +211,7 @@ Die Arena zeigt nicht nur, *welche* Zeile feuert, sondern auch *warum* die ander
 - **Schwebende Zahlen am Ziel:** Schaden weiss, Krit gelb und grösser, Heilung grün, «Block» und «Ausgewichen» als Wort. Kommt die Wirkung von einer Tafel-Zeile, liegt die Zahl auf einem Feld in der Farbe dieser Zeile. Auch Brennen zählt zur Zeile, die es gesetzt hat.
 - **Auswertung nach dem Kampf** (vor «Weiter»): Tabelle pro Zeile mit «gefeuert», Schaden und Heilung gesamt, Anteil am Gesamtschaden, wie oft übersprungen und häufigster Grund. Dazu Hinweise wie «Zeile 3 hat nie gefeuert: Bedingung nie erfüllt» oder «Zeile 2 (Bohrstoß) macht 64 % des Schadens». «Build öffnen» öffnet direkt das Fenster «Build».
 - **Auslöser und Wiederholungen:** Der Cast-Balken zeigt «↪ von Zeile 1» bei ausgelösten und «↻ Wiederholung» bei wiederholten Aktionen. Im Protokoll steht beim Start «↪ ausgelöst von Zeile n» und verfallene Auslöser als «Auslöser von Zeile 1 verfällt, Zeile 2 (Bohrstoß) nicht bereit», so lässt sich jede Kette verfolgen. Die Auswertung zählt in «gefeuert» ausgelöste (↪) und wiederholte (↻) Starts mit und gibt Hinweise wie «Zeile 2 (Bohrstoß) wurde 4× ausgelöst, von Zeile 1 ×4» oder «3 Auslöser auf Zeile 2 verfielen».
+- **Schwierigkeit in der Auswertung:** Spalte «erfüllt» (wie oft die Bedingung von nicht erfüllt zu erfüllt wechselte) und «Bonus» (Zusatzschaden bzw. -heilung aus dem Schwierigkeits-Bonus und eingesparter Cooldown), das Symbol vor jeder Zeile. Hinweise wie «Zeile 2: Bonus ◆◆ brachte +140 Schaden (20 % des Zeilenschadens)» oder «Zeile 3: schwerer Baustein (Sehr schwer) nie erfüllt. Erleichterer helfen, ohne den Bonus zu senken.»
 - **Protokoll-Filter:** «Alles», «Meine Aktionen» oder «Nur Schaden». Einträge einer Zeile tragen deren Farbstreifen.
 - **Bei 4×:** Hervorhebungen (feuernde Zeile, Treffer-Blitz) bleiben mindestens 0,35 s Echtzeit sichtbar, schwebende Zahlen gut 1 s.
 
@@ -324,6 +362,9 @@ Boss durchs Portal; bis Game Over oder Akt 3.
 | `exceptionCount`, `exceptions` | Exceptions mit Text und Stacktrace (höchstens 40 Texte, gezählt wird alles) |
 | `errorLogCount`, `errorLogs` | Fehler-Logs (`Debug.LogError`, Asserts) mit Text |
 | `hangCount`, `hangs` | Hänger: keine Aktion länger als 10 s (danach Befreiungsversuch, ab 3 Hängern Abbruch des Runs) |
+| `runeStats` | Pro Baustein: Grundschwierigkeit, Kämpfe auf der Tafel, Kämpfe mit erfüllter Bedingung, wie oft erfüllt und gefeuert, Feuern pro Minute |
+
+**Messung für die Schwierigkeit:** Aus `runeStats` (pro Run und summiert in `total`) lässt sich ablesen, wie oft jeder Baustein in Bot-Kämpfen feuert. Am Ende steht dieselbe Tabelle im Log (`[Autoplay] Bausteine in Bot-Kämpfen …`), im Code `RuneFireStats.Table(runs)`. Bausteine, die der Bot oft erfüllt, sind Kandidaten für eine niedrigere Stufe, und umgekehrt.
 
 ## Phasenplan Meilenstein 1
 

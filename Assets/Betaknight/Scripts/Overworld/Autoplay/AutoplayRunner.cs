@@ -155,6 +155,7 @@ namespace Betaknight.Overworld.Autoplay
             _phase = Phase.Done;
             Application.logMessageReceived -= OnLog;
             Debug.Log($"[Autoplay] {_summary.Summary()}");
+            Debug.Log($"[Autoplay] {RuneFireStats.Table(_summary.Runs)}");
 
             _reportPath = string.IsNullOrEmpty(_options.ReportPath)
                 ? Path.Combine(Application.persistentDataPath, "autoplay-report.json")

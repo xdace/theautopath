@@ -27,6 +27,9 @@ namespace Betaknight.Core.Autoplay
         public readonly List<string> BoardRows = new List<string>();
         public readonly List<string> Modules = new List<string>();
         public int TriggersSet;
+
+        /// <summary>Pro Baustein (Runen-Id): wie oft erfüllt und gefeuert, für die Einstufung der Schwierigkeit.</summary>
+        public readonly SortedDictionary<string, RuneFireStat> RuneStats = new SortedDictionary<string, RuneFireStat>(StringComparer.Ordinal);
         public int TriggerLinks;
         public readonly List<string> Duos = new List<string>();
         public double DurationSeconds;
@@ -129,6 +132,8 @@ namespace Betaknight.Core.Autoplay
             w.Field("errorLogs", ErrorLogs);
             w.Field("hangCount", HangCount);
             w.Field("hangs", Hangs);
+            w.Name("runeStats");
+            RuneFireStats.Write(w, RuneStats.Values);
         }
 
         internal static string Num(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
@@ -186,6 +191,8 @@ namespace Betaknight.Core.Autoplay
             w.Field("errorLogCount", Runs.Sum(r => r.ErrorLogCount));
             w.Field("hangCount", Runs.Sum(r => r.HangCount));
             w.Field("endReasons", Runs.Select(r => r.EndReason).ToList());
+            w.Name("runeStats");
+            RuneFireStats.Write(w, RuneFireStats.Merge(Runs));
             w.Close('}');
             w.Name("runs");
             w.Open('[');

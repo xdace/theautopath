@@ -33,9 +33,9 @@ namespace Betaknight.Tests.EditMode
         public void BotNutztAlleBausteineDesSpiels()
         {
             // Über mehrere Seeds soll die Strategie jede Art von Entscheidung mindestens einmal treffen
-            // (Seed 23 bekommt einen Auslöser angeboten).
+            // (Seed 1 bekommt bis Akt 3 einen Auslöser angeboten).
             var summary = new AutoplaySummary();
-            foreach (int seed in new[] { 1, 2, 3, 4, 5, 6, 23 }) summary.Runs.Add(HeadlessAutoplay.Run(seed, targetAct: 2));
+            foreach (int seed in new[] { 1, 2, 3, 4, 5, 6 }) summary.Runs.Add(HeadlessAutoplay.Run(seed, targetAct: seed == 1 ? 3 : 2));
 
             Assert.That(summary.Ok, Is.True, summary.Summary());
             var rewards = summary.Runs.SelectMany(r => r.Rewards.Keys).Distinct().ToList();
@@ -45,6 +45,18 @@ namespace Betaknight.Tests.EditMode
             Assert.That(summary.Runs.Any(r => r.Act >= 2), Is.True, "mindestens ein Run erreicht Akt 2");
             Assert.That(summary.Runs.Sum(r => r.TriggersSet), Is.GreaterThan(0), "mindestens ein Auslöser gelegt");
             Assert.That(summary.Runs.All(r => r.BoardRows.Count > 0), Is.True);
+        }
+
+        [Test]
+        public void TheBotMeasuresHowOftenEveryBlockFires()
+        {
+            AutoplayReport a = HeadlessAutoplay.Run(5, targetAct: 2);
+            AutoplayReport b = HeadlessAutoplay.Run(5, targetAct: 2);
+            Assert.IsNotEmpty(a.RuneStats);
+            Assert.IsTrue(a.RuneStats.Values.All(s => s.Fights > 0 && s.FightsMet <= s.Fights));
+            Assert.Greater(a.RuneStats.Values.Sum(s => s.Fired), 0);
+            Assert.AreEqual(RuneFireStats.Table(new[] { a }), RuneFireStats.Table(new[] { b }));
+            StringAssert.Contains("\"runeStats\"", a.ToJson());
         }
 
         [Test]

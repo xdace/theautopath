@@ -119,6 +119,13 @@ namespace Betaknight.Core.Autoplay
             if (cell != null && cell.Content == CellContent.Elite) kind = FightKind.Elite;
             else if (cell != null && cell.Content == CellContent.GoldMine) kind = FightKind.Mine;
             _pending.Add((kind, result.Victory));
+
+            if (result.Battle != null && _session != null)
+            {
+                var runes = new List<(string, string, int)>();
+                foreach (RuneSlot row in _session.Runes.Rows) runes.Add((row.Rune?.Id, row.Rune?.Name ?? "?", row.Rune?.Difficulty ?? 0));
+                RuneFireStats.Record(Report.RuneStats, runes, result.Battle);
+            }
         }
 
         private void OnBoss(CombatResult result)
