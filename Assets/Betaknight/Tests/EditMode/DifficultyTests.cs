@@ -91,7 +91,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual((15, 0, 0, 0), Tuple(Config[1]));
             Assert.AreEqual((30, 25, 0, 0), Tuple(Config[2]));
             Assert.AreEqual((50, 50, 30, Ticks.PerSecond), Tuple(Config[3]));
-            Assert.AreEqual("−30 % Cooldown, +25 % Wirkung", Config[2].Text);
+            Assert.AreEqual("−30 % Cooldown, +25 % power", Config[2].Text);
         }
 
         private static (int, int, int, int) Tuple(DifficultyBonus b) =>
@@ -268,7 +268,7 @@ namespace Betaknight.Tests.EditMode
                 Assert.IsNotEmpty(r.Tag, $"{r.CarrierId} braucht Tag bzw. Art");
                 Assert.IsNotEmpty(r.EasedRuneIds, r.CarrierId);
                 foreach (string rune in r.EasedRuneIds) Assert.IsTrue(runes.TryGet(rune, out _), rune);
-                StringAssert.StartsWith("Erleichtert: «", reliefs.EasesText(r.CarrierId, runes));
+                StringAssert.StartsWith("Eases: \"", reliefs.EasesText(r.CarrierId, runes));
             }
         }
 
@@ -439,7 +439,7 @@ namespace Betaknight.Tests.EditMode
             Assert.Greater(hard.BonusDamage, 0);
             Assert.AreEqual(hard.Damage - hard.Damage * 100 / 125, hard.BonusDamage, 1);
             Assert.Greater(hard.CooldownSavedTicks, 0);
-            StringAssert.Contains("erfüllt", hard.DifficultyText);
+            StringAssert.Contains("Condition met", hard.DifficultyText);
             Assert.IsTrue(report.Hints.Any(h => h.Contains("Bonus")), string.Join("\n", report.Hints));
         }
 

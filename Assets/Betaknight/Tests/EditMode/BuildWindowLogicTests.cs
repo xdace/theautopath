@@ -233,12 +233,12 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(30, now.Hp);
 
             var changes = s.PreviewEquip(Item(s, "tower_shield"));
-            StatChange armor = changes.Single(c => c.Label == "Rüstung");
+            StatChange armor = changes.Single(c => c.Label == "Armor");
             Assert.AreEqual(1, armor.Sign, "mehr Rüstung ist besser");
             Assert.AreEqual(now.Armor.ToString(), armor.Before);
             Assert.Greater(int.Parse(armor.After), now.Armor);
 
-            StatChange lost = s.PreviewUnequip(EquipmentSlot.Shield).Single(c => c.Label == "Rüstung");
+            StatChange lost = s.PreviewUnequip(EquipmentSlot.Shield).Single(c => c.Label == "Armor");
             Assert.AreEqual(-1, lost.Sign);
             Assert.AreEqual(now.Armor, s.StatsNow().Armor, "Die Vorschau ändert die echte Ausrüstung nicht");
         }

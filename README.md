@@ -14,27 +14,29 @@ Dieses Repository enthält den **Meilenstein 1: Oberwelt bis einschliesslich Bew
 
 Es sind keine Prefabs, Sprites oder Fonts nötig. Hexfelder, Spielfigur und Labels werden zur Laufzeit erzeugt.
 
-### Bedienung
+### Controls
 
-| Aktion | Wirkung |
+The game is in English since A-18. This README stays German for the team; German names of game terms map to the in-game English names in the «Glossar Deutsch → Englisch» at the end.
+
+| Action | Effect |
 |---|---|
-| Maus über ein Feld | Zeigt die geplante Route (gelb) oder rot, wenn das Feld nicht erreichbar ist |
-| Klick auf ein «?»-Nachbarfeld | Erkunden: 1 Schritt, 1 Zug |
-| Klick auf ein entferntes Feld, das über besuchte Felder erreichbar ist | Reise über bekannte Routen, Schritt für Schritt; die ganze Reise kostet **einen Zug**. Sie hält an einem neuen Feld, bei Gegnern und angegriffenen Minen an, auch dann zählt sie als ein Zug |
-| Fenster bei mittleren Events | Eine der Optionen wählen (ausgegraute sind nicht bezahlbar) |
-| Runenwahl | Eine Rune oder ein Ausrüstungsteil nehmen (★ = passt zu einem vorhandenen Tag) oder für 3 Gold verzichten. Teile: «Anlegen» oder «Ins Inventar»; Runen bei voller Tafel: «Ins Runen-Inventar» oder eine Zeile tauschen |
-| Taste **B** / Button «Build (B)» | Fenster «Build» (ersetzt den Tafel-Editor): Mitte die Logik-Tafel, eine Zeile pro Rune + Skill (Rune mit Stufen-Abzeichen und Wachstum, Skill mit Kurzwerten, Details im Tooltip). Links das Skill-Inventar, rechts Module und Runen-Inventar oder das Rezeptbuch, oben die Stat-Leiste |
-| Ziehen im Build | Skill auf eine Zeile = einsetzen (besetzte Zeile: tauschen), Skill aus der Zeile ins Skill-Inventar = herausnehmen. Zeile am Griff ≡ auf eine andere Zeile = umsortieren. Rune aus dem Runen-Inventar auf eine Zeile = tauschen, auf einen freien Platz = neue Zeile; Rune einer Zeile ins Runen-Inventar = ablegen. Modul auf einen freien Platz ◇ an Baustein oder Skill = einsetzen, zurück in die Modul-Liste = abnehmen; Klick auf einen Auslöser wählt sein Ziel |
-| Taste **I** / Button «Inventar (I)» | Fenster «Inventar» wie im Rollenspiel: Figur des Ritters mit den 7 Plätzen (Helm, Handschuhe, Brust, Beinschienen, Stiefel, Waffe, Schild), daneben Details zum gewählten Teil, Tags und Sets, darunter das Item-Raster (12 Zellen) für Ausrüstung und später Verbrauchsgegenstände. Runen und Skills stehen nur im Build |
-| Ziehen im Inventar | Teil aus dem Raster auf seinen Platz an der Figur = anlegen (das alte Teil kommt in dieselbe Zelle; ein falscher Platz wird rot und verweigert), Teil von der Figur ins Raster = ablegen (auf ein passendes Teil: tauschen). Zelle auf Zelle = tauschen, auf eine leere Zelle = verschieben; die Reihenfolge bleibt erhalten, auch über Akte |
-| Doppel- oder Rechtsklick | Kurzweg: Skill, Rune oder Modul in die erste passende Zeile bzw. heraus; Teil anlegen bzw. ablegen. Einfacher Klick auf ein Teil zeigt die Details (Anlegen, Ablegen, Verwerfen) |
-| Stat-Leiste | In beiden Fenstern: HP, Waffenschaden, Angriffe/s, Rüstung, Ausweichen, Block, Krit, Präzision, Flächenschaden und aktive Set-Boni, Tag-Stufen und Duos. Maus über ein Teil oder Ziehen eines Teils zeigt die Änderung («Rüstung 6 → 9», grün besser, rot schlechter); bei Skills, Runen und Modulen stehen die Kurzwerte darunter |
-| Während Kampf und offenen Entscheidungen | Beide Fenster bleiben lesbar, Ziehen ist gesperrt. «B» und «I» schliessen sich gegenseitig, Esc schliesst |
-| Arena nach jedem Kampf | Spielt den Kampf ab: Tempo 1×/2×/4×, Pause, «Überspringen». Tafel live mit Zustand pro Zeile, Zustände, Ressourcen und schwebende Zahlen. Danach Auswertung pro Zeile, Protokoll mit Filter, «Build öffnen» oder «Weiter» (siehe «Die Arena lesen») |
-| Button «Shop öffnen» | Erscheint auf einem bereits besuchten Shop-Feld |
-| Button «Neuer Run» | Zurück zur Kit-Auswahl, neue Karte |
+| Hover a tile | Shows the planned route (yellow), or red if the tile can't be reached |
+| Click a "?" neighbour tile | Explore: 1 step, 1 turn |
+| Click a distant tile reachable over visited tiles | Travel along known routes step by step; the whole trip costs **one turn**. It stops on a new tile, at enemies and at raided mines, and still counts as one turn |
+| Window on medium events | Pick one of the options (greyed out = can't afford) |
+| Choose a Reward | Take a rune, item, skill or module (★ = fits a tag you have) or skip for 3 Gold. Items: "Equip" or "To Inventory"; runes on a full board: "Put in Rune Inventory" or swap a row |
+| Key **B** / button "Build (B)" | Build window: the Logic Board in the middle, one row per rune + skill (rune with level badge and growth, skill with short stats, details in the tooltip). Skill inventory on the left, modules and rune inventory or the Recipe Book on the right, stat bar on top |
+| Drag in Build | Skill onto a row = place (taken row: swap), skill from a row to the skill inventory = remove. Row by its handle ≡ onto another row = reorder. Rune from the rune inventory onto a row = swap, onto a free slot = new row; a row's rune into the rune inventory = unequip. Module onto a free slot ◇ on a rune or skill = insert, back to the module list = remove; click a trigger to pick its target |
+| Key **I** / button "Inventory (I)" | Inventory window: the knight with 7 slots (Helmet, Gloves, Chest, Legs, Boots, Weapon, Shield), details of the selected item, tags and sets, and the item grid (12 cells). Runes and skills are only in Build |
+| Drag in Inventory | Item from the grid onto its slot = equip (the old item goes to the same cell; a wrong slot turns red), item from the knight to the grid = unequip (onto a matching item: swap). Cell onto cell = swap, onto an empty cell = move; the order is kept, also across acts |
+| Double or right click | Shortcut: skill, rune or module into the first fitting row or back out; equip or unequip an item. A single click on an item shows its details (Equip, Unequip, Discard) |
+| Stat bar | In both windows: HP, Weapon Damage, Attacks/s, Armor, Dodge, Block, Crit, Accuracy, Area Damage, plus active set bonuses, tag tiers and duos. Hovering or dragging an item shows the change ("Armor 6 → 9", green better, red worse); skills, runes and modules show their short stats below |
+| During a fight or an open decision | Both windows stay readable, dragging is locked. "B" and "I" close each other, Esc closes |
+| Arena after every fight | Plays the fight back: speed 1×/2×/4×, Pause, Skip. Live board with the state of each row, statuses, resources and floating numbers. Afterwards the Report per row, the Log with filters, "Open Build (B)" or "Continue" (see «Die Arena lesen») |
+| Button "Open Shop" | Appears on a shop tile you visited before |
+| Button "New Run" | Back to kit selection, new map |
 
-Eine Reise stoppt automatisch auf feindlichen Feldern (Gegner, Boss), auf neu entdeckten Feldern und sobald ein Fenster offen ist.
+Travel stops by itself on hostile tiles (enemy, boss), on newly discovered tiles and whenever a window opens.
 
 ### Ablauf eines frühen Runs
 
@@ -288,6 +290,43 @@ Standard-Verteilung (Radius 6):
 
 Shops frühestens ab Ring 3 und höchstens 2, Truhen höchstens 6, Goldminen höchstens 4. Garantiert: 2 Kämpfe in Ring 2, 1 Truhe in Ring 2–3, je 1 Shop in Ring 3–4 und 5–6, 2 Goldminen.
 
+### Keywords
+
+| Keyword | Meaning |
+|---|---|
+| Logic Board | Your combat program: rows from top to bottom, each row is **Rune + Skill**. The last row is always "Always → Basic Attack" |
+| Row | One line of the board. Higher rows have priority |
+| Rune | The condition of a row (when it fires), e.g. "On Hit", "HP Below 30 %". Has a level (better parameter) and a difficulty |
+| Skill | What a row does. Each skill is a copy in your Collection with its own Growth and Level |
+| Basic Attack | Weapon attack that fills every gap |
+| Cast Time | Wind-up before a skill hits. Floor 0.1 s |
+| Recovery | Short pause after a skill |
+| Cooldown (CD) | Time until a skill can fire again |
+| Haste | Speed: the Haste tag lowers Cast Time, Haste stacks raise attack speed |
+| Queue / Queued | A row whose condition is met but can't start yet waits in the queue, higher rows first |
+| Triggered | How often a row's condition was met |
+| Missed Trigger | How often a row's condition was not met while a lower row or the Basic Attack fired |
+| Skipped | Only for orphaned rows (no skill) |
+| Trigger | Module that starts another row after this row fires (↪) |
+| Repeat | An action that runs a second time (↻), e.g. from Multicast or Echo |
+| Module | Rare add-on for a skill or rune (Multicast, Area, Chain, Invert, Threshold, Trigger …) |
+| Difficulty | Easy, Medium, Hard, Very Hard: harder runes give a bigger bonus (◆) |
+| Easer | Item or module that makes a hard rune happen more often, without losing its bonus |
+| Growth / Level | Growth points from fights; Levels at 5/15/30 |
+| Evolution | A skill or rune turns into a stronger one after a survived boss when its recipe is met. Found recipes go into the Recipe Book |
+| Set | Items of one set give bonuses at 2 and 3 pieces |
+| Tag | Synergy tag on items (Heat, Charge, Phantom, Haste, Toxin, Scrap); tiers at 2/4/6 pieces |
+| Duo | Bonus for two tags both at 4 pieces; hidden until found |
+| Burn / Poison | Damage over time |
+| Stun | The target can't act |
+| Blind | Lower Accuracy |
+| Armor Break | Lower Armor |
+| Heat / Charge | Resources of the knight, shown as bars |
+| Overheat | Both fighters take growing damage after 90 s |
+| Rune Shards | 3 shards open a reward choice |
+| Gold Mine | Gives gold every few turns, can be raided |
+| Portal | Escape from the boss after surviving |
+
 ## Architektur
 
 ```
@@ -442,6 +481,55 @@ Falls der Test Runner fehlt, im Package Manager das Paket **Test Framework** ins
 | Gegneralarme beim Zurückreisen | `StepResult.FirstVisit == false` und `HexCell.VisitCount` |
 | Hindernisse | `HexCell.IsWalkable` (Regeln und Pfadsuche berücksichtigen es bereits) |
 | Neue Events | Eintrag in `EncounterCatalog.CreateDefault()` |
+
+## Glossar Deutsch → Englisch (Team)
+
+Seit A-18 sind alle Spieltexte Englisch. Texte stehen pro Bereich an einem Ort: `Core/CatalogTexts.cs` (lose Katalogtexte), `Core/Arena/ArenaTexts.cs` (Kampf, Protokoll, Auswertung, Zahlenformat), `Core/SessionTexts.cs` (Oberwelt-Meldungen), `Core/Autoplay/AutoplayTexts.cs` (Testspieler) und `Overworld/UI/UiTexts.cs` (Fenster). Namen und Beschreibungen von Skills, Runen, Teilen usw. bleiben in ihren Katalogen. Zahlen: `0.4 s`, `25 %`. Ein Test (`EnglishTextTests`) prüft alle Kataloge auf Umlaute.
+
+| Deutsch | Englisch |
+|---|---|
+| Logik-Tafel, Zeile | Logic Board, Row |
+| Rune / Logikbaustein / Baustein | Rune (in Hinweisen zur Schwierigkeit auch "block") |
+| Bedingung, Basisangriff | Condition, Basic Attack |
+| Auslöser, ausgelöst, Wiederholung | Trigger, triggered, Repeat |
+| Warteschlange, eingereiht | Queue, queued |
+| übersprungen (nur verwaist), verwaist | skipped, orphaned |
+| Modul, Erleichterer | Module, Easer |
+| Leicht / Mittel / Schwer / Sehr schwer | Easy / Medium / Hard / Very Hard |
+| Wachstum, Stufe (Skill), Stufe (Tag) | Growth, Level, Tier |
+| Rezeptbuch, Sammlung, Inventar, Ausrüstung | Recipe Book, Collection, Inventory, Gear |
+| Teil, Platz, Synergie-Tag | Item / piece, Slot, Tag |
+| Wirkung (passiv) | power |
+| Cast-Zeit, Erholung, Takt (Basisangriff) | Cast Time, Recovery, Interval |
+| Waffenschaden, Flächenschaden, Heilung | Weapon Damage, Area Damage, Healing |
+| Rüstung, Ausweichen, Krit, Präzision, Angriffe/s | Armor, Dodge, Crit, Accuracy, Attacks/s |
+| Betäubung, Brennen, Gift, Blendung, Rüstungsbruch | Stun, Burn, Poison, Blind, Armor Break |
+| Hitze, Ladung, Takt (Tag), Schrott | Heat, Charge, Haste, Scrap |
+| Tempo-Stapel, Überhitzung | Haste stacks, Overheat |
+| Protokoll, Auswertung | Log, Report |
+| Zug, Akt, Runensplitter, Lagerfeuer, Truhe, Goldmine | Turn, Act, Rune Shards, Campfire, Chest, Gold Mine |
+| Spiel vorbei, Testspieler | Game Over, Autoplay |
+| Runenwahl | Choose a Reward |
+| Klingen-, Schild-, Funkenritter | Blade Knight, Shield Knight, Spark Knight |
+
+Katalognamen:
+
+| Bereich | Deutsch → Englisch |
+|---|---|
+| Skills | Rüstungsbruch → Armor Break, Entzünden → Ignite, Schildschlag → Shield Bash, EMP-Schildschlag → EMP Shield Bash, Not-Reparatur → Emergency Repair, Kühlmittel-Injektion → Coolant Injection, Notfall-Schildwall → Emergency Shield Wall, Blendgranate → Flashbang, Bohrstoß → Drill Strike, Bodenanker → Ground Anchor, Schubdüsen → Thrusters, Schockstich → Shock Stab, Echo-Protokoll → Echo Protocol, Ladungsspule → Charge Coil, Lähmnebel → Numbing Mist |
+| Evolutionen | Feuersturm → Firestorm, Blitzlanze → Lightning Lance, Resonanz → Resonance, Säurebohrer → Acid Drill, Schrottramme → Scrap Ram |
+| Skill-Arten | Angriff → Attack, Schild → Shield, Feuer → Fire, Schock → Shock, Heilung → Healing, Bewegung → Movement |
+| Runen-Tags | Klinge → Blade, Schild → Shield, Funke → Spark, Glut → Ember, Phantom → Phantom |
+| Runen | Jeder n. Angriff → Every n Attacks, Nach jedem n. Angriff → After Every n Attacks, Alle n Sekunden → Every n Seconds, Kampfbeginn → Battle Start, Jeder n. erlittene Treffer → Every n Hits Taken, Kette → Chain, Nach eigenem Skill → After Own Skill, Bei Treffer → On Hit, Nach Krit → After Crit, Gegner unter n % → Enemy Below n %, Gegner gepanzert → Enemy Armored, Gegner betäubt → Enemy Stunned, Gegner stärker → Enemy Stronger, Tempo ≥ n → Haste ≥ n, Wenn getroffen → When Hit, Nach Block → After Block, Gegner lädt auf → Enemy Charging, HP voll → HP Full, Schwerer Treffer → Heavy Hit, Ladung voll → Charge Full, HP unter n % → HP Below n %, Nach Selbstschaden → After Self-Damage, Nach Heilung → After Healing, Gegner brennt → Enemy Burning, Gegner fällt → Enemy Falls, Überhitzung → Overheat, Nach Ausweichen → After Dodge, n Ausweicher in Folge → n Dodges in a Row, Immer → Always, Auf Goldmine → On Gold Mine, Gegen Boss → Vs. Boss, In Unterzahl → Outnumbered, Letzter Gegner → Last Enemy, HP unter n % oder ausgewichen → HP Below n % or Dodged |
+| Module | Mehrfach → Multicast, Fläche → Area, Kette → Chain, Blutzoll → Blood Toll, Schnellcast → Quickcast, Umkehren → Invert (Label "NOT"), Verlängern → Extend, Schwelle → Threshold, Auslöser → Trigger, Alarmfühler → Alarm Sensor, Witterung → Scent |
+| Sets | Überlast-Protokoll → Overload Protocol, Aegis-Firewall → Aegis Firewall, Schrott-Ernter → Scrap Harvester, Phantom-Signal → Phantom Signal |
+| Duos | Glutrhythmus → Ember Rhythm, Phasenschild → Phase Shield, Brandgift → Fire Venom, Schrottkondensator → Scrap Capacitor, Geisterschritt → Ghost Step, Säurefraß → Acid Bite |
+| Plätze | Helm → Helmet, Handschuhe → Gloves, Brust → Chest, Beinschienen → Legs, Waffe → Weapon, Schild → Shield, Stiefel → Boots |
+| Teile (Auswahl) | Kurzklinge → Short Blade, Kurzschwert → Short Sword, Rundschild → Round Shield, Funkenstab → Spark Staff, Titanhammer → Titan Hammer, Turmschild → Tower Shield, Holo-Projektor → Holo Projector, Gift-Injektor → Toxin Injector, Konterschild → Counter Shield |
+| Gegner | Schrottratte → Scrap Rat, Rostwächter → Rust Warden, Funkendrohne → Spark Drone, Panzerkäfer → Armor Beetle, Rattenrudel → Rat Pack, Schmelzläufer → Smelter, Belagerungs-Golem → Siege Golem, Der Verwalter → The Overseer |
+| Events | Verstreute Münzen → Scattered Coins, Heilkräuter → Healing Herbs, Wegweiser → Signpost, Händlerspuren → Merchant Tracks, Dornengestrüpp → Thorn Thicket, Wanderer → Wanderer, Blutschrein → Blood Shrine, Verletzter Söldner → Wounded Mercenary, Verschütteter Vorrat → Buried Cache |
+| Belohnungs-Quellen (auch Schlüssel in `ProgressionConfig`) | Sieg → Victory, Elite-Sieg → Elite Victory, Mine verteidigt → Mine Defended, Schatztruhe → Treasure Chest, Runensplitter → Rune Shards |
+| Autoplay-Endgründe / Belohnungs-Schlüssel im JSON | Akt n erreicht → Act n reached, Zuglimit → Turn limit, Hänger → Hang; Heilung → Healing, Runen-Stufe → Rune Level, Tafel-Erweiterung → Board Expansion |
 
 ## Hinweise
 

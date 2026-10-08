@@ -128,7 +128,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(1, bash.Level);
             Assert.AreEqual(5, bash.Growth);
             Assert.AreEqual(3, s.Skills.Count, "kein neues Exemplar");
-            StringAssert.Contains("Schildschlag → Schildschlag +5", messages.Last());
+            StringAssert.Contains("Shield Bash → Shield Bash +5", messages.Last());
             Assert.AreEqual(stunBefore + 5 * Ticks.FromTenths(1), s.DescribeSkill(bash).Effects.First(e => e.DurationTicks > 0).DurationTicks);
 
             SkillInstance copy = s.GainSkill(SkillIds.ShieldBash, SkillDuplicateChoice.KeepCopy);

@@ -13,7 +13,7 @@ namespace Betaknight.Tests.EditMode
         {
             var board = new LogicBoard(new[]
             {
-                new LogicRow(ConditionRegistry.CreateDefault().Create("enemy_charging", 0), Skills.Get(SkillIds.ShieldBash), "Gegner lädt auf"),
+                new LogicRow(ConditionRegistry.CreateDefault().Create("enemy_charging", 0), Skills.Get(SkillIds.ShieldBash), "Enemy Charging"),
             });
             CombatantSetup golem = SetTests.Golem();
             return CombatSimulation.Run(Duel(Fighter("Ritter", 40, 4, board: board), golem, 3));
@@ -46,7 +46,7 @@ namespace Betaknight.Tests.EditMode
 
             p.Advance(bash);
             Assert.IsTrue(p.IsRowHighlighted(0));
-            Assert.IsTrue(p.Lines.Any(l => l.Contains("[Gegner lädt auf] → Schildschlag")));
+            Assert.IsTrue(p.Lines.Any(l => l.Contains("[Enemy Charging] → Shield Bash")), string.Join("\n", p.Lines));
 
             p.Advance(BattlePlayback.RowHighlightTicks);
             Assert.IsFalse(p.IsRowHighlighted(0));
@@ -59,7 +59,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(2, r.Fighters.Count);
             Assert.AreEqual(Side.Player, r.Fighters[0].Side);
             Assert.AreEqual(40, r.Fighters[0].StartHp);
-            CollectionAssert.AreEqual(new[] { "Schildschlag", "Basisangriff" }, r.PlayerRowSkills);
+            CollectionAssert.AreEqual(new[] { "Shield Bash", "Basic Attack" }, r.PlayerRowSkills);
         }
     }
 }

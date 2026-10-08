@@ -138,7 +138,7 @@ namespace Betaknight.Tests.EditMode
 
             Assert.Greater(report.TotalDamage, 0);
             Assert.LessOrEqual(report.BasicAttackShareBp, BasisPoints.Percent(35), report.DamageSplitText);
-            StringAssert.StartsWith("Basisangriff ", report.DamageSplitText);
+            StringAssert.StartsWith("Basic Attack ", report.DamageSplitText);
             StringAssert.Contains(" · Skills ", report.DamageSplitText);
         }
 
@@ -193,7 +193,7 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(report.BasicAttackSharePercent.HasValue);
             Assert.That(report.BasicAttackSharePercent.Value, Is.InRange(0.0, 100.0));
             StringAssert.Contains("\"basicAttackSharePercent\"", report.ToJson());
-            StringAssert.Contains("Basisangriff ", report.Summary());
+            StringAssert.Contains("Basic Attack ", report.Summary());
         }
     }
 }

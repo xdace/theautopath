@@ -106,9 +106,9 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(2, combat.LastRequest.Tier, "Entfernung 1 + 1 Stufe Bonus.");
             Assert.IsFalse(s.Map.GetCell(East).IsUnderAttack);
             Assert.IsEmpty(s.Raids);
-            Assert.AreEqual("Goldmine verteidigt", outcome.Title);
+            Assert.AreEqual("Gold Mine defended", outcome.Title);
             CollectionAssert.Contains(outcome.Lines, $"+{3 + OverworldSession.MineDefenseGold} Gold");
-            Assert.AreEqual("Mine verteidigt", s.PendingRuneOffer.Source);
+            Assert.AreEqual("Mine Defended", s.PendingRuneOffer.Source);
             Assert.IsTrue(step.InterruptsTravel || s.IsBusy);
         }
 

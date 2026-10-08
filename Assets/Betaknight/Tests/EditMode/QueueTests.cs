@@ -286,8 +286,8 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(Queued(r, 0).Count, row.Queued);
             Assert.Greater(row.StartedFromQueue, 0);
             Assert.Greater(row.AverageWaitTicks, 0);
-            StringAssert.Contains("× eingereiht, Ø ", row.QueueText);
-            StringAssert.EndsWith(" gewartet", row.QueueText);
+            StringAssert.Contains("× queued, Ø ", row.QueueText);
+            StringAssert.EndsWith(" wait", row.QueueText);
         }
 
         [Test]
@@ -304,13 +304,13 @@ namespace Betaknight.Tests.EditMode
             playback.Advance(queued.Tick);
             Assert.IsTrue(playback.IsRowQueued(0));
             Assert.AreEqual(RowDisplay.Queued, playback.RowStateAt(0));
-            StringAssert.StartsWith("Wartet: 1. a ", playback.QueueText());
-            Assert.IsTrue(playback.Lines.Any(l => l.Contains("Zeile 1 (a) eingereiht")), string.Join("\n", playback.Lines));
+            StringAssert.StartsWith("Waiting: 1. a ", playback.QueueText());
+            Assert.IsTrue(playback.Lines.Any(l => l.Contains("Row 1 (a) queued")), string.Join("\n", playback.Lines));
 
             BattleEvent start = Starts(r, "a").First(e => e.FromQueue);
             playback.Advance(start.Tick - playback.Tick);
             Assert.IsFalse(playback.IsRowQueued(0));
-            Assert.IsTrue(playback.Lines.Last(l => l.Contains("] → a")).Contains("aus der Warteschlange nach"));
+            Assert.IsTrue(playback.Lines.Last(l => l.Contains("] → a")).Contains("from the queue after"));
 
             playback.SkipToEnd();
             Assert.AreEqual(string.Empty, playback.QueueText());

@@ -127,7 +127,7 @@ namespace Betaknight.Tests.EditMode
             var skills = new SkillCollection();
             SkillInstance drill = skills.Add(SkillIds.Drill);
             skills.Grow(drill, 7);
-            Assert.AreEqual("Bohrstoß +7", drill.NameFrom(Catalog));
+            Assert.AreEqual("Drill Strike +7", drill.NameFrom(Catalog));
 
             LogicBoard board = BoardFactory.CreateDefault().Create(new[] { new BoardRowSpec("always", SkillIds.Drill, skillGrowth: drill.Growth) }, null);
             DamageEffect damage = board.Rows[0].Skill.Effects.OfType<DamageEffect>().Single();
@@ -142,12 +142,12 @@ namespace Betaknight.Tests.EditMode
         public void ThresholdGrowthStopsAtFiftyPercent()
         {
             BoardFactory factory = BoardFactory.CreateDefault();
-            Assert.AreEqual("HP unter 45 %", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, blockGrowth: 15), null).Label);
-            Assert.AreEqual("HP unter 50 %", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, blockGrowth: 40), null).Label);
+            Assert.AreEqual("HP Below 45 %", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, blockGrowth: 15), null).Label);
+            Assert.AreEqual("HP Below 50 %", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, blockGrowth: 40), null).Label);
             // Das Stufen-Abzeichen «▲2» kommt aus dem Runen-Stufen-Hotfix.
-            Assert.AreEqual("HP unter 50 % ▲2", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, level: 2, blockGrowth: 40), null).Label,
+            Assert.AreEqual("HP Below 50 % ▲2", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, level: 2, blockGrowth: 40), null).Label,
                 "Ein höherer Grundwert bleibt");
-            Assert.AreEqual("HP unter 60 %", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, blockGrowth: 40,
+            Assert.AreEqual("HP Below 60 %", factory.CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, blockGrowth: 40,
                 blockModules: new[] { new ModuleSpec(ModuleIds.Threshold) }), null).Label, "Das Modul «Schwelle» kommt obendrauf");
         }
 
@@ -213,7 +213,7 @@ namespace Betaknight.Tests.EditMode
             (OverworldSession s, SkillInstance ignite) = ReadyForInferno(true);
             EvolutionRecipe recipe = s.EvolutionCatalog.Get("evo_inferno");
             Assert.IsEmpty(s.EvolutionMissing(recipe, ignite));
-            StringAssert.Contains("bereit", s.EvolutionProgress(recipe));
+            StringAssert.Contains("ready", s.EvolutionProgress(recipe));
 
             Walk(s, OverworldSession.BossInterval - 1);
             Assert.AreEqual(SkillIds.Ignite, ignite.SkillId, "Vor dem Boss passiert nichts");
@@ -230,8 +230,8 @@ namespace Betaknight.Tests.EditMode
             Assert.AreSame(area, ignite.Modules.Single(), "Module bleiben");
             Assert.AreSame(row, ignite.Holder);
             Assert.IsTrue(s.RecipeBook.HasEvolution("evo_inferno"));
-            Assert.AreEqual("Feuersturm", s.EvolutionName(recipe));
-            StringAssert.StartsWith("Feuersturm +", ignite.NameFrom(s.SkillCatalog));
+            Assert.AreEqual("Firestorm", s.EvolutionName(recipe));
+            StringAssert.StartsWith("Firestorm +", ignite.NameFrom(s.SkillCatalog));
         }
 
         [Test]
@@ -240,12 +240,12 @@ namespace Betaknight.Tests.EditMode
             OverworldSession s = EmptySession();
             SkillInstance ignite = AddRow(s, "always", SkillIds.Ignite);
             RuneSlot row = s.Runes.Rows[0];
-            Assert.AreEqual(new[] { "Evolution ???: fehlt Stufe 3 (Wachstum 0/30), Modul Fläche" }, s.EvolutionProgressFor(row));
+            Assert.AreEqual(new[] { "Evolution ???: missing Level 3 (Growth 0/30), Module Area" }, s.EvolutionProgressFor(row));
             Assert.IsFalse(s.IsEvolutionReady(row));
 
             (OverworldSession ready, SkillInstance _) = ReadyForInferno(true);
             Assert.IsTrue(ready.IsEvolutionReady(ready.Runes.Rows[0]));
-            StringAssert.Contains("bereit", ready.EvolutionProgressFor(ready.Runes.Rows[0]).Single());
+            StringAssert.Contains("ready", ready.EvolutionProgressFor(ready.Runes.Rows[0]).Single());
         }
 
         [Test]
@@ -253,8 +253,8 @@ namespace Betaknight.Tests.EditMode
         {
             (OverworldSession s, SkillInstance ignite) = ReadyForInferno(false);
             EvolutionRecipe recipe = s.EvolutionCatalog.Get("evo_inferno");
-            CollectionAssert.AreEqual(new[] { "Modul Fläche" }, s.EvolutionMissing(recipe, ignite));
-            Assert.AreEqual("Evolution ???: fehlt Modul Fläche", s.EvolutionProgress(recipe));
+            CollectionAssert.AreEqual(new[] { "Module Area" }, s.EvolutionMissing(recipe, ignite));
+            Assert.AreEqual("Evolution ???: missing Module Area", s.EvolutionProgress(recipe));
 
             Walk(s, OverworldSession.BossInterval);
             Assert.IsFalse(s.IsGameOver);
@@ -267,7 +267,7 @@ namespace Betaknight.Tests.EditMode
             low.Skills.Grow(young, 12);
             ModuleInstance area = low.GainModule(ModuleIds.Area);
             Assert.IsTrue(low.PlaceModuleOnSkill(area.InstanceId, young.InstanceId));
-            CollectionAssert.AreEqual(new[] { "Stufe 3 (Wachstum 12/30)" }, low.EvolutionMissing(recipe, young));
+            CollectionAssert.AreEqual(new[] { "Level 3 (Growth 12/30)" }, low.EvolutionMissing(recipe, young));
         }
 
         [Test]
@@ -277,13 +277,13 @@ namespace Betaknight.Tests.EditMode
             SkillInstance stab = AddRow(s, "always", SkillIds.ShockStab);
             s.Skills.Grow(stab, 30);
             EvolutionRecipe lance = s.EvolutionCatalog.Get("evo_lance");
-            CollectionAssert.AreEqual(new[] { "Tag Ladung 0/4" }, s.EvolutionMissing(lance, stab));
+            CollectionAssert.AreEqual(new[] { "Tag Charge 0/4" }, s.EvolutionMissing(lance, stab));
 
             SkillInstance drill = AddRow(s, "hp_full", SkillIds.Drill);
             s.Skills.Grow(drill, 30);
             EvolutionRecipe acid = s.EvolutionCatalog.Get("evo_acid");
             Assert.AreEqual(1, s.EvolutionMissing(acid, drill).Count);
-            StringAssert.StartsWith("Baustein «Gegner unter", s.EvolutionMissing(acid, drill)[0]);
+            StringAssert.StartsWith("Rune \"Enemy Below", s.EvolutionMissing(acid, drill)[0]);
 
             // Bohrstoß in eine Zeile mit «Gegner unter x %»: bereit.
             Assert.IsTrue(s.Runes.TryAdd(s.RuneCatalog.Get("enemy_low"), SkillInstance.BasicAttack()));
@@ -311,7 +311,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(EvolvedRuneIds.PhantomReflex, row.Rune.Id);
             Assert.AreEqual(2, row.Level);
             Assert.AreSame(extend, row.Modules.Single());
-            StringAssert.StartsWith("HP unter 50 % oder ausgewichen", row.Name);
+            StringAssert.StartsWith("HP Below 50 % or Dodged", row.Name);
         }
 
         [Test]
@@ -336,8 +336,8 @@ namespace Betaknight.Tests.EditMode
             SkillInstance ignite = AddRow(s, "always", SkillIds.Ignite);
             s.Skills.Grow(ignite, 30);
 
-            Assert.AreEqual(new[] { "Evolution ???: fehlt Modul Fläche" }, s.EvolutionHintsForSkill(SkillIds.Ignite));
-            StringAssert.StartsWith("Evolution ???: fehlt Modul Fläche (Teil des Rezepts für Entzünden)", s.EvolutionHintsForModule(ModuleIds.Area).Single());
+            Assert.AreEqual(new[] { "Evolution ???: missing Module Area" }, s.EvolutionHintsForSkill(SkillIds.Ignite));
+            StringAssert.StartsWith("Evolution ???: missing Module Area (part of the recipe for Ignite)", s.EvolutionHintsForModule(ModuleIds.Area).Single());
             Assert.IsEmpty(s.EvolutionHintsForModule(ModuleIds.Multicast), "Echo fehlt: kein Hinweis");
         }
 
@@ -359,7 +359,7 @@ namespace Betaknight.Tests.EditMode
             nextRun.UseRecipeStore(store);
             Assert.IsTrue(nextRun.RecipeBook.HasEvolution("evo_inferno"));
             Assert.IsTrue(nextRun.IsDuoDiscovered("glutrhythmus"));
-            Assert.AreEqual("Feuersturm", nextRun.EvolutionName(nextRun.EvolutionCatalog.Get("evo_inferno")));
+            Assert.AreEqual("Firestorm", nextRun.EvolutionName(nextRun.EvolutionCatalog.Get("evo_inferno")));
             Assert.AreEqual(0, nextRun.Skills.Count, "Nur Wissen, keine Werte");
         }
 

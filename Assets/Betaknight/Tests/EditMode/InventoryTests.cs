@@ -68,13 +68,13 @@ namespace Betaknight.Tests.EditMode
         public void AutoPlacementEquipsIntoFreeSlotsAndStoresTheRest()
         {
             OverworldSession s = Session(OnlyOffering("thermo_blade"));
-            s.OfferRunes("Schatztruhe");
+            s.OfferRunes("Treasure Chest");
             Assert.IsTrue(s.TakeItem(0));
             Assert.AreEqual("thermo_blade", s.Gear.Get(EquipmentSlot.Weapon).Id, "Platz war frei");
 
             OverworldSession t = Session(OnlyOffering("thermo_blade"));
             Wear(t, "short_sword");
-            t.OfferRunes("Schatztruhe");
+            t.OfferRunes("Treasure Chest");
             Assert.IsTrue(t.TakeItem(0, ItemPlacement.Inventory));
             Assert.AreEqual("short_sword", t.Gear.Get(EquipmentSlot.Weapon).Id);
             CollectionAssert.AreEqual(new[] { "thermo_blade" }, InventoryIds(t));
@@ -119,7 +119,7 @@ namespace Betaknight.Tests.EditMode
         {
             OverworldSession s = Session(OnlyOffering("tower_shield"));
             Wear(s, "plasma_drill");
-            s.OfferRunes("Schatztruhe");
+            s.OfferRunes("Treasure Chest");
 
             Assert.IsFalse(s.CanTakeItem(0, ItemPlacement.Equip));
             Assert.IsTrue(s.TakeItem(0));
@@ -136,7 +136,7 @@ namespace Betaknight.Tests.EditMode
             int overflows = 0;
             s.InventoryOverflow += () => overflows++;
 
-            s.OfferRunes("Schatztruhe");
+            s.OfferRunes("Treasure Chest");
             Assert.IsTrue(s.TakeItem(0, ItemPlacement.Inventory));
             Assert.AreEqual("thermo_blade", s.PendingItem.Id);
             Assert.IsTrue(s.IsBusy, "Bewegung gesperrt, bis entschieden ist");
@@ -147,7 +147,7 @@ namespace Betaknight.Tests.EditMode
             Assert.IsFalse(s.IsBusy);
             Assert.IsFalse(s.Inventory.Contains("thermo_blade"));
 
-            s.OfferRunes("Schatztruhe");
+            s.OfferRunes("Treasure Chest");
             s.TakeItem(0, ItemPlacement.Inventory);
             Assert.IsTrue(s.DiscardItem(0));
             Assert.IsNull(s.PendingItem);
@@ -174,12 +174,12 @@ namespace Betaknight.Tests.EditMode
             OverworldSession s = Session();
             s.Runes.TryAdd(s.RuneCatalog.Get("hp_low"), SkillIds.BasicAttack);
             Assert.IsTrue(s.Runes.Upgrade(0));
-            Assert.AreEqual("HP unter 40 %", s.Runes.Rows[0].Name);
+            Assert.AreEqual("HP Below 40 %", s.Runes.Rows[0].Name);
 
             Assert.IsTrue(s.UnequipRune(0));
             Assert.AreEqual(0, s.Runes.Rows.Count);
             Assert.AreEqual(1, s.RuneInventory.Runes.Single().Level);
-            Assert.AreEqual("HP unter 40 %", s.RuneInventory.Runes.Single().Name);
+            Assert.AreEqual("HP Below 40 %", s.RuneInventory.Runes.Single().Name);
 
             Assert.IsTrue(s.EquipRuneFromInventory(0));
             Assert.AreEqual(1, s.Runes.Rows[0].Level);

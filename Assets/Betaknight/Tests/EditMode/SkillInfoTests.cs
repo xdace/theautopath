@@ -76,10 +76,10 @@ namespace Betaknight.Tests.EditMode
             EffectInfo hit = info.Effects.Single(e => e.Kind == EffectInfoKind.Damage);
             Assert.AreEqual(BasisPoints.Percent(190), hit.DamageBp);
             Assert.AreEqual(13, hit.Amount);
-            Assert.AreEqual("190 % Waffenschaden ≈ 13", info.DamageText);
+            Assert.AreEqual("190 % Weapon Damage ≈ 13", info.DamageText);
             Assert.AreEqual(Ticks.FromSeconds(6), info.Effects.Single(e => e.Kind == EffectInfoKind.StatChange).DurationTicks);
-            StringAssert.Contains("Gegner Rüstung −50 % für 6 s", info.OtherEffectsText);
-            Assert.AreEqual("CD 8 s · Cast 0,8 s · Erholung 0,2 s", info.TimingText);
+            StringAssert.Contains("Enemy Armor −50 % for 6 s", info.OtherEffectsText);
+            Assert.AreEqual("CD 8 s · Cast 0.8 s · Recovery 0.2 s", info.TimingText);
         }
 
         [Test]
@@ -89,10 +89,10 @@ namespace Betaknight.Tests.EditMode
 
             EffectInfo burn = info.Effects.Single();
             Assert.AreEqual(EffectInfoKind.DamageOverTime, burn.Kind);
-            Assert.AreEqual(4, burn.Amount, "70 % von 6 Waffenschaden pro Sekunde");
+            Assert.AreEqual(4, burn.Amount, "70 % von 6 Weapon Damage pro Sekunde");
             Assert.AreEqual(20, burn.Total, "5 s Brennen");
             Assert.AreEqual(Ticks.FromSeconds(5), burn.DurationTicks);
-            Assert.AreEqual("Brennen 70 % Waffenschaden/s ≈ 4/s, 20 über 5 s", info.DamageText);
+            Assert.AreEqual("Burn 70 % Weapon Damage/s ≈ 4/s, 20 over 5 s", info.DamageText);
             Assert.IsTrue(info.DealsDamage);
         }
 
@@ -100,14 +100,14 @@ namespace Betaknight.Tests.EditMode
         public void DrillHitsAllEnemiesForHundredEightyPercent()
         {
             SkillInfo plain = Info(SkillIds.Drill, Gear("short_sword"));
-            Assert.AreEqual("180 % Waffenschaden ≈ 10 an allen Gegnern", plain.DamageText);
+            Assert.AreEqual("180 % Weapon Damage ≈ 10 to all enemies", plain.DamageText);
 
             // Der Plasma-Bohrer gibt Klinge-Skills +25 % Wirkung (A-05: passive Effekte statt Skills).
             SkillInfo info = Info(SkillIds.Drill, Gear("plasma_drill"));
             Assert.AreEqual(9, info.Stats.WeaponDamage);
-            Assert.AreEqual("225 % Waffenschaden ≈ 20 an allen Gegnern", info.DamageText);
+            Assert.AreEqual("225 % Weapon Damage ≈ 20 to all enemies", info.DamageText);
             Assert.IsTrue(info.Effects.Single().AllEnemies);
-            Assert.AreEqual("CD 5 s · Cast 1,5 s · Erholung 0,3 s", info.TimingText);
+            Assert.AreEqual("CD 5 s · Cast 1.5 s · Recovery 0.3 s", info.TimingText);
         }
 
         [Test]
@@ -121,7 +121,7 @@ namespace Betaknight.Tests.EditMode
             // 225 % durch den Plasma-Bohrer (Klinge +25 %), auf der Mine noch einmal +50 % Flächenschaden.
             Assert.AreEqual(20, elsewhere.Effects.Single().Amount);
             Assert.AreEqual(30, onMine.Effects.Single().Amount);
-            StringAssert.StartsWith("225 % Waffenschaden ≈ 30", onMine.DamageText);
+            StringAssert.StartsWith("225 % Weapon Damage ≈ 30", onMine.DamageText);
         }
 
         [Test]
@@ -129,9 +129,9 @@ namespace Betaknight.Tests.EditMode
         {
             SkillInfo info = Info(SkillIds.ShieldBash, Gear("short_sword", "round_shield"));
 
-            Assert.AreEqual("70 % Waffenschaden ≈ 4", info.DamageText);
+            Assert.AreEqual("70 % Weapon Damage ≈ 4", info.DamageText);
             Assert.AreEqual(Ticks.FromSeconds(2), info.Effects.Single(e => e.Kind == EffectInfoKind.Stun).DurationTicks);
-            Assert.AreEqual("bricht Aufladung ab, betäubt 2 s", info.OtherEffectsText);
+            Assert.AreEqual("interrupts charging, stuns for 2 s", info.OtherEffectsText);
         }
 
         [Test]
@@ -139,23 +139,23 @@ namespace Betaknight.Tests.EditMode
         {
             SkillInfo info = Info(null, Gear("short_blade"));
 
-            Assert.AreEqual("60 % Waffenschaden ≈ 4", info.DamageText, "A-12: Basisangriff des Ritters 60 %");
+            Assert.AreEqual("60 % Weapon Damage ≈ 4", info.DamageText, "A-12: Basisangriff des Ritters 60 %");
             Assert.AreEqual(18, info.WindupTicks + info.RecoveryTicks, "Intervall 20 − 2 der Kurzklinge");
-            Assert.AreEqual("Takt 0,9 s · Cast 0,6 s · Erholung 0,3 s", info.TimingText);
+            Assert.AreEqual("Interval 0.9 s · Cast 0.6 s · Recovery 0.3 s", info.TimingText);
         }
 
         [Test]
-        public void SkillsWithoutDamageSayKeinSchaden()
+        public void SkillsWithoutDamageSayNoDamage()
         {
             SkillInfo flash = Info(SkillIds.Flashbang, Gear("short_sword", "holo_projector"));
             SkillInfo repair = Info(SkillIds.Repair, Gear("short_sword"));
 
             Assert.IsFalse(flash.DealsDamage);
-            Assert.AreEqual("kein Schaden", flash.DamageText);
-            StringAssert.Contains("Gegner Präzision −40 % für 4 s", flash.OtherEffectsText);
-            Assert.AreEqual("kein Schaden", repair.DamageText);
-            Assert.AreEqual("heilt 25 % Max-HP ≈ 7", repair.OtherEffectsText);
-            StringAssert.Contains("kein Schaden", repair.Details);
+            Assert.AreEqual("no damage", flash.DamageText);
+            StringAssert.Contains("Enemy Accuracy −40 % for 4 s", flash.OtherEffectsText);
+            Assert.AreEqual("no damage", repair.DamageText);
+            Assert.AreEqual("heals 25 % Max HP ≈ 7", repair.OtherEffectsText);
+            StringAssert.Contains("no damage", repair.Details);
         }
 
         [Test]
@@ -165,7 +165,7 @@ namespace Betaknight.Tests.EditMode
 
             EffectInfo stun = info.Effects.Single(e => e.Kind == EffectInfoKind.Stun);
             Assert.AreEqual(BasisPoints.Percent(20), stun.ChanceBp);
-            Assert.AreEqual("20 % Chance: betäubt 1 s", stun.Text);
+            Assert.AreEqual("20 % chance: stuns for 1 s", stun.Text);
         }
 
         [Test]
@@ -181,15 +181,15 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void SecondsAndPercentAreFormattedGerman()
+        public void SecondsAndPercentAreFormattedEnglish()
         {
-            Assert.AreEqual("0,5 s", SkillInfo.Seconds(10));
-            Assert.AreEqual("1,5 s", SkillInfo.Seconds(30));
-            Assert.AreEqual("0,35 s", SkillInfo.Seconds(7));
+            Assert.AreEqual("0.5 s", SkillInfo.Seconds(10));
+            Assert.AreEqual("1.5 s", SkillInfo.Seconds(30));
+            Assert.AreEqual("0.35 s", SkillInfo.Seconds(7));
             Assert.AreEqual("12 s", SkillInfo.Seconds(240));
             Assert.AreEqual("120 %", SkillInfo.Percent(12000));
             Assert.AreEqual("−40 %", SkillInfo.Percent(-4000));
-            Assert.AreEqual("12,5 %", SkillInfo.Percent(1250));
+            Assert.AreEqual("12.5 %", SkillInfo.Percent(1250));
         }
 
         // ------------------------------------------------------------------ Abgleich mit dem Simulator

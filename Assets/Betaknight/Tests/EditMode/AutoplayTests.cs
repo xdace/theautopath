@@ -21,7 +21,7 @@ namespace Betaknight.Tests.EditMode
 
                 Assert.That(report.ExceptionCount, Is.EqualTo(0), $"Seed {seed}: {string.Join("\n", report.Exceptions)}");
                 Assert.That(report.HangCount, Is.EqualTo(0), $"Seed {seed}: {string.Join("\n", report.Hangs)}");
-                Assert.That(report.EndReason, Is.EqualTo("Game Over").Or.EqualTo("Akt 2 erreicht"), $"Seed {seed}");
+                Assert.That(report.EndReason, Is.EqualTo("Game Over").Or.EqualTo("Act 2 reached"), $"Seed {seed}");
                 Assert.That(report.Turns, Is.GreaterThan(0), $"Seed {seed}");
                 Assert.That(report.Actions, Is.GreaterThan(report.Turns), $"Seed {seed}: der Bot soll mehr tun als laufen");
                 Assert.That(report.FightsWon + report.FightsLost, Is.GreaterThan(0), $"Seed {seed}");
@@ -39,7 +39,7 @@ namespace Betaknight.Tests.EditMode
 
             Assert.That(summary.Ok, Is.True, summary.Summary());
             var rewards = summary.Runs.SelectMany(r => r.Rewards.Keys).Distinct().ToList();
-            Assert.That(rewards, Does.Contain("Heilung").Or.Contain("Runen-Stufe"), "Lagerfeuer oder Shop-Heilung");
+            Assert.That(rewards, Does.Contain("Healing").Or.Contain("Rune Level"), "Lagerfeuer oder Shop-Heilung");
             Assert.That(rewards.Count, Is.GreaterThanOrEqualTo(4), string.Join(", ", rewards));
             Assert.That(summary.Runs.Sum(r => r.Bosses), Is.GreaterThan(0), "mindestens ein Boss");
             Assert.That(summary.Runs.Any(r => r.Act >= 2), Is.True, "mindestens ein Run erreicht Akt 2");
@@ -109,7 +109,7 @@ namespace Betaknight.Tests.EditMode
         {
             var summary = new AutoplaySummary();
             summary.Runs.Add(HeadlessAutoplay.Run(3, targetAct: 2));
-            var broken = new AutoplayReport { Seed = 9, Kit = "Test \"Ritter\"", EndReason = "Hänger" };
+            var broken = new AutoplayReport { Seed = 9, Kit = "Test \"Ritter\"", EndReason = "Hang" };
             broken.AddException("Zeile 1\nZeile 2");
             broken.AddHang("keine Aktion");
             broken.FpsAverage = 59.5;
@@ -138,7 +138,7 @@ namespace Betaknight.Tests.EditMode
             var report = new AutoplayReport { Seed = 1, Kit = "Bastion", EndReason = "Game Over", Act = 1, Turns = 30 };
             Assert.That(report.Summary(), Does.Contain("Game Over").And.Contain("OK"));
             report.AddHang("x");
-            Assert.That(report.Summary(), Does.Contain("FEHLER"));
+            Assert.That(report.Summary(), Does.Contain("FAILED"));
             Assert.That(report.Ok, Is.False);
         }
 

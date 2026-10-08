@@ -57,8 +57,8 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(6, s.Stats.Gold);
             Assert.IsTrue(s.Map.GetCell(East).IsResolved);
             Assert.IsNotNull(s.PendingRuneOffer);
-            Assert.AreEqual("Sieg", s.PendingRuneOffer.Source);
-            Assert.AreEqual("Kampf gewonnen", outcome.Title);
+            Assert.AreEqual("Victory", s.PendingRuneOffer.Source);
+            Assert.AreEqual("Fight won", outcome.Title);
             Assert.AreEqual(1, combat.LastRequest.Tier);
         }
 
@@ -105,7 +105,7 @@ namespace Betaknight.Tests.EditMode
             s.TryStep(East);
 
             Assert.That(s.Stats.Gold, Is.InRange(6, 10));
-            Assert.AreEqual("Schatztruhe", s.PendingRuneOffer.Source);
+            Assert.AreEqual("Treasure Chest", s.PendingRuneOffer.Source);
             Assert.IsTrue(s.Map.GetCell(East).IsResolved);
         }
 
@@ -236,7 +236,7 @@ namespace Betaknight.Tests.EditMode
             OverworldSession s = OverworldSession.Create(new MapGenerationConfig { Radius = 6, Seed = 21 }, kit: kit);
             var random = new Random(3);
             int fights = 0;
-            s.MajorEventResolved += o => { if (o.Title.StartsWith("Kampf")) fights++; };
+            s.MajorEventResolved += o => { if (o.Title.Contains("Fight")) fights++; };
 
             // Zufälliger Spieler: wählt immer die letzte Option, nimmt die erste Rune, verlässt Shops, lässt Überzähliges liegen.
             for (int step = 0; step < 60 && !s.IsGameOver; step++)

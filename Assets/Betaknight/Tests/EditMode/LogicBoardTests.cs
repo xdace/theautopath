@@ -32,8 +32,8 @@ namespace Betaknight.Tests.EditMode
         {
             // Zeile 1: [HP < 30 %] -> Reparatur, Zeile 2: [Gegner lädt auf] -> Schildschlag, darunter Basisangriff.
             LogicBoard player = Board(
-                new LogicRow(Rune("hp_low", 30), Repair, "HP unter 30 %"),
-                new LogicRow(Rune("enemy_charging"), ShieldBash, "Gegner lädt auf"));
+                new LogicRow(Rune("hp_low", 30), Repair, "HP Below 30 %"),
+                new LogicRow(Rune("enemy_charging"), ShieldBash, "Enemy Charging"));
 
             BattleResult r = CombatSimulation.Run(Duel(
                 Fighter("Ritter", 100, 5, board: player),
@@ -164,7 +164,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(30, hpLow.ParameterAt(0));
             Assert.AreEqual(50, hpLow.ParameterAt(2));
             Assert.AreEqual(50, hpLow.ParameterAt(9), "Über der Höchststufe bleibt es bei der Höchststufe.");
-            Assert.AreEqual("HP unter 40 %", hpLow.NameAt(1));
+            Assert.AreEqual("HP Below 40 %", hpLow.NameAt(1));
         }
 
         [Test]

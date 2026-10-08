@@ -80,9 +80,9 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(8, stab.WindupTicks, "Grundwert bleibt");
 
             SkillInfo info = SkillInfo.Create(stab, new SkillUserStats(10));
-            Assert.AreEqual("Cast 0,1 s (Grund 0,4 s)", info.CastText);
-            Assert.AreEqual(SkillPassive.Cast(SkillKind.Shock, -20).Text, "Schock-Skills −20 % Cast-Zeit");
-            Assert.AreEqual(SkillPassive.Cast(SkillKinds.Every, -15).Text, "Alle Skills −15 % Cast-Zeit");
+            Assert.AreEqual("Cast 0.1 s (base 0.4 s)", info.CastText);
+            Assert.AreEqual(SkillPassive.Cast(SkillKind.Shock, -20).Text, "Shock Skills −20 % Cast Time");
+            Assert.AreEqual(SkillPassive.Cast(SkillKinds.Every, -15).Text, "All Skills −15 % Cast Time");
         }
 
         [Test]
@@ -144,7 +144,7 @@ namespace Betaknight.Tests.EditMode
             Equipment gear = Wearing(T(SynergyTagIds.Charge), T(SynergyTagIds.Charge, SynergyTagIds.Heat), T(SynergyTagIds.Charge));
             Assert.AreEqual(3, gear.TagCount(SynergyTagIds.Charge));
             Assert.AreEqual(1, gear.TagCount(SynergyTagIds.Heat));
-            Assert.AreEqual("Ladung 3/4", Synergies.Counters(gear).Single(c => c.Tag.Id == SynergyTagIds.Charge).Text);
+            Assert.AreEqual("Charge 3/4", Synergies.Counters(gear).Single(c => c.Tag.Id == SynergyTagIds.Charge).Text);
 
             gear.Unequip(EquipmentSlot.Gloves);
             Assert.AreEqual(2, gear.TagCount(SynergyTagIds.Charge), "Abgelegte Teile zählen nicht");
@@ -222,16 +222,16 @@ namespace Betaknight.Tests.EditMode
         {
             Equipment gear = Wearing(T(SynergyTagIds.Charge), T(SynergyTagIds.Charge), T(SynergyTagIds.Charge));
             var item = new EquipmentDefinition("x", "X", EquipmentSlot.Boots, tags: T(SynergyTagIds.Charge));
-            CollectionAssert.AreEqual(new[] { "→ Ladung 4/6: Schwelle!" }, Synergies.Preview(gear, item));
+            CollectionAssert.AreEqual(new[] { "→ Charge 4/6: Tier reached!" }, Synergies.Preview(gear, item));
 
             var sameSlot = new EquipmentDefinition("y", "Y", EquipmentSlot.Helmet, tags: T(SynergyTagIds.Charge));
-            CollectionAssert.AreEqual(new[] { "→ Ladung 3/4" }, Synergies.Preview(gear, sameSlot), "Verdrängtes Teil zählt nicht mehr");
+            CollectionAssert.AreEqual(new[] { "→ Charge 3/4" }, Synergies.Preview(gear, sameSlot), "Verdrängtes Teil zählt nicht mehr");
 
             Equipment almost = Wearing(T(SynergyTagIds.Heat, SynergyTagIds.Tempo), T(SynergyTagIds.Heat, SynergyTagIds.Tempo),
                 T(SynergyTagIds.Heat, SynergyTagIds.Tempo));
             var fourth = new EquipmentDefinition("z", "Z", EquipmentSlot.Legs, tags: T(SynergyTagIds.Heat, SynergyTagIds.Tempo));
             List<string> preview = Synergies.Preview(almost, fourth, d => "???");
-            CollectionAssert.Contains(preview, "→ Duo frei: ???");
+            CollectionAssert.Contains(preview, "→ Duo unlocked: ???");
         }
 
         [Test]
@@ -250,8 +250,8 @@ namespace Betaknight.Tests.EditMode
             var messages = new List<string>();
             s.BuildImproved += messages.Add;
             typeof(OverworldSession).GetMethod("DiscoverDuos", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(s, null);
-            Assert.AreEqual("Glutrhythmus", s.DuoName(duo));
-            Assert.IsTrue(messages.Any(m => m.Contains("Duo entdeckt: Glutrhythmus")));
+            Assert.AreEqual("Ember Rhythm", s.DuoName(duo));
+            Assert.IsTrue(messages.Any(m => m.Contains("Duo discovered: Ember Rhythm")));
 
             OverworldSession next = OverworldSession.CreateNextAct(new MapGenerationConfig { Radius = 4, Seed = 3 }, s);
             Assert.IsTrue(next.IsDuoDiscovered(duo.Id), "Das Rezeptbuch wandert durch die Akte mit");
@@ -278,10 +278,10 @@ namespace Betaknight.Tests.EditMode
             SynergyRegistry registry = SynergyRegistry.CreateDefault();
             Assert.IsTrue(registry.TryGetTag(SynergyTagIds.Toxin, out SynergyTag toxin));
             string text = toxin.Describe(2);
-            StringAssert.StartsWith("Toxin 2 Teile", text);
-            StringAssert.Contains("● 2 Teile: Eigene Skill-Treffer vergiften", text);
-            StringAssert.Contains("○ 4 Teile: Eigene Angriffe +1 Schaden je Gift-Stapel", text);
-            StringAssert.Contains("○ 6 Teile: Auch Basisangriffe vergiften.", text);
+            StringAssert.StartsWith("Toxin 2 pieces", text);
+            StringAssert.Contains("● 2 pieces: Your skill hits poison", text);
+            StringAssert.Contains("○ 4 pieces: Your attacks deal +1 Damage per Poison stack", text);
+            StringAssert.Contains("○ 6 pieces: Basic Attack", text);
             Assert.AreEqual(string.Empty, toxin.ActiveText(1));
             foreach (SynergyTag tag in registry.Tags)
             {
@@ -304,7 +304,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(1, s.TagCountWith(toxic, SynergyTagIds.Toxin), "schon getragen");
             Assert.AreEqual(2, s.TagCountWith(second, SynergyTagIds.Toxin));
             s.Gear.Equip(second);
-            StringAssert.Contains("Toxin 2\n2 Teile: Eigene Skill-Treffer vergiften", s.ActiveSynergyText());
+            StringAssert.Contains("Toxin 2\n2 pieces: Your skill hits poison", s.ActiveSynergyText());
         }
     }
 }

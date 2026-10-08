@@ -151,7 +151,7 @@ namespace Betaknight.Tests.EditMode
         {
             var factory = BoardFactory.CreateDefault();
             LogicRow row = factory.CreateRow(new BoardRowSpec(Never, SkillIds.ShockStab, blockModules: new[] { new ModuleSpec(ModuleIds.Invert) }), null);
-            StringAssert.StartsWith("NICHT ", row.Label);
+            StringAssert.StartsWith("NOT ", row.Label);
 
             BattleResult r = Run(Duel(Fighter("A", 1000, 0, 20, board: new LogicBoard(new[] { row })), Fighter("B", 100000, 0, 1000)), 5);
             Assert.Greater(Executions(r, SkillIds.ShockStab).Count, 0, "«NICHT HP unter 30 %» ist bei voller HP erfüllt");
@@ -189,7 +189,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(0, ModuleRules.ApplyToParameter(runes.Get("always"), 0, threshold), "Ohne Prozent-Schwelle wirkungslos");
 
             LogicRow row = BoardFactory.CreateDefault().CreateRow(new BoardRowSpec("hp_low", SkillIds.Repair, blockModules: threshold), null);
-            Assert.AreEqual("HP unter 40 %", row.Label);
+            Assert.AreEqual("HP Below 40 %", row.Label);
         }
 
         // ------------------------------------------------------------------ Auslöser
@@ -305,10 +305,10 @@ namespace Betaknight.Tests.EditMode
             BattleResult r = Run(Duel(Fighter("A", 1000, 0, 20, board: TriggerBoard(Skills.Get(SkillIds.ShockStab), Skills.Get(SkillIds.Drill))), Fighter("B", 100000, 0, 1000)), 20);
             BattleEvent started = r.Events.First(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.Drill);
             Assert.IsTrue(started.IsTriggered);
-            StringAssert.Contains("ausgelöst von Zeile 1", BattleLogText.Describe(started, r));
+            StringAssert.Contains("triggered by Row 1", BattleLogText.Describe(started, r));
 
             List<BattleEvent> expired = r.Events.Where(e => e.Kind == BattleEventKind.TriggerExpired).ToList();
-            if (expired.Count > 0) StringAssert.Contains("Auslöser von Zeile 1 verfällt", BattleLogText.Describe(expired[0], r));
+            if (expired.Count > 0) StringAssert.Contains("Trigger from Row 1 expires", BattleLogText.Describe(expired[0], r));
         }
 
         [Test]
@@ -324,8 +324,8 @@ namespace Betaknight.Tests.EditMode
             // Seit A-13 verfällt kein Auslöser mehr: das Ziel im Cooldown wird eingereiht.
             Assert.AreEqual(0, drill.TriggersExpired);
             Assert.Greater(drill.Queued, 0);
-            Assert.AreEqual($"Zeile 1 ×{drill.Triggered}", drill.TriggeredByText);
-            Assert.IsTrue(report.Hints.Any(h => h.StartsWith("Zeile 2 (") && h.Contains("ausgelöst, von Zeile 1 ×")));
+            Assert.AreEqual($"Row 1 ×{drill.Triggered}", drill.TriggeredByText);
+            Assert.IsTrue(report.Hints.Any(h => h.StartsWith("Row 2 (") && h.Contains(", by Row 1 ×")));
         }
 
         // ------------------------------------------------------------------ Sammlung und Tafel
@@ -396,7 +396,7 @@ namespace Betaknight.Tests.EditMode
             ModuleInstance when = s.GainModule(ModuleIds.Trigger, SkillDuplicateChoice.KeepCopy);
             Assert.IsTrue(s.PlaceModuleOnSkill(after.InstanceId, s.Runes.Rows[0].Skill.InstanceId));
             Assert.IsTrue(s.PlaceModuleOnRow(when.InstanceId, 1));
-            Assert.AreEqual("Nach Ausführung → kein Ziel", s.DescribeTrigger(after));
+            Assert.AreEqual("After execution → no target", s.DescribeTrigger(after));
             Assert.IsEmpty(s.TriggerLinks());
 
             Assert.IsTrue(s.CycleTriggerTarget(after.InstanceId));
@@ -404,7 +404,7 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(s.CycleTriggerTarget(after.InstanceId));
             Assert.AreEqual(1, RuneLoadoutBoard.TargetRow(s.Runes, after.Target));
             Assert.IsTrue(s.CycleTriggerTarget(when.InstanceId));
-            StringAssert.StartsWith("Wenn erfüllt → ", s.DescribeTrigger(when));
+            StringAssert.StartsWith("When met → ", s.DescribeTrigger(when));
 
             var links = s.TriggerLinks();
             Assert.AreEqual(2, links.Count, "Kreis Zeile 1 ↔ Zeile 2");
@@ -435,7 +435,7 @@ namespace Betaknight.Tests.EditMode
             ModuleInstance a = s.GainModule(ModuleIds.Chain);
             Assert.AreSame(a, s.GainModule(ModuleIds.Chain));
             Assert.AreEqual(1, a.Level);
-            Assert.AreEqual("Kette +1", a.NameFrom(s.ModuleCatalog));
+            Assert.AreEqual("Chain +1", a.NameFrom(s.ModuleCatalog));
 
             ModuleInstance b = s.GainModule(ModuleIds.Chain);
             Assert.AreNotSame(a, b, "Auf Maximalstufe kommt ein weiteres Exemplar");

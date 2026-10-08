@@ -41,7 +41,7 @@ namespace Betaknight.Tests.EditMode
             int expected = Skills.Get(SkillIds.ShieldBash).CooldownTicks - (next.Tick - first.Tick);
             Assert.AreEqual(expected, check.CooldownLeft);
             Assert.AreEqual(Skills.Get(SkillIds.ShieldBash).CooldownTicks, check.CooldownTotal);
-            StringAssert.StartsWith("Skill im Cooldown (noch ", RowStateText.Reason(check));
+            StringAssert.StartsWith("skill on cooldown (", RowStateText.Reason(check));
         }
 
         [Test]
@@ -86,7 +86,7 @@ namespace Betaknight.Tests.EditMode
             BattleResult r = Run(new LogicBoard(new[] { Row("always", null, label: "Immer") }), Fighter("Puppe", 30, 0, 1000));
             Assert.AreEqual(RowCheckState.Orphaned, r.Decisions[0].Rows[0].State);
             BattleReport report = BattleReport.Create(r);
-            CollectionAssert.Contains(report.Hints, "Zeile 1 hat nie gefeuert: verwaist, kein Skill zugeordnet.");
+            CollectionAssert.Contains(report.Hints, "Row 1 never fired: orphaned, no skill assigned.");
             // H-04: «skipped» nur für verwaiste Zeilen; sie sind ein anderer Grund als ein verpasster Auslöser.
             Assert.AreEqual("skipped (no skill)", RowStateText.Reason(r.Decisions[0].Rows[0]));
             Assert.AreEqual(RowCheckState.Orphaned, report.Rows[0].OtherReason);
@@ -109,7 +109,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(RowCheckState.ActionRunning, busy.Rows[0].State);
             Assert.AreEqual(1, busy.RunningRow);
             Assert.IsTrue(busy.Skipped(0));
-            Assert.AreEqual("Bedingung erfüllt, aber Aktion läuft", RowStateText.Reason(busy.Rows[0]));
+            Assert.AreEqual("condition met, but an action is running", RowStateText.Reason(busy.Rows[0]));
 
             // Pro laufender Aktion nur ein Eintrag je Zeile, nicht jeden Tick.
             var perAction = r.Decisions.Where(d => d.IsBusy).GroupBy(d => d.RunningRow + ":" + LastChoiceBefore(r, d.Tick));
@@ -134,7 +134,7 @@ namespace Betaknight.Tests.EditMode
         {
             var board = new LogicBoard(new[]
             {
-                Row("enemy_charging", SkillIds.ShieldBash, label: "Gegner lädt auf"),
+                Row("enemy_charging", SkillIds.ShieldBash, label: "Enemy Charging"),
                 Row("every_5s", SkillIds.Ignite, 5, "Alle 5 s"),
                 Row("enemy_armored", SkillIds.ArmorBreak, label: "Gegner gepanzert"),
             });
@@ -278,7 +278,7 @@ namespace Betaknight.Tests.EditMode
             BattleDecision skip = r.Decisions.First(d => d.ChosenRow == 1);
             p.Advance(skip.Tick - p.Tick);
             Assert.Less(p.CooldownFraction(0), 1f);
-            StringAssert.Contains("Skill im Cooldown (noch", p.LastSkipReason(0));
+            StringAssert.Contains("skill on cooldown (", p.LastSkipReason(0));
             Assert.IsNull(p.LastSkipReason(1), "Fallback wurde nie übersprungen");
         }
 
@@ -311,8 +311,8 @@ namespace Betaknight.Tests.EditMode
             List<LogEntry> damage = p.Entries.Where(e => e.Matches(LogFilter.Damage)).ToList();
             Assert.IsNotEmpty(mine);
             Assert.IsNotEmpty(damage);
-            Assert.IsTrue(mine.Any(e => e.Text.Contains("Schildschlag")));
-            Assert.IsTrue(damage.All(e => e.Text.Contains("−") || e.Text.Contains("Krit") || e.Text.Contains("blockt") || e.Text.Contains("weicht")));
+            Assert.IsTrue(mine.Any(e => e.Text.Contains("Shield Bash")));
+            Assert.IsTrue(damage.All(e => e.Text.Contains("−") || e.Text.Contains("Crit") || e.Text.Contains("blocks") || e.Text.Contains("dodges")));
             Assert.AreEqual(p.Entries.Count, p.Entries.Count(e => e.Matches(LogFilter.All)));
         }
     }

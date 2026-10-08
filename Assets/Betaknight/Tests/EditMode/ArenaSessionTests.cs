@@ -153,7 +153,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(0, s.Runes.Rows[0].Level, "when_hit hat keine Stufen.");
             Assert.AreEqual(2, s.Runes.Rows[1].Level);
             Assert.AreEqual(hpLow.NameAt(2), s.Runes.Rows[1].Name);
-            StringAssert.Contains("Rune verstärkt", lines.Single());
+            StringAssert.Contains("Rune upgraded", lines.Single());
         }
 
         [Test]

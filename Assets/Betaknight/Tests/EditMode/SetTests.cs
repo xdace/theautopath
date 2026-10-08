@@ -161,11 +161,11 @@ namespace Betaknight.Tests.EditMode
             SetBonusRegistry sets = SetBonusRegistry.CreateDefault();
             Assert.IsTrue(sets.TryGet(SetIds.Aegis, out SetDefinition aegis));
             string text = aegis.Describe(2);
-            StringAssert.StartsWith("Aegis-Firewall 2/3", text);
-            StringAssert.Contains("● 2 Teile: Jeder Block: +1 Ladung", text);
-            StringAssert.Contains("○ 3 Teile: Skills aus «Ladung voll»-Zeilen entladen", text);
+            StringAssert.StartsWith("Aegis Firewall 2/3", text);
+            StringAssert.Contains("● 2 pieces: Every Block: +1 Charge", text);
+            StringAssert.Contains("○ 3 pieces: Skills from \"Charge Full\" rows discharge", text);
             Assert.AreEqual(string.Empty, aegis.ActiveText(1));
-            StringAssert.StartsWith("2 Teile: ", aegis.ActiveText(2));
+            StringAssert.StartsWith("2 pieces: ", aegis.ActiveText(2));
             foreach (SetDefinition set in sets.All)
                 Assert.AreEqual(2, set.Bonuses.Count, $"{set.Name}: Boni für 2 und 3 Teile");
         }
@@ -184,8 +184,8 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(string.Empty, s.ActiveSetBonusText(), "ein Teil: noch kein Bonus");
 
             s.Gear.Equip(absorber);
-            StringAssert.Contains("Aegis-Firewall 2/3", s.ActiveSetBonusText());
-            StringAssert.Contains("2 Teile: Jeder Block", s.ActiveSetBonusText());
+            StringAssert.Contains("Aegis Firewall 2/3", s.ActiveSetBonusText());
+            StringAssert.Contains("2 pieces: Every Block", s.ActiveSetBonusText());
         }
     }
 }

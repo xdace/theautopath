@@ -70,7 +70,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(s.Progression.MaxBoardRows, s.Runes.Slots);
             Assert.IsFalse(s.CanExpandBoard);
             Assert.AreEqual(5, messages.Count);
-            Assert.AreEqual("Tafel 3 → 4 Zeilen", messages[0]);
+            Assert.AreEqual("Board 3 → 4 rows", messages[0]);
         }
 
         [Test]
@@ -149,8 +149,8 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(s.TakeRune(0));
 
             Assert.AreEqual(1, s.Runes.Rows.Single().Level);
-            Assert.AreEqual("HP unter 40 %", s.Runes.Rows.Single().Name);
-            Assert.AreEqual("Rune HP unter 30 % → HP unter 40 %", messages.Last());
+            Assert.AreEqual("HP Below 40 %", s.Runes.Rows.Single().Name);
+            Assert.AreEqual("Rune HP Below 30 % → HP Below 40 %", messages.Last());
         }
 
         [Test]
@@ -183,7 +183,7 @@ namespace Betaknight.Tests.EditMode
 
             EquipmentDefinition blade = s.Gear.Get(EquipmentSlot.Weapon);
             Assert.AreEqual(1, blade.Level);
-            Assert.AreEqual("Kurzklinge +1", blade.Name);
+            Assert.AreEqual("Short Blade +1", blade.Name);
             Assert.AreEqual(3, blade.StatBonus(StatKind.Damage), "2 + 50 %");
             Assert.AreEqual(-3, blade.StatBonus(StatKind.AttackInterval));
             Assert.AreEqual(0, s.Inventory.Count, "Kein zweites Exemplar");
@@ -191,8 +191,8 @@ namespace Betaknight.Tests.EditMode
             // A-05: Die Teilstufe hebt nur Werte; die Skill-Stufe gehört dem Skill-Exemplar.
             SkillInfo info = s.DescribeSkill(SkillIds.ArmorBreak);
             Assert.AreEqual(BasisPoints.Percent(190), info.Effects.First(e => e.IsDamage).DamageBp, "Rüstungsbruch seit A-12: 190 %");
-            StringAssert.Contains("Kurzklinge → Kurzklinge +1", messages.Last());
-            StringAssert.Contains("Waffenschaden 2 → 3", messages.Last());
+            StringAssert.Contains("Short Blade → Short Blade +1", messages.Last());
+            StringAssert.Contains("Weapon Damage 2 → 3", messages.Last());
         }
 
         [Test]
