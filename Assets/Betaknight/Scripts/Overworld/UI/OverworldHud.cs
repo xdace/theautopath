@@ -37,7 +37,7 @@ namespace Betaknight.Overworld.UI
             _onNewMap = onNewMap;
         }
 
-        private static readonly Rect PanelRect = new Rect(12, 12, 380, 470);
+        private static readonly Rect PanelRect = new Rect(12, 12, 380, 540);
 
         /// <summary>Liegt ein Bildschirmpunkt (Ursprung unten links) über dem HUD? Dann ignoriert die Karte den Klick.</summary>
         public static bool ContainsScreenPoint(Vector2 screen)
@@ -62,7 +62,8 @@ namespace Betaknight.Overworld.UI
             string bossText = boss <= 3 ? $"<color=#ff7a6b>Boss in {boss} Zügen</color>" : $"Boss in {boss} Zügen";
             GUILayout.Label($"Zug: {_session.Turns.CurrentTurn}   {bossText}", _style);
             GUILayout.Label($"HP: {_session.Stats.Hp}/{_session.Stats.MaxHp}   Gold: {_session.Stats.Gold}   Splitter: {_session.Stats.Shards}", _style);
-            GUILayout.Label($"Logik-Tafel ({_session.Runes.Rows.Count}/{_session.Runes.Slots}):\n{BoardList()}", _style);
+            GUILayout.Label($"Logik-Tafel: {_session.Runes.Rows.Count} Runen, Zeilen {_session.Runes.Slots}/{_session.Progression.MaxBoardRows}\n{BoardList()}", _style);
+            GUILayout.Label($"<size=13>{BuildSummary()}</size>", _style);
             GUILayout.Label($"Ausrüstung: {GearList()}", _style);
             string sets = SetList();
             if (sets.Length > 0) GUILayout.Label($"Sets: {sets}", _style);
@@ -133,6 +134,26 @@ namespace Betaknight.Overworld.UI
             return string.Join(", ", parts);
         }
 
+        private int _weapon;
+        private int _weaponFrame = -1;
+
+        /// <summary>Kurze Build-Übersicht: Waffenschaden, Stufen von Ausrüstung und Runen, Inventar.</summary>
+        private string BuildSummary()
+        {
+            int itemLevels = 0;
+            foreach (EquipmentDefinition item in _session.Gear.Items) itemLevels += item.Level;
+            int runeLevels = 0;
+            foreach (RuneSlot row in _session.Runes.Rows) runeLevels += row.Level;
+            if (_weaponFrame != Time.frameCount)
+            {
+                _weapon = _session.SkillUserStats().WeaponDamage;
+                _weaponFrame = Time.frameCount;
+            }
+            int weapon = _weapon;
+            return $"Build: Waffenschaden {weapon}, Ausrüstung +{itemLevels}, Runen-Stufen +{runeLevels}, "
+                + $"Inventar {_session.Inventory.Count} Teile / {_session.RuneInventory.Count} Runen";
+        }
+
         private string GearList()
         {
             if (_session.Gear.Items.Count == 0) return "nichts";
@@ -157,6 +178,7 @@ namespace Betaknight.Overworld.UI
             {
                 case CellContent.Enemy: return "Gegner";
                 case CellContent.Boss: return "Boss";
+                case CellContent.Elite: return "Elite-Gegner";
                 case CellContent.Shop: return "Shop";
                 case CellContent.Treasure: return "Schatztruhe";
                 case CellContent.GoldMine: return "Goldmine";

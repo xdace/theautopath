@@ -100,7 +100,9 @@ namespace Betaknight.Overworld.UI
             if (GUILayout.Button($"Heilen (+{prices.HealAmount} HP) – {prices.Heal} Gold", GUILayout.Height(30f))) _session.BuyHeal();
 
             GUI.enabled = _session.CanBuyRuneSlot;
-            if (GUILayout.Button($"Zusätzlicher Runenplatz – {prices.Slot} Gold", GUILayout.Height(30f))) _session.BuyRuneSlot();
+            string slot = _session.CanExpandBoard ? $"Zusätzlicher Runenplatz – {_session.RuneSlotPrice} Gold"
+                : $"Tafel voll ({_session.Progression.MaxBoardRows} Zeilen)";
+            if (GUILayout.Button(slot, GUILayout.Height(30f))) _session.BuyRuneSlot();
 
             GUI.enabled = _session.CanRerollShop;
             if (GUILayout.Button($"Runen neu würfeln – {prices.Reroll} Gold", GUILayout.Height(30f))) _session.RerollShop();

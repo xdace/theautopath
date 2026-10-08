@@ -137,7 +137,7 @@ namespace Betaknight.Overworld
             controller.InputBlocked = () => _arenaWindow.IsOpen || _boardWindow.IsOpen || _inventoryWindow.IsOpen;
 
             _hud.Initialize(Session, controller, _config.Encounters, StartNewRun);
-            _encounterWindow.Initialize(Session);
+            _encounterWindow.Initialize(Session, keepMessages: Session.Act > 1);
             _runeWindow.Initialize(Session);
             _shopWindow.Initialize(Session);
             _gameOverWindow.Initialize(Session, StartNewRun);

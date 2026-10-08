@@ -35,10 +35,22 @@ Eine Reise stoppt automatisch auf feindlichen Feldern (Gegner, Boss), auf neu en
 
 1. **Kit wählen:** Klingen-, Schild- oder Funkenritter. Jedes Kit bringt HP, Gold und eine Start-Rune mit.
 2. **Ring 1** um den Start hat nur kleine Events (Münzen, Kräuter, Runensplitter, Wegweiser). Sie wirken sofort und melden sich unten links.
-3. **Ab Ring 2** kommen mittlere Events mit einer Entscheidung und die ersten Kämpfe. Truhen sind selten, Shops gibt es erst ab Ring 3.
-4. **3 Runensplitter** öffnen eine Runenwahl, ebenso jeder gewonnene Kampf und jede Truhe. Es gibt 3 Runenplätze, ein vierter ist im Shop käuflich.
+3. **Ab Ring 2** kommen mittlere Events mit einer Entscheidung und die ersten Kämpfe. Truhen sind selten, Shops gibt es erst ab Ring 3. **Ab Ring 3** gibt es Elite-Gegner (Feld «E»): zwei Stufen stärker, mit mehr Leben und Schaden, dafür mehr Gold und oft eine Tafel-Erweiterung.
+4. **3 Runensplitter** öffnen eine Runenwahl, ebenso jeder gewonnene Kampf und jede Truhe. Die Tafel startet mit 3 Zeilen und wächst bis 8 (siehe «Belohnungen»).
 5. **Sammeln statt ersetzen:** Ausrüstung (12 Plätze) und Runen (6 Plätze) haben ein Inventar. Neue Teile werden angelegt, wenn ihr Platz frei ist, sonst kommen sie ins Inventar; verdrängte Teile (auch der Schild bei einer Zweihandwaffe) wandern ins Inventar. Eine neue Rune bei voller Tafel kommt ins Runen-Inventar. Runen behalten ihre Lagerfeuer-Stufe, beim Tauschen bleibt der Skill an der Zeile. Ist ein Inventar voll, wird gefragt: ein vorhandenes verwerfen oder das neue ablehnen. Wechseln geht jederzeit ausserhalb von Kampf und offenen Fenstern; Set-Boni, verwaiste Zeilen und Set-Runen folgen sofort. Im Shop lässt sich das Inventar für den halben Preis verkaufen. Das Inventar wandert durch die Akte mit.
-6. Fällt der Ritter in einem Kampf, ist der Run vorbei. Events auf der Oberwelt töten nie.
+6. **Aufbauen statt austauschen:** Belohnungen nach Kämpfen enthalten immer mindestens eine Verbesserung des aktuellen Builds. Eine doppelte Rune hebt die vorhandene eine Stufe (wie das Lagerfeuer), ein doppeltes Teil wertet das vorhandene auf (+1 bis +3). Nach jeder Verbesserung erscheint unten links eine Meldung, z. B. «Rüstungsbruch 100 % → 115 %» oder «Tafel 4 → 5 Zeilen». Das HUD zeigt Zeilen x/8 und eine kurze Build-Übersicht.
+7. Fällt der Ritter in einem Kampf, ist der Run vorbei. Events auf der Oberwelt töten nie.
+
+### Belohnungen
+
+| Belohnung | Quelle | Wirkung |
+|---|---|---|
+| Rune | Runenwahl (Sieg, Truhe, 3 Splitter), Shop | Neue Rune auf eine freie Zeile oder ins Runen-Inventar; schon vorhandene Rune: +1 Stufe |
+| Ausrüstung | Sieg (50 %), Truhe, Shop | Anlegen oder ins Inventar; schon vorhandenes Teil: +1 Stufe (bis +3), jede Stufe +50 % der Grundwerte und stärkere Skills (+15 % Waffenschaden, +10 % Brennen pro Sekunde, +5 % Heilung) |
+| Tafel-Erweiterung: +1 Zeile | Garantiert bei jeder Boss-Flucht und beim Akt-Wechsel, als Wahl bei Elite-Siegen (50 %) und seltenen Truhen (10 %), Shop-Platz (20, 35, 50 … Gold pro Run, einer pro Shop) | Bis höchstens 8 Zeilen |
+| Gold, Splitter | Kämpfe, Events, Minen, Boss-Flucht | Elite-Siege geben +4 Gold |
+
+Kampfbelohnungen bieten bevorzugt Verbesserungen an: Stufe für ein getragenes Teil, ein fehlendes Set-Teil, Stufe für eine vorhandene Rune oder eine Rune zu einem vorhandenen Tag. Mindestens eine Option ist immer eine Verbesserung. Gegner skalieren weiter über Ring und Akt, die Schutzregeln (eine Aktion pro Tick, Überhitzung ab 90 s) bleiben. Alle Werte stehen in `Core/Run/ProgressionConfig.cs`.
 
 ### Kampf: die Logik-Tafel
 
@@ -66,6 +78,7 @@ Konzept: `/mnt/project-files/design/kampfsystem-konzept.md` im Projekt.
 | Grossbuchstabe (`F`, `W`, `S`, `M`, `V`) | Mittleres Event: Lagerfeuer, Wanderer, Blutschrein, Söldner, Vorrat |
 | `!` | Gegner |
 | `B` | Boss |
+| `E` | Elite-Gegner |
 | `$` | Shop |
 | `*` | Schatztruhe |
 | `G` | Goldmine |
@@ -99,7 +112,7 @@ Assets/Betaknight/
 │   │   ├── Turns/         TurnSystem
 │   │   ├── Movement/      PlayerModel, MovementRules, Pathfinder
 │   │   ├── Encounters/    Kleine und mittlere Events: Katalog, Optionen, Wirkungen, Resolver
-│   │   ├── Run/           PlayerStats (HP, Gold, Splitter), KnightKit
+│   │   ├── Run/           PlayerStats (HP, Gold, Splitter), KnightKit, ProgressionConfig
 │   │   ├── Runes/         Runen (Bedingungen der Logik-Tafel), Loadout, Runenwahl, RuneInventory
 │   │   ├── Arena/         Kampfsimulator: Battle (Tick-Schleife), Combatant, LogicBoard, Conditions/ (Runen-Bedingungen + ConditionRegistry),
 │   │   │                  Effects/ (ISkillEffect), Statuses/, Skills/ (SkillCatalog), BattleModifier, Playback/ (Wiedergabe + Protokolltext)
@@ -110,6 +123,7 @@ Assets/Betaknight/
 │   │   ├── OverworldSession.MajorEvents.cs  Fassade: Kampf, Truhe, Goldmine, Shop
 │   │   ├── OverworldSession.Gear.cs         Fassade: Ausrüstung, Skill-Zuordnung, Tafel umsortieren
 │   │   ├── OverworldSession.Inventory.cs    Fassade: Inventar, anlegen/ablegen/tauschen, verwerfen, verkaufen
+│   │   ├── OverworldSession.Progression.cs  Fassade: Tafel-Erweiterung, Stufen, Angebote mit Verbesserung
 │   │   ├── OverworldSession.Mines.cs        Fassade: Goldminen-Raids und Verteidigung
 │   │   ├── OverworldSession.Boss.cs         Fassade: Boss alle 25 Züge, Flucht durchs Portal
 │   │   └── OverworldSession.Acts.cs         Fassade: Portal, Akte, Gegnerstufe pro Akt

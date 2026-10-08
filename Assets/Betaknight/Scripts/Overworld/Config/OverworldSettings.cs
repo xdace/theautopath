@@ -60,6 +60,7 @@ namespace Betaknight.Overworld.Config
             new ContentStyle { content = CellContent.Empty, color = new Color(0.45f, 0.52f, 0.45f), label = "" },
             new ContentStyle { content = CellContent.Enemy, color = new Color(0.70f, 0.30f, 0.28f), label = "!" },
             new ContentStyle { content = CellContent.Boss, color = new Color(0.50f, 0.10f, 0.35f), label = "B" },
+            new ContentStyle { content = CellContent.Elite, color = new Color(0.85f, 0.25f, 0.55f), label = "E" },
             new ContentStyle { content = CellContent.Shop, color = new Color(0.30f, 0.50f, 0.75f), label = "$" },
             new ContentStyle { content = CellContent.Treasure, color = new Color(0.75f, 0.60f, 0.25f), label = "*" },
             new ContentStyle { content = CellContent.GoldMine, color = new Color(0.85f, 0.72f, 0.20f), label = "G" },
@@ -102,6 +103,8 @@ namespace Betaknight.Overworld.Config
             {
                 if (style.content == content) return style;
             }
+            // Ältere Settings-Assets kennen neue Feldarten noch nicht: dann die eingebaute Vorgabe nutzen.
+            if (content == CellContent.Elite) return new ContentStyle { content = content, color = new Color(0.85f, 0.25f, 0.55f), label = "E" };
             return new ContentStyle { content = content, color = Color.magenta, label = "?" };
         }
     }

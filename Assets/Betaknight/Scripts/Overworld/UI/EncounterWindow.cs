@@ -21,11 +21,13 @@ namespace Betaknight.Overworld.UI
         private GUIStyle _textStyle;
         private GUIStyle _messageStyle;
 
-        public void Initialize(OverworldSession session)
+        /// <param name="keepMessages">Beim Akt-Wechsel bleiben die letzten Meldungen stehen (z. B. «Tafel 4 → 5 Zeilen»).</param>
+        public void Initialize(OverworldSession session, bool keepMessages = false)
         {
             Unsubscribe();
-            _messages.Clear();
+            if (!keepMessages) _messages.Clear();
             _session = session;
+            _session.BuildImproved += OnImproved;
             _session.EncounterResolved += OnResolved;
             _session.MajorEventResolved += OnMajorResolved;
             _session.MineRaidStarted += OnRaid;
@@ -44,6 +46,8 @@ namespace Betaknight.Overworld.UI
             _messages.Add((text, Time.time + MessageSeconds));
             if (_messages.Count > MaxMessages) _messages.RemoveAt(0);
         }
+
+        private void OnImproved(string text) => Post($"<color=#7ddc6f><b>Verbessert:</b> {text}</color>");
 
         private void OnResolved(EncounterOutcome outcome) =>
             Post($"<b>{outcome.Definition.Title}</b>: {outcome.Summary}");
@@ -114,6 +118,7 @@ namespace Betaknight.Overworld.UI
         {
             if (_session == null) return;
             _session.EncounterResolved -= OnResolved;
+            _session.BuildImproved -= OnImproved;
             _session.MajorEventResolved -= OnMajorResolved;
             _session.MineRaidStarted -= OnRaid;
             _session.MineLost -= OnMineLost;

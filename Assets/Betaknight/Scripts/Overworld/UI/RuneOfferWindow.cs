@@ -48,7 +48,7 @@ namespace Betaknight.Overworld.UI
             EnsureStyles();
 
             const float width = 520f;
-            const float height = 520f;
+            float height = Mathf.Min(Screen.height - 40f, 600f);
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUILayout.BeginArea(rect, GUI.skin.box);
 
@@ -69,6 +69,16 @@ namespace Betaknight.Overworld.UI
             for (int i = 0; i < options.Count; i++)
             {
                 RuneDefinition rune = options[i];
+                if (_session.OwnsRune(rune))
+                {
+                    // Doppelte Rune: die vorhandene steigt eine Stufe.
+                    string upgrade = $"<color=#7ddc6f>▲ Stufe erhöhen</color>  <b>{RuneLevelText(rune)}</b>\n{rune.Description}";
+                    GUI.enabled = _session.CanUpgradeRune(rune);
+                    if (GUILayout.Button(upgrade, _nameStyle, GUILayout.Height(64f))) _session.TakeRune(i);
+                    GUI.enabled = true;
+                    continue;
+                }
+
                 bool synergy = _session.Runes.HasTag(rune.Tag);
                 string label = $"<b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]{(synergy ? "  ★" : string.Empty)}\n{rune.Description}";
                 if (GUILayout.Button(label, _nameStyle, GUILayout.Height(64f)))
@@ -83,6 +93,14 @@ namespace Betaknight.Overworld.UI
                 if (!_session.Items.TryGet(offer.ItemIds[i], out EquipmentDefinition item)) continue;
                 EquipmentDefinition worn = _session.Gear.Get(item.Slot);
                 string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)} ({_session.Gear.SetPieces(item.SetId)}/3)" : string.Empty;
+                if (_session.CanUpgradeItem(item.Id))
+                {
+                    // Doppeltes Teil: das vorhandene wird aufgewertet (Werte und Skill-Stärke).
+                    string where = worn != null && worn.Id == item.Id ? "angelegt" : "im Inventar";
+                    string text = $"<color=#7ddc6f>▲ Aufwerten</color>  <b>{item.BaseName}</b> ({where}) → Stufe +{OwnedLevel(item) + 1}\n{ItemText.Describe(item)}";
+                    if (GUILayout.Button(text, _nameStyle, GUILayout.Height(64f))) _session.TakeItem(i);
+                    continue;
+                }
                 GUILayout.BeginVertical(GUI.skin.box);
                 GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}\n<size=12>{ItemText.Compare(item, worn)}</size>", _plainStyle);
                 GUILayout.BeginHorizontal();
@@ -96,11 +114,34 @@ namespace Betaknight.Overworld.UI
                 GUILayout.EndVertical();
             }
 
+            if (offer.BoardExpansion)
+            {
+                GUI.enabled = _session.CanExpandBoard;
+                string text = $"<color=#7ddc6f>▲ Tafel-Erweiterung: +1 Zeile</color>  ({_session.Runes.Slots} → {_session.Runes.Slots + 1} von {_session.Progression.MaxBoardRows})";
+                if (GUILayout.Button(text, _nameStyle, GUILayout.Height(44f))) _session.TakeBoardExpansion();
+                GUI.enabled = true;
+            }
+
             GUILayout.FlexibleSpace();
             if (GUILayout.Button($"Verzichten (+{OverworldSession.SkipRuneGold} Gold)", GUILayout.Height(30f)))
             {
                 _session.SkipRuneOffer();
             }
+        }
+
+        private string RuneLevelText(RuneDefinition rune)
+        {
+            int row = _session.Runes.IndexOf(rune);
+            int level = row >= 0 ? _session.Runes.Rows[row].Level : _session.RuneInventory[_session.RuneInventory.IndexOf(rune)].Level;
+            return level < rune.MaxLevel ? $"{rune.NameAt(level)} → {rune.NameAt(level + 1)}" : $"{rune.NameAt(level)} (höchste Stufe)";
+        }
+
+        private int OwnedLevel(EquipmentDefinition item)
+        {
+            EquipmentDefinition worn = _session.Gear.Get(item.Slot);
+            if (worn != null && worn.Id == item.Id) return worn.Level;
+            int index = _session.Inventory.IndexOf(item.Id);
+            return index >= 0 ? _session.Inventory[index].Level : 0;
         }
 
         private void DrawReplace(RuneDefinition incoming)
