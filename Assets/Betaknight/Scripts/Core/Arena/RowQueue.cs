@@ -10,6 +10,9 @@ namespace Betaknight.Core.Arena
     /// </summary>
     public sealed class RowQueueConfig
     {
+        /// <summary>Die Regel in einem Satz, für Tooltips.</summary>
+        public const string RuleText = "Erfüllte Zeilen warten, bis sie dran sind – höhere Zeilen zuerst.";
+
         /// <summary>Ohne Warteschlange gilt die alte Regel (überspringen, Auslöser verfallen).</summary>
         public bool Enabled { get; set; } = true;
 

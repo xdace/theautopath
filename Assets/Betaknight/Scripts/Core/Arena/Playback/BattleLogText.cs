@@ -51,6 +51,12 @@ namespace Betaknight.Core.Arena
                     text = row != null ? $"{who}: [{row}] → {SkillName(e.Detail)}" : $"{who}: {SkillName(e.Detail)}";
                     if (e.IsTriggered) text += $"  ↪ ausgelöst von Zeile {e.CauseRow + 1}";
                     else if (e.IsRepeat) text += "  ↻ Wiederholung";
+                    if (e.FromQueue) text += $"  ⏳ aus der Warteschlange nach {Time(e.QueuedTicks)}";
+                    break;
+                case BattleEventKind.RowQueued:
+                    text = $"{who}: Zeile {e.RowIndex + 1} ({SkillName(e.Detail)}) eingereiht, "
+                        + (e.Amount > 0 ? $"wartet auf Cooldown (noch {Time(e.Amount)})" : "wartet, Aktion läuft");
+                    if (e.IsTriggered) text += $"  ↪ ausgelöst von Zeile {e.CauseRow + 1}";
                     break;
                 case BattleEventKind.TriggerExpired:
                     text = $"{who}: Auslöser von Zeile {e.Amount + 1} verfällt, Zeile {e.RowIndex + 1} ({SkillName(e.Detail)}) nicht bereit";

@@ -200,6 +200,7 @@ namespace Betaknight.Overworld.UI
         {
             GUILayout.BeginVertical(UiTheme.Section, GUILayout.Width(width), GUILayout.Height(height));
             GUILayout.Label("<b>Logik-Tafel</b>  <color=#9aa4b2>Rune (Wann) → Skill (Was) · ≡ ziehen zum Umsortieren · Maus darüber zeigt Details</color>", UiTheme.Text);
+            Hover(GUILayoutUtility.GetLastRect(), $"<b>Logik-Tafel</b>: Von oben nach unten gilt die erste Zeile, deren Bedingung erfüllt und deren Skill bereit ist. {RowQueueConfig.RuleText}");
             _boardScroll = GUILayout.BeginScrollView(_boardScroll);
 
             IReadOnlyList<RuneSlot> rows = _session.Runes.Rows;

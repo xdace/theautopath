@@ -273,6 +273,32 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
+        public void ThePlaybackShowsTheQueueNextToTheBoard()
+        {
+            BattleResult r = Run(Setup(new LogicBoard(new[]
+            {
+                Row("when_hit", Skill("a", 2, Ticks.FromSeconds(3))),
+                Row("always", Skill("long", Ticks.FromSeconds(3), 0)),
+            }), enemyInterval: 30), 10);
+            BattleEvent queued = Queued(r, 0)[0];
+
+            var playback = new BattlePlayback(r);
+            playback.Advance(queued.Tick);
+            Assert.IsTrue(playback.IsRowQueued(0));
+            Assert.AreEqual(RowDisplay.Queued, playback.RowStateAt(0));
+            StringAssert.StartsWith("Wartet: 1. a ", playback.QueueText());
+            Assert.IsTrue(playback.Lines.Any(l => l.Contains("Zeile 1 (a) eingereiht")), string.Join("\n", playback.Lines));
+
+            BattleEvent start = Starts(r, "a").First(e => e.FromQueue);
+            playback.Advance(start.Tick - playback.Tick);
+            Assert.IsFalse(playback.IsRowQueued(0));
+            Assert.IsTrue(playback.Lines.Last(l => l.Contains("] → a")).Contains("aus der Warteschlange nach"));
+
+            playback.SkipToEnd();
+            Assert.AreEqual(string.Empty, playback.QueueText());
+        }
+
+        [Test]
         public void TheDecisionLogSaysQueuedInsteadOfSkipped()
         {
             BattleResult r = Run(Setup(new LogicBoard(new[]

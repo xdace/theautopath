@@ -357,7 +357,7 @@ namespace Betaknight.Overworld.UI
         private void DrawBoard(Rect area)
         {
             GUILayout.BeginArea(area, GUI.skin.box);
-            GUILayout.Label("<b>Logik-Tafel</b>  <size=13><color=#9aa4b2>Zeile hovern für den Grund</color></size>", _text);
+            GUILayout.Label(new GUIContent("<b>Logik-Tafel</b>  <size=13><color=#9aa4b2>Zeile hovern für den Grund</color></size>", QueueRule), _text);
             BattleResult r = _playback.Result;
             for (int i = 0; i < r.PlayerRowLabels.Count; i++)
             {
@@ -378,9 +378,10 @@ namespace Betaknight.Overworld.UI
                 string text = $"{prefix} [{r.PlayerRowLabels[i]}] → {skill}";
                 if (lit) text = $"<color=#ffd75e><b>{text}</b></color>";
                 else if (state == RowDisplay.Orphaned || skill == "—") text = $"<color=#777777>{text}</color>";
+                else if (state == RowDisplay.Queued) text = $"<color=#7fd7ff>{text}</color>";
                 GUI.Label(new Rect(badge.xMax + 6f, line.y, line.width - badge.width - 16f, line.height), new GUIContent(text, RowTooltip(i, state)), _row);
 
-                if (state == RowDisplay.Cooldown)
+                if (state == RowDisplay.Cooldown || (state == RowDisplay.Queued && _playback.CooldownLeft(i) > 0))
                 {
                     float frac = _playback.CooldownFraction(i);
                     var bar = new Rect(badge.xMax + 6f, line.yMax - 4f, (line.width - badge.width - 16f), 3f);
@@ -388,11 +389,19 @@ namespace Betaknight.Overworld.UI
                     Fill(new Rect(bar.x, bar.y, bar.width * frac, bar.height), new Color(1f, 0.7f, 0.25f));
                 }
             }
+            // A-13: Warteschlange direkt unter der Tafel.
+            string queue = _playback.QueueText(Glyph('⏳', "…"));
+            GUILayout.Space(4f);
+            GUILayout.Label(new GUIContent(queue.Length > 0 ? $"<size=13><color=#7fd7ff>{queue}</color></size>" : "<size=13><color=#666b75>Wartet: –</color></size>",
+                QueueRule), _row);
             GUILayout.FlexibleSpace();
             GUILayout.Label($"<size=13>{StateGlyph(RowDisplay.Ready)} bereit   {StateGlyph(RowDisplay.ConditionFalse)} Bedingung falsch   "
-                + $"{StateGlyph(RowDisplay.Cooldown)} Cooldown   {StateGlyph(RowDisplay.Orphaned)} verwaist</size>", _row);
+                + $"{StateGlyph(RowDisplay.Cooldown)} Cooldown   {StateGlyph(RowDisplay.Queued)} eingereiht   {StateGlyph(RowDisplay.Orphaned)} verwaist</size>", _row);
             GUILayout.EndArea();
         }
+
+        /// <summary>Die Regel der Warteschlange in einem Satz (A-13).</summary>
+        private const string QueueRule = RowQueueConfig.RuleText;
 
         private string RowTooltip(int row, RowDisplay state)
         {
@@ -403,10 +412,15 @@ namespace Betaknight.Overworld.UI
                 case RowDisplay.ConditionFalse: now = "Bedingung nicht erfüllt"; break;
                 case RowDisplay.Cooldown: now = $"Skill im Cooldown (noch {RowStateText.Seconds(_playback.CooldownLeft(row))})"; break;
                 case RowDisplay.Orphaned: now = "verwaist (kein Skill)"; break;
+                case RowDisplay.Queued:
+                    int left = _playback.CooldownLeft(row);
+                    now = left > 0 ? $"eingereiht, wartet auf Cooldown (noch {RowStateText.Seconds(left)})" : "eingereiht, wartet (Aktion läuft)";
+                    break;
                 default: now = "noch keine Entscheidung"; break;
             }
             string skipped = _playback.LastSkipReason(row);
-            return skipped != null ? $"Jetzt: {now}\nZuletzt übersprungen bei {skipped}" : $"Jetzt: {now}";
+            string text = skipped != null ? $"Jetzt: {now}\nZuletzt bei {skipped}" : $"Jetzt: {now}";
+            return $"{text}\n{QueueRule}";
         }
 
         // ------------------------------------------------------------------ Auswertung nach dem Kampf
@@ -427,19 +441,19 @@ namespace Betaknight.Overworld.UI
 
             _reportScroll = GUILayout.BeginScrollView(_reportScroll);
             float w = area.width - 40f;
-            float[] cols = { w * 0.28f, w * 0.08f, w * 0.07f, w * 0.08f, w * 0.07f, w * 0.07f, w * 0.13f, w * 0.08f, w * 0.14f };
+            float[] cols = { w * 0.24f, w * 0.08f, w * 0.06f, w * 0.07f, w * 0.06f, w * 0.06f, w * 0.11f, w * 0.12f, w * 0.07f, w * 0.13f };
             ReportRow(cols, Color.clear, "<b>Zeile</b>", "<b>gefeuert</b>", "<b>erfüllt</b>", "<b>Schaden</b>", "<b>Heilung</b>", "<b>Anteil</b>",
-                "<b>Bonus</b>", "<b>übersprungen</b>", "<b>häufigster Grund</b>");
+                "<b>Bonus</b>", "<b>eingereiht</b>", "<b>übersprungen</b>", "<b>häufigster Grund</b>");
             foreach (RowReport row in _report.Rows)
             {
                 string prefix = row.IsFallback ? "↓" : $"{row.Index + 1}. {RuneText.Difficulty(row.Difficulty)}";
                 string reason = row.MainReason.HasValue ? RowStateText.Reason(row.MainReason.Value) : "–";
                 string met = row.IsFallback || row.ConditionMet < 0 ? "–" : $"{row.ConditionMet}×";
                 ReportRow(cols, RowColorFor(row.Index), $"{prefix} [{row.Label}] → {row.Skill}", FiredText(row), met, row.Damage.ToString(),
-                    row.Healing.ToString(), SkillInfo.Percent(row.DamageShareBp), BonusText(row), row.Skipped > 0 ? $"{row.Skipped}×" : "–", reason);
+                    row.Healing.ToString(), SkillInfo.Percent(row.DamageShareBp), BonusText(row), QueueCell(row), row.Skipped > 0 ? $"{row.Skipped}×" : "–", reason);
             }
             if (_report.OtherDamage > 0)
-                ReportRow(cols, Color.clear, "<color=#9aa4b2>ohne Zeile (Set-Boni, Rückschlag)</color>", "", "", _report.OtherDamage.ToString(), "", "", "", "", "");
+                ReportRow(cols, Color.clear, "<color=#9aa4b2>ohne Zeile (Set-Boni, Rückschlag)</color>", "", "", _report.OtherDamage.ToString(), "", "", "", "", "", "");
 
             GUILayout.Space(8f);
             foreach (string hint in _report.Hints) GUILayout.Label($"• {hint}", _row);
@@ -456,6 +470,14 @@ namespace Betaknight.Overworld.UI
             if (row.BonusHealing > 0) parts.Add($"+{row.BonusHealing} HP");
             if (row.CooldownSavedTicks > 0) parts.Add($"−{SkillInfo.Seconds(row.CooldownSavedTicks)} CD");
             return $"<color=#ffae42>{(parts.Count > 0 ? string.Join(" · ", parts) : $"{row.BonusExecutions}×")}</color>";
+        }
+
+        /// <summary>A-13: «4× · Ø 1,2 s» (wie oft eingereiht, mittlere Wartezeit bis zum Start), «–» ohne.</summary>
+        private static string QueueCell(RowReport row)
+        {
+            if (row.Queued == 0) return "–";
+            string text = row.StartedFromQueue > 0 ? $"{row.Queued}× · Ø {SkillInfo.Seconds(row.AverageWaitTicks)}" : $"{row.Queued}×";
+            return $"<color=#7fd7ff>{text}</color>";
         }
 
         /// <summary>«5×», mit Anteil ausgelöster (↪) und wiederholter (↻) Starts.</summary>
@@ -596,6 +618,7 @@ namespace Betaknight.Overworld.UI
                 case RowDisplay.Ready: return new Color(0.4f, 0.95f, 0.5f);
                 case RowDisplay.ConditionFalse: return new Color(1f, 0.4f, 0.35f);
                 case RowDisplay.Cooldown: return new Color(1f, 0.7f, 0.25f);
+                case RowDisplay.Queued: return new Color(0.5f, 0.85f, 1f);
                 default: return new Color(0.5f, 0.5f, 0.55f);
             }
         }
@@ -648,6 +671,7 @@ namespace Betaknight.Overworld.UI
                 case RowDisplay.ConditionFalse: return Glyph('✖', "×");
                 case RowDisplay.Cooldown: return Glyph('⏳', "…");
                 case RowDisplay.Orphaned: return Glyph('⌀', "Ø");
+                case RowDisplay.Queued: return Glyph('⧗', "»");
                 default: return "·";
             }
         }

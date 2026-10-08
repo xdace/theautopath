@@ -280,7 +280,7 @@ namespace Betaknight.Core.Arena
             {
                 if (row.Triggered > 0) _hints.Add($"{row.Name} ({row.Skill}) wurde {row.Triggered}× ausgelöst, von {row.TriggeredByText}.");
                 if (row.TriggersExpired > 0)
-                    _hints.Add($"{row.TriggersExpired} Auslöser auf {row.Name} verfielen: der Skill war nicht bereit (Cooldown oder Aktion lief).");
+                    _hints.Add($"{row.TriggersExpired} Auslöser auf {row.Name} verfielen: ohne Warteschlange war der Skill nicht bereit, oder das Ziel war verwaist.");
             }
 
             // Schwierigkeits-Bonus: was hat er ausgemacht, und welche schweren Bausteine kamen nie zum Zug?
