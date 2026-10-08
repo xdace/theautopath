@@ -38,6 +38,8 @@ namespace Betaknight.Core.Arena
         {
             var r = new ConditionRegistry();
             RegisterStateConditions(r);
+            RegisterEventConditions(r);
+            RegisterClockAndCounterConditions(r);
             return r;
         }
 
@@ -58,6 +60,39 @@ namespace Betaknight.Core.Arena
             r.Register("overheat", _ => new OverheatCondition());
             r.Register("on_goldmine", _ => new ContextCondition(ContextCondition.Kind.OnGoldMine));
             r.Register("vs_boss", _ => new ContextCondition(ContextCondition.Kind.VsBoss));
+        }
+
+        private static bool Own(ConditionContext c, BattleEvent e, BattleEventKind kind) => e.Kind == kind && e.Source == c.Self;
+        private static bool OnSelf(ConditionContext c, BattleEvent e, BattleEventKind kind) => e.Kind == kind && e.Target == c.Self;
+
+        private static void RegisterEventConditions(ConditionRegistry r)
+        {
+            r.Register("on_hit", _ => new EventCondition((c, e) => Own(c, e, BattleEventKind.Hit), (c, e) => e.Target));
+            r.Register("on_crit", _ => new EventCondition((c, e) => Own(c, e, BattleEventKind.Crit), (c, e) => e.Target));
+            r.Register("when_hit", _ => new EventCondition((c, e) => OnSelf(c, e, BattleEventKind.Hit), (c, e) => e.Source));
+            r.Register("after_block", _ => new EventCondition((c, e) => OnSelf(c, e, BattleEventKind.Blocked), (c, e) => e.Source));
+            r.Register("after_dodge", _ => new EventCondition((c, e) => OnSelf(c, e, BattleEventKind.Dodged), (c, e) => e.Source));
+            r.Register("after_self_damage", _ => new EventCondition((c, e) => OnSelf(c, e, BattleEventKind.SelfDamage) && e.Amount > 0));
+            r.Register("after_heal", _ => new EventCondition((c, e) => OnSelf(c, e, BattleEventKind.Healed)));
+            r.Register("enemy_dies", _ => new EventCondition((c, e) => e.Kind == BattleEventKind.Death && e.Target != null && e.Target.Side != c.Self.Side));
+            r.Register("big_hit_taken", p => new EventCondition((c, e) =>
+                OnSelf(c, e, BattleEventKind.Damage) && (long)e.Amount * 100 > (long)p * c.Self.MaxHp, (c, e) => e.Source));
+            r.Register("after_own_skill", _ => new EventCondition((c, e) =>
+                Own(c, e, BattleEventKind.ActionExecuted) && e.Detail != SkillDefinition.BasicAttackId && e.RowIndex != c.Row.Index));
+            r.Register("battle_start", _ => new BattleStartCondition());
+            r.Register("chain", _ => new ChainCondition());
+        }
+
+        private static void RegisterClockAndCounterConditions(ConditionRegistry r)
+        {
+            r.Register("every_5s", p => new ClockCondition(Ticks.FromSeconds(p)));
+            r.Register("every_20s", p => new ClockCondition(Ticks.FromSeconds(p)));
+            r.Register("every_3rd", p => new CounterCondition(p, (c, e) => Own(c, e, BattleEventKind.ActionExecuted) && e.Amount == 1));
+            r.Register("every_nth_attack", p => new CounterCondition(p, (c, e) => Own(c, e, BattleEventKind.ActionExecuted) && e.Amount == 1));
+            r.Register("every_nth_hit_taken", p => new CounterCondition(p, (c, e) => OnSelf(c, e, BattleEventKind.Hit)));
+            r.Register("dodge_streak", p => new DodgeStreakCondition(p));
+            r.Register("tempo_stacks", p => new ResourceAtLeastCondition(ResourceIds.Tempo, p));
+            r.Register("charge_full", p => new ResourceAtLeastCondition(ResourceIds.Charge, p));
         }
     }
 }
