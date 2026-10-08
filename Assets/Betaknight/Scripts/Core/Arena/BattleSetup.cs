@@ -34,6 +34,23 @@ namespace Betaknight.Core.Arena
         Timeout,
     }
 
+    /// <summary>Ein Kämpfer, wie er in den Kampf ging. Für die Wiedergabe des Protokolls.</summary>
+    public sealed class FighterInfo
+    {
+        public Combatant Combatant { get; }
+        public string Name => Combatant.Name;
+        public Side Side => Combatant.Side;
+        public int MaxHp { get; }
+        public int StartHp { get; }
+
+        public FighterInfo(Combatant combatant, int maxHp, int startHp)
+        {
+            Combatant = combatant;
+            MaxHp = maxHp;
+            StartHp = startHp;
+        }
+    }
+
     public sealed class BattleResult
     {
         public BattleOutcome Outcome { get; }
@@ -50,9 +67,18 @@ namespace Betaknight.Core.Arena
         /// <summary>Namen der Tafel-Zeilen des Spielers, für die Anzeige im Protokoll.</summary>
         public IReadOnlyList<string> PlayerRowLabels { get; }
 
+        /// <summary>Skill-Namen der Tafel-Zeilen des Spielers ("—" bei verwaisten Zeilen).</summary>
+        public IReadOnlyList<string> PlayerRowSkills { get; }
+
+        /// <summary>Alle Kämpfer mit Start-Leben, Spieler zuerst.</summary>
+        public IReadOnlyList<FighterInfo> Fighters { get; }
+
         public BattleResult(BattleOutcome outcome, int endTick, int playerHp, int playerMaxHp, int enemiesDefeated, int bonusGold,
-            IReadOnlyList<BattleEvent> events, IReadOnlyList<string> playerRowLabels)
+            IReadOnlyList<BattleEvent> events, IReadOnlyList<string> playerRowLabels,
+            IReadOnlyList<string> playerRowSkills = null, IReadOnlyList<FighterInfo> fighters = null)
         {
+            PlayerRowSkills = playerRowSkills ?? new string[0];
+            Fighters = fighters ?? new FighterInfo[0];
             Outcome = outcome;
             EndTick = endTick;
             PlayerHp = playerHp;

@@ -31,6 +31,8 @@ namespace Betaknight.Overworld
         private ShopWindow _shopWindow;
         private GameOverWindow _gameOverWindow;
         private KitSelectionWindow _kitWindow;
+        private ArenaWindow _arenaWindow;
+        private BoardEditorWindow _boardWindow;
         private KnightKit _kit;
 
         public OverworldSession Session { get; private set; }
@@ -49,6 +51,16 @@ namespace Betaknight.Overworld
             _shopWindow = gameObject.AddComponent<ShopWindow>();
             _gameOverWindow = gameObject.AddComponent<GameOverWindow>();
             _kitWindow = gameObject.AddComponent<KitSelectionWindow>();
+            _arenaWindow = gameObject.AddComponent<ArenaWindow>();
+            _boardWindow = gameObject.AddComponent<BoardEditorWindow>();
+
+            // Die Arena spielt zuerst ab; Runenwahl, Events, Shop und Game Over warten so lange.
+            System.Func<bool> arenaOpen = () => _arenaWindow.IsOpen;
+            _encounterWindow.Hidden = arenaOpen;
+            _runeWindow.Hidden = arenaOpen;
+            _shopWindow.Hidden = arenaOpen;
+            _gameOverWindow.Hidden = arenaOpen;
+            _hud.OnEditBoard = () => _boardWindow.Toggle();
         }
 
         private void Start() => StartNewRun();
@@ -60,6 +72,8 @@ namespace Betaknight.Overworld
             _root = null;
             Session = null;
             _hud.Initialize(null, null, null, null);
+            _arenaWindow.Initialize(null);
+            _boardWindow.Initialize(null);
             SetRunWindowsEnabled(false);
 
             _kitWindow.Open(KnightKit.Defaults, RuneCatalog.CreateDefault(), kit =>
@@ -93,12 +107,15 @@ namespace Betaknight.Overworld
 
             OverworldController controller = _root.AddComponent<OverworldController>();
             controller.Initialize(Session, grid, player, cam);
+            controller.InputBlocked = () => _arenaWindow.IsOpen || _boardWindow.IsOpen;
 
             _hud.Initialize(Session, controller, config.Encounters, StartNewRun);
             _encounterWindow.Initialize(Session);
             _runeWindow.Initialize(Session);
             _shopWindow.Initialize(Session);
             _gameOverWindow.Initialize(Session, StartNewRun);
+            _arenaWindow.Initialize(Session);
+            _boardWindow.Initialize(Session);
 
             Debug.Log($"[Betaknight] Oberwelt erzeugt: {Session.Map.Count} Felder, Seed {seed}, Kit {_kit?.Name ?? "keins"}.");
         }

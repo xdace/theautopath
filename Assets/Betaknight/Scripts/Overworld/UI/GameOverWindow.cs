@@ -18,8 +18,12 @@ namespace Betaknight.Overworld.UI
             _onNewRun = onNewRun;
         }
 
+        /// <summary>Solange true, bleibt das Fenster verborgen (z. B. während die Arena läuft).</summary>
+        public System.Func<bool> Hidden;
+
         private void OnGUI()
         {
+            if (Hidden != null && Hidden()) return;
             if (_session == null || !_session.IsGameOver) return;
 
             if (_titleStyle == null)

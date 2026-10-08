@@ -98,12 +98,11 @@ namespace Betaknight.Core.Arena
         {
             target = null;
             int streak = 0;
-            bool broken = false;
             Combatant self = c.Self;
             c.Battle.AnyEvent(c.Row.LastFiredTick, c.Tick - 1, e =>
             {
                 if (e.Target != self) return false;
-                if (e.Kind == BattleEventKind.Hit) { broken = true; return true; }
+                if (e.Kind == BattleEventKind.Hit) return true; // Serie gebrochen, ältere Ereignisse zählen nicht
                 if (e.Kind == BattleEventKind.Dodged) streak++;
                 return false;
             });

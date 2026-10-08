@@ -63,6 +63,9 @@ namespace Betaknight.Core.Arena
 
         public BattleResult Run()
         {
+            var fighters = new List<FighterInfo>();
+            foreach (Combatant c in _all) fighters.Add(new FighterInfo(c, c.MaxHp, c.Hp));
+
             Emit(new BattleEvent(0, BattleEventKind.BattleStart, null, null));
             foreach (Combatant c in _all)
                 foreach (BattleModifier m in c.ModifierList.ToArray()) m.OnBattleStart(this, c);
@@ -91,10 +94,16 @@ namespace Betaknight.Core.Arena
             foreach (Combatant e in _enemies) if (!e.IsAlive) defeated++;
 
             var labels = new List<string>();
-            foreach (LogicRow row in Player.Board.Rows) labels.Add(row.Label);
-            labels.Add(Player.Board.Fallback.Label);
+            var skills = new List<string>();
+            for (int i = 0; i <= Player.Board.Rows.Count; i++)
+            {
+                LogicRow row = Player.Board.RowAt(i);
+                labels.Add(row.Label);
+                skills.Add(row.Skill?.Name ?? "—");
+            }
 
-            return new BattleResult(outcome.Value, Tick, Math.Max(0, Player.Hp), Player.MaxHp, defeated, BonusGold, _events, labels);
+            return new BattleResult(outcome.Value, Tick, Math.Max(0, Player.Hp), Player.MaxHp, defeated, BonusGold, _events, labels,
+                skills, fighters);
         }
 
         private void UpdateTime()

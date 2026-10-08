@@ -27,8 +27,12 @@ namespace Betaknight.Overworld.UI
             _choiceAwaitingSlot = -1;
         }
 
+        /// <summary>Solange true, bleibt das Fenster verborgen (z. B. während die Arena läuft).</summary>
+        public System.Func<bool> Hidden;
+
         private void OnGUI()
         {
+            if (Hidden != null && Hidden()) return;
             if (_session == null) return;
 
             RuneOffer offer = _session.PendingRuneOffer;

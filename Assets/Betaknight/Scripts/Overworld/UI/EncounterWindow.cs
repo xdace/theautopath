@@ -43,8 +43,12 @@ namespace Betaknight.Overworld.UI
         private void OnMajorResolved(MajorEventOutcome outcome) =>
             Post($"<b>{outcome.Title}</b>: {outcome.Summary}");
 
+        /// <summary>Solange true, bleibt das Fenster verborgen (z. B. während die Arena läuft).</summary>
+        public System.Func<bool> Hidden;
+
         private void OnGUI()
         {
+            if (Hidden != null && Hidden()) return;
             if (_session == null) return;
             EnsureStyles();
 

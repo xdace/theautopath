@@ -27,6 +27,9 @@ namespace Betaknight.Overworld.Controllers
 
         public bool IsTravelling => _travel != null;
 
+        /// <summary>Zusätzliche Sperre von aussen, z. B. Arena oder Tafel-Editor offen.</summary>
+        public System.Func<bool> InputBlocked;
+
         /// <summary>Für HUD und Debugging: das Feld unter dem Mauszeiger.</summary>
         public HexCoord? HoveredCoord => _hovered;
 
@@ -44,7 +47,7 @@ namespace Betaknight.Overworld.Controllers
             if (IsTravelling) return;
 
             // Ein offenes Fenster (Event, Runenwahl, Shop, Game Over) hat Vorrang vor der Karte.
-            if (_session.IsBusy || _session.IsGameOver)
+            if (_session.IsBusy || _session.IsGameOver || (InputBlocked != null && InputBlocked()))
             {
                 SetHovered(null);
                 return;
