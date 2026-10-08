@@ -22,7 +22,7 @@ namespace Betaknight.Core.Autoplay
         {
             config = config ?? (s => new MapGenerationConfig { Radius = 6, Seed = s });
             kit = kit ?? AutoplayBot.ChooseKit(KnightKit.Defaults, seed);
-            var report = new AutoplayReport { Seed = seed, Kit = kit?.Name ?? "keins" };
+            var report = new AutoplayReport { Seed = seed, Kit = kit?.Name ?? AutoplayTexts.NoKit };
             var recorder = new AutoplayRecorder(report);
             var bot = new AutoplayBot(seed);
             var watch = Stopwatch.StartNew();
@@ -41,7 +41,7 @@ namespace Betaknight.Core.Autoplay
             catch (Exception e)
             {
                 report.AddException(e.ToString());
-                report.EndReason = "Exception beim Start";
+                report.EndReason = AutoplayTexts.EndStartException;
                 return report;
             }
 
@@ -51,10 +51,10 @@ namespace Betaknight.Core.Autoplay
             string reason;
             while (true)
             {
-                if (session.IsGameOver) { reason = "Game Over"; break; }
-                if (session.Act >= targetAct) { reason = $"Akt {targetAct} erreicht"; break; }
-                if (session.Turns.CurrentTurn >= MaxTurns) { reason = "Zuglimit"; break; }
-                if (report.ExceptionCount >= 10) { reason = "zu viele Exceptions"; break; }
+                if (session.IsGameOver) { reason = AutoplayTexts.EndGameOver; break; }
+                if (session.Act >= targetAct) { reason = AutoplayTexts.EndActReached(targetAct); break; }
+                if (session.Turns.CurrentTurn >= MaxTurns) { reason = AutoplayTexts.EndTurnLimit; break; }
+                if (report.ExceptionCount >= 10) { reason = AutoplayTexts.EndTooManyExceptions; break; }
 
                 BotAction action;
                 try
@@ -63,9 +63,9 @@ namespace Betaknight.Core.Autoplay
                 }
                 catch (Exception e)
                 {
-                    report.AddException($"Entscheidung: {e}");
+                    report.AddException(AutoplayTexts.DecisionException(e.ToString()));
                     idle++;
-                    if (idle > HangActions) { reason = Hang(report, session, "Entscheidung wirft wiederholt"); break; }
+                    if (idle > HangActions) { reason = Hang(report, session, AutoplayTexts.DecisionThrowsRepeatedly); break; }
                     continue;
                 }
 
@@ -105,7 +105,7 @@ namespace Betaknight.Core.Autoplay
                 }
                 else if (++idle > HangActions)
                 {
-                    reason = Hang(report, session, $"{HangActions} Aktionen ohne neuen Zug, zuletzt «{action.Description}»");
+                    reason = Hang(report, session, AutoplayTexts.ActionsWithoutNewTurn(HangActions, action.Description));
                     break;
                 }
             }
@@ -118,8 +118,8 @@ namespace Betaknight.Core.Autoplay
 
         private static string Hang(AutoplayReport report, OverworldSession s, string what)
         {
-            report.AddHang($"Akt {s.Act}, Zug {s.Turns.CurrentTurn}: {what}");
-            return "Hänger";
+            report.AddHang(AutoplayTexts.HangAt(s.Act, s.Turns.CurrentTurn, what));
+            return AutoplayTexts.EndHang;
         }
     }
 }

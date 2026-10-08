@@ -112,7 +112,7 @@ namespace Betaknight.Core.Gear
             foreach (ModuleSpec m in spec.BlockModules)
             {
                 condition = ModuleRules.ApplyToCondition(condition, m);
-                if (m.ModuleId == ModuleIds.Invert) label = $"NICHT {label}";
+                if (m.ModuleId == ModuleIds.Invert) label = ArenaTexts.InvertedLabel(label);
                 else if (m.ModuleId == ModuleIds.Extend) label = $"{label} (+{SkillInfo.Seconds(ModuleRules.ExtendTicks + ModuleRules.ExtendTicksPerLevel * m.Level)})";
             }
 

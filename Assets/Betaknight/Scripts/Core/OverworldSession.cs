@@ -122,7 +122,7 @@ namespace Betaknight.Core
             Turns.TurnEnded += OnTurnEnded;
 
             if (!Map.TryGetCell(Player.Position, out HexCell startCell))
-                throw new ArgumentException("Der Spieler muss auf einem Feld der Karte starten.");
+                throw new ArgumentException("The player must start on a tile of the map.");
 
             Map.RegisterVisit(startCell);
             Exploration.RevealAround(Player.Position);
@@ -323,7 +323,7 @@ namespace Betaknight.Core
             if (IsBusy || Stats.Shards < ShardsPerRune) return;
             if (!Stats.TrySpendShards(ShardsPerRune)) return;
 
-            if (OfferRunes("Runensplitter") == null)
+            if (OfferRunes(RewardSources.Shards) == null)
             {
                 // Nichts mehr anzubieten: Splitter zurückgeben statt sie zu verlieren.
                 Stats.AddShards(ShardsPerRune);

@@ -43,19 +43,19 @@ namespace Betaknight.Core
 
             var lines = new List<string>();
             if (!string.IsNullOrEmpty(result.EnemyName)) lines.Add(result.EnemyName);
-            if (!ApplyCombat(cell, result, "Boss", lines)) return;
+            if (!ApplyCombat(cell, result, SessionTexts.FightBoss, lines)) return;
 
             Stats.AddGold(BossEscapeGold);
             Stats.AddShards(BossEscapeShards);
-            lines.Add($"+{BossEscapeGold} Gold");
-            lines.Add($"+{BossEscapeShards} Runensplitter");
+            lines.Add(SessionTexts.GoldGain(BossEscapeGold));
+            lines.Add(SessionTexts.ShardGain(BossEscapeShards));
             int before = Runes.Slots;
-            if (ExpandBoard(Progression.BoardRowsOnBossEscape)) lines.Add($"Tafel-Erweiterung: {before} → {Runes.Slots} Zeilen");
+            if (ExpandBoard(Progression.BoardRowsOnBossEscape)) lines.Add(SessionTexts.BoardExpansion(before, Runes.Slots));
             string module = GrantBossModule();
             if (module != null) lines.Add(module);
             lines.AddRange(EvolveAfterBoss());
-            lines.Add($"Portal zu Akt {Act + 1} offen");
-            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, result.Escaped ? "Durchs Portal entkommen" : "Boss besiegt", lines));
+            lines.Add(SessionTexts.PortalOpen(Act + 1));
+            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, result.Escaped ? SessionTexts.EscapedThroughPortal : SessionTexts.BossDefeated, lines));
             CheckShards();
             OpenPortal();
         }

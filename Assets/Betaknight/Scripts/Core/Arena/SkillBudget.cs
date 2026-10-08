@@ -77,9 +77,8 @@ namespace Betaknight.Core.Arena
 
         /// <summary>«Bohrstoß: 180 % pro Ziel, Budget 178 % (Fläche, 1,8 s Aktion, 5 s CD)».</summary>
         public string Explain(SkillDefinition skill) =>
-            $"{skill.Name}: {SkillInfo.Percent(DamagePerTargetBp(skill))} pro {(IsArea(skill) ? "Ziel" : "Ausführung")}, "
-            + $"Budget {SkillInfo.Percent(RequiredDamageBp(skill))} ({(IsArea(skill) ? "Fläche" : "Einzelziel")}, "
-            + $"{SkillInfo.Seconds(ActionTicks(skill))} Aktion, {SkillInfo.Seconds(skill.CooldownTicks)} CD)";
+            ArenaTexts.Budget(skill.Name, SkillInfo.Percent(DamagePerTargetBp(skill)), IsArea(skill), SkillInfo.Percent(RequiredDamageBp(skill)),
+                SkillInfo.Seconds(ActionTicks(skill)), SkillInfo.Seconds(skill.CooldownTicks));
 
         /// <summary>Weapon 10000: Beträge entsprechen direkt Basispunkten des Waffenschadens.</summary>
         private static IReadOnlyList<EffectInfo> Describe(SkillDefinition skill) =>

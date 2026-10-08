@@ -95,17 +95,17 @@ namespace Betaknight.Core.Arena
         {
             switch (check.State)
             {
-                case RowCheckState.ConditionFalse: return "missed trigger (condition not met)";
-                case RowCheckState.Cooldown: return check.CooldownLeft > 0 ? $"Skill im Cooldown (noch {Seconds(check.CooldownLeft)})" : "Skill im Cooldown";
-                case RowCheckState.Orphaned: return "skipped (no skill)";
-                case RowCheckState.ActionRunning: return "Bedingung erfüllt, aber Aktion läuft";
+                case RowCheckState.ConditionFalse: return ArenaTexts.ReasonMissedTrigger;
+                case RowCheckState.Cooldown: return check.CooldownLeft > 0 ? ArenaTexts.ReasonCooldownLeft(Seconds(check.CooldownLeft)) : ArenaTexts.ReasonCooldown;
+                case RowCheckState.Orphaned: return ArenaTexts.ReasonOrphaned;
+                case RowCheckState.ActionRunning: return ArenaTexts.ReasonActionRunning;
                 case RowCheckState.Queued:
-                    return check.CooldownLeft > 0 ? $"queued, waiting for cooldown ({Seconds(check.CooldownLeft)} left)" : "queued, waiting (action running)";
-                default: return "bereit";
+                    return check.CooldownLeft > 0 ? ArenaTexts.ReasonQueuedCooldown(Seconds(check.CooldownLeft)) : ArenaTexts.ReasonQueuedRunning;
+                default: return ArenaTexts.Ready;
             }
         }
 
-        /// <summary>«1,5 s» mit einer Nachkommastelle.</summary>
-        public static string Seconds(int ticks) => $"{ticks / Ticks.PerSecond},{ticks % Ticks.PerSecond * 10 / Ticks.PerSecond} s";
+        /// <summary>«1.5 s» mit einer Nachkommastelle.</summary>
+        public static string Seconds(int ticks) => ArenaTexts.SecondsOneDecimal(ticks);
     }
 }

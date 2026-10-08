@@ -65,7 +65,7 @@ namespace Betaknight.Core.Arena
             Rows = new List<LogicRow>(rows ?? Array.Empty<LogicRow>());
             Graph = graph ?? LogicGraph.Empty;
             Bonus = bonus ?? DifficultyBonusConfig.Default;
-            Fallback = new LogicRow(AlwaysCondition.Instance, fallbackSkill ?? SkillDefinition.BasicAttack, "Immer");
+            Fallback = new LogicRow(AlwaysCondition.Instance, fallbackSkill ?? SkillDefinition.BasicAttack, ArenaTexts.AlwaysLabel);
         }
 
         public static LogicBoard FallbackOnly { get; } = new LogicBoard(null);

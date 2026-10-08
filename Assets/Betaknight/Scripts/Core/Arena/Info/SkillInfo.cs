@@ -87,9 +87,9 @@ namespace Betaknight.Core.Arena
         /// <summary>Dieselbe Wirkung, nur mit einer Chance (Text bekommt "20 % Chance: " vorangestellt).</summary>
         /// <summary>Dieselbe Kennzahl für alle Gegner («an allen Gegnern»).</summary>
         public EffectInfo ForAllEnemies() => AllEnemies ? this
-            : new EffectInfo(Kind, $"{Text} an allen Gegnern", DamageBp, Amount, Total, DurationTicks, ChanceBp, true);
+            : new EffectInfo(Kind, Text + ArenaTexts.ToAllEnemies, DamageBp, Amount, Total, DurationTicks, ChanceBp, true);
 
-        public EffectInfo WithChance(int chanceBp) => new EffectInfo(Kind, $"{SkillInfo.Percent(chanceBp)} Chance: {Text}",
+        public EffectInfo WithChance(int chanceBp) => new EffectInfo(Kind, ArenaTexts.WithChance(SkillInfo.Percent(chanceBp), Text),
             DamageBp, Amount, Total, DurationTicks, (int)((long)ChanceBp * chanceBp / BasisPoints.Full), AllEnemies);
     }
 
@@ -167,7 +167,7 @@ namespace Betaknight.Core.Arena
             {
                 var parts = new List<string>();
                 foreach (EffectInfo e in Effects) if (e.IsDamage) parts.Add(e.Text);
-                return parts.Count > 0 ? string.Join(", ", parts) : "kein Schaden";
+                return parts.Count > 0 ? string.Join(", ", parts) : ArenaTexts.NoDamage;
             }
         }
 
@@ -187,9 +187,9 @@ namespace Betaknight.Core.Arena
         {
             get
             {
-                string cd = Skill.IsBasicAttack ? $"Takt {Seconds(WindupTicks + RecoveryTicks)}"
-                    : CooldownTicks > 0 ? $"CD {Seconds(CooldownTicks)}" : "kein CD";
-                return $"{cd} · {CastText} · Erholung {Seconds(RecoveryTicks)}";
+                string cd = Skill.IsBasicAttack ? ArenaTexts.BasicAttackInterval(Seconds(WindupTicks + RecoveryTicks))
+                    : CooldownTicks > 0 ? ArenaTexts.Cooldown(Seconds(CooldownTicks)) : ArenaTexts.NoCooldown;
+                return $"{cd} · {CastText} · {ArenaTexts.Recovery(Seconds(RecoveryTicks))}";
             }
         }
 
@@ -198,8 +198,8 @@ namespace Betaknight.Core.Arena
         {
             get
             {
-                string text = $"Cast {Seconds(WindupTicks)}";
-                return WindupTicks != BaseCastTicks ? $"{text} (Grund {Seconds(BaseCastTicks)})" : text;
+                string text = ArenaTexts.Cast(Seconds(WindupTicks));
+                return WindupTicks != BaseCastTicks ? ArenaTexts.CastWithBase(text, Seconds(BaseCastTicks)) : text;
             }
         }
 
@@ -212,9 +212,9 @@ namespace Betaknight.Core.Arena
             get
             {
                 var parts = new List<string>();
-                if (Skill.PowerBonusPercent != 0) parts.Add($"{(Skill.PowerBonusPercent > 0 ? "+" : "−")}{Math.Abs(Skill.PowerBonusPercent)} % Wirkung");
-                if (Skill.CooldownBonusTicks != 0) parts.Add($"{(Skill.CooldownBonusTicks < 0 ? "−" : "+")}{Seconds(Math.Abs(Skill.CooldownBonusTicks))} CD");
-                if (Skill.CastBonusPercent != 0) parts.Add($"{(Skill.CastBonusPercent < 0 ? "−" : "+")}{Math.Abs(Skill.CastBonusPercent)} % Cast-Zeit");
+                if (Skill.PowerBonusPercent != 0) parts.Add(ArenaTexts.PowerBonus(Skill.PowerBonusPercent > 0 ? "+" : "−", Math.Abs(Skill.PowerBonusPercent)));
+                if (Skill.CooldownBonusTicks != 0) parts.Add(ArenaTexts.CooldownBonus(Skill.CooldownBonusTicks < 0 ? "−" : "+", Seconds(Math.Abs(Skill.CooldownBonusTicks))));
+                if (Skill.CastBonusPercent != 0) parts.Add(ArenaTexts.CastBonus(Skill.CastBonusPercent < 0 ? "−" : "+", Math.Abs(Skill.CastBonusPercent)));
                 return string.Join(", ", parts);
             }
         }
@@ -222,7 +222,7 @@ namespace Betaknight.Core.Arena
         /// <summary>«Baustein ◆◆ Schwer: −30 % Cooldown, +25 % Wirkung (eingerechnet)» oder leer ohne Bonus.</summary>
         public string DifficultyLine =>
             Skill.DifficultyTier > 0
-                ? $"Baustein {DifficultyText.Symbol(Skill.DifficultyTier)} {DifficultyText.Name(Skill.DifficultyTier)}: {Skill.Difficulty.Text} (eingerechnet)"
+                ? ArenaTexts.DifficultyLine(DifficultyText.Symbol(Skill.DifficultyTier), DifficultyText.Name(Skill.DifficultyTier), Skill.Difficulty.Text)
                 : string.Empty;
 
         /// <summary>Alle Details, eine Wirkung pro Zeile (für Tooltips).</summary>
@@ -233,13 +233,13 @@ namespace Betaknight.Core.Arena
                 var sb = new StringBuilder();
                 sb.Append(Skill.Name);
                 if (Skill.Description.Length > 0) sb.Append(": ").Append(Skill.Description);
-                if (Effects.Count == 0) sb.Append("\n• kein Schaden");
+                if (Effects.Count == 0) sb.Append("\n• ").Append(ArenaTexts.NoDamage);
                 foreach (EffectInfo e in Effects) sb.Append("\n• ").Append(e.Text);
-                if (!DealsDamage && Effects.Count > 0) sb.Append("\n• kein Schaden");
+                if (!DealsDamage && Effects.Count > 0) sb.Append("\n• ").Append(ArenaTexts.NoDamage);
                 sb.Append('\n').Append(TimingText);
-                if (Skill.Kinds != SkillKind.None) sb.Append("\nArt: ").Append(SkillKinds.Names(Skill.Kinds));
+                if (Skill.Kinds != SkillKind.None) sb.Append(ArenaTexts.DetailsKinds).Append(SkillKinds.Names(Skill.Kinds));
                 string bonus = BonusText;
-                if (bonus.Length > 0) sb.Append("\nAusrüstung: ").Append(bonus);
+                if (bonus.Length > 0) sb.Append(ArenaTexts.DetailsGear).Append(bonus);
                 string difficulty = DifficultyLine;
                 if (difficulty.Length > 0) sb.Append('\n').Append(difficulty);
                 return sb.ToString();
@@ -248,47 +248,13 @@ namespace Betaknight.Core.Arena
 
         // ------------------------------------------------------------------ Formatierung
 
-        /// <summary>Ticks als Sekunden mit Komma, ohne unnötige Nullen: 0,5 s, 1,5 s, 5 s, 0,35 s.</summary>
-        public static string Seconds(int ticks)
-        {
-            int hundredths = (int)((long)ticks * 100 / Ticks.PerSecond);
-            int whole = hundredths / 100;
-            int frac = hundredths % 100;
-            if (frac == 0) return $"{whole} s";
-            return frac % 10 == 0 ? $"{whole},{frac / 10} s" : $"{whole},{frac:00} s";
-        }
+        /// <summary>Ticks als Sekunden mit Punkt, ohne unnötige Nullen: 0.5 s, 1.5 s, 5 s, 0.35 s.</summary>
+        public static string Seconds(int ticks) => ArenaTexts.Seconds(ticks);
 
-        /// <summary>Basispunkte als Prozent: 12000 → "120 %", 2500 → "25 %", 1250 → "12,5 %".</summary>
-        public static string Percent(int bp)
-        {
-            int abs = Math.Abs(bp);
-            string sign = bp < 0 ? "−" : string.Empty;
-            int whole = abs / 100;
-            int frac = abs % 100;
-            if (frac == 0) return $"{sign}{whole} %";
-            return frac % 10 == 0 ? $"{sign}{whole},{frac / 10} %" : $"{sign}{whole},{frac:00} %";
-        }
+        /// <summary>Basispunkte als Prozent: 12000 → "120 %", 2500 → "25 %", 1250 → "12.5 %".</summary>
+        public static string Percent(int bp) => ArenaTexts.Percent(bp);
 
-        public static string StatName(StatKind kind)
-        {
-            switch (kind)
-            {
-                case StatKind.MaxHp: return "Max-HP";
-                case StatKind.Damage: return "Waffenschaden";
-                case StatKind.AttackInterval: return "Angriffsintervall";
-                case StatKind.AttackSpeed: return "Angriffstempo";
-                case StatKind.Armor: return "Rüstung";
-                case StatKind.ArmorMultiplier: return "Rüstung";
-                case StatKind.Dodge: return "Ausweichen";
-                case StatKind.DodgeCap: return "Ausweich-Obergrenze";
-                case StatKind.Block: return "Block";
-                case StatKind.Crit: return "Krit";
-                case StatKind.Accuracy: return "Präzision";
-                case StatKind.AreaDamage: return "Flächenschaden";
-                case StatKind.BlockCap: return "Block-Obergrenze";
-                default: return kind.ToString();
-            }
-        }
+        public static string StatName(StatKind kind) => ArenaTexts.StatName(kind);
 
         /// <summary>Werte in Basispunkten zeigen Prozent, alle anderen ganze Zahlen.</summary>
         public static bool IsPercentStat(StatKind kind)
@@ -313,15 +279,6 @@ namespace Betaknight.Core.Arena
             return $"{StatName(kind)} {value}";
         }
 
-        public static string ResourceName(string id)
-        {
-            switch (id)
-            {
-                case ResourceIds.Heat: return "Hitze";
-                case ResourceIds.Charge: return "Ladung";
-                case ResourceIds.Tempo: return "Tempo-Stapel";
-                default: return id;
-            }
-        }
+        public static string ResourceName(string id) => ArenaTexts.ResourceName(id) ?? id;
     }
 }

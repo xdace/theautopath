@@ -63,7 +63,7 @@ namespace Betaknight.Core.Skills
         /// <param name="level">Startet mit dem Wachstum dieser Stufe (für Aufbau und Tests).</param>
         public SkillInstance(string skillId, int level = 0)
         {
-            if (string.IsNullOrEmpty(skillId)) throw new ArgumentException("Skill-Id fehlt.", nameof(skillId));
+            if (string.IsNullOrEmpty(skillId)) throw new ArgumentException("Skill id missing.", nameof(skillId));
             SkillId = skillId;
             Growth = GrowthStages.GrowthForStage(Math.Max(0, level));
         }

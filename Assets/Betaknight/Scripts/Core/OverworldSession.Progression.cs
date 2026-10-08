@@ -11,11 +11,11 @@ namespace Betaknight.Core
     /// <summary>Bekannte Quellen für Belohnungsangebote.</summary>
     public static class RewardSources
     {
-        public const string Victory = "Sieg";
-        public const string Elite = "Elite-Sieg";
-        public const string MineDefended = "Mine verteidigt";
-        public const string Treasure = "Schatztruhe";
-        public const string Shards = "Runensplitter";
+        public const string Victory = "Victory";
+        public const string Elite = "Elite Victory";
+        public const string MineDefended = "Mine Defended";
+        public const string Treasure = "Treasure Chest";
+        public const string Shards = "Rune Shards";
 
         /// <summary>Belohnungen nach Kämpfen: sie bieten immer mindestens eine Verbesserung des Builds an.</summary>
         public static bool IsFight(string source) => source == Victory || source == Elite || source == MineDefended;
@@ -46,7 +46,7 @@ namespace Betaknight.Core
             int before = Runes.Slots;
             for (int i = 0; i < rows && CanExpandBoard; i++) Runes.AddSlot();
             if (Runes.Slots == before) return false;
-            BuildImproved?.Invoke($"Tafel {before} → {Runes.Slots} Zeilen");
+            BuildImproved?.Invoke(SessionTexts.BoardGrown(before, Runes.Slots));
             return true;
         }
 
@@ -101,7 +101,7 @@ namespace Betaknight.Core
             if (worn) Gear.Equip(upgraded);
             else Inventory.ReplaceAt(Inventory.IndexOf(itemId), upgraded);
 
-            var parts = new List<string> { $"{old.Name} → {upgraded.Name}" };
+            var parts = new List<string> { SessionTexts.Upgrade(old.Name, upgraded.Name) };
             foreach (KeyValuePair<StatKind, int> stat in upgraded.Stats)
             {
                 int before = old.StatBonus(stat.Key);
@@ -125,7 +125,7 @@ namespace Betaknight.Core
                 if (a.IsDamage && a.DamageBp != b.DamageBp)
                     return $"{after.Skill.Name} {SkillInfo.Percent(a.DamageBp)} → {SkillInfo.Percent(b.DamageBp)}";
                 if (a.Kind == EffectInfoKind.Heal && a.Amount != b.Amount)
-                    return $"{after.Skill.Name} heilt {a.Amount} → {b.Amount}";
+                    return SessionTexts.HealChange(after.Skill.Name, a.Amount, b.Amount);
             }
             return null;
         }
@@ -150,7 +150,7 @@ namespace Betaknight.Core
                 RuneInventory.Upgrade(index);
                 after = RuneInventory[index].Name;
             }
-            BuildImproved?.Invoke($"Rune {before} → {after}");
+            BuildImproved?.Invoke(SessionTexts.RuneLevelUp(before, after));
             return true;
         }
 

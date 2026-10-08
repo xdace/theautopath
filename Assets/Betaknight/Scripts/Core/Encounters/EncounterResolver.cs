@@ -36,7 +36,7 @@ namespace Betaknight.Core.Encounters
             if (!option.IsAvailable(_stats) || !_stats.TrySpendGold(option.GoldCost)) return null;
 
             var lines = new List<string>();
-            if (option.GoldCost > 0) lines.Add($"-{option.GoldCost} Gold");
+            if (option.GoldCost > 0) lines.Add(SessionTexts.GoldCost(option.GoldCost));
 
             foreach (EncounterEffect effect in option.Effects)
             {
@@ -54,27 +54,27 @@ namespace Betaknight.Core.Encounters
             {
                 case EffectKind.Gold:
                     _stats.AddGold(amount);
-                    return $"+{amount} Gold";
+                    return SessionTexts.GoldGain(amount);
 
                 case EffectKind.Heal:
                     int healed = _stats.Heal(amount);
-                    return healed > 0 ? $"+{healed} HP" : "Schon voll geheilt";
+                    return healed > 0 ? SessionTexts.HpGain(healed) : SessionTexts.AlreadyFullHealth;
 
                 case EffectKind.Damage:
                     int dealt = _stats.Damage(amount, lethal: false);
-                    return dealt > 0 ? $"-{dealt} HP" : null;
+                    return dealt > 0 ? SessionTexts.HpLoss(dealt) : null;
 
                 case EffectKind.MaxHp:
                     _stats.RaiseMaxHp(amount);
-                    return $"+{amount} Max-HP";
+                    return SessionTexts.MaxHpGain(amount);
 
                 case EffectKind.Shards:
                     _stats.AddShards(amount);
-                    return amount == 1 ? "+1 Runensplitter" : $"+{amount} Runensplitter";
+                    return SessionTexts.ShardGain(amount);
 
                 case EffectKind.ScoutAround:
                     int scouted = _exploration.ScoutAround(origin, amount);
-                    return scouted > 0 ? $"{scouted} Felder ausgekundschaftet" : "Nichts Neues in der Nähe";
+                    return scouted > 0 ? SessionTexts.TilesScouted(scouted) : SessionTexts.NothingNearby;
 
                 case EffectKind.ScoutNearest:
                     return ScoutNearest(effect.Target, origin);
@@ -90,9 +90,9 @@ namespace Betaknight.Core.Encounters
         private string UpgradeRune()
         {
             int index = _runes?.BestUpgradeTarget() ?? -1;
-            if (index < 0) return "Keine Rune lässt sich verstärken";
+            if (index < 0) return SessionTexts.NoRuneToUpgrade;
             _runes.Upgrade(index);
-            return $"Rune verstärkt: {_runes.Rows[index].Name}";
+            return SessionTexts.RuneUpgraded(_runes.Rows[index].Name);
         }
 
         private string ScoutNearest(CellContent target, HexCoord origin)
@@ -114,22 +114,22 @@ namespace Betaknight.Core.Encounters
                 }
             }
 
-            if (best == null) return "Keine Spur gefunden";
+            if (best == null) return SessionTexts.NoTrailFound;
             _exploration.Scout(best.Coord);
-            return $"{Name(target)} entdeckt";
+            return SessionTexts.Discovered(Name(target));
         }
 
         private static string Name(CellContent content)
         {
             switch (content)
             {
-                case CellContent.Shop: return "Shop";
-                case CellContent.Treasure: return "Schatztruhe";
-                case CellContent.GoldMine: return "Goldmine";
-                case CellContent.Enemy: return "Gegner";
-                case CellContent.Boss: return "Boss";
-                case CellContent.Elite: return "Elite-Gegner";
-                default: return "Ort";
+                case CellContent.Shop: return SessionTexts.PlaceShop;
+                case CellContent.Treasure: return SessionTexts.PlaceTreasure;
+                case CellContent.GoldMine: return SessionTexts.PlaceGoldMine;
+                case CellContent.Enemy: return SessionTexts.PlaceEnemy;
+                case CellContent.Boss: return SessionTexts.PlaceBoss;
+                case CellContent.Elite: return SessionTexts.PlaceElite;
+                default: return SessionTexts.PlaceOther;
             }
         }
     }

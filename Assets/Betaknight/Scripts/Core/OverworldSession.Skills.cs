@@ -118,7 +118,7 @@ namespace Betaknight.Core
 
             SkillInstance added = Skills.Add(skillId);
             SkillGained?.Invoke(added);
-            BuildImproved?.Invoke(OwnsSkillTwice(skillId) ? $"Neuer Skill: {definition.Name} (weiteres Exemplar)" : $"Neuer Skill: {definition.Name}");
+            BuildImproved?.Invoke(SessionTexts.NewSkill(definition.Name, OwnsSkillTwice(skillId)));
             return added;
         }
 

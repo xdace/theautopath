@@ -32,7 +32,7 @@ namespace Betaknight.Core
         public List<SynergyDuo> ActiveDuos() => Synergies.ActiveDuos(Gear);
 
         /// <summary>Name eines Duos, oder «???» solange es nicht entdeckt ist (Silhouette).</summary>
-        public string DuoName(SynergyDuo duo) => IsDuoDiscovered(duo.Id) ? duo.Name : "???";
+        public string DuoName(SynergyDuo duo) => IsDuoDiscovered(duo.Id) ? duo.Name : SessionTexts.Unknown;
 
         /// <summary>Getragene Teile mit einem Tag, wenn <paramref name="item"/> angelegt würde (ersetzt das Teil im selben Platz).</summary>
         public int TagCountWith(EquipmentDefinition item, string tagId)
@@ -59,7 +59,7 @@ namespace Betaknight.Core
                 if (active.Length > 0) blocks.Add($"{c.Tag.Name} {c.Count}\n{active}");
             }
             foreach (SynergyDuo duo in ActiveDuos())
-                blocks.Add(IsDuoDiscovered(duo.Id) ? $"Duo {duo.Name}\n{duo.Effect.Text}" : "Duo ???\nWirkung zeigt sich im nächsten Kampf.");
+                blocks.Add(IsDuoDiscovered(duo.Id) ? $"Duo {duo.Name}\n{duo.Effect.Text}" : SessionTexts.DuoUnknown);
             return string.Join("\n\n", blocks);
         }
 
@@ -73,13 +73,13 @@ namespace Betaknight.Core
             {
                 if (!RecipeBook.DiscoverDuo(duo.Id)) continue;
                 DuoDiscovered?.Invoke(duo);
-                BuildImproved?.Invoke($"Duo entdeckt: {duo.Name} ({Synergies.NameOf(duo.TagA)} + {Synergies.NameOf(duo.TagB)})");
+                BuildImproved?.Invoke(SessionTexts.DuoDiscovered(duo.Name, Synergies.NameOf(duo.TagA), Synergies.NameOf(duo.TagB)));
             }
         }
 
         private void CarryRecipeBook(OverworldSession previous) => RecipeBook = previous.RecipeBook;
 
         /// <summary>Hinweis für ein unentdecktes Duo: einer der beiden Tags, der zweite bleibt offen.</summary>
-        public string DuoHint(SynergyDuo duo) => $"{Synergies.NameOf(duo.TagA)} und ein zweiter Tag, beide auf 4";
+        public string DuoHint(SynergyDuo duo) => SessionTexts.DuoHint(Synergies.NameOf(duo.TagA));
     }
 }

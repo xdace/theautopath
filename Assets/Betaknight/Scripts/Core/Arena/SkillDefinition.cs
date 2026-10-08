@@ -85,7 +85,7 @@ namespace Betaknight.Core.Arena
         {
             Kinds = kinds;
             IsEvolution = isEvolution;
-            if (string.IsNullOrEmpty(id)) throw new ArgumentException("Id fehlt.", nameof(id));
+            if (string.IsNullOrEmpty(id)) throw new ArgumentException("Id missing.", nameof(id));
             if (windupTicks < 0 || recoveryTicks < 0 || cooldownTicks < 0) throw new ArgumentOutOfRangeException(nameof(windupTicks));
 
             Id = id;
@@ -109,9 +109,9 @@ namespace Betaknight.Core.Arena
         /// </summary>
         public static SkillDefinition CreateBasicAttack(int damageBp, int cooldownCutTicks)
         {
-            string text = damageBp == BasisPoints.Full ? "Waffenschaden." : $"{SkillInfo.Percent(damageBp)} Waffenschaden.";
-            if (cooldownCutTicks > 0) text += $" Jeder Treffer verkürzt laufende Skill-Cooldowns um {SkillInfo.Seconds(cooldownCutTicks)}.";
-            return new SkillDefinition(BasicAttackId, "Basisangriff", 0, 0, 0, new ISkillEffect[] { new DamageEffect(damageBp) }, text, isBasicAttack: true)
+            string text = ArenaTexts.BasicAttackDescription(damageBp == BasisPoints.Full ? null : SkillInfo.Percent(damageBp));
+            if (cooldownCutTicks > 0) text += ArenaTexts.BasicAttackCooldownCut(SkillInfo.Seconds(cooldownCutTicks));
+            return new SkillDefinition(BasicAttackId, ArenaTexts.BasicAttack, 0, 0, 0, new ISkillEffect[] { new DamageEffect(damageBp) }, text, isBasicAttack: true)
             {
                 CooldownCutOnHitTicks = Math.Max(0, cooldownCutTicks),
             };

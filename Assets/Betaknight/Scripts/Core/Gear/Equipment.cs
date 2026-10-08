@@ -37,12 +37,12 @@ namespace Betaknight.Core.Gear
             reason = null;
             if (item == null)
             {
-                reason = "Kein Teil.";
+                reason = SessionTexts.NoItem;
                 return false;
             }
             if (item.Slot == EquipmentSlot.Shield && IsShieldLocked)
             {
-                reason = "Die Zweihandwaffe sperrt den Schild-Platz.";
+                reason = SessionTexts.ShieldLocked;
                 return false;
             }
             return true;

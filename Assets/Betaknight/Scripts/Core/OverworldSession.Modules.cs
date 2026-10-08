@@ -75,9 +75,9 @@ namespace Betaknight.Core
             {
                 RuneSlot row = Runes.Rows[i];
                 if (row.Skill != null && !row.Skill.IsBasicAttack)
-                    result.Add((ModuleTarget.Skill(row.Skill.InstanceId), $"{row.Skill.NameFrom(SkillCatalog)} (Zeile {i + 1})"));
+                    result.Add((ModuleTarget.Skill(row.Skill.InstanceId), SessionTexts.SkillInRow(row.Skill.NameFrom(SkillCatalog), i)));
                 else
-                    result.Add((ModuleTarget.Row(row.RowId), $"Zeile {i + 1}"));
+                    result.Add((ModuleTarget.Row(row.RowId), SessionTexts.Row(i)));
             }
             return result;
         }
@@ -86,10 +86,10 @@ namespace Betaknight.Core
         public string DescribeTarget(ModuleTarget? target)
         {
             int row = Betaknight.Core.Gear.RuneLoadoutBoard.TargetRow(Runes, target);
-            if (!target.HasValue) return "kein Ziel";
-            if (row < 0) return target.Value.Kind == ModuleTargetKind.Skill ? "Ziel nicht an der Tafel" : "Zeile fehlt";
+            if (!target.HasValue) return SessionTexts.NoTarget;
+            if (row < 0) return target.Value.Kind == ModuleTargetKind.Skill ? SessionTexts.TargetNotOnBoard : SessionTexts.RowMissing;
             RuneSlot slot = Runes.Rows[row];
-            return target.Value.Kind == ModuleTargetKind.Skill ? $"{slot.Skill.NameFrom(SkillCatalog)} (Zeile {row + 1})" : $"Zeile {row + 1}";
+            return target.Value.Kind == ModuleTargetKind.Skill ? SessionTexts.SkillInRow(slot.Skill.NameFrom(SkillCatalog), row) : SessionTexts.Row(row);
         }
 
         /// <summary>Freie Module, die an diesen Ort passen (für die Auswahl im Tafel-Editor).</summary>
@@ -101,11 +101,11 @@ namespace Betaknight.Core
         {
             switch (module?.Holder)
             {
-                case RuneSlot row: return $"Baustein Zeile {Runes.IndexOfRow(row) + 1}";
+                case RuneSlot row: return SessionTexts.RuneRow(Runes.IndexOfRow(row));
                 case SkillInstance skill:
                     int at = skill.Holder is RuneSlot slot ? Runes.IndexOfRow(slot) : -1;
-                    return at >= 0 ? $"Skill {skill.NameFrom(SkillCatalog)} (Zeile {at + 1})" : $"Skill {skill.NameFrom(SkillCatalog)} (frei)";
-                default: return "frei";
+                    return at >= 0 ? SessionTexts.HolderSkill(skill.NameFrom(SkillCatalog), at) : SessionTexts.HolderSkillFree(skill.NameFrom(SkillCatalog));
+                default: return SessionTexts.Free;
             }
         }
 
@@ -113,8 +113,8 @@ namespace Betaknight.Core
         public string DescribeTrigger(ModuleInstance module)
         {
             if (module == null || module.ModuleId != ModuleIds.Trigger) return string.Empty;
-            string when = module.Holder is RuneSlot ? "Wenn erfüllt" : "Nach Ausführung";
-            return $"{when} → {DescribeTarget(module.Target)}";
+            string when = module.Holder is RuneSlot ? SessionTexts.WhenMet : SessionTexts.AfterExecution;
+            return SessionTexts.ModuleTrigger(when, DescribeTarget(module.Target));
         }
 
         /// <summary>Wählt das nächste mögliche Ziel eines Auslösers (Reihenfolge der Zeilen, danach «kein Ziel»).</summary>
@@ -181,12 +181,12 @@ namespace Betaknight.Core
                 {
                     string old = target.NameFrom(ModuleCatalog);
                     Modules.Upgrade(target, MaxModuleLevel(moduleId));
-                    BuildImproved?.Invoke($"Modul {old} → {target.NameFrom(ModuleCatalog)}");
+                    BuildImproved?.Invoke(SessionTexts.ModuleUpgrade(old, target.NameFrom(ModuleCatalog)));
                     return target;
                 }
             }
             ModuleInstance added = Modules.Add(moduleId);
-            BuildImproved?.Invoke($"Neues Modul: {definition.Name}");
+            BuildImproved?.Invoke(SessionTexts.NewModule(definition.Name));
             return added;
         }
 
@@ -263,7 +263,7 @@ namespace Betaknight.Core
             List<string> picked = PickModules(1);
             if (picked.Count == 0) return null;
             ModuleInstance module = GainModule(picked[0], SkillDuplicateChoice.KeepCopy);
-            return module != null ? $"Modul: {module.NameFrom(ModuleCatalog)}" : null;
+            return module != null ? SessionTexts.ModuleLabel(module.NameFrom(ModuleCatalog)) : null;
         }
 
         private void CarryModules(OverworldSession previous) => Modules = previous.Modules;

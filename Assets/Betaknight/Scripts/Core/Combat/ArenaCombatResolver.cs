@@ -49,7 +49,7 @@ namespace Betaknight.Core.Combat
 
             int damageTaken = Math.Max(0, request.Stats.Hp - battle.PlayerHp);
             int gold = battle.IsVictory ? random.Next(2, 5) + request.Tier / 2 + battle.BonusGold : 0;
-            string name = request.Enemy == CellContent.Elite ? $"Elite: {enemy.Name}" : enemy.Name;
+            string name = request.Enemy == CellContent.Elite ? ArenaTexts.EliteName(enemy.Name) : enemy.Name;
             return new CombatResult(battle.IsSurvived, damageTaken, gold, battle, name);
         }
 
@@ -80,14 +80,14 @@ namespace Betaknight.Core.Combat
             SkillLevelRules skillLevels = null)
         {
             var request = new CombatRequest(CellContent.Enemy, 0, stats, runes, equipment, context, skillLevels);
-            var target = new CombatantSetup { Name = "Ziel", Stats = new CombatStats(1, 0) };
+            var target = new CombatantSetup { Name = ArenaTexts.DummyTargetName, Stats = new CombatStats(1, 0) };
             return new Battle(CreateSetup(request, new List<CombatantSetup> { target }, 0)).Player;
         }
 
         public BattleSetup CreateSetup(CombatRequest request, List<CombatantSetup> enemies, int seed)
         {
             var baseStats = new CombatStats(Math.Max(1, request.Stats.MaxHp), BaseDamage, BaseAttackInterval);
-            CombatantSetup player = PlayerLoadout.CreateCombatant("Ritter", baseStats, request.Equipment,
+            CombatantSetup player = PlayerLoadout.CreateCombatant(ArenaTexts.PlayerName, baseStats, request.Equipment,
                 request.Runes.ToBoardSpecs(), Math.Max(1, request.Stats.Hp), _boards, _sets, request.SkillLevels, _synergies);
 
             return new BattleSetup

@@ -92,12 +92,11 @@ namespace Betaknight.Core.Autoplay
         /// <summary>Textabelle: «◆◆ Gegner betäubt: 14 Kämpfe, erfüllt in 43 %, 2,1× pro Minute gefeuert».</summary>
         public static string Table(IEnumerable<AutoplayReport> runs)
         {
-            var sb = new StringBuilder("Bausteine in Bot-Kämpfen (Grundlage für die Schwierigkeit):");
+            var sb = new StringBuilder(AutoplayTexts.RuneTableHeader);
             foreach (RuneFireStat s in Merge(runs))
             {
-                sb.Append('\n').Append($"{DifficultyText.Symbol(s.Difficulty),-4} {s.Name} [{s.RuneId}]: {s.Fights} Kämpfe, ");
-                sb.Append($"erfüllt in {AutoplayReport.Num(s.MetPercent)} % ({s.Met}×), ");
-                sb.Append($"gefeuert {s.Fired}× = {AutoplayReport.Num(s.FiredPerMinute)}/min");
+                sb.Append('\n').Append(AutoplayTexts.RuneTableLine(DifficultyText.Symbol(s.Difficulty), s.Name, s.RuneId, s.Fights,
+                    AutoplayReport.Num(s.MetPercent), s.Met, s.Fired, AutoplayReport.Num(s.FiredPerMinute)));
             }
             return sb.ToString();
         }

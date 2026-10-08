@@ -12,7 +12,7 @@ namespace Betaknight.Core.Arena
     /// <summary>Bauplan eines Kämpfers für einen Kampf. Der Simulator erzeugt daraus einen <see cref="Combatant"/>.</summary>
     public sealed class CombatantSetup
     {
-        public string Name = "Kämpfer";
+        public string Name = ArenaTexts.DefaultFighterName;
         public CombatStats Stats = new CombatStats();
 
         /// <summary>Leben zu Kampfbeginn. 0 = volles Leben (z. B. Spieler bringt seine Oberwelt-HP mit).</summary>

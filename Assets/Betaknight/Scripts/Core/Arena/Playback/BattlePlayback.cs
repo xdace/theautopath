@@ -71,8 +71,8 @@ namespace Betaknight.Core.Arena
                 switch (Kind)
                 {
                     case PopupKind.Heal: return $"+{Amount}";
-                    case PopupKind.Blocked: return "Block";
-                    case PopupKind.Dodged: return "Ausgewichen";
+                    case PopupKind.Blocked: return ArenaTexts.PopupBlocked;
+                    case PopupKind.Dodged: return ArenaTexts.PopupDodged;
                     case PopupKind.Crit: return $"{Amount}!";
                     default: return Amount.ToString();
                 }
@@ -309,9 +309,9 @@ namespace Betaknight.Core.Arena
             foreach (QueueView q in _queue)
             {
                 int left = Math.Min(q.CooldownLeft(Tick), CooldownLeft(q.Row) > 0 ? CooldownLeft(q.Row) : int.MaxValue);
-                parts.Add($"{q.Row + 1}. {q.Skill} {(left > 0 ? hourglass + RowStateText.Seconds(left) : "bereit")}");
+                parts.Add($"{q.Row + 1}. {q.Skill} {(left > 0 ? hourglass + RowStateText.Seconds(left) : ArenaTexts.Ready)}");
             }
-            return "Wartet: " + string.Join(" · ", parts);
+            return ArenaTexts.QueuePrefix + string.Join(" · ", parts);
         }
 
         /// <summary>Live-Zustand einer Zeile: aus der letzten Entscheidung, Cooldown läuft bis jetzt weiter.</summary>

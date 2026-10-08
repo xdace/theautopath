@@ -56,7 +56,7 @@ namespace Betaknight.Core.Autoplay
                             o.Speed = Math.Min(100f, speed);
                             i++;
                         }
-                        else o.Warnings.Add($"{a} erwartet eine Zahl > 0");
+                        else o.Warnings.Add(AutoplayTexts.ExpectsPositiveNumber(a));
                         break;
                     case "-report":
                         if (i + 1 < args.Count && !args[i + 1].StartsWith("-", StringComparison.Ordinal))
@@ -64,7 +64,7 @@ namespace Betaknight.Core.Autoplay
                             o.ReportPath = args[i + 1];
                             i++;
                         }
-                        else o.Warnings.Add($"{a} erwartet einen Pfad");
+                        else o.Warnings.Add(AutoplayTexts.ExpectsPath(a));
                         break;
                 }
             }
@@ -79,7 +79,7 @@ namespace Betaknight.Core.Autoplay
                 i++;
                 return true;
             }
-            o.Warnings.Add($"{name} erwartet eine ganze Zahl");
+            o.Warnings.Add(AutoplayTexts.ExpectsInteger(name));
             return false;
         }
     }

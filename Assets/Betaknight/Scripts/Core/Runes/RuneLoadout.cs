@@ -51,7 +51,7 @@ namespace Betaknight.Core.Runes
             Skill = skill;
         }
 
-        public string HolderName => $"Zeile {_owner.IndexOfRow(this) + 1}";
+        public string HolderName => Arena.ArenaTexts.RowName(_owner.IndexOfRow(this));
 
         void ISkillHolder.Hold(SkillInstance skill)
         {

@@ -96,7 +96,7 @@ namespace Betaknight.Core
         {
             _raids.TryGetValue(cell.Coord, out MineRaid raid);
             bool lost = raid?.IsLost == true;
-            string title = lost ? "Mine zurückerobert" : "Goldmine verteidigt";
+            string title = lost ? SessionTexts.MineRecaptured : SessionTexts.GoldMineDefended;
 
             int tier = TierAt(cell.Coord) + MineRaidTierBonus;
             var context = new BattleContext { OnGoldMine = true, Turn = Turns.CurrentTurn };
@@ -104,13 +104,13 @@ namespace Betaknight.Core
 
             var lines = new List<string>();
             if (!string.IsNullOrEmpty(result.EnemyName)) lines.Add(result.EnemyName);
-            if (!ApplyCombat(cell, result, "Kampf um die Mine", lines)) return;
+            if (!ApplyCombat(cell, result, SessionTexts.MineFight, lines)) return;
 
             _raids.Remove(cell.Coord);
             Map.SetUnderAttack(cell.Coord, false);
             int gold = result.GoldReward + MineDefenseGold;
             Stats.AddGold(gold);
-            lines.Add($"+{gold} Gold");
+            lines.Add(SessionTexts.GoldGain(gold));
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, title, lines));
             OfferRunes(RewardSources.MineDefended);
         }

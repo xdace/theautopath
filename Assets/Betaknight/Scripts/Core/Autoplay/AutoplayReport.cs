@@ -114,12 +114,11 @@ namespace Betaknight.Core.Autoplay
         /// <summary>Kurze Zusammenfassung für das Log, eine Zeile.</summary>
         public string Summary()
         {
-            string fps = FpsAverage.HasValue ? $", FPS Ø {Num(FpsAverage.Value)} / min {Num(FpsMin ?? 0)}" : string.Empty;
-            return $"Seed {Seed}, {Kit}: {EndReason} in Akt {Act} nach {Turns} Zügen. Kämpfe {FightsWon}:{FightsLost}, " +
-                $"Elite {ElitesWon}:{ElitesLost}, Boss {BossesSurvived}/{Bosses}, Tafel {BoardRows.Count} Zeilen, " +
-                $"Module {Modules.Count}, Auslöser {TriggersSet}, Duos {Duos.Count}, Basisangriff {ShareText(BasicAttackSharePercent)} " +
-                $"(ab Akt 2: {ShareText(BasicAttackShareFromAct2Percent)}), {Num(DurationSeconds)} s{fps}. " +
-                $"Exceptions {ExceptionCount}, Fehler-Logs {ErrorLogCount}, Hänger {HangCount} → {(Ok ? "OK" : "FEHLER")}";
+            string fps = FpsAverage.HasValue ? AutoplayTexts.Fps(Num(FpsAverage.Value), Num(FpsMin ?? 0)) : string.Empty;
+            return AutoplayTexts.RunSummary(Seed, Kit, EndReason, Act, Turns, FightsWon, FightsLost, ElitesWon, ElitesLost,
+                BossesSurvived, Bosses, BoardRows.Count, Modules.Count, TriggersSet, Duos.Count,
+                ShareText(BasicAttackSharePercent), ShareText(BasicAttackShareFromAct2Percent), Num(DurationSeconds), fps,
+                ExceptionCount, ErrorLogCount, HangCount, Ok);
         }
 
         public string ToJson(int indent = 2)
@@ -197,12 +196,9 @@ namespace Betaknight.Core.Autoplay
 
         public string Summary()
         {
-            var sb = new StringBuilder();
-            sb.Append($"Autoplay: {Runs.Count} Runs, {Runs.Count(r => r.Ok)} OK, höchster Akt {(Runs.Count > 0 ? Runs.Max(r => r.Act) : 0)}, ");
-            sb.Append($"Kämpfe {Runs.Sum(r => r.FightsWon)}:{Runs.Sum(r => r.FightsLost)}, ");
-            sb.Append($"Exceptions {Runs.Sum(r => r.ExceptionCount)}, Fehler-Logs {Runs.Sum(r => r.ErrorLogCount)}, Hänger {Runs.Sum(r => r.HangCount)}, ");
-            sb.Append($"Exit-Code {ExitCode}");
-            return sb.ToString();
+            return AutoplayTexts.TotalSummary(Runs.Count, Runs.Count(r => r.Ok), Runs.Count > 0 ? Runs.Max(r => r.Act) : 0,
+                Runs.Sum(r => r.FightsWon), Runs.Sum(r => r.FightsLost), Runs.Sum(r => r.ExceptionCount),
+                Runs.Sum(r => r.ErrorLogCount), Runs.Sum(r => r.HangCount), ExitCode);
         }
 
         public string ToJson()

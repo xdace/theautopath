@@ -54,8 +54,7 @@ namespace Betaknight.Core.Arena
         {
             int amount = AmountFor(info.Stats.WeaponDamage, info.Stats.AreaDamageBp);
             string flat = FlatBonus > 0 ? $" +{FlatBonus}" : string.Empty;
-            string text = $"{SkillInfo.Percent(DamageBp)} Waffenschaden{flat} ≈ {amount}{(AllEnemies ? " an allen Gegnern" : string.Empty)}"
-                + (IgnoreArmor ? " (ignoriert Rüstung)" : string.Empty);
+            string text = ArenaTexts.DamageEffect(SkillInfo.Percent(DamageBp), flat, amount, AllEnemies, IgnoreArmor);
             info.Add(new EffectInfo(EffectInfoKind.Damage, text, DamageBp, amount, allEnemies: AllEnemies));
         }
 

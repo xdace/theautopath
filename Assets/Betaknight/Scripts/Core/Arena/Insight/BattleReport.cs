@@ -31,7 +31,7 @@ namespace Betaknight.Core.Arena
             get
             {
                 var parts = new List<string>();
-                foreach (KeyValuePair<int, int> p in TriggeredBy) parts.Add($"Zeile {p.Key + 1} ×{p.Value}");
+                foreach (KeyValuePair<int, int> p in TriggeredBy) parts.Add(ArenaTexts.TriggeredByPart(p.Key, p.Value));
                 return string.Join(", ", parts);
             }
         }
@@ -55,7 +55,7 @@ namespace Betaknight.Core.Arena
 
         /// <summary>«4× eingereiht, Ø 1,2 s gewartet» oder leer.</summary>
         public string QueueText => Queued == 0 ? string.Empty
-            : StartedFromQueue > 0 ? $"{Queued}× eingereiht, Ø {SkillInfo.Seconds(AverageWaitTicks)} gewartet" : $"{Queued}× eingereiht";
+            : StartedFromQueue > 0 ? ArenaTexts.QueueStats(Queued, SkillInfo.Seconds(AverageWaitTicks)) : ArenaTexts.QueueStats(Queued);
 
         /// <summary>Grundschwierigkeit des Bausteins (0–3); bestimmt den Bonus.</summary>
         public int Difficulty { get; internal set; }
@@ -80,14 +80,14 @@ namespace Betaknight.Core.Arena
             {
                 if (IsFallback) return string.Empty;
                 var parts = new List<string>();
-                if (ConditionMet >= 0) parts.Add($"Bedingung {ConditionMet}× erfüllt");
+                if (ConditionMet >= 0) parts.Add(ArenaTexts.ConditionMetCount(ConditionMet));
                 if (BonusExecutions > 0)
                 {
-                    var bonus = new List<string> { $"{BonusExecutions} Ausführungen" };
-                    if (BonusDamage > 0) bonus.Add($"+{BonusDamage} Schaden");
-                    if (BonusHealing > 0) bonus.Add($"+{BonusHealing} Heilung");
-                    if (CooldownSavedTicks > 0) bonus.Add($"{SkillInfo.Seconds(CooldownSavedTicks)} Cooldown gespart");
-                    parts.Add("Bonus: " + string.Join(", ", bonus));
+                    var bonus = new List<string> { ArenaTexts.BonusExecutions(BonusExecutions) };
+                    if (BonusDamage > 0) bonus.Add(ArenaTexts.BonusDamage(BonusDamage));
+                    if (BonusHealing > 0) bonus.Add(ArenaTexts.BonusHealing(BonusHealing));
+                    if (CooldownSavedTicks > 0) bonus.Add(ArenaTexts.CooldownSaved(SkillInfo.Seconds(CooldownSavedTicks)));
+                    parts.Add(ArenaTexts.BonusPrefix + string.Join(", ", bonus));
                 }
                 return string.Join(" · ", parts);
             }
@@ -117,7 +117,7 @@ namespace Betaknight.Core.Arena
         public int SkipCount(RowCheckState reason) => SkipReasons.TryGetValue(reason, out int n) ? n : 0;
 
         /// <summary>«Zeile 3» oder «Basisangriff» für die Fallback-Zeile.</summary>
-        public string Name => IsFallback ? "Basisangriff-Zeile" : $"Zeile {Index + 1}";
+        public string Name => IsFallback ? ArenaTexts.BasicAttackRow : ArenaTexts.RowName(Index);
 
         internal RowReport(int index, string label, string skill, bool fallback)
         {
@@ -155,7 +155,7 @@ namespace Betaknight.Core.Arena
 
         /// <summary>«Basisangriff 28 % · Skills 72 %», leer ohne Schaden.</summary>
         public string DamageSplitText => TotalDamage > 0
-            ? $"Basisangriff {SkillInfo.Percent(BasicAttackShareBp)} · Skills {SkillInfo.Percent(BasisPoints.Full - BasicAttackShareBp)}"
+            ? ArenaTexts.DamageSplit(SkillInfo.Percent(BasicAttackShareBp), SkillInfo.Percent(BasisPoints.Full - BasicAttackShareBp))
             : string.Empty;
 
         /// <summary>Schaden, den Schwierigkeits-Boni insgesamt dazugegeben haben.</summary>
@@ -279,13 +279,11 @@ namespace Betaknight.Core.Arena
                 // H-04: Wie oft wurde die Bedingung erfüllt? Selten erfüllte Bausteine brauchen Erleichterer oder einen anderen Baustein.
                 if (row.ConditionMet >= 0 && row.ConditionMet <= RarelyTriggered && row.Triggered == 0 && !OnlyOrphaned(row) && row.AllStates.Count > 0)
                 {
-                    string how = row.ConditionMet == 0 ? "never triggered" : $"triggered only {row.ConditionMet}×";
-                    string symbol = row.Difficulty > 0 ? $" ({DifficultyText.Name(row.Difficulty)} block)" : string.Empty;
-                    _hints.Add($"Row {row.Index + 1}: {how}{symbol} – try an easer or a different block.");
+                    _hints.Add(ArenaTexts.HintRarelyTriggered(row.Index, row.ConditionMet, row.Difficulty > 0 ? DifficultyText.Name(row.Difficulty) : null));
                     continue;
                 }
                 if (row.Fired > 0) continue;
-                _hints.Add($"{row.Name} hat nie gefeuert: {NeverFiredReason(row)}.");
+                _hints.Add(ArenaTexts.HintNeverFired(row.Name, NeverFiredReason(row)));
             }
 
             // Wer trägt den Schaden? Nur sinnvoll, wenn mehrere Zeilen Schaden machen.
@@ -298,21 +296,21 @@ namespace Betaknight.Core.Arena
                 if (best == null || row.Damage > best.Damage) best = row;
             }
             if (best != null && dealing > 1)
-                _hints.Add($"{best.Name} ({best.Skill}) macht {SkillInfo.Percent(best.DamageShareBp)} des Schadens.");
+                _hints.Add(ArenaTexts.HintTopDamage(best.Name, best.Skill, SkillInfo.Percent(best.DamageShareBp)));
 
             foreach (RowReport row in _rows)
             {
                 if (row.Fired == 0 || row.Skipped < 3) continue;
                 if (row.MainReason == RowCheckState.ActionRunning && row.SkipCount(RowCheckState.ActionRunning) * 2 >= row.Skipped)
-                    _hints.Add($"{row.Name} war {row.SkipCount(RowCheckState.ActionRunning)}× bereit, während eine andere Aktion lief. Kürzere Aktionen darunter helfen.");
+                    _hints.Add(ArenaTexts.HintBlockedByAction(row.Name, row.SkipCount(RowCheckState.ActionRunning)));
             }
 
             // Auslöser-Ketten: wer löst wen aus, und wie viele verfallen, weil das Ziel nicht bereit war.
             foreach (RowReport row in _rows)
             {
-                if (row.Triggered > 0) _hints.Add($"{row.Name} ({row.Skill}) wurde {row.Triggered}× ausgelöst, von {row.TriggeredByText}.");
+                if (row.Triggered > 0) _hints.Add(ArenaTexts.HintTriggered(row.Name, row.Skill, row.Triggered, row.TriggeredByText));
                 if (row.TriggersExpired > 0)
-                    _hints.Add($"{row.TriggersExpired} Auslöser auf {row.Name} verfielen: ohne Warteschlange war der Skill nicht bereit, oder das Ziel war verwaist.");
+                    _hints.Add(ArenaTexts.HintTriggersExpired(row.TriggersExpired, row.Name));
             }
 
             // Schwierigkeits-Bonus: was hat er ausgemacht, und welche schweren Bausteine kamen nie zum Zug?
@@ -320,8 +318,8 @@ namespace Betaknight.Core.Arena
             {
                 if (row.IsFallback || row.Difficulty == 0) continue;
                 if (row.BonusDamage > 0 && row.Damage > 0)
-                    _hints.Add($"{row.Name}: Bonus {DifficultyText.Symbol(row.Difficulty)} brachte +{row.BonusDamage} Schaden "
-                        + $"({SkillInfo.Percent((int)((long)row.BonusDamage * BasisPoints.Full / row.Damage))} des Zeilenschadens).");
+                    _hints.Add(ArenaTexts.HintBonus(row.Name, DifficultyText.Symbol(row.Difficulty), row.BonusDamage,
+                        SkillInfo.Percent((int)((long)row.BonusDamage * BasisPoints.Full / row.Damage))));
             }
 
             // Warteschlange: welche Zeile wartet am längsten?
@@ -329,10 +327,9 @@ namespace Betaknight.Core.Arena
             foreach (RowReport row in _rows)
                 if (row.StartedFromQueue > 0 && (waiting == null || row.AverageWaitTicks > waiting.AverageWaitTicks)) waiting = row;
             if (waiting != null && waiting.AverageWaitTicks >= Ticks.PerSecond)
-                _hints.Add($"{waiting.Name} ({waiting.Skill}) wartete im Schnitt {SkillInfo.Seconds(waiting.AverageWaitTicks)} in der Warteschlange. "
-                    + "Höhere Zeilen oder lange Casts halten sie auf.");
+                _hints.Add(ArenaTexts.HintLongWait(waiting.Name, waiting.Skill, SkillInfo.Seconds(waiting.AverageWaitTicks)));
 
-            if (OtherDamage > 0) _hints.Add($"{OtherDamage} Schaden kam ohne Zeile (Set-Boni, Rückschlag).");
+            if (OtherDamage > 0) _hints.Add(ArenaTexts.HintOtherDamage(OtherDamage));
         }
 
         private static bool OnlyOrphaned(RowReport row)
@@ -344,19 +341,19 @@ namespace Betaknight.Core.Arena
 
         private static string NeverFiredReason(RowReport row)
         {
-            if (row.AllStates.Count == 0) return "es gab keine Entscheidung";
+            if (row.AllStates.Count == 0) return ArenaTexts.NeverFiredNoDecision;
             int Count(RowCheckState s) => row.AllStates.TryGetValue(s, out int n) ? n : 0;
             int total = 0;
             foreach (int n in row.AllStates.Values) total += n;
 
-            if (Count(RowCheckState.Orphaned) == total) return "verwaist, kein Skill zugeordnet";
-            if (Count(RowCheckState.ConditionFalse) == total) return "Bedingung nie erfüllt";
-            if (Count(RowCheckState.Cooldown) == total) return "Skill war immer im Cooldown";
-            if (Count(RowCheckState.ActionRunning) > 0) return "Bedingung war erfüllt, aber es lief jedes Mal eine andere Aktion";
-            if (Count(RowCheckState.Ready) > 0) return "Bedingung war erfüllt, aber höhere Zeilen hatten Vorrang";
+            if (Count(RowCheckState.Orphaned) == total) return ArenaTexts.NeverFiredOrphaned;
+            if (Count(RowCheckState.ConditionFalse) == total) return ArenaTexts.NeverFiredConditionFalse;
+            if (Count(RowCheckState.Cooldown) == total) return ArenaTexts.NeverFiredCooldown;
+            if (Count(RowCheckState.ActionRunning) > 0) return ArenaTexts.NeverFiredActionRunning;
+            if (Count(RowCheckState.Ready) > 0) return ArenaTexts.NeverFiredPriority;
             return Count(RowCheckState.ConditionFalse) >= Count(RowCheckState.Cooldown)
-                ? "Bedingung nie erfüllt, wenn der Skill bereit war"
-                : "Skill meist im Cooldown";
+                ? ArenaTexts.NeverFiredConditionWhenReady
+                : ArenaTexts.NeverFiredMostlyCooldown;
         }
 
         private static void Add(Dictionary<RowCheckState, int> counts, RowCheckState state) =>

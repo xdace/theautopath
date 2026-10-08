@@ -65,13 +65,13 @@ namespace Betaknight.Core.Autoplay
         /// <summary>Die nächste Aktion für diesen Zustand, oder <see cref="BotActionKind.None"/>, wenn nichts geht.</summary>
         public BotAction Decide(OverworldSession s)
         {
-            if (s == null) return BotAction.Nothing("keine Session");
-            if (s.IsGameOver) return BotAction.Nothing("Game Over");
+            if (s == null) return BotAction.Nothing(AutoplayTexts.NoSession);
+            if (s.IsGameOver) return BotAction.Nothing(AutoplayTexts.EndGameOver);
             SyncTurn(s);
 
             BotAction action = Overflow(s) ?? Encounter(s) ?? Offer(s) ?? Shop(s) ?? Portal(s);
             if (action != null) return action;
-            if (s.IsBusy) return BotAction.Nothing("Session wartet auf eine unbekannte Entscheidung");
+            if (s.IsBusy) return BotAction.Nothing(AutoplayTexts.SessionBusy);
 
             if (s.CanChangeLoadout && _loadoutActions < MaxLoadoutActionsPerTurn)
             {
@@ -83,7 +83,7 @@ namespace Betaknight.Core.Autoplay
                 }
             }
 
-            return Move(s) ?? BotAction.Nothing("kein begehbares Feld");
+            return Move(s) ?? BotAction.Nothing(AutoplayTexts.NoWalkableTile);
         }
 
         private void SyncTurn(OverworldSession s)
@@ -112,11 +112,11 @@ namespace Betaknight.Core.Autoplay
         private BotAction Overflow(OverworldSession s)
         {
             if (s.PendingItem != null)
-                return Try(BotActionKind.Overflow, $"Inventar voll: {s.PendingItem.Name} liegen lassen", s.RejectPendingItem)
-                    ?? Try(BotActionKind.Overflow, $"Inventar voll: {s.PendingItem.Name} liegen lassen (2)", s.RejectPendingItem);
+                return Try(BotActionKind.Overflow, AutoplayTexts.DiscardItem(s.PendingItem.Name, false), s.RejectPendingItem)
+                    ?? Try(BotActionKind.Overflow, AutoplayTexts.DiscardItem(s.PendingItem.Name, true), s.RejectPendingItem);
             if (s.PendingRune != null)
-                return Try(BotActionKind.Overflow, $"Runen-Inventar voll: {s.PendingRune.Name} liegen lassen", s.RejectPendingRune)
-                    ?? Try(BotActionKind.Overflow, $"Runen-Inventar voll: {s.PendingRune.Name} liegen lassen (2)", s.RejectPendingRune);
+                return Try(BotActionKind.Overflow, AutoplayTexts.DiscardRune(s.PendingRune.Name, false), s.RejectPendingRune)
+                    ?? Try(BotActionKind.Overflow, AutoplayTexts.DiscardRune(s.PendingRune.Name, true), s.RejectPendingRune);
             return null;
         }
 
@@ -148,7 +148,7 @@ namespace Betaknight.Core.Autoplay
             {
                 if (!options[i].IsAvailable(s.Stats)) continue;
                 int index = i;
-                BotAction a = Try(BotActionKind.Encounter, $"{prompt.Definition.Title}: {options[i].Text}",
+                BotAction a = Try(BotActionKind.Encounter, AutoplayTexts.EncounterChoice(prompt.Definition.Title, options[i].Text),
                     () => s.ChooseEncounterOption(index) != null, RewardOf(options[i]));
                 if (a != null) return a;
             }
@@ -161,10 +161,10 @@ namespace Betaknight.Core.Autoplay
             {
                 switch (e.Kind)
                 {
-                    case EffectKind.Heal: return "Heilung";
-                    case EffectKind.UpgradeRune: return "Runen-Stufe";
-                    case EffectKind.Shards: return "Runensplitter";
-                    case EffectKind.Gold: return "Gold";
+                    case EffectKind.Heal: return AutoplayTexts.RewardHealing;
+                    case EffectKind.UpgradeRune: return AutoplayTexts.RewardRuneLevel;
+                    case EffectKind.Shards: return AutoplayTexts.RewardShards;
+                    case EffectKind.Gold: return AutoplayTexts.RewardGold;
                 }
             }
             return null;
@@ -192,7 +192,7 @@ namespace Betaknight.Core.Autoplay
                 if (!s.CanTakeModule(i)) continue;
                 bool upgrade = s.ModuleUpgradeTarget(id) != null;
                 int score = id == ModuleIds.Trigger && !hasTrigger ? 40 : upgrade ? 34 : 24;
-                Add(score, Try(BotActionKind.Offer, $"Angebot: Modul {ModuleName(s, id)}", () => s.TakeModule(index), "Modul"));
+                Add(score, Try(BotActionKind.Offer, AutoplayTexts.OfferModule(ModuleName(s, id)), () => s.TakeModule(index), AutoplayTexts.RewardModule));
             }
             for (int i = 0; i < offer.SkillIds.Count; i++)
             {
@@ -200,7 +200,7 @@ namespace Betaknight.Core.Autoplay
                 string id = offer.SkillIds[i];
                 if (!s.CanTakeSkill(i)) continue;
                 int score = s.IsImprovementSkill(id) ? 33 : 23;
-                Add(score, Try(BotActionKind.Offer, $"Angebot: Skill {SkillName(s, id)}", () => s.TakeSkill(index), "Skill"));
+                Add(score, Try(BotActionKind.Offer, AutoplayTexts.OfferSkill(SkillName(s, id)), () => s.TakeSkill(index), AutoplayTexts.RewardSkill));
             }
             for (int i = 0; i < offer.ItemIds.Count; i++)
             {
@@ -208,7 +208,7 @@ namespace Betaknight.Core.Autoplay
                 if (!s.Items.TryGet(offer.ItemIds[i], out EquipmentDefinition item) || !s.CanTakeItem(i)) continue;
                 bool better = s.IsImprovement(item) || Score(s.StatsWith(item)) > Score(s.StatsNow()) + 0.5;
                 int score = better ? 32 : 22;
-                Add(score, Try(BotActionKind.Offer, $"Angebot: Teil {item.Name}", () => s.TakeItem(index), "Teil"));
+                Add(score, Try(BotActionKind.Offer, AutoplayTexts.OfferItem(item.Name), () => s.TakeItem(index), AutoplayTexts.RewardItem));
             }
             for (int i = 0; i < offer.Options.Count; i++)
             {
@@ -217,13 +217,13 @@ namespace Betaknight.Core.Autoplay
                 bool room = !s.Runes.IsFull || !s.RuneInventory.IsFull || s.OwnsRune(rune);
                 if (!room) continue;
                 int score = s.IsImprovement(rune) ? 31 : 21;
-                Add(score, Try(BotActionKind.Offer, $"Angebot: Rune {rune.Name}", () => s.TakeRune(index), "Rune"));
+                Add(score, Try(BotActionKind.Offer, AutoplayTexts.OfferRune(rune.Name), () => s.TakeRune(index), AutoplayTexts.RewardRune));
             }
             if (offer.BoardExpansion)
-                Add(35, Try(BotActionKind.Offer, "Angebot: Tafel-Erweiterung", s.TakeBoardExpansion, "Tafel-Erweiterung"));
+                Add(35, Try(BotActionKind.Offer, AutoplayTexts.OfferBoardExpansion, s.TakeBoardExpansion, AutoplayTexts.RewardBoardExpansion));
 
             if (candidates.Count > 0) return candidates.OrderByDescending(c => c.score).First().action;
-            return Try(BotActionKind.Offer, "Angebot: verzichten (Gold)", s.SkipRuneOffer, "Gold");
+            return Try(BotActionKind.Offer, AutoplayTexts.OfferSkip, s.SkipRuneOffer, AutoplayTexts.RewardGold);
         }
 
         private static string ModuleName(OverworldSession s, string id) =>
@@ -240,37 +240,37 @@ namespace Betaknight.Core.Autoplay
             var stock = s.PendingShop.Inventory;
             BotAction a = null;
 
-            if (HpPercent(s) < 80 && s.CanBuyHeal) a = Try(BotActionKind.Shop, "Shop: heilen", s.BuyHeal, "Heilung");
+            if (HpPercent(s) < 80 && s.CanBuyHeal) a = Try(BotActionKind.Shop, AutoplayTexts.ShopHeal, s.BuyHeal, AutoplayTexts.RewardHealing);
 
             for (int i = 0; a == null && i < stock.ModuleIds.Count; i++)
             {
                 int index = i;
                 if (s.CanBuyShopModule(i))
-                    a = Try(BotActionKind.Shop, $"Shop: Modul {ModuleName(s, stock.ModuleIds[i])}", () => s.BuyShopModule(index), "Modul");
+                    a = Try(BotActionKind.Shop, AutoplayTexts.ShopModule(ModuleName(s, stock.ModuleIds[i])), () => s.BuyShopModule(index), AutoplayTexts.RewardModule);
             }
             for (int i = 0; a == null && i < stock.SkillIds.Count; i++)
             {
                 int index = i;
                 string id = stock.SkillIds[i];
                 if (s.CanBuyShopSkill(i) && (!s.OwnsSkill(id) || s.IsImprovementSkill(id)))
-                    a = Try(BotActionKind.Shop, $"Shop: Skill {SkillName(s, id)}", () => s.BuyShopSkill(index), "Skill");
+                    a = Try(BotActionKind.Shop, AutoplayTexts.ShopSkill(SkillName(s, id)), () => s.BuyShopSkill(index), AutoplayTexts.RewardSkill);
             }
             for (int i = 0; a == null && i < stock.ItemIds.Count; i++)
             {
                 int index = i;
                 if (!s.Items.TryGet(stock.ItemIds[i], out EquipmentDefinition item) || !s.CanBuyShopItem(i)) continue;
                 if (s.IsImprovement(item) || Score(s.StatsWith(item)) > Score(s.StatsNow()) + 0.5)
-                    a = Try(BotActionKind.Shop, $"Shop: Teil {item.Name}", () => s.BuyShopItem(index), "Teil");
+                    a = Try(BotActionKind.Shop, AutoplayTexts.ShopItem(item.Name), () => s.BuyShopItem(index), AutoplayTexts.RewardItem);
             }
-            if (a == null && s.CanBuyRuneSlot) a = Try(BotActionKind.Shop, "Shop: Tafel-Zeile", s.BuyRuneSlot, "Tafel-Erweiterung");
+            if (a == null && s.CanBuyRuneSlot) a = Try(BotActionKind.Shop, AutoplayTexts.ShopBoardRow, s.BuyRuneSlot, AutoplayTexts.RewardBoardExpansion);
             for (int i = 0; a == null && i < stock.Runes.Count; i++)
             {
                 int index = i;
                 if (s.CanBuyShopRune(i) && !s.Runes.IsFull)
-                    a = Try(BotActionKind.Shop, $"Shop: Rune {stock.Runes[i].Name}", () => s.BuyShopRune(index), "Rune");
+                    a = Try(BotActionKind.Shop, AutoplayTexts.ShopRune(stock.Runes[i].Name), () => s.BuyShopRune(index), AutoplayTexts.RewardRune);
             }
 
-            return a ?? Try(BotActionKind.Shop, "Shop verlassen", () =>
+            return a ?? Try(BotActionKind.Shop, AutoplayTexts.ShopLeave, () =>
             {
                 s.LeaveShop();
                 return s.PendingShop == null;
@@ -280,7 +280,7 @@ namespace Betaknight.Core.Autoplay
         // ------------------------------------------------------------------ Portal
 
         private BotAction Portal(OverworldSession s) =>
-            s.CanEnterPortal ? Try(BotActionKind.Portal, $"Durchs Portal zu Akt {s.Act + 1}", s.EnterPortal) : null;
+            s.CanEnterPortal ? Try(BotActionKind.Portal, AutoplayTexts.EnterPortal(s.Act + 1), s.EnterPortal) : null;
 
         // ------------------------------------------------------------------ Tafel und Ausrüstung
 
@@ -315,7 +315,7 @@ namespace Betaknight.Core.Autoplay
             if (bestCell >= 0)
             {
                 int cell = bestCell;
-                BotAction a = Try(BotActionKind.Inventory, $"Anlegen: {s.Inventory[cell].Name}", () => s.EquipFromInventory(cell));
+                BotAction a = Try(BotActionKind.Inventory, AutoplayTexts.Equip(s.Inventory[cell].Name), () => s.EquipFromInventory(cell));
                 if (a != null) return a;
             }
 
@@ -325,7 +325,7 @@ namespace Betaknight.Core.Autoplay
                 for (int i = 0; i < s.RuneInventory.Count; i++)
                 {
                     int index = i;
-                    BotAction a = Try(BotActionKind.Build, $"Rune einsetzen: {s.RuneInventory[i].Name}", () => s.EquipRuneFromInventory(index));
+                    BotAction a = Try(BotActionKind.Build, AutoplayTexts.PlaceRune(s.RuneInventory[i].Name), () => s.EquipRuneFromInventory(index));
                     if (a != null) return a;
                 }
             }
@@ -340,7 +340,7 @@ namespace Betaknight.Core.Autoplay
                     if (current != null && !current.IsBasicAttack) continue;
                     SkillInstance skill = free[0];
                     int r = row;
-                    BotAction a = Try(BotActionKind.Build, $"Skill setzen: {skill.NameFrom(s.SkillCatalog)} → Zeile {row + 1}",
+                    BotAction a = Try(BotActionKind.Build, AutoplayTexts.PlaceSkill(skill.NameFrom(s.SkillCatalog), row + 1),
                         () => s.PlaceSkill(skill.InstanceId, r));
                     if (a != null) return a;
                 }
@@ -357,13 +357,13 @@ namespace Betaknight.Core.Autoplay
                     if (slot.Skill != null && !slot.Skill.IsBasicAttack && s.CanPlaceModule(module, slot.Skill))
                     {
                         SkillInstance skill = slot.Skill;
-                        BotAction a = Try(BotActionKind.Build, $"Modul setzen: {name} → Skill Zeile {row + 1}",
+                        BotAction a = Try(BotActionKind.Build, AutoplayTexts.PlaceModuleOnSkill(name, row + 1),
                             () => s.PlaceModuleOnSkill(module.InstanceId, skill.InstanceId));
                         if (a != null) return a;
                     }
                     if (s.CanPlaceModule(module, slot))
                     {
-                        BotAction a = Try(BotActionKind.Build, $"Modul setzen: {name} → Baustein Zeile {row + 1}",
+                        BotAction a = Try(BotActionKind.Build, AutoplayTexts.PlaceModuleOnRune(name, row + 1),
                             () => s.PlaceModuleOnRow(module.InstanceId, r));
                         if (a != null) return a;
                     }
@@ -374,7 +374,7 @@ namespace Betaknight.Core.Autoplay
             foreach (ModuleInstance module in s.Modules.All)
             {
                 if (module.ModuleId != ModuleIds.Trigger || module.IsFree || module.Target.HasValue) continue;
-                BotAction a = Try(BotActionKind.Build, $"Auslöser-Ziel setzen: Modul #{module.InstanceId}",
+                BotAction a = Try(BotActionKind.Build, AutoplayTexts.SetTriggerTarget(module.InstanceId),
                     () => s.CycleTriggerTarget(module.InstanceId) && module.Target.HasValue, setsTrigger: true);
                 if (a != null) return a;
             }
@@ -393,14 +393,14 @@ namespace Betaknight.Core.Autoplay
             foreach (MineRaid raid in s.Raids.Where(r => !r.IsLost).OrderBy(r => r.Coord.DistanceTo(here)))
             {
                 if (avoidFights) break;
-                BotAction a = Toward(s, raid.Coord, "Mine verteidigen", raid.TurnsLeft(s.Turns.CurrentTurn) + 1);
+                BotAction a = Toward(s, raid.Coord, AutoplayTexts.WhyDefendMine, raid.TurnsLeft(s.Turns.CurrentTurn) + 1);
                 if (a != null) return a;
             }
 
             // 2. Bekannte, freie Minen in der Nähe erobern.
             foreach (HexCell mine in KnownCells(s, CellContent.GoldMine).Where(c => !c.IsResolved && c.Coord.DistanceTo(here) <= MineDetour))
             {
-                BotAction a = Toward(s, mine.Coord, "Mine erobern");
+                BotAction a = Toward(s, mine.Coord, AutoplayTexts.WhyCaptureMine);
                 if (a != null) return a;
             }
 
@@ -409,7 +409,7 @@ namespace Betaknight.Core.Autoplay
             {
                 foreach (HexCell shop in KnownCells(s, CellContent.Shop).Where(c => c.VisitCount == 0).OrderBy(c => c.Coord.DistanceTo(here)))
                 {
-                    BotAction a = Toward(s, shop.Coord, "zum Shop");
+                    BotAction a = Toward(s, shop.Coord, AutoplayTexts.WhyToShop);
                     if (a != null) return a;
                 }
             }
@@ -428,7 +428,7 @@ namespace Betaknight.Core.Autoplay
                 int top = fresh.Max(c => StepValue(c));
                 List<HexCell> pool = fresh.Where(c => StepValue(c) == top).ToList();
                 HexCell pick = pool[_random.Next(pool.Count)];
-                BotAction a = StepTo(s, pick.Coord, "erkunden");
+                BotAction a = StepTo(s, pick.Coord, AutoplayTexts.WhyExplore);
                 if (a != null) return a;
             }
 
@@ -437,7 +437,7 @@ namespace Betaknight.Core.Autoplay
                 .Where(c => c.VisitCount == 0 && c.IsWalkable && c.Visibility != CellVisibility.Hidden && !(avoidFights && IsKnownHostile(c)))
                 .OrderBy(c => c.Coord.DistanceTo(here)).Take(12))
             {
-                BotAction a = Toward(s, target.Coord, "zum nächsten unbekannten Feld");
+                BotAction a = Toward(s, target.Coord, AutoplayTexts.WhyNextUnknown);
                 if (a != null) return a;
             }
 
@@ -445,7 +445,7 @@ namespace Betaknight.Core.Autoplay
             List<HexCell> wander = avoidFights ? steps.Where(c => !IsKnownHostile(c)).ToList() : steps;
             if (wander.Count == 0) wander = steps;
             HexCell any = wander[_random.Next(wander.Count)];
-            return StepTo(s, any.Coord, "warten auf den Boss") ?? StepTo(s, steps[0].Coord, "irgendwohin");
+            return StepTo(s, any.Coord, AutoplayTexts.WhyWaitForBoss) ?? StepTo(s, steps[0].Coord, AutoplayTexts.WhyAnywhere);
         }
 
         private static IEnumerable<HexCell> KnownCells(OverworldSession s, CellContent content) =>
@@ -483,7 +483,7 @@ namespace Betaknight.Core.Autoplay
         {
             HexCoord last = route[route.Count - 1];
             if (!s.CanStepTo(route[0])) return null;
-            return Try(BotActionKind.Move, $"Reise nach ({last.Q},{last.R}), {route.Count} Felder: {why}", () =>
+            return Try(BotActionKind.Move, AutoplayTexts.Travel(last.Q, last.R, route.Count, why), () =>
             {
                 bool moved = false;
                 for (int i = 0; i < route.Count; i++)
@@ -501,7 +501,7 @@ namespace Betaknight.Core.Autoplay
         private BotAction StepTo(OverworldSession s, HexCoord step, string why)
         {
             if (!s.CanStepTo(step)) return null;
-            return Try(BotActionKind.Move, $"Schritt nach ({step.Q},{step.R}): {why}", () => s.TryStep(step).Success, step: step);
+            return Try(BotActionKind.Move, AutoplayTexts.Step(step.Q, step.R, why), () => s.TryStep(step).Success, step: step);
         }
     }
 }

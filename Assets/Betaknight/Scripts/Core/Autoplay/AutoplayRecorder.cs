@@ -21,6 +21,9 @@ namespace Betaknight.Core.Autoplay
         private readonly List<(FightKind kind, bool victory)> _pending = new List<(FightKind, bool)>();
         private readonly List<string> _discoveredDuos = new List<string>();
 
+        /// <summary>Nach <see cref="OverworldSession.BossEncountered"/>: das nächste grosse Ereignis ist das Boss-Ergebnis.</summary>
+        private bool _awaitingBossOutcome;
+
         public AutoplayReport Report { get; }
 
         public AutoplayRecorder(AutoplayReport report)
@@ -33,6 +36,7 @@ namespace Betaknight.Core.Autoplay
             Flush();
             Detach();
             _session = session;
+            _awaitingBossOutcome = false;
             if (_session == null) return;
             _session.CombatFinished += OnCombat;
             _session.BossEncountered += OnBoss;
@@ -96,7 +100,7 @@ namespace Betaknight.Core.Autoplay
         private static string RowText(OverworldSession s, int i)
         {
             RuneSlot row = s.Runes.Rows[i];
-            string skill = row.Skill == null ? "leer" : row.Skill.NameFrom(s.SkillCatalog);
+            string skill = row.Skill == null ? AutoplayTexts.EmptyRow : row.Skill.NameFrom(s.SkillCatalog);
             var modules = new List<ModuleInstance>(row.Modules);
             if (row.Skill != null) modules.AddRange(row.Skill.Modules);
             string extra = modules.Count == 0 ? string.Empty : " [" + string.Join(", ", modules.Select(m => m.NameFrom(s.ModuleCatalog))) + "]";
@@ -134,12 +138,17 @@ namespace Betaknight.Core.Autoplay
         private void OnBoss(CombatResult result)
         {
             Report.Bosses++;
+            _awaitingBossOutcome = true;
             if (_pending.Count > 0) _pending[_pending.Count - 1] = (FightKind.Boss, _pending[_pending.Count - 1].victory);
         }
 
         private void OnMajorEvent(MajorEventOutcome outcome)
         {
-            if (outcome.Title == "Boss besiegt" || outcome.Title == "Durchs Portal entkommen") Report.BossesSurvived++;
+            // Unabhängig vom (übersetzten) Titel: das erste Ereignis nach dem Boss-Kampf ist sein Ergebnis;
+            // überlebt hat der Ritter, wenn er danach nicht tot ist (Sieg oder durchs Portal entkommen).
+            if (!_awaitingBossOutcome) return;
+            _awaitingBossOutcome = false;
+            if (_session != null && !_session.Stats.IsDead) Report.BossesSurvived++;
         }
 
         private void OnDuo(SynergyDuo duo)

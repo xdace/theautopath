@@ -19,7 +19,7 @@ namespace Betaknight.Core.Arena
         public void Describe(SkillInfoBuilder info)
         {
             int amount = System.Math.Max(1, BasisPoints.Of(info.Stats.MaxHp, MaxHpBp));
-            info.Add(new EffectInfo(EffectInfoKind.Heal, $"heilt {SkillInfo.Percent(MaxHpBp)} Max-HP ≈ {amount}", amount: amount));
+            info.Add(new EffectInfo(EffectInfoKind.Heal, ArenaTexts.HealEffect(SkillInfo.Percent(MaxHpBp), amount), amount: amount));
         }
     }
 
@@ -50,7 +50,7 @@ namespace Betaknight.Core.Arena
         public ISkillEffect Extended(int ticks) => new StunEffect(Ticks + ticks, AllEnemies);
 
         public void Describe(SkillInfoBuilder info) => info.Add(new EffectInfo(EffectInfoKind.Stun,
-            $"betäubt {(AllEnemies ? "alle " : string.Empty)}{SkillInfo.Seconds(Ticks)}", durationTicks: Ticks, allEnemies: AllEnemies));
+            ArenaTexts.StunEffect(AllEnemies, SkillInfo.Seconds(Ticks)), durationTicks: Ticks, allEnemies: AllEnemies));
     }
 
     /// <summary>Bricht eine laufende Aufladung des Ziels ab, ohne es zu betäuben.</summary>
@@ -61,7 +61,7 @@ namespace Betaknight.Core.Arena
             if (c.Target != null && c.Target.IsCharging) c.Battle.Interrupt(c.Target);
         }
 
-        public void Describe(SkillInfoBuilder info) => info.Add(new EffectInfo(EffectInfoKind.Interrupt, "bricht Aufladung ab"));
+        public void Describe(SkillInfoBuilder info) => info.Add(new EffectInfo(EffectInfoKind.Interrupt, ArenaTexts.InterruptEffect));
     }
 
     /// <summary>Zeitlicher Wertebonus auf den Anwender oder Malus auf das Ziel.</summary>
@@ -94,7 +94,7 @@ namespace Betaknight.Core.Arena
         public StatModifierEffect Scaled(int percent) => new StatModifierEffect(StatusId, Stat, Amount * (100 + percent) / 100, Ticks, OnTarget);
 
         public void Describe(SkillInfoBuilder info) => info.Add(new EffectInfo(EffectInfoKind.StatChange,
-            $"{(OnTarget ? "Gegner " : string.Empty)}{SkillInfo.StatChange(Stat, Amount)} für {SkillInfo.Seconds(Ticks)}", durationTicks: Ticks));
+            ArenaTexts.StatChangeEffect(OnTarget, SkillInfo.StatChange(Stat, Amount), SkillInfo.Seconds(Ticks)), durationTicks: Ticks));
     }
 
     /// <summary>Setzt das Ziel in Brand: Schaden pro Sekunde in Prozent des eigenen Waffenschadens.</summary>
@@ -131,7 +131,7 @@ namespace Betaknight.Core.Arena
             int dps = DamagePerSecondFor(info.Stats.WeaponDamage);
             int total = dps * BurnStatus.TicksOfDamage(Ticks);
             info.Add(new EffectInfo(EffectInfoKind.DamageOverTime,
-                $"Brennen {SkillInfo.Percent(DamageBpPerSecond)} Waffenschaden/s ≈ {dps}/s, {total} über {SkillInfo.Seconds(Ticks)}",
+                ArenaTexts.BurnEffect(SkillInfo.Percent(DamageBpPerSecond), dps, total, SkillInfo.Seconds(Ticks)),
                 DamageBpPerSecond, dps, total, Ticks));
         }
     }
@@ -176,7 +176,7 @@ namespace Betaknight.Core.Arena
         {
             StatusEffect sample = Create();
             info.Add(new EffectInfo(EffectInfoKind.Status,
-                $"{(OnTarget ? "Gegner: " : string.Empty)}{sample.Summary} ({SkillInfo.Seconds(sample.TicksLeft)})", durationTicks: sample.TicksLeft));
+                ArenaTexts.StatusEffect(OnTarget, sample.Summary, SkillInfo.Seconds(sample.TicksLeft)), durationTicks: sample.TicksLeft));
         }
     }
 
@@ -229,7 +229,7 @@ namespace Betaknight.Core.Arena
             c.Battle.ChangeResource(c.User, ResourceId, Value - c.User.GetResource(ResourceId), int.MaxValue, int.MinValue);
 
         public void Describe(SkillInfoBuilder info) =>
-            info.Add(new EffectInfo(EffectInfoKind.Resource, $"{SkillInfo.ResourceName(ResourceId)} auf {Value}"));
+            info.Add(new EffectInfo(EffectInfoKind.Resource, ArenaTexts.ResourceSet(SkillInfo.ResourceName(ResourceId), Value)));
     }
 
     /// <summary>Ändert eine eigene Ressource um einen Betrag, z. B. +3 Ladung (bis zur Obergrenze).</summary>
@@ -266,7 +266,7 @@ namespace Betaknight.Core.Arena
         }
 
         public void Describe(SkillInfoBuilder info) =>
-            info.Add(new EffectInfo(EffectInfoKind.Repeat, "wiederholt den letzten eigenen Skill mit dessen Cast-Zeit, ohne Cooldown"));
+            info.Add(new EffectInfo(EffectInfoKind.Repeat, ArenaTexts.RepeatEffect));
     }
 }
 

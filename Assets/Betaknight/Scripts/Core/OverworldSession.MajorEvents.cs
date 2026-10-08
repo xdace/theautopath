@@ -111,16 +111,16 @@ namespace Betaknight.Core
 
             var lines = new List<string>();
             if (!string.IsNullOrEmpty(result.EnemyName)) lines.Add(result.EnemyName);
-            string title = cell.Content == CellContent.Boss ? "Boss" : elite ? "Elite-Kampf" : "Kampf";
+            string title = cell.Content == CellContent.Boss ? SessionTexts.FightBoss : elite ? SessionTexts.FightElite : SessionTexts.Fight;
 
             // Ein verlorener Kampf endet tödlich, auch wenn der Resolver noch HP übrig liess.
             if (!ApplyCombat(cell, result, title, lines)) return;
 
             int gold = result.GoldReward + (elite ? Progression.EliteGoldBonus : 0);
             Stats.AddGold(gold);
-            lines.Add($"+{gold} Gold");
+            lines.Add(SessionTexts.GoldGain(gold));
             Map.MarkResolved(cell.Coord);
-            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, $"{title} gewonnen", lines));
+            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, SessionTexts.FightWon(title), lines));
             OfferRunes(elite ? RewardSources.Elite : RewardSources.Victory);
         }
 
@@ -152,11 +152,11 @@ namespace Betaknight.Core
         private bool ApplyCombat(HexCell cell, CombatResult result, string title, List<string> lines)
         {
             int dealt = Stats.Damage(result.DamageTaken);
-            if (dealt > 0) lines.Add($"-{dealt} HP");
+            if (dealt > 0) lines.Add(SessionTexts.HpLoss(dealt));
             if (result.Victory && !Stats.IsDead) return true;
 
             if (!Stats.IsDead) Stats.Damage(Stats.Hp);
-            lines.Add("Niederlage");
+            lines.Add(SessionTexts.Defeat);
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, title, lines));
             RunEnded?.Invoke();
             return false;
@@ -167,7 +167,7 @@ namespace Betaknight.Core
             int gold = _random.Next(6, 11);
             Stats.AddGold(gold);
             Map.MarkResolved(cell.Coord);
-            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, "Schatztruhe", new[] { $"+{gold} Gold" }));
+            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, SessionTexts.Treasure, new[] { SessionTexts.GoldGain(gold) }));
             OfferRunes(RewardSources.Treasure);
         }
 
@@ -176,8 +176,8 @@ namespace Betaknight.Core
             _mines.Add(cell.Coord);
             Stats.AddGold(3);
             Map.MarkResolved(cell.Coord);
-            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, "Goldmine erobert",
-                new[] { "+3 Gold", $"+{MineIncomeGold} Gold alle {MineIncomeInterval} Züge" }));
+            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, SessionTexts.GoldMineCaptured,
+                new[] { SessionTexts.GoldGain(3), SessionTexts.MineIncome(MineIncomeGold, MineIncomeInterval) }));
         }
 
         private void OnTurnEnded(int turn)

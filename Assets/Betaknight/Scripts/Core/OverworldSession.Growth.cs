@@ -37,14 +37,14 @@ namespace Betaknight.Core
             int bonus = rule.BonusAt(growth);
             switch (rule.Effect)
             {
-                case GrowthEffect.FlatDamage: return $"+{bonus} Schaden";
-                case GrowthEffect.StunTicks: return $"+{SkillInfo.Seconds(bonus)} Betäubung";
-                case GrowthEffect.PowerPercent: return $"+{bonus} % Wirkung";
+                case GrowthEffect.FlatDamage: return SessionTexts.GrowthDamage(bonus);
+                case GrowthEffect.StunTicks: return SessionTexts.GrowthStun(SkillInfo.Seconds(bonus));
+                case GrowthEffect.PowerPercent: return SessionTexts.GrowthPower(bonus);
                 case GrowthEffect.ThresholdPercent:
                     if (row == null) return string.Empty;
                     int base0 = row.Rune.ParameterAt(row.Level);
                     int grown = GrowthApplier.ApplyToParameter(row.Rune, base0, rule, growth);
-                    return grown > base0 ? $"Schwelle {base0} → {grown} %" : string.Empty;
+                    return grown > base0 ? SessionTexts.GrowthThreshold(base0, grown) : string.Empty;
                 default: return string.Empty;
             }
         }
@@ -53,11 +53,11 @@ namespace Betaknight.Core
         public string MilestoneText(int growth, bool skill)
         {
             int next = GrowthStages.NextMilestone(growth, skill);
-            if (next < 0) return $"Wachstum {growth}";
+            if (next < 0) return SessionTexts.Growth(growth);
             bool stage = skill && Array.IndexOf(GrowthStages.SkillStageThresholds, next) >= 0;
             bool slot = Array.IndexOf(GrowthStages.ModuleSlotThresholds, next) >= 0;
-            string what = stage && slot ? "Stufe und Modul-Platz" : stage ? $"Stufe {GrowthStages.StageFor(next)}" : "Modul-Platz";
-            return $"Wachstum {growth}, bei {next}: {what}";
+            string what = stage && slot ? SessionTexts.MilestoneLevelAndSlot : stage ? SessionTexts.MilestoneLevel(GrowthStages.StageFor(next)) : SessionTexts.MilestoneSlot;
+            return SessionTexts.GrowthMilestone(growth, next, what);
         }
 
         /// <summary>Nach jedem Kampf: Wachstumspunkte aus dem Protokoll an Skill-Exemplare und Bausteine verteilen.</summary>
@@ -88,16 +88,16 @@ namespace Betaknight.Core
                 {
                     int before = row.Growth;
                     Runes.Grow(row, rowPoints);
-                    AnnounceMilestones($"Baustein «{row.Name}»", before, row.Growth, false, 0, 0);
+                    AnnounceMilestones(SessionTexts.RuneQuoted(row.Name), before, row.Growth, false, 0, 0);
                 }
             }
         }
 
         private void AnnounceMilestones(string name, int before, int after, bool skill, int stageBefore, int stageAfter)
         {
-            if (skill && stageAfter > stageBefore) BuildImproved?.Invoke($"{name}: Stufe {stageAfter} erreicht");
+            if (skill && stageAfter > stageBefore) BuildImproved?.Invoke(SessionTexts.LevelReached(name, stageAfter));
             if (GrowthStages.ModuleSlotsFor(after) > GrowthStages.ModuleSlotsFor(before))
-                BuildImproved?.Invoke($"{name}: {GrowthStages.ModuleSlotsFor(after)}. Modul-Platz frei");
+                BuildImproved?.Invoke(SessionTexts.ModuleSlotUnlocked(name, GrowthStages.ModuleSlotsFor(after)));
         }
 
         // ------------------------------------------------------------------ Evolution
@@ -106,7 +106,7 @@ namespace Betaknight.Core
 
         /// <summary>Name der Evolutionsform oder «???», solange sie nicht im Rezeptbuch steht.</summary>
         public string EvolutionName(EvolutionRecipe recipe) =>
-            recipe == null ? string.Empty : RecipeBook.HasEvolution(recipe.Id) ? FormName(recipe.Subject, recipe.ToId) : "???";
+            recipe == null ? string.Empty : RecipeBook.HasEvolution(recipe.Id) ? FormName(recipe.Subject, recipe.ToId) : SessionTexts.Unknown;
 
         public string FormName(EvolutionSubject subject, string id)
         {
@@ -120,18 +120,18 @@ namespace Betaknight.Core
             switch (recipe.Requirement)
             {
                 case EvolutionRequirement.Module:
-                    return $"Modul {(ModuleCatalog.TryGet(recipe.RequirementId, out ModuleDefinition m) ? m.Name : recipe.RequirementId)}";
+                    return SessionTexts.RequirementModule(ModuleCatalog.TryGet(recipe.RequirementId, out ModuleDefinition m) ? m.Name : recipe.RequirementId);
                 case EvolutionRequirement.BlockInRow:
-                    return $"Baustein «{(RuneCatalog.TryGet(recipe.RequirementId, out RuneDefinition r) ? r.Name : recipe.RequirementId)}» in derselben Zeile";
+                    return SessionTexts.RequirementRuneInRow(RuneCatalog.TryGet(recipe.RequirementId, out RuneDefinition r) ? r.Name : recipe.RequirementId);
                 case EvolutionRequirement.Tag:
-                    return $"Tag {Synergies.NameOf(recipe.RequirementId)} {EvolutionRecipe.TagThreshold}";
+                    return SessionTexts.RequirementTag(Synergies.NameOf(recipe.RequirementId), EvolutionRecipe.TagThreshold);
                 default: return recipe.RequirementId;
             }
         }
 
         /// <summary>Das ganze Rezept, z. B. «Entzünden auf Höchststufe + Modul Fläche → Feuersturm».</summary>
         public string RecipeText(EvolutionRecipe recipe) =>
-            $"{FormName(recipe.Subject, recipe.FromId)} auf Höchststufe + {RequirementText(recipe)} → {FormName(recipe.Subject, recipe.ToId)}";
+            SessionTexts.Recipe(FormName(recipe.Subject, recipe.FromId), RequirementText(recipe), FormName(recipe.Subject, recipe.ToId));
 
         /// <summary>Was einem Skill-Exemplar zu diesem Rezept fehlt; leer = bereit (entwickelt sich nach dem nächsten Boss).</summary>
         public List<string> EvolutionMissing(EvolutionRecipe recipe, SkillInstance skill)
@@ -140,15 +140,15 @@ namespace Betaknight.Core
             if (recipe == null || recipe.Subject != EvolutionSubject.Skill) return missing;
             if (skill == null || skill.SkillId != recipe.FromId)
             {
-                missing.Add($"Skill {FormName(EvolutionSubject.Skill, recipe.FromId)}");
-                missing.Add($"Stufe {MaxSkillStage}");
+                missing.Add(SessionTexts.MissingSkill(FormName(EvolutionSubject.Skill, recipe.FromId)));
+                missing.Add(SessionTexts.MissingLevel(MaxSkillStage));
                 missing.Add(RequirementText(recipe));
                 return missing;
             }
 
-            if (skill.Level < MaxSkillStage) missing.Add($"Stufe {MaxSkillStage} (Wachstum {skill.Growth}/{GrowthStages.GrowthForStage(MaxSkillStage)})");
+            if (skill.Level < MaxSkillStage) missing.Add(SessionTexts.MissingLevelWithGrowth(MaxSkillStage, skill.Growth, GrowthStages.GrowthForStage(MaxSkillStage)));
             RuneSlot row = skill.Holder as RuneSlot;
-            if (row == null || !Runes.Rows.Contains(row)) missing.Add("an der Tafel");
+            if (row == null || !Runes.Rows.Contains(row)) missing.Add(SessionTexts.MissingOnBoard);
             switch (recipe.Requirement)
             {
                 case EvolutionRequirement.Module:
@@ -171,13 +171,13 @@ namespace Betaknight.Core
             if (recipe == null || recipe.Subject != EvolutionSubject.Block) return missing;
             if (row == null || row.Rune.Id != recipe.FromId)
             {
-                missing.Add($"Baustein {FormName(EvolutionSubject.Block, recipe.FromId)}");
-                missing.Add("Höchststufe");
+                missing.Add(SessionTexts.MissingRune(FormName(EvolutionSubject.Block, recipe.FromId)));
+                missing.Add(SessionTexts.MissingMaxLevel);
                 missing.Add(RequirementText(recipe));
                 return missing;
             }
 
-            if (row.Level < row.Rune.MaxLevel) missing.Add($"Höchststufe (Stufe {row.Level + 1}/{row.Rune.MaxLevel + 1}, Lagerfeuer oder doppelte Rune)");
+            if (row.Level < row.Rune.MaxLevel) missing.Add(SessionTexts.MissingMaxLevelRune(row.Level + 1, row.Rune.MaxLevel + 1));
             switch (recipe.Requirement)
             {
                 case EvolutionRequirement.Module:
@@ -196,7 +196,7 @@ namespace Betaknight.Core
         {
             int count = Gear.TagCount(recipe.RequirementId);
             if (count < EvolutionRecipe.TagThreshold)
-                missing.Add($"Tag {Synergies.NameOf(recipe.RequirementId)} {count}/{EvolutionRecipe.TagThreshold}");
+                missing.Add(SessionTexts.MissingTag(Synergies.NameOf(recipe.RequirementId), count, EvolutionRecipe.TagThreshold));
         }
 
         /// <summary>Das Exemplar, das diesem Rezept am nächsten ist (am wenigsten fehlt), oder null ohne passendes.</summary>
@@ -218,8 +218,8 @@ namespace Betaknight.Core
         {
             string name = EvolutionName(recipe);
             return missing.Count == 0
-                ? $"Evolution {name}: bereit, nach dem nächsten Boss"
-                : $"Evolution {name}: fehlt {string.Join(", ", missing)}";
+                ? SessionTexts.EvolutionReady(name)
+                : SessionTexts.EvolutionMissing(name, string.Join(", ", missing));
         }
 
         /// <summary>Fortschritt der Evolutionen genau dieser Zeile (ihr Skill und ihr Baustein), für Tafel und Karte.</summary>
@@ -251,12 +251,12 @@ namespace Betaknight.Core
 
         public List<string> EvolutionHintsForModule(string moduleId) =>
             EvolutionCatalog.Needing(EvolutionRequirement.Module, moduleId).Where(OwnsSubject)
-                .Select(r => $"{EvolutionProgress(r)} (Teil des Rezepts für {FormName(r.Subject, r.FromId)})").ToList();
+                .Select(r => SessionTexts.EvolutionHintModule(EvolutionProgress(r), FormName(r.Subject, r.FromId))).ToList();
 
         public List<string> EvolutionHintsForRune(string runeId)
         {
             var hints = EvolutionCatalog.Needing(EvolutionRequirement.BlockInRow, runeId).Where(OwnsSubject)
-                .Select(r => $"{EvolutionProgress(r)} (in die Zeile von {FormName(r.Subject, r.FromId)})").ToList();
+                .Select(r => SessionTexts.EvolutionHintRune(EvolutionProgress(r), FormName(r.Subject, r.FromId))).ToList();
             hints.AddRange(EvolutionCatalog.From(EvolutionSubject.Block, runeId).Select(EvolutionProgress));
             return hints;
         }
@@ -270,7 +270,7 @@ namespace Betaknight.Core
             {
                 int count = Gear.TagCount(tag);
                 if (count < EvolutionRecipe.TagThreshold)
-                    hints.Add($"→ {Synergies.NameOf(tag)} {count + 1}/{EvolutionRecipe.TagThreshold} für Evolution von {FormName(r.Subject, r.FromId)}");
+                    hints.Add(SessionTexts.EvolutionHintTag(Synergies.NameOf(tag), count + 1, EvolutionRecipe.TagThreshold, FormName(r.Subject, r.FromId)));
             }
             return hints;
         }
@@ -311,7 +311,7 @@ namespace Betaknight.Core
         private string Announce(EvolutionRecipe recipe, string change)
         {
             RecipeBook.DiscoverEvolution(recipe.Id);
-            string line = $"Evolution: {change}";
+            string line = SessionTexts.Evolution(change);
             Evolved?.Invoke(recipe, change);
             BuildImproved?.Invoke(line);
             return line;

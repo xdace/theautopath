@@ -60,8 +60,8 @@ namespace Betaknight.Core.Arena
         public Battle(BattleSetup setup)
         {
             _setup = setup ?? throw new ArgumentNullException(nameof(setup));
-            if (setup.Player == null) throw new ArgumentException("Spieler fehlt.");
-            if (setup.Enemies == null || setup.Enemies.Count == 0) throw new ArgumentException("Mindestens ein Gegner.");
+            if (setup.Player == null) throw new ArgumentException("Player missing.");
+            if (setup.Enemies == null || setup.Enemies.Count == 0) throw new ArgumentException("At least one enemy required.");
 
             Random = new Random(setup.Seed);
             Context = setup.Context ?? new BattleContext();

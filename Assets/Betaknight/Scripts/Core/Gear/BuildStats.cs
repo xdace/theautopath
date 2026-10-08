@@ -89,15 +89,15 @@ namespace Betaknight.Core.Gear
         /// <summary>Die Leiste in fester Reihenfolge.</summary>
         public List<StatLine> Lines() => new List<StatLine>
         {
-            new StatLine("HP", $"{Hp}/{MaxHp}", MaxHp),
-            new StatLine("Waffenschaden", WeaponDamage.ToString(), WeaponDamage),
-            new StatLine("Angriffe/s", Hundredths((int)Math.Round(AttacksPerSecond * 100)), (int)Math.Round(AttacksPerSecond * 1000)),
-            new StatLine("Rüstung", Armor.ToString(), Armor),
-            new StatLine("Ausweichen", SkillInfo.Percent(DodgeBp), DodgeBp),
-            new StatLine("Block", SkillInfo.Percent(BlockBp), BlockBp),
-            new StatLine("Krit", SkillInfo.Percent(CritBp), CritBp),
-            new StatLine("Präzision", SkillInfo.Percent(AccuracyBp), AccuracyBp),
-            new StatLine("Flächenschaden", SkillInfo.Percent(AreaDamageBp), AreaDamageBp),
+            new StatLine(SessionTexts.StatHp, $"{Hp}/{MaxHp}", MaxHp),
+            new StatLine(SessionTexts.StatWeaponDamage, WeaponDamage.ToString(), WeaponDamage),
+            new StatLine(SessionTexts.StatAttacksPerSecond, Hundredths((int)Math.Round(AttacksPerSecond * 100)), (int)Math.Round(AttacksPerSecond * 1000)),
+            new StatLine(SessionTexts.StatArmor, Armor.ToString(), Armor),
+            new StatLine(SessionTexts.StatDodge, SkillInfo.Percent(DodgeBp), DodgeBp),
+            new StatLine(SessionTexts.StatBlock, SkillInfo.Percent(BlockBp), BlockBp),
+            new StatLine(SessionTexts.StatCrit, SkillInfo.Percent(CritBp), CritBp),
+            new StatLine(SessionTexts.StatAccuracy, SkillInfo.Percent(AccuracyBp), AccuracyBp),
+            new StatLine(SessionTexts.StatAreaDamage, SkillInfo.Percent(AreaDamageBp), AreaDamageBp),
         };
 
         /// <summary>Was sich von <paramref name="before"/> zu <paramref name="after"/> ändert, inklusive Boni, die dazukommen oder wegfallen.</summary>
@@ -110,14 +110,14 @@ namespace Betaknight.Core.Gear
                 if (a[i].Score != b[i].Score) changes.Add(new StatChange(a[i].Label, a[i].Text, b[i].Text, Math.Sign(b[i].Score - a[i].Score)));
 
             foreach (string bonus in after.Bonuses)
-                if (!Contains(before.Bonuses, bonus)) changes.Add(new StatChange(bonus, "–", "aktiv", 1));
+                if (!Contains(before.Bonuses, bonus)) changes.Add(new StatChange(bonus, "–", SessionTexts.BonusActive, 1));
             foreach (string bonus in before.Bonuses)
-                if (!Contains(after.Bonuses, bonus)) changes.Add(new StatChange(bonus, "aktiv", "–", -1));
+                if (!Contains(after.Bonuses, bonus)) changes.Add(new StatChange(bonus, SessionTexts.BonusActive, "–", -1));
             return changes;
         }
 
-        /// <summary>125 → «1,25» (ohne Kultur-Einstellungen).</summary>
-        private static string Hundredths(int value) => $"{value / 100},{value % 100:00}";
+        /// <summary>125 → «1.25» (ohne Kultur-Einstellungen).</summary>
+        private static string Hundredths(int value) => ArenaTexts.Hundredths(value);
 
         private static bool Contains(IReadOnlyList<string> list, string value)
         {

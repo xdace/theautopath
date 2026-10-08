@@ -34,6 +34,6 @@ namespace Betaknight.Core.Encounters
             Lines = lines;
         }
 
-        public string Summary => Lines.Count == 0 ? "Nichts passiert." : string.Join(", ", Lines);
+        public string Summary => Lines.Count == 0 ? SessionTexts.NothingHappened : string.Join(", ", Lines);
     }
 }
