@@ -123,6 +123,14 @@ namespace Betaknight.Overworld.Views
                     break;
             }
 
+            if (_cell.IsUnderAttack && _cell.IsContentKnown)
+            {
+                // Angegriffene oder verlorene eigene Mine: rot pulsierend wäre schöner, fürs Erste fest rot getönt.
+                color = Color.Lerp(color, _settings.blockedHighlightColor, 0.6f);
+                text = "!G";
+                textColor = Color.white;
+            }
+
             if (!_cell.IsWalkable) color *= 0.5f;
 
             switch (_highlight)

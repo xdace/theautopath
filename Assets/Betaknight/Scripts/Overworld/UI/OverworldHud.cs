@@ -61,6 +61,11 @@ namespace Betaknight.Overworld.UI
             GUILayout.Label($"Ausrüstung: {GearList()}", _style);
             string sets = SetList();
             if (sets.Length > 0) GUILayout.Label($"Sets: {sets}", _style);
+            foreach (MineRaid raid in _session.Raids)
+            {
+                string state = raid.IsLost ? "verloren" : $"angegriffen, noch {raid.TurnsLeft(_session.Turns.CurrentTurn)} Züge";
+                GUILayout.Label($"<color=#ff7a6b>Mine {raid.Coord}: {state}</color>", _style);
+            }
             GUILayout.Label($"Position: {_session.Player.Position}", _style);
             GUILayout.Label($"Feld: {Describe(_session.CurrentCell)}", _style);
             GUILayout.Label($"Seed: {_session.Map.Seed}", _style);

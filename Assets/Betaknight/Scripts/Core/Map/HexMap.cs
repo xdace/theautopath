@@ -108,6 +108,14 @@ namespace Betaknight.Core.Map
             CellChanged?.Invoke(cell);
         }
 
+        public void SetUnderAttack(HexCoord coord, bool underAttack)
+        {
+            HexCell cell = GetCell(coord);
+            if (cell.IsUnderAttack == underAttack) return;
+            cell.IsUnderAttack = underAttack;
+            CellChanged?.Invoke(cell);
+        }
+
         public void SetWalkable(HexCoord coord, bool walkable)
         {
             HexCell cell = GetCell(coord);

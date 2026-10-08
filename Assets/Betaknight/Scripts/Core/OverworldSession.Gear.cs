@@ -131,7 +131,7 @@ namespace Betaknight.Core
 
         private List<string> RollRewardItems(string source)
         {
-            bool offerItem = source == "Schatztruhe" || (source == "Sieg" && _random.Next(100) < VictoryItemChance);
+            bool offerItem = source == "Schatztruhe" || ((source == "Sieg" || source == "Mine verteidigt") && _random.Next(100) < VictoryItemChance);
             return offerItem ? PickItems(1) : new List<string>();
         }
 

@@ -33,6 +33,9 @@ namespace Betaknight.Core.Map
         /// <summary>Vorbereitet für Hindernisse (Berge, Abgründe). Aktuell sind alle Felder begehbar.</summary>
         public bool IsWalkable { get; internal set; } = true;
 
+        /// <summary>Eine eigene Goldmine wird angegriffen oder ist verloren. Betreten löst den Verteidigungskampf aus.</summary>
+        public bool IsUnderAttack { get; internal set; }
+
         /// <summary>Wie oft der Spieler das Feld betreten hat. Grundlage für spätere Gegneralarme beim Zurückreisen.</summary>
         public int VisitCount { get; internal set; }
 

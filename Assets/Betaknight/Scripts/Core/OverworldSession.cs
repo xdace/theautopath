@@ -32,7 +32,7 @@ namespace Betaknight.Core
         }
 
         /// <summary>Soll eine laufende Mehrfeld-Reise nach diesem Schritt anhalten?</summary>
-        public bool InterruptsTravel => !Success || FirstVisit || Cell.Content.IsHostile();
+        public bool InterruptsTravel => !Success || FirstVisit || Cell.Content.IsHostile() || Cell.IsUnderAttack;
 
         public static StepResult Ok(HexCell cell, bool firstVisit) => new StepResult(true, MoveFailure.None, cell, firstVisit);
         public static StepResult Fail(MoveFailure failure) => new StepResult(false, failure, null, false);

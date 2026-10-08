@@ -60,7 +60,8 @@ namespace Betaknight.Core
         /// <summary>Ein Kampf wurde simuliert, bevor sein Ergebnis angewendet wird.</summary>
         public event Action<CombatResult> CombatFinished;
 
-        public int ClaimedMines { get; private set; }
+        /// <summary>Eroberte Minen, die gerade Gold bringen (nicht verlorene).</summary>
+        public int ClaimedMines => CountProducingMines();
 
         public bool IsGameOver => Stats.IsDead;
 
@@ -89,7 +90,8 @@ namespace Betaknight.Core
                     break;
 
                 case CellContent.GoldMine:
-                    if (!cell.IsResolved) ClaimMine(cell);
+                    if (cell.IsUnderAttack) DefendMine(cell);
+                    else if (!cell.IsResolved) ClaimMine(cell);
                     break;
 
                 case CellContent.Shop:
@@ -103,32 +105,44 @@ namespace Betaknight.Core
         {
             int tier = cell.Coord.DistanceTo(Map.Center);
             var context = new BattleContext { VsBoss = cell.Content == CellContent.Boss, Turn = Turns.CurrentTurn };
-            CombatResult result = _combat.Resolve(new CombatRequest(cell.Content, tier, Stats, Runes, Gear, context), _random);
-            LastCombat = result;
-            CombatFinished?.Invoke(result);
+            CombatResult result = RunCombat(cell.Content, tier, context);
 
             var lines = new List<string>();
             if (!string.IsNullOrEmpty(result.EnemyName)) lines.Add(result.EnemyName);
-            int dealt = Stats.Damage(result.DamageTaken);
-            if (dealt > 0) lines.Add($"-{dealt} HP");
-
             string title = cell.Content == CellContent.Boss ? "Boss" : "Kampf";
 
-            if (!result.Victory || Stats.IsDead)
-            {
-                // Ein verlorener Kampf endet tödlich, auch wenn der Resolver noch HP übrig liess.
-                if (!Stats.IsDead) Stats.Damage(Stats.Hp);
-                lines.Add("Niederlage");
-                MajorEventResolved?.Invoke(new MajorEventOutcome(cell, title, lines));
-                RunEnded?.Invoke();
-                return;
-            }
+            // Ein verlorener Kampf endet tödlich, auch wenn der Resolver noch HP übrig liess.
+            if (!ApplyCombat(cell, result, title, lines)) return;
 
             Stats.AddGold(result.GoldReward);
             lines.Add($"+{result.GoldReward} Gold");
             Map.MarkResolved(cell.Coord);
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, $"{title} gewonnen", lines));
             OfferRunes("Sieg");
+        }
+
+        private CombatResult RunCombat(CellContent enemy, int tier, BattleContext context)
+        {
+            CombatResult result = _combat.Resolve(new CombatRequest(enemy, tier, Stats, Runes, Gear, context), _random);
+            LastCombat = result;
+            CombatFinished?.Invoke(result);
+            return result;
+        }
+
+        /// <summary>
+        /// Wendet Schaden an und beendet bei Niederlage den Run. Gibt true zurück, wenn der Ritter gewonnen hat.
+        /// </summary>
+        private bool ApplyCombat(HexCell cell, CombatResult result, string title, List<string> lines)
+        {
+            int dealt = Stats.Damage(result.DamageTaken);
+            if (dealt > 0) lines.Add($"-{dealt} HP");
+            if (result.Victory && !Stats.IsDead) return true;
+
+            if (!Stats.IsDead) Stats.Damage(Stats.Hp);
+            lines.Add("Niederlage");
+            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, title, lines));
+            RunEnded?.Invoke();
+            return false;
         }
 
         private void OpenTreasure(HexCell cell)
@@ -142,7 +156,7 @@ namespace Betaknight.Core
 
         private void ClaimMine(HexCell cell)
         {
-            ClaimedMines++;
+            _mines.Add(cell.Coord);
             Stats.AddGold(3);
             Map.MarkResolved(cell.Coord);
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, "Goldmine erobert",
@@ -153,6 +167,7 @@ namespace Betaknight.Core
         {
             if (ClaimedMines > 0 && TurnSystem.IsIntervalTurn(turn, MineIncomeInterval))
                 Stats.AddGold(ClaimedMines * MineIncomeGold);
+            UpdateMineRaids(turn);
         }
 
         /// <summary>Steht der Spieler auf einem Shop-Feld und wartet nichts anderes?</summary>

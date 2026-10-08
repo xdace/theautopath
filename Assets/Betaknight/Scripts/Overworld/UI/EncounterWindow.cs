@@ -28,7 +28,15 @@ namespace Betaknight.Overworld.UI
             _session = session;
             _session.EncounterResolved += OnResolved;
             _session.MajorEventResolved += OnMajorResolved;
+            _session.MineRaidStarted += OnRaid;
+            _session.MineLost += OnMineLost;
         }
+
+        private void OnRaid(MineRaid raid) =>
+            Post($"<color=#ff7a6b><b>Goldmine {raid.Coord} angegriffen!</b></color> {OverworldSession.MineRaidTurns} Züge zum Verteidigen");
+
+        private void OnMineLost(MineRaid raid) =>
+            Post($"<color=#ff7a6b><b>Goldmine {raid.Coord} verloren.</b></color> Zurückerobern bringt sie wieder");
 
         /// <summary>Hinweis unten links einblenden, z. B. für andere Systeme.</summary>
         public void Post(string text)
@@ -107,6 +115,8 @@ namespace Betaknight.Overworld.UI
             if (_session == null) return;
             _session.EncounterResolved -= OnResolved;
             _session.MajorEventResolved -= OnMajorResolved;
+            _session.MineRaidStarted -= OnRaid;
+            _session.MineLost -= OnMineLost;
         }
 
         private void OnDestroy() => Unsubscribe();
