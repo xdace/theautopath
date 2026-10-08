@@ -1,36 +1,40 @@
 using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
+using Betaknight.Core.Combat;
 using Betaknight.Core.Runes;
 using NUnit.Framework;
 using static Betaknight.Tests.EditMode.ArenaSimulationTests;
 
 namespace Betaknight.Tests.EditMode
 {
+    /// <summary>Platinen im Kampf (A-19): Relais lösen aus, Komponenten feuern in Lesereihenfolge, keine Cooldowns.</summary>
     public class LogicBoardTests
     {
         private static readonly ConditionRegistry Registry = ConditionRegistry.CreateDefault();
 
         private static ICondition Rune(string id, int parameter = 0) => Registry.Create(id, parameter);
 
-        internal static readonly SkillDefinition Repair = new SkillDefinition("repair", "Not-Reparatur", 4, 4, Ticks.FromSeconds(15),
+        internal static readonly SkillDefinition Repair = new SkillDefinition("repair", "Not-Reparatur", 4, 4,
             new ISkillEffect[] { new HealEffect(BasisPoints.Percent(25)) });
 
-        internal static readonly SkillDefinition ShieldBash = new SkillDefinition("shield_bash", "Schildschlag", 4, 6, Ticks.FromSeconds(6),
+        internal static readonly SkillDefinition ShieldBash = new SkillDefinition("shield_bash", "Schildschlag", 4, 6,
             new ISkillEffect[] { new DamageEffect(BasisPoints.Percent(80)), new StunEffect(Ticks.FromTenths(15)) }, countsAsAttack: true);
 
         /// <summary>Gegner-Skill mit sichtbarer Aufladung von 2 Sekunden.</summary>
-        internal static readonly SkillDefinition HeavySmash = new SkillDefinition("heavy_smash", "Wuchtschlag", Ticks.FromSeconds(2), 10, Ticks.FromSeconds(5),
+        internal static readonly SkillDefinition HeavySmash = new SkillDefinition("heavy_smash", "Wuchtschlag", Ticks.FromSeconds(2), 10,
             new ISkillEffect[] { new DamageEffect(BasisPoints.Percent(400)) }, countsAsAttack: true);
 
         private static LogicBoard Board(params LogicRow[] rows) => new LogicBoard(rows);
 
-        private static LogicBoard SmashingEnemy() => Board(new LogicRow(AlwaysCondition.Instance, HeavySmash, "Immer"));
+        /// <summary>Gegner, der alle 5 s den Wuchtschlag auflädt (Takt-Relais statt «Immer» mit Cooldown).</summary>
+        private static LogicBoard SmashingEnemy() => EnemyBoard.Build(new EnemyPart(new ClockCondition(Ticks.FromSeconds(5)), "Every 5 s", HeavySmash));
 
         [Test]
         public void MarcsExample_ShieldBashInterruptsChargeAndHealIsSkipped()
         {
-            // Zeile 1: [HP < 30 %] -> Reparatur, Zeile 2: [Gegner lädt auf] -> Schildschlag, darunter Basisangriff.
+            // Komponente 1: [HP < 30 %] -> Reparatur, Komponente 2: [Gegner lädt auf] -> Schildschlag, dazu der Basisangriff.
             LogicBoard player = Board(
                 new LogicRow(Rune("hp_low", 30), Repair, "HP Below 30 %"),
                 new LogicRow(Rune("enemy_charging"), ShieldBash, "Enemy Charging"));
@@ -44,14 +48,17 @@ namespace Betaknight.Tests.EditMode
             BattleEvent bash = events.First(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == "shield_bash");
             BattleEvent interrupted = events.First(e => e.Kind == BattleEventKind.ActionInterrupted && e.Detail == "heavy_smash");
 
-            Assert.AreEqual(1, bash.RowIndex, "Zeile 2 feuert.");
+            Assert.AreEqual(1, bash.RowIndex, "Komponente 2 feuert.");
             Assert.Greater(bash.Tick, charge.Tick);
             Assert.Less(interrupted.Tick, charge.Tick + Ticks.FromSeconds(2), "Abgebrochen, bevor der Wuchtschlag trifft.");
-            Assert.IsFalse(events.Any(e => e.Detail == "repair" && e.Tick <= bash.Tick), "HP über 30 %, Zeile 1 wird übersprungen.");
+            Assert.IsFalse(events.Any(e => e.Detail == "repair" && e.Tick <= bash.Tick), "HP über 30 %, Komponente 1 löst nicht aus.");
 
-            // Nach dem Schildschlag: 6 s Cooldown, dazwischen nur Basisangriffe.
+            // Kein Cooldown, aber ein Zustand löst nur bei der steigenden Flanke aus: der nächste Schildschlag kommt erst,
+            // wenn der Gegner erneut auflädt; dazwischen nur Basisangriffe.
             BattleEvent nextBash = events.FirstOrDefault(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == "shield_bash" && e.Tick > bash.Tick);
-            if (nextBash != null) Assert.GreaterOrEqual(nextBash.Tick - bash.Tick, Ticks.FromSeconds(6));
+            if (nextBash != null)
+                Assert.IsTrue(events.Any(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == "heavy_smash" && e.Tick > bash.Tick && e.Tick <= nextBash.Tick),
+                    "erst eine neue Aufladung löst wieder aus");
             Assert.IsTrue(events.Any(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillDefinition.BasicAttackId
                                           && e.Source.Name == "Ritter" && e.Tick > bash.Tick));
         }
@@ -64,41 +71,50 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void HigherRowsWinWhenBothAreMet()
+        public void EarlierComponentsWinWhenBothAreTriggered()
         {
-            var second = new SkillDefinition("second", "Zweite", 2, 2, Ticks.FromSeconds(1), new ISkillEffect[] { new DamageEffect(BasisPoints.Full) });
-            var first = new SkillDefinition("first", "Erste", 2, 2, Ticks.FromSeconds(1), new ISkillEffect[] { new DamageEffect(BasisPoints.Full) });
-            LogicBoard board = Board(new LogicRow(AlwaysCondition.Instance, first), new LogicRow(AlwaysCondition.Instance, second));
+            var second = new SkillDefinition("second", "Zweite", 2, 2, new ISkillEffect[] { new DamageEffect(BasisPoints.Full) });
+            var first = new SkillDefinition("first", "Erste", 2, 2, new ISkillEffect[] { new DamageEffect(BasisPoints.Full) });
+            LogicBoard board = Board(new LogicRow(Rune("battle_start"), first), new LogicRow(Rune("battle_start"), second));
 
             BattleResult r = CombatSimulation.Run(Duel(Fighter("A", 100, 1, board: board), Fighter("B", 30, 1, 1000)));
 
             var started = r.Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Source.Name == "A").ToList();
-            Assert.AreEqual("first", started[0].Detail);
-            // Während "first" auf Cooldown ist, darf "second" feuern.
+            Assert.AreEqual("first", started[0].Detail, "beide lösen im selben Tick aus, die frühere in Lesereihenfolge startet zuerst");
+            // Die zweite wartet in der Warteschlange und startet direkt danach, ohne dass der Basisangriff dazwischenkommt.
             Assert.AreEqual("second", started[1].Detail);
+            Assert.IsTrue(started[1].FromQueue && started[1].QueuedTicks > 0);
         }
 
         [Test]
-        public void SharedCooldownAcrossRows()
+        public void AComponentPoweredByTwoRelaysIsQueuedOnlyOnce()
         {
-            LogicBoard board = Board(new LogicRow(AlwaysCondition.Instance, Repair), new LogicRow(Rune("hp_full"), Repair));
-            var p = Fighter("A", 100, 1, board: board);
-            p.StartHp = 50;
+            // Zwei Relais links und rechts derselben Komponente lösen im selben Tick aus: sie wartet trotzdem nur einmal.
+            var mend = new SkillDefinition("mend", "Flicken", 4, 4, new ISkillEffect[] { new HealEffect(BasisPoints.Percent(10)) });
+            LogicBoard board = LogicBoard.Compile(new BoardLayout(3, 1, null),
+                new[] { new LogicRow(mend, new CellRect(1, 0)) },
+                new[] { new LogicRelay(Rune("battle_start"), "Links", rect: new CellRect(0, 0)), new LogicRelay(Rune("battle_start"), "Rechts", rect: new CellRect(2, 0)) });
+            Assert.AreEqual(2, board.Rows[0].Relays.Count);
 
-            BattleResult r = CombatSimulation.Run(Duel(p, Fighter("B", 30, 1, 1000)));
-
-            var repairs = r.Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == "repair").Select(e => e.Tick).ToList();
-            for (int i = 1; i < repairs.Count; i++) Assert.GreaterOrEqual(repairs[i] - repairs[i - 1], Ticks.FromSeconds(15));
+            BattleResult r = CombatSimulation.Run(Duel(Fighter("A", 100, 1, board: board), Fighter("B", 30, 1, 1000)));
+            List<BattleEvent> own = r.Events.Where(e => e.Source?.Name == "A").ToList();
+            Assert.AreEqual(2, own.Count(e => e.Kind == BattleEventKind.RelayTriggered));
+            Assert.AreEqual(1, own.Count(e => e.Kind == BattleEventKind.RowQueued));
+            BattleEvent missed = own.Single(e => e.Kind == BattleEventKind.TriggerMissed);
+            Assert.AreEqual((int)MissReason.AlreadyQueued, missed.Amount);
+            Assert.AreEqual(1, missed.Relay, "das zweite Relais verpasst");
+            Assert.AreEqual(1, own.Count(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == "mend"));
         }
 
         [Test]
-        public void OrphanedRowsAreSkipped()
+        public void OrphanedComponentsNeverFire()
         {
-            LogicBoard board = Board(new LogicRow(AlwaysCondition.Instance, null, "verwaist"));
+            LogicBoard board = Board(new LogicRow(Rune("battle_start"), null, "verwaist"));
             BattleResult r = CombatSimulation.Run(Duel(Fighter("A", 100, 5, board: board), Fighter("B", 10, 1, 1000)));
 
             Assert.IsTrue(r.IsVictory);
             Assert.IsTrue(r.Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Source.Name == "A").All(e => e.RowIndex == 1));
+            Assert.IsTrue(r.Events.Any(e => e.Kind == BattleEventKind.TriggerMissed && e.Amount == (int)MissReason.Orphaned), "das Auslösen verpufft");
         }
 
         [Test]
@@ -117,7 +133,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void StunCancelsAndBlocksActions()
         {
-            LogicBoard board = Board(new LogicRow(AlwaysCondition.Instance, ShieldBash));
+            LogicBoard board = Board(new LogicRow(Rune("battle_start"), ShieldBash));
             BattleResult r = CombatSimulation.Run(Duel(Fighter("A", 100, 1, board: board), Fighter("B", 1000, 1)));
 
             BattleEvent stun = r.Events.First(e => e.Kind == BattleEventKind.StatusApplied && e.Detail == StatusIds.Stun);
@@ -144,7 +160,7 @@ namespace Betaknight.Tests.EditMode
             var setup = Duel(Fighter("A", 100, 1), Fighter("B", 100, 1, armor: 10));
             setup.Context.OnGoldMine = true;
             var battle = new Battle(setup);
-            var ctx = new ConditionContext(battle, battle.Player, battle.RowState(battle.Player, 0));
+            var ctx = new ConditionContext(battle, battle.Player, new RowRuntime(0));
 
             Assert.IsTrue(Rune("enemy_armored").IsMet(ctx, out Combatant armored));
             Assert.AreSame(battle.Enemies[0], armored);
@@ -173,7 +189,7 @@ namespace Betaknight.Tests.EditMode
             var catalog = RuneCatalog.CreateDefault();
             for (int seed = 0; seed < 200; seed++)
             {
-                RuneOffer offer = RuneOffer.Create("Test", catalog, new RuneLoadout(), new System.Random(seed));
+                RuneOffer offer = RuneOffer.Create("Test", catalog, new CircuitBoard(), new System.Random(seed));
                 Assert.IsFalse(offer.Options.Any(o => o.IsExclusive));
             }
         }

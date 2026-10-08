@@ -1,16 +1,18 @@
 using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Run;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Skills;
 using NUnit.Framework;
 
 namespace Betaknight.Tests.EditMode
 {
     /// <summary>
-    /// Skill-Kennzahlen für den Tafel-Editor: aus den Effekten abgeleitet und gegen das geprüft,
+    /// Skill-Kennzahlen für den Platinen-Editor: aus den Effekten abgeleitet und gegen das geprüft,
     /// was der Simulator wirklich austeilt.
     /// </summary>
     public class SkillInfoTests
@@ -26,20 +28,43 @@ namespace Betaknight.Tests.EditMode
             return gear;
         }
 
-        /// <summary>Tafel mit einer Zeile [Immer] → Skill; ohne Skill nur der Basisangriff.</summary>
-        private static RuneLoadout Board(string skillId)
+        /// <summary>
+        /// Relais, das den Skill gleich zu Kampfbeginn auslöst und gross genug für seine Form ist: «HP Full» ◆ (bis 2 Zellen)
+        /// oder «Outnumbered» ◆◆ (bis 4 Zellen, ab 3 Gegnern).
+        /// </summary>
+        private static string RelayFor(string skillId) => Skills.Get(skillId).Shape.Cells <= 2 ? "hp_full" : "outnumbered";
+
+        /// <summary>
+        /// Platine (6×6) mit dem Relais unten rechts und dem Skill daneben, weit weg vom Kern (kein Kern-Bonus);
+        /// ohne Skill nur der Basisangriff.
+        /// </summary>
+        private static CircuitBoard Board(string skillId)
         {
-            var loadout = new RuneLoadout(4);
-            if (skillId != null) loadout.TryAdd(Runes.Get("always"), skillId);
-            return loadout;
+            var board = new CircuitBoard();
+            while (board.Expand()) { }
+            if (skillId == null) return board;
+            Assert.IsNotNull(board.AddRelay(Runes.Get(RelayFor(skillId)), new Cell(5, 5)));
+            Shape shape = board.ShapeOfSkill(skillId);
+            ComponentSlot slot = board.Place(new SkillInstance(skillId), new Cell(5 - shape.Width, 6 - shape.Height));
+            Assert.IsNotNull(slot, skillId);
+            Assert.IsFalse(board.TouchesCore(slot), skillId);
+            return board;
         }
 
-        private static SkillInfo Info(string skillId, Equipment gear, BattleContext context = null)
+        /// <summary>Kennzahlen wie im Build-Fenster, ohne Schwierigkeits-Bonus.</summary>
+        private static SkillInfo Info(string skillId, Equipment gear, BattleContext context = null) => Info(skillId, gear, 0, context);
+
+        /// <summary>Kennzahlen mit dem Bonus der Stufe <paramref name="tier"/>, wie die Komponente am Relais feuert.</summary>
+        private static SkillInfo Info(string skillId, Equipment gear, int tier, BattleContext context = null)
         {
             SkillUserStats stats = new ArenaCombatResolver().PreviewStats(new PlayerStats(30, 0), Board(skillId), gear, context);
-            // Wie im Kampf: passive Effekte der Ausrüstung auf passende Tags (A-05) sind eingerechnet.
-            return SkillInfo.Create(gear.Boost(Skills.Get(skillId ?? SkillIds.BasicAttack)), stats);
+            // Wie im Kampf: passive Effekte der Ausrüstung auf passende Tags (A-05) sind eingerechnet, danach der Relais-Bonus.
+            return SkillInfo.Create(DifficultyBonusConfig.Default.Apply(gear.Boost(Skills.Get(skillId ?? SkillIds.BasicAttack)), tier), stats);
         }
+
+        /// <summary>Kennzahlen, wie der Skill in <see cref="Simulate"/> feuert: mit dem Bonus seines Relais.</summary>
+        private static SkillInfo FiredInfo(string skillId, Equipment gear, BattleContext context = null) =>
+            Info(skillId, gear, skillId == null ? 0 : Runes.Get(RelayFor(skillId)).Difficulty, context);
 
         /// <summary>Gegner, die nur einstecken: viel Leben, keine Rüstung, kein Schaden, kein Ausweichen.</summary>
         private static BattleResult Simulate(string skillId, Equipment gear, int enemies = 1, int seconds = 12, BattleContext context = null)
@@ -74,12 +99,12 @@ namespace Betaknight.Tests.EditMode
 
             Assert.AreEqual(7, info.Stats.WeaponDamage);
             EffectInfo hit = info.Effects.Single(e => e.Kind == EffectInfoKind.Damage);
-            Assert.AreEqual(BasisPoints.Percent(190), hit.DamageBp);
-            Assert.AreEqual(13, hit.Amount);
-            Assert.AreEqual("190 % Weapon Damage ≈ 13", info.DamageText);
+            Assert.AreEqual(BasisPoints.Percent(300), hit.DamageBp);
+            Assert.AreEqual(21, hit.Amount);
+            Assert.AreEqual("300 % Weapon Damage ≈ 21", info.DamageText);
             Assert.AreEqual(Ticks.FromSeconds(6), info.Effects.Single(e => e.Kind == EffectInfoKind.StatChange).DurationTicks);
             StringAssert.Contains("Enemy Armor −50 % for 6 s", info.OtherEffectsText);
-            Assert.AreEqual("CD 8 s · Cast 0.8 s · Recovery 0.2 s", info.TimingText);
+            Assert.AreEqual("2×2 (4 cells) · Cast 0.8 s · Recovery 0.2 s", info.TimingText, "Grösse statt Cooldown");
         }
 
         [Test]
@@ -89,25 +114,25 @@ namespace Betaknight.Tests.EditMode
 
             EffectInfo burn = info.Effects.Single();
             Assert.AreEqual(EffectInfoKind.DamageOverTime, burn.Kind);
-            Assert.AreEqual(4, burn.Amount, "70 % von 6 Weapon Damage pro Sekunde");
-            Assert.AreEqual(20, burn.Total, "5 s Brennen");
+            Assert.AreEqual(1, burn.Amount, "32 % von 6 Weapon Damage pro Sekunde, abgerundet");
+            Assert.AreEqual(5, burn.Total, "5 s Brennen");
             Assert.AreEqual(Ticks.FromSeconds(5), burn.DurationTicks);
-            Assert.AreEqual("Burn 70 % Weapon Damage/s ≈ 4/s, 20 over 5 s", info.DamageText);
+            Assert.AreEqual("Burn 32 % Weapon Damage/s ≈ 1/s, 5 over 5 s", info.DamageText);
             Assert.IsTrue(info.DealsDamage);
         }
 
         [Test]
-        public void DrillHitsAllEnemiesForHundredEightyPercent()
+        public void DrillHitsAllEnemiesForTwoHundredTenPercent()
         {
             SkillInfo plain = Info(SkillIds.Drill, Gear("short_sword"));
-            Assert.AreEqual("180 % Weapon Damage ≈ 10 to all enemies", plain.DamageText);
+            Assert.AreEqual("210 % Weapon Damage ≈ 12 to all enemies", plain.DamageText);
 
             // Der Plasma-Bohrer gibt Klinge-Skills +25 % Wirkung (A-05: passive Effekte statt Skills).
             SkillInfo info = Info(SkillIds.Drill, Gear("plasma_drill"));
             Assert.AreEqual(9, info.Stats.WeaponDamage);
-            Assert.AreEqual("225 % Weapon Damage ≈ 20 to all enemies", info.DamageText);
+            Assert.AreEqual("262.5 % Weapon Damage ≈ 23 to all enemies", info.DamageText);
             Assert.IsTrue(info.Effects.Single().AllEnemies);
-            Assert.AreEqual("CD 5 s · Cast 1.5 s · Recovery 0.3 s", info.TimingText);
+            Assert.AreEqual("2×2 (4 cells) · Cast 1.5 s · Recovery 0.3 s", info.TimingText);
         }
 
         [Test]
@@ -118,10 +143,10 @@ namespace Betaknight.Tests.EditMode
             SkillInfo onMine = Info(SkillIds.Drill, gear, new BattleContext { OnGoldMine = true });
             SkillInfo elsewhere = Info(SkillIds.Drill, gear);
 
-            // 225 % durch den Plasma-Bohrer (Klinge +25 %), auf der Mine noch einmal +50 % Flächenschaden.
-            Assert.AreEqual(20, elsewhere.Effects.Single().Amount);
-            Assert.AreEqual(30, onMine.Effects.Single().Amount);
-            StringAssert.StartsWith("225 % Weapon Damage ≈ 30", onMine.DamageText);
+            // 262,5 % durch den Plasma-Bohrer (Klinge +25 %), auf der Mine noch einmal +50 % Flächenschaden.
+            Assert.AreEqual(23, elsewhere.Effects.Single().Amount);
+            Assert.AreEqual(34, onMine.Effects.Single().Amount);
+            StringAssert.StartsWith("262.5 % Weapon Damage ≈ 34", onMine.DamageText);
         }
 
         [Test]
@@ -198,8 +223,8 @@ namespace Betaknight.Tests.EditMode
         public void ArmorBreakDealsWhatTheInfoSays()
         {
             Equipment gear = Gear("short_blade");
-            SkillInfo info = Info(SkillIds.ArmorBreak, gear);
-            BattleResult r = Simulate(SkillIds.ArmorBreak, gear);
+            SkillInfo info = FiredInfo(SkillIds.ArmorBreak, gear);
+            BattleResult r = Simulate(SkillIds.ArmorBreak, gear, enemies: 3);
 
             Assert.AreEqual(info.Effects.Single(e => e.IsDamage).Amount, PlayerDamage(r, SkillIds.ArmorBreak).First().Amount);
             Assert.AreEqual(info.WindupTicks, WindupInBattle(r, SkillIds.ArmorBreak));
@@ -209,7 +234,7 @@ namespace Betaknight.Tests.EditMode
         public void IgniteBurnsForTheShownTotal()
         {
             Equipment gear = Gear("spark_staff");
-            SkillInfo info = Info(SkillIds.Ignite, gear);
+            SkillInfo info = FiredInfo(SkillIds.Ignite, gear);
             BattleResult r = Simulate(SkillIds.Ignite, gear, seconds: 6);
 
             List<BattleEvent> burns = PlayerDamage(r, StatusIds.Burn);
@@ -222,7 +247,7 @@ namespace Betaknight.Tests.EditMode
         public void DrillHitsEveryEnemyForTheShownAmount()
         {
             Equipment gear = Gear("plasma_drill");
-            SkillInfo info = Info(SkillIds.Drill, gear);
+            SkillInfo info = FiredInfo(SkillIds.Drill, gear);
             BattleResult r = Simulate(SkillIds.Drill, gear, enemies: 3);
 
             List<BattleEvent> first = PlayerDamage(r, SkillIds.Drill).Take(3).ToList();
@@ -235,8 +260,8 @@ namespace Betaknight.Tests.EditMode
         {
             Equipment gear = Gear("plasma_drill", "crawler_tracks", "resource_compactor");
             var mine = new BattleContext { OnGoldMine = true };
-            SkillInfo info = Info(SkillIds.Drill, gear, mine);
-            BattleResult r = Simulate(SkillIds.Drill, gear, enemies: 2, context: mine);
+            SkillInfo info = FiredInfo(SkillIds.Drill, gear, mine);
+            BattleResult r = Simulate(SkillIds.Drill, gear, enemies: 3, context: mine);
 
             Assert.AreEqual(info.Effects.Single().Amount, PlayerDamage(r, SkillIds.Drill).First().Amount);
         }
@@ -245,7 +270,7 @@ namespace Betaknight.Tests.EditMode
         public void ShieldBashDealsWhatTheInfoSays()
         {
             Equipment gear = Gear("short_sword", "round_shield");
-            SkillInfo info = Info(SkillIds.ShieldBash, gear);
+            SkillInfo info = FiredInfo(SkillIds.ShieldBash, gear);
             BattleResult r = Simulate(SkillIds.ShieldBash, gear);
 
             Assert.AreEqual(info.Effects.Single(e => e.IsDamage).Amount, PlayerDamage(r, SkillIds.ShieldBash).First().Amount);
@@ -257,7 +282,7 @@ namespace Betaknight.Tests.EditMode
         public void BasicAttackDealsWhatTheInfoSaysInTheShownRhythm()
         {
             Equipment gear = Gear("short_blade");
-            SkillInfo info = Info(null, gear);
+            SkillInfo info = FiredInfo(null, gear);
             BattleResult r = Simulate(null, gear);
 
             List<BattleEvent> hits = PlayerDamage(r, SkillIds.BasicAttack);

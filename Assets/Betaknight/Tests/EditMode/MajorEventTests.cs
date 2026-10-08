@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Betaknight.Core;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Exploration;
 using Betaknight.Core.Hex;
@@ -32,14 +33,14 @@ namespace Betaknight.Tests.EditMode
             }
         }
 
-        private static OverworldSession Session(PlayerStats stats = null, ICombatResolver combat = null, RuneLoadout runes = null)
+        private static OverworldSession Session(PlayerStats stats = null, ICombatResolver combat = null, CircuitBoard board = null)
         {
             var map = new HexMap(HexCoord.Zero, 4, 11);
             foreach (HexCoord c in HexCoord.Spiral(HexCoord.Zero, 4))
                 map.AddCell(new HexCell(c, CellContent.Empty));
 
             return new OverworldSession(map, new PlayerModel(HexCoord.Zero), new TurnSystem(), new ExplorationService(map),
-                stats, null, runes, null, combat);
+                stats, null, board, null, combat);
         }
 
         [Test]
@@ -141,7 +142,7 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(s.BuyShopRune(0));
 
             Assert.AreEqual(30 - s.ShopPrices.Rune, s.Stats.Gold);
-            Assert.IsTrue(s.Runes.Contains(rune));
+            Assert.IsTrue(s.Board.Contains(rune), "Die gekaufte Rune liegt als Relais auf der Platine.");
             Assert.IsFalse(s.PendingShop.Inventory.Runes.Contains(rune));
         }
 
@@ -171,14 +172,14 @@ namespace Betaknight.Tests.EditMode
             s.TryStep(East);
 
             Assert.IsFalse(s.BuyShopRune(0));
-            Assert.IsFalse(s.BuyRuneSlot());
+            Assert.IsFalse(s.BuyBoardExpansion());
             Assert.IsFalse(s.RerollShop());
             Assert.IsFalse(s.BuyHeal(), "Volle HP und zu wenig Gold.");
             Assert.AreEqual(2, s.Stats.Gold);
         }
 
         [Test]
-        public void ShopHealSlotAndReroll()
+        public void ShopHealExpansionAndReroll()
         {
             OverworldSession s = Session(new PlayerStats(maxHp: 30, gold: 100));
             s.Stats.Damage(20);
@@ -188,9 +189,9 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(s.BuyHeal());
             Assert.AreEqual(20, s.Stats.Hp);
 
-            Assert.IsTrue(s.BuyRuneSlot());
-            Assert.AreEqual(4, s.Runes.Slots);
-            Assert.IsFalse(s.BuyRuneSlot(), "Nur ein Platz pro Shop.");
+            Assert.IsTrue(s.BuyBoardExpansion());
+            Assert.AreEqual("4×4", s.BoardSize);
+            Assert.IsFalse(s.BuyBoardExpansion(), "Nur eine Erweiterung pro Shop.");
 
             Assert.IsTrue(s.RerollShop());
             Assert.AreEqual(3, s.PendingShop.Inventory.Runes.Count);
@@ -208,11 +209,11 @@ namespace Betaknight.Tests.EditMode
         public void PlaceholderCombatRewardsRunes()
         {
             var resolver = new PlaceholderCombatResolver();
-            var none = new RuneLoadout();
-            var synergy = new RuneLoadout();
+            var none = new CircuitBoard();
+            var synergy = new CircuitBoard();
             RuneCatalog catalog = RuneCatalog.CreateDefault();
-            synergy.TryAdd(catalog.Get("on_hit"));
-            synergy.TryAdd(catalog.Get("enemy_low"));
+            synergy.AddRelay(catalog.Get("on_hit"));
+            synergy.AddRelay(catalog.Get("enemy_low"));
 
             Assert.AreEqual(0, resolver.Mitigation(none));
             Assert.AreEqual(2 * resolver.ReductionPerRune + resolver.SynergyReduction, resolver.Mitigation(synergy));
@@ -223,7 +224,7 @@ namespace Betaknight.Tests.EditMode
         {
             var resolver = new PlaceholderCombatResolver();
             var stats = new PlayerStats(maxHp: 2);
-            CombatResult result = resolver.Resolve(new CombatRequest(CellContent.Enemy, 6, stats, new RuneLoadout()), new Random(1));
+            CombatResult result = resolver.Resolve(new CombatRequest(CellContent.Enemy, 6, stats, new CircuitBoard()), new Random(1));
 
             Assert.IsFalse(result.Victory);
             Assert.AreEqual(0, result.GoldReward);

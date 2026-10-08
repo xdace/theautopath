@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
+using Betaknight.Core.Gear;
 using Betaknight.Core.Map;
 using Betaknight.Core.Run;
 using NUnit.Framework;
@@ -10,7 +12,7 @@ using static Betaknight.Tests.EditMode.ArenaSimulationTests;
 
 namespace Betaknight.Tests.EditMode
 {
-    /// <summary>Kampf-Lesbarkeit: Entscheidungs-Protokoll, Auswertung pro Zeile und Live-Anzeige der Wiedergabe.</summary>
+    /// <summary>Kampf-Lesbarkeit: Relais-Auslösungen und Missed Triggers, Auswertung pro Komponente und Live-Anzeige der Wiedergabe.</summary>
     public class BattleInsightTests
     {
         private static readonly SkillCatalog Skills = SkillCatalog.CreateDefault();
@@ -24,107 +26,136 @@ namespace Betaknight.Tests.EditMode
 
         // ------------------------------------------------------------------ Gründe
 
-        [Test]
-        public void CooldownIsTheReasonWhileTheSkillRecharges()
+        /// <summary>Platine aus dem Katalog: «When Hit» oben links, rechts daneben der Schockstich, darunter der zu grosse
+        /// Rüstungsbrecher (2×2 an einem ◆-Relais), unten rechts die Schubdüsen ohne Relais.</summary>
+        private static LogicBoard MixedBoard()
         {
-            BattleResult r = Run(new LogicBoard(new[] { Row("always", SkillIds.ShieldBash, label: "Immer") }));
-
-            BattleDecision first = r.Decisions[0];
-            Assert.AreEqual(0, first.ChosenRow, "Schildschlag feuert zuerst");
-
-            BattleDecision next = r.Decisions.First(d => d.ChosenRow == 1);
-            RowCheck check = next.Rows[0];
-            Assert.AreEqual(RowCheckState.Cooldown, check.State);
-            Assert.IsTrue(next.Skipped(0));
-
-            // Rest-Cooldown passt genau zur Zeit seit dem Schildschlag.
-            int expected = Skills.Get(SkillIds.ShieldBash).CooldownTicks - (next.Tick - first.Tick);
-            Assert.AreEqual(expected, check.CooldownLeft);
-            Assert.AreEqual(Skills.Get(SkillIds.ShieldBash).CooldownTicks, check.CooldownTotal);
-            StringAssert.StartsWith("skill on cooldown (", RowStateText.Reason(check));
+            var spec = new CircuitSpec { Width = 4, Height = 3 };
+            spec.Relays.Add(new RelaySpec("when_hit", new Cell(0, 0)));
+            spec.Components.Add(new ComponentSpec(SkillIds.ShockStab, new Cell(1, 0)));
+            spec.Components.Add(new ComponentSpec(SkillIds.ArmorBreak, new Cell(0, 1)));
+            spec.Components.Add(new ComponentSpec(SkillIds.Thrusters, new Cell(3, 2)));
+            return BoardFactory.CreateDefault().Create(spec, null);
         }
 
         [Test]
-        public void ConditionFalseIsTheReasonWhenItDoesNotHold()
+        public void TooLargeAndUnpoweredComponentsAreExplained()
         {
-            // Volles Leben gegen eine harmlose Puppe: «HP unter 30 %» wird nie wahr.
+            LogicBoard board = MixedBoard();
+            CollectionAssert.AreEqual(new[] { SkillIds.ShockStab, SkillIds.ArmorBreak, SkillIds.Thrusters }, board.Rows.Select(x => x.Skill.Id).ToList());
+            BattleResult r = Run(board);
+            BattleReport report = BattleReport.Create(r);
+
+            RowReport stab = report.Rows[0], breaker = report.Rows[1], thrusters = report.Rows[2];
+            Assert.Greater(stab.Fired, 0);
+            Assert.AreEqual(stab.Queued, stab.Triggered, "der Schockstich verpasst nichts");
+
+            // Der Rüstungsbrecher berührt das Relais, ist aber zu gross: jedes Auslösen ist ein «Missed Trigger».
+            Assert.IsFalse(breaker.IsPowered);
+            Assert.IsTrue(breaker.IsTooLargeSomewhere);
+            Assert.AreEqual(0, breaker.Fired);
+            Assert.AreEqual(report.RelayTriggers, breaker.MissCount(MissReason.TooLarge));
+            Assert.AreEqual(MissReason.TooLarge, breaker.MainMissReason);
+            Assert.IsTrue(report.HasMissedTriggers);
+            Assert.AreEqual("too large for the relay", RowStateText.Reason(MissReason.TooLarge));
+            CollectionAssert.Contains(report.Hints, "#2 Armor Break never fired: too large for every touching relay.");
+
+            // Die Schubdüsen berührt kein Relais: nie ausgelöst, kein Missed Trigger.
+            Assert.IsFalse(thrusters.IsPowered);
+            Assert.IsFalse(thrusters.IsTooLargeSomewhere);
+            Assert.AreEqual(0, thrusters.Triggered);
+            CollectionAssert.Contains(report.Hints, "#3 Thrusters never fired: no relay touches it.");
+        }
+
+        [Test]
+        public void ARelayThatNeverTriggersIsExplained()
+        {
+            // Volles Leben gegen eine harmlose Puppe: «HP unter 30 %» wird nie wahr, das Relais löst nie aus.
             BattleResult r = Run(new LogicBoard(new[] { Row("hp_low", SkillIds.Repair, 30, "HP unter 30 %") }), Fighter("Puppe", 60, 0, 1000));
 
-            Assert.IsNotEmpty(r.Decisions);
-            foreach (BattleDecision d in r.Decisions)
-            {
-                Assert.AreEqual(1, d.ChosenRow);
-                Assert.AreEqual(RowCheckState.ConditionFalse, d.Rows[0].State);
-            }
-            Assert.AreEqual("missed trigger (condition not met)", RowStateText.Reason(r.Decisions[0].Rows[0]));
-
             BattleReport report = BattleReport.Create(r);
+            Assert.AreEqual(0, report.RelayTriggers);
             Assert.AreEqual(0, report.Rows[0].Fired);
-            Assert.AreEqual(r.Decisions.Count, report.Rows[0].Skipped);
-            Assert.AreEqual(RowCheckState.ConditionFalse, report.Rows[0].MainReason);
-            // H-04: «Missed Trigger» zählt genau die Entscheidungen mit nicht erfüllter Bedingung; sonst kein Grund, keine Grund-Spalte.
-            Assert.AreEqual(r.Decisions.Count, report.Rows[0].MissedTrigger);
-            Assert.IsNull(report.Rows[0].OtherReason);
-            Assert.IsFalse(report.HasOtherReasons);
-            Assert.AreEqual(0, report.Rows[0].ConditionMet, "Triggered");
-            CollectionAssert.Contains(report.Hints, "Row 1: never triggered – try an easer or a different block.");
+            Assert.AreEqual(0, report.Rows[0].Triggered, "Triggered");
+            Assert.AreEqual(0, report.Rows[0].Missed, "nie ausgelöst ist kein verpasster Auslöser");
+            Assert.IsNull(report.Rows[0].MainMissReason);
+            Assert.IsFalse(report.HasMissedTriggers);
+            CollectionAssert.Contains(report.Hints, "#1 Emergency Repair: never triggered – try an easer or a different relay.");
         }
 
         [Test]
-        public void ARarelyTriggeredRowGetsAHint()
+        public void ARarelyTriggeredComponentGetsAHint()
         {
-            // «Kampfbeginn» wird genau einmal wahr: «triggered only 1×».
-            BattleResult r = Run(new LogicBoard(new[] { Row("battle_start", SkillIds.Repair, 0, "Kampfbeginn") }), Fighter("Puppe", 60, 0, 1000));
+            // «Kampfbeginn» löst genau einmal aus; davor steht eine Komponente, deren Cast länger dauert als der Kampf. Die
+            // Reparatur wartet bis zum Ende und feuert nie: «triggered only 1×».
+            var endless = new SkillDefinition("endless", "Endless", Ticks.FromSeconds(1000), 0, new ISkillEffect[0]);
+            BattleResult r = Run(new LogicBoard(new[]
+            {
+                new LogicRow(Conditions.Create("battle_start", 0), endless, "Kampfbeginn"),
+                Row("battle_start", SkillIds.Repair, 0, "Kampfbeginn"),
+            }), Fighter("Puppe", 60, 0, 1000));
             BattleReport report = BattleReport.Create(r);
-            Assert.AreEqual(1, report.Rows[0].ConditionMet);
-            CollectionAssert.Contains(report.Hints, "Row 1: triggered only 1× – try an easer or a different block.");
+            Assert.AreEqual(0, report.Rows[1].Fired);
+            Assert.AreEqual(1, report.Rows[1].Triggered);
+            Assert.AreEqual(1, report.Rows[1].Queued);
+            CollectionAssert.Contains(report.Hints, "#2 Emergency Repair: triggered only 1× – try an easer or a different relay.");
         }
 
         [Test]
-        public void OrphanedRowsAreSkippedAsOrphaned()
+        public void OrphanedComponentsMissAsOrphaned()
         {
-            BattleResult r = Run(new LogicBoard(new[] { Row("always", null, label: "Immer") }), Fighter("Puppe", 30, 0, 1000));
-            Assert.AreEqual(RowCheckState.Orphaned, r.Decisions[0].Rows[0].State);
+            BattleResult r = Run(new LogicBoard(new[] { Row("battle_start", null, label: "Kampfbeginn") }), Fighter("Puppe", 30, 0, 1000));
             BattleReport report = BattleReport.Create(r);
-            CollectionAssert.Contains(report.Hints, "Row 1 never fired: orphaned, no skill assigned.");
-            // H-04: «skipped» nur für verwaiste Zeilen; sie sind ein anderer Grund als ein verpasster Auslöser.
-            Assert.AreEqual("skipped (no skill)", RowStateText.Reason(r.Decisions[0].Rows[0]));
-            Assert.AreEqual(RowCheckState.Orphaned, report.Rows[0].OtherReason);
-            Assert.IsTrue(report.HasOtherReasons);
-            Assert.AreEqual(0, report.Rows[0].MissedTrigger);
+            CollectionAssert.Contains(report.Hints, "#1 — never fired: no skill placed.");
+            Assert.AreEqual("no skill", RowStateText.Reason(MissReason.Orphaned));
+            Assert.AreEqual(1, report.Rows[0].MissCount(MissReason.Orphaned));
+            Assert.AreEqual(MissReason.Orphaned, report.Rows[0].MainMissReason);
+            Assert.AreEqual(0, report.Rows[0].MissCount(MissReason.AlreadyQueued));
         }
 
         [Test]
-        public void ReadyRowsDuringAnUninterruptibleActionAreMarkedAsActionRunning()
+        public void ATriggerDuringARunningActionWaitsInTheQueue()
         {
-            // Schildschlag holt aus, die schnelle Puppe trifft: «HP unter 100 %» wird wahr, während die Aktion läuft.
+            // Schildschlag holt aus, die schnelle Puppe trifft: «HP unter 100 %» löst aus, während die Aktion läuft.
             var board = new LogicBoard(new[]
             {
                 Row("hp_low", SkillIds.Repair, 100, "Verletzt"),
-                Row("always", SkillIds.ShieldBash, label: "Immer"),
+                Row("battle_start", SkillIds.ShieldBash, label: "Kampfbeginn"),
             });
             BattleResult r = Run(board, Fighter("Puppe", 400, 1, 3));
+            Combatant player = r.Fighters[0].Combatant;
 
-            BattleDecision busy = r.Decisions.First(d => d.IsBusy);
-            Assert.AreEqual(RowCheckState.ActionRunning, busy.Rows[0].State);
-            Assert.AreEqual(1, busy.RunningRow);
-            Assert.IsTrue(busy.Skipped(0));
-            Assert.AreEqual("condition met, but an action is running", RowStateText.Reason(busy.Rows[0]));
+            BattleEvent bash = r.Events.First(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.ShieldBash);
+            BattleEvent queued = r.Events.First(e => e.Kind == BattleEventKind.RowQueued && e.Source == player && e.RowIndex == 0);
+            Assert.Less(bash.Tick, queued.Tick);
+            Assert.Less(queued.Tick, bash.Tick + bash.Amount, "eingereiht, während der Schildschlag noch ausholt");
+            Assert.IsFalse(r.Events.Any(e => e.Kind == BattleEventKind.ActionInterrupted && e.Detail == SkillIds.ShieldBash), "nichts bricht den Schildschlag ab");
 
-            // Pro laufender Aktion nur ein Eintrag je Zeile, nicht jeden Tick.
-            var perAction = r.Decisions.Where(d => d.IsBusy).GroupBy(d => d.RunningRow + ":" + LastChoiceBefore(r, d.Tick));
-            foreach (var group in perAction) Assert.LessOrEqual(group.Count(d => d.Rows[0].State == RowCheckState.ActionRunning), 1);
+            BattleEvent repair = r.Events.First(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.Repair);
+            Assert.IsTrue(repair.FromQueue);
+            Assert.Greater(repair.Tick, bash.Tick + bash.Amount - 1, "startet erst nach dem Schildschlag");
+            Assert.AreEqual(repair.Tick - queued.Tick, repair.QueuedTicks);
+            Assert.Greater(BattleReport.Create(r).Rows[0].AverageWaitTicks, 0);
         }
 
-        private static int LastChoiceBefore(BattleResult r, int tick) => r.Decisions.Last(d => !d.IsBusy && d.Tick <= tick).Tick;
-
         [Test]
-        public void DecisionsAreOnlyRecordedWhenSomethingIsDecided()
+        public void EveryRelayTriggerReachesEachComponentItTouches()
         {
-            BattleResult r = Run(new LogicBoard(new[] { Row("always", SkillIds.ShieldBash) }));
-            int started = r.Events.Count(e => e.Kind == BattleEventKind.ActionStarted && e.Source.Side == Side.Player);
-            Assert.AreEqual(started, r.Decisions.Count(d => !d.IsBusy));
-            Assert.Less(r.Decisions.Count, r.EndTick / 4, "deutlich weniger Einträge als Ticks");
+            // Jedes Auslösen nennt, wie viele Komponenten es versorgt; jede berührte Komponente wird eingereiht oder verpasst.
+            LogicBoard board = MixedBoard();
+            BattleResult r = Run(board);
+            Combatant player = r.Fighters[0].Combatant;
+            List<BattleEvent> own = r.Events.Where(e => e.Source == player).ToList();
+            List<BattleEvent> triggers = own.Where(e => e.Kind == BattleEventKind.RelayTriggered).ToList();
+            Assert.IsNotEmpty(triggers);
+            Assert.Less(triggers.Count, r.EndTick / 4, "deutlich weniger Einträge als Ticks");
+            foreach (BattleEvent t in triggers)
+            {
+                Assert.AreEqual(1, t.Extra, "versorgt nur den Schockstich");
+                List<BattleEvent> reached = own.Where(e => e.Tick == t.Tick && e.Relay == t.Relay
+                    && (e.Kind == BattleEventKind.RowQueued || e.Kind == BattleEventKind.TriggerMissed)).ToList();
+                CollectionAssert.AreEquivalent(new[] { 0, 1 }, reached.Select(e => e.RowIndex).ToList(), $"Tick {t.Tick}");
+            }
         }
 
         // ------------------------------------------------------------------ Auswertung
@@ -156,9 +187,9 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void BurnDamageCountsForTheRowThatIgnited()
+        public void BurnDamageCountsForTheComponentThatIgnited()
         {
-            BattleResult r = Run(new LogicBoard(new[] { Row("always", SkillIds.Ignite, label: "Immer") }), Fighter("Puppe", 400, 0, 1000));
+            BattleResult r = Run(new LogicBoard(new[] { Row("battle_start", SkillIds.Ignite, label: "Kampfbeginn") }), Fighter("Puppe", 400, 0, 1000));
             Combatant player = r.Fighters[0].Combatant;
             List<BattleEvent> burns = r.Events.Where(e => e.Kind == BattleEventKind.Damage && e.Source == player && e.Detail == StatusIds.Burn).ToList();
 
@@ -179,39 +210,45 @@ namespace Betaknight.Tests.EditMode
         /// Mit A-12 erneut: Skills neu eingestellt, Basisangriff 60 % und verkürzt Cooldowns, Gegner-HP 65 %.
         /// Mit A-13 erneut: Warteschlange, erfüllte Zeilen warten statt übersprungen zu werden; durchgehend erfüllte feuern nach jedem Cooldown.
         /// Schild mit Bohrstoß an der Start-Rune: Seed 5 des Schildritters erneut aufgenommen.
+        /// Mit A-19 erneut: Platine statt Tafel, keine Cooldowns, Relais lösen bei Ereignissen bzw. steigender Flanke aus,
+        /// Skills nach Grösse neu eingestellt, Gegner mit Takt-Relais.
         /// </summary>
-        [TestCase("blade", 5, "2 Kämpfe, 160 Ereignisse, ECDD1EF6E91402DD")]
-        [TestCase("blade", 21, "3 Kämpfe, 168 Ereignisse, 2427B85FF7426862")]
-        [TestCase("shield", 5, "4 Kämpfe, 336 Ereignisse, 23FF6E4CF91A9B38")]
-        [TestCase("shield", 21, "2 Kämpfe, 200 Ereignisse, 3CF50B54B9F5F2B1")]
-        [TestCase("spark", 5, "2 Kämpfe, 139 Ereignisse, FC176BE2532C6AA4")]
-        [TestCase("spark", 21, "2 Kämpfe, 142 Ereignisse, F7164EE645981A14")]
+        [TestCase("blade", 5, "3 Kämpfe, 268 Ereignisse, 3AD0920C43ADA63A")]
+        [TestCase("blade", 21, "3 Kämpfe, 192 Ereignisse, 86B5A1950A926B32")]
+        [TestCase("shield", 5, "6 Kämpfe, 659 Ereignisse, DD0BA36073CDDD91")]
+        [TestCase("shield", 21, "2 Kämpfe, 241 Ereignisse, BA6101FE6AAF1A1C")]
+        [TestCase("spark", 5, "3 Kämpfe, 285 Ereignisse, 808777C913A56248")]
+        [TestCase("spark", 21, "2 Kämpfe, 166 Ereignisse, BCBED52BC40C3DF6")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {
             Assert.AreEqual(fingerprint, Fingerprint(BotBattles(KnightKit.Defaults.Single(k => k.Id == kit), seed)));
         }
 
         [Test]
-        public void SameSeedsGiveTheSameDecisions()
+        public void SameSeedsGiveTheSameQueues()
         {
             KnightKit kit = KnightKit.Defaults.Single(k => k.Id == "shield");
             List<BattleResult> a = BotBattles(kit, 21);
             List<BattleResult> b = BotBattles(kit, 21);
             Assert.AreEqual(a.Count, b.Count);
+            Assert.IsNotEmpty(a);
             for (int i = 0; i < a.Count; i++)
             {
                 Assert.AreEqual(Describe(a[i]), Describe(b[i]));
 
-                // Jede gewählte Zeile ist genau eine gestartete Aktion des Spielers.
+                // Jede Komponente startet aus der Warteschlange; nur der Basisangriff und Wiederholungen nicht.
                 Combatant player = a[i].Fighters[0].Combatant;
-                CollectionAssert.AreEqual(
-                    a[i].Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Source == player && !e.IsRepeat).Select(e => (e.Tick, e.RowIndex)),
-                    a[i].Decisions.Where(d => !d.IsBusy).Select(d => (d.Tick, d.ChosenRow)));
+                List<BattleEvent> starts = a[i].Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Source == player && !e.IsRepeat).ToList();
+                Assert.IsTrue(starts.Where(e => e.Detail != SkillIds.BasicAttack).All(e => e.FromQueue));
+                Assert.IsTrue(starts.Where(e => e.Detail == SkillIds.BasicAttack).All(e => !e.FromQueue));
+                Assert.LessOrEqual(starts.Count(e => e.FromQueue), a[i].Events.Count(e => e.Kind == BattleEventKind.RowQueued && e.Source == player));
             }
         }
 
-        private static string Describe(BattleResult r) => string.Join(";", r.Decisions.Select(d =>
-            $"{d.Tick}:{d.ChosenRow}:{d.RunningRow}:" + string.Join(",", d.Rows.Select(c => $"{c.State}/{c.CooldownLeft}/{c.ConditionMet}"))));
+        private static string Describe(BattleResult r) => string.Join(";", r.Events
+            .Where(e => e.Kind == BattleEventKind.RelayTriggered || e.Kind == BattleEventKind.RowQueued || e.Kind == BattleEventKind.TriggerMissed
+                        || e.Kind == BattleEventKind.ActionStarted)
+            .Select(e => $"{e.Tick}:{e.Kind}:{e.Source?.Index}:{e.RowIndex}:{e.Relay}:{e.QueuedTicks}:{e.Amount}"));
 
         internal static string Fingerprint(IEnumerable<BattleResult> battles)
         {
@@ -265,27 +302,32 @@ namespace Betaknight.Tests.EditMode
         // ------------------------------------------------------------------ Wiedergabe
 
         [Test]
-        public void PlaybackShowsRowStatesCooldownAndSkipReasons()
+        public void PlaybackShowsComponentStatesRelaysAndMissReasons()
         {
-            BattleResult r = Run(new LogicBoard(new[] { Row("always", SkillIds.ShieldBash, label: "Immer") }));
+            BattleResult r = Run(MixedBoard());
             var p = new BattlePlayback(r);
-            Assert.AreEqual(RowDisplay.Unknown, p.RowStateAt(0));
+            Assert.AreEqual(RowDisplay.Idle, p.RowStateAt(0));
+            Assert.AreEqual(RowDisplay.TooLarge, p.RowStateAt(1));
+            Assert.AreEqual(RowDisplay.Unpowered, p.RowStateAt(2));
+            Assert.AreEqual(0, p.RelayCount(0));
 
-            p.Advance(r.Decisions[0].Tick);
-            Assert.AreEqual(RowDisplay.Cooldown, p.RowStateAt(0));
-            Assert.AreEqual(1f, p.CooldownFraction(0), 0.001f);
+            BattleEvent trigger = r.Events.First(e => e.Kind == BattleEventKind.RelayTriggered && e.Source == r.Fighters[0].Combatant);
+            p.Advance(trigger.Tick);
+            Assert.IsTrue(p.IsRelayLit(0));
+            Assert.AreEqual(1, p.RelayCount(0));
+            Assert.AreEqual(RowDisplay.Firing, p.RowStateAt(0), "der Schockstich startet im selben Tick");
+            StringAssert.Contains("too large for the relay", p.LastSkipReason(1));
+            Assert.IsNull(p.LastSkipReason(0), "der Schockstich hat nichts verpasst");
+            Assert.IsNull(p.LastSkipReason(3), "der Basisangriff wird nie ausgelöst");
 
-            BattleDecision skip = r.Decisions.First(d => d.ChosenRow == 1);
-            p.Advance(skip.Tick - p.Tick);
-            Assert.Less(p.CooldownFraction(0), 1f);
-            StringAssert.Contains("skill on cooldown (", p.LastSkipReason(0));
-            Assert.IsNull(p.LastSkipReason(1), "Fallback wurde nie übersprungen");
+            p.Advance(BattlePlayback.RowHighlightTicks);
+            Assert.IsFalse(p.IsRelayLit(0), "das Leuchten vergeht");
         }
 
         [Test]
         public void PlaybackTracksStatusesResourcesAndPopups()
         {
-            BattleResult r = Run(new LogicBoard(new[] { Row("always", SkillIds.Ignite, label: "Immer") }), Fighter("Puppe", 400, 0, 1000));
+            BattleResult r = Run(new LogicBoard(new[] { Row("battle_start", SkillIds.Ignite, label: "Kampfbeginn") }), Fighter("Puppe", 400, 0, 1000));
             int ignite = r.Events.First(e => e.Kind == BattleEventKind.StatusApplied && e.Detail == StatusIds.Burn).Tick;
             var p = new BattlePlayback(r);
             p.Advance(ignite);
@@ -303,7 +345,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void LogFilterSeparatesOwnActionsAndDamage()
         {
-            BattleResult r = Run(new LogicBoard(new[] { Row("always", SkillIds.ShieldBash, label: "Immer") }), Fighter("Puppe", 60, 2, 25));
+            BattleResult r = Run(new LogicBoard(new[] { Row("clock", SkillIds.ShieldBash, 2, "Clock 2 s") }), Fighter("Puppe", 60, 2, 25));
             var p = new BattlePlayback(r);
             p.SkipToEnd();
 

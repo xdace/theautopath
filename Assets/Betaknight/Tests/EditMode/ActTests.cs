@@ -97,7 +97,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(2, next.Act);
             Assert.AreNotEqual(first.Map.Seed, next.Map.Seed);
             Assert.AreSame(first.Stats, next.Stats);
-            Assert.AreSame(first.Runes, next.Runes);
+            Assert.AreSame(first.Board, next.Board);
             Assert.AreSame(first.Gear, next.Gear);
             Assert.AreSame(first.Kit, next.Kit);
             Assert.AreEqual(first.Turns.CurrentTurn, next.Turns.CurrentTurn);

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Exploration;
 using Betaknight.Core.Gear;
@@ -10,6 +11,7 @@ using Betaknight.Core.Map;
 using Betaknight.Core.Movement;
 using Betaknight.Core.Run;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Skills;
 using Betaknight.Core.Turns;
 using NUnit.Framework;
 using static Betaknight.Tests.EditMode.ArenaSimulationTests;
@@ -57,7 +59,8 @@ namespace Betaknight.Tests.EditMode
         {
             OverworldSession s = Session(60);
             s.Gear.Equip(s.Items.Get("round_shield"));
-            s.Runes.TryAdd(s.RuneCatalog.Get("enemy_charging"), SkillIds.ShieldBash);
+            KnightKit.LayOut(s.Board, s.RuneCatalog.Get("enemy_charging"), s.GainSkill(SkillIds.ShieldBash));
+            Assert.IsTrue(s.IsPowered(s.Board.Components.Single()));
             CombatResult? boss = null;
             s.BossEncountered += r => boss = r;
 
@@ -89,16 +92,27 @@ namespace Betaknight.Tests.EditMode
             {
                 var eq = new Equipment();
                 foreach (string g in gear) eq.Equip(items.Get(g));
-                var loadout = new RuneLoadout(4);
-                foreach ((string rune, string skill) in rows) loadout.TryAdd(runes.Get(rune), skill);
+                // Je Paar ein Relais und rechts daneben die Komponente, untereinander und abseits des Kerns.
+                var loadout = new CircuitBoard();
+                while (loadout.Expand()) { }
+                int y = 0;
+                foreach ((string rune, string skill) in rows)
+                {
+                    Assert.IsNotNull(loadout.AddRelay(runes.Get(rune), new Cell(3, y)), rune);
+                    ComponentSlot slot = loadout.Place(new SkillInstance(skill), new Cell(4, y));
+                    Assert.IsNotNull(slot, skill);
+                    y += slot.Shape.Height;
+                }
                 CombatResult r = new ArenaCombatResolver().Resolve(new CombatRequest(CellContent.Boss, 5, new PlayerStats(24, 0), loadout, eq,
                     new BattleContext { VsBoss = true }), new Random(1));
                 return r.Victory ? 24 - r.DamageTaken : 0;
             }
 
-            int plain = RestHp(new[] { "short_blade" }, ("on_hit", SkillIds.ArmorBreak));
+            // Seit A-19 kann «On Hit» (◆, bis 2 Zellen) den 2×2-Rüstungsbrecher des einfachen Ritters nicht versorgen: er
+            // kämpft wie zuvor faktisch nur mit dem Basisangriff. «Every 5 Seconds» ersetzt das frühere «Immer» mit Cooldown.
+            int plain = RestHp(new[] { "short_blade" });
             int phantom = RestHp(new[] { "gyro_thrusters", "holo_projector", "shock_dagger" },
-                ("always", SkillIds.Flashbang), ("enemy_charging", SkillIds.Thrusters));
+                ("every_5s", SkillIds.Flashbang), ("enemy_charging", SkillIds.Thrusters));
             Assert.Greater(phantom, plain);
             Assert.Greater(phantom, 0);
         }

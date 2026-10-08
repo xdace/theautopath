@@ -38,7 +38,7 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void FiringRowLightsUpAndIsNamed()
+        public void FiringComponentLightsUpAndIsNamed()
         {
             BattleResult r = Fight();
             int bash = r.Events.First(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.ShieldBash).Tick;
@@ -46,7 +46,7 @@ namespace Betaknight.Tests.EditMode
 
             p.Advance(bash);
             Assert.IsTrue(p.IsRowHighlighted(0));
-            Assert.IsTrue(p.Lines.Any(l => l.Contains("[Enemy Charging] → Shield Bash")), string.Join("\n", p.Lines));
+            Assert.IsTrue(p.Lines.Any(l => l.Contains("[Enemy Charging] → #1 Shield Bash")), string.Join("\n", p.Lines));
 
             p.Advance(BattlePlayback.RowHighlightTicks);
             Assert.IsFalse(p.IsRowHighlighted(0));

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Exploration;
 using Betaknight.Core.Gear;
@@ -15,7 +16,7 @@ using NUnit.Framework;
 
 namespace Betaknight.Tests.EditMode
 {
-    /// <summary>Inventar: sammeln und wechseln statt ersetzen, mit allen Ausrüstungs- und Tafelregeln.</summary>
+    /// <summary>Inventar: sammeln und wechseln statt ersetzen, mit allen Ausrüstungs- und Platinenregeln.</summary>
     public class InventoryTests
     {
         private static readonly HexCoord East = new HexCoord(1, 0);
@@ -172,33 +173,37 @@ namespace Betaknight.Tests.EditMode
         public void RuneKeepsItsLevelWhenStoredAndReinserted()
         {
             OverworldSession s = Session();
-            s.Runes.TryAdd(s.RuneCatalog.Get("hp_low"), SkillIds.BasicAttack);
-            Assert.IsTrue(s.Runes.Upgrade(0));
-            Assert.AreEqual("HP Below 40 %", s.Runes.Rows[0].Name);
+            s.Board.AddRelay(s.RuneCatalog.Get("hp_low"), new Cell(2, 0));
+            Assert.IsTrue(s.Board.Upgrade(0));
+            Assert.AreEqual("HP Below 40 %", s.Board.Relays[0].Name);
 
             Assert.IsTrue(s.UnequipRune(0));
-            Assert.AreEqual(0, s.Runes.Rows.Count);
+            Assert.AreEqual(0, s.Board.Relays.Count);
             Assert.AreEqual(1, s.RuneInventory.Runes.Single().Level);
             Assert.AreEqual("HP Below 40 %", s.RuneInventory.Runes.Single().Name);
 
-            Assert.IsTrue(s.EquipRuneFromInventory(0));
-            Assert.AreEqual(1, s.Runes.Rows[0].Level);
+            Assert.IsTrue(s.EquipRuneFromInventory(0, new Cell(3, 2)));
+            Assert.AreEqual(1, s.Board.Relays[0].Level);
+            Assert.AreEqual(new Cell(3, 2), s.Board.Relays[0].Position);
             Assert.AreEqual(0, s.RuneInventory.Count);
         }
 
         [Test]
-        public void SwappingARuneKeepsTheSkillOnTheRow()
+        public void SwappingARuneKeepsTheRelayInPlace()
         {
+            // A-19: Der Tausch wechselt nur die Rune des Relais; Lage und die versorgte Komponente bleiben.
             OverworldSession s = Session();
             Wear(s, "short_blade");
-            s.Runes.TryAdd(s.RuneCatalog.Get("on_hit"), SkillIds.ArmorBreak);
+            s.Board.AddRelay(s.RuneCatalog.Get("on_hit"), new Cell(2, 0));
+            Assert.IsTrue(s.PlaceSkill(s.Skills.Add(SkillIds.ShockStab).InstanceId, new Cell(3, 0)));
             s.RuneInventory.TryAdd(new StoredRune(s.RuneCatalog.Get("hp_low"), 2));
 
             Assert.IsTrue(s.SwapRune(0, 0));
 
-            Assert.AreEqual("hp_low", s.Runes.Rows[0].Rune.Id);
-            Assert.AreEqual(2, s.Runes.Rows[0].Level);
-            Assert.AreEqual(SkillIds.ArmorBreak, s.Runes.Rows[0].SkillId);
+            Assert.AreEqual("hp_low", s.Board.Relays[0].Rune.Id);
+            Assert.AreEqual(2, s.Board.Relays[0].Level);
+            Assert.AreEqual(new Cell(2, 0), s.Board.Relays[0].Position);
+            Assert.AreEqual(SkillIds.ShockStab, s.Board.ComponentsTouching(s.Board.Relays[0]).Single().Skill.SkillId);
             Assert.AreEqual("on_hit", s.RuneInventory.Runes.Single().Rune.Id);
         }
 
@@ -207,14 +212,14 @@ namespace Betaknight.Tests.EditMode
         {
             OverworldSession s = Session();
             foreach (RuneDefinition r in s.RuneCatalog.All.Where(r => r.Weight > 0 && !r.IsExclusive).Skip(3))
-                if (!s.RuneInventory.TryAdd(new StoredRune(r))) s.Runes.TryAdd(r);
+                if (!s.RuneInventory.TryAdd(new StoredRune(r))) s.Board.AddRelay(r);
 
             RuneOffer offer = s.OfferRunes("Test");
             Assert.IsNotNull(offer);
             foreach (RuneDefinition r in offer.Options)
             {
                 Assert.IsFalse(s.RuneInventory.Contains(r), r.Id);
-                Assert.IsFalse(s.Runes.Contains(r), r.Id);
+                Assert.IsFalse(s.Board.Contains(r), r.Id);
             }
         }
 
@@ -224,8 +229,10 @@ namespace Betaknight.Tests.EditMode
             var catalog = RuneCatalog.CreateDefault();
             OverworldSession s = Session();
             var free = catalog.All.Where(r => r.Weight > 0 && !r.IsExclusive).ToList();
-            for (int i = 0; i < s.Runes.Slots; i++) s.Runes.TryAdd(free[i]);
-            for (int i = 0; i < s.RuneInventory.Capacity; i++) s.RuneInventory.TryAdd(new StoredRune(free[s.Runes.Slots + i]));
+            // Platine voll mit Relais (kein Platz für ein weiteres), Runen-Inventar voll.
+            int onBoard = 0;
+            while (!s.Board.IsFull) Assert.IsNotNull(s.Board.AddRelay(free[onBoard++]));
+            for (int i = 0; i < s.RuneInventory.Capacity; i++) s.RuneInventory.TryAdd(new StoredRune(free[onBoard + i]));
 
             RuneOffer offer = s.OfferRunes("Test");
             Assert.IsTrue(s.TakeRune(0));
@@ -246,20 +253,26 @@ namespace Betaknight.Tests.EditMode
             Wear(s, "holo_barrier");
             Put(s, "shock_absorber");
             RuneDefinition chargeFull = s.RuneCatalog.Get("charge_full");
-            s.Runes.TryAdd(chargeFull, SkillIds.EmpBash);
-            LogicRow Row() => BoardFactory.CreateDefault().Create(s.Runes.ToBoardSpecs(), s.Gear).Rows[0];
+            s.Board.AddRelay(chargeFull, new Cell(1, 0));
+            Assert.IsTrue(s.PlaceSkill(s.Skills.Add(SkillIds.EmpBash).InstanceId, new Cell(2, 0)), "2×2 rechts am Relais");
+
+            // A-19: Eine gesperrte Set-Rune ergibt ein totes Relais (löst nie aus); die Komponente bleibt liegen.
+            LogicBoard Compiled() => BoardFactory.CreateDefault().Create(s.Board.ToSpec(), s.Gear);
+            bool RelayDead() => Compiled().Relays[0].Condition is NotCondition not && not.Inner is AlwaysCondition;
 
             Assert.IsFalse(s.IsRuneUnlocked(chargeFull));
-            Assert.IsTrue(Row().IsOrphaned, "Set-Rune braucht 2 Aegis-Teile");
+            Assert.IsTrue(RelayDead(), "Set-Rune braucht 2 Aegis-Teile");
+            Assert.IsFalse(Compiled().Rows[0].IsOrphaned);
 
             Assert.IsTrue(s.EquipFromInventory(0));
             Assert.AreEqual(2, s.WornSets().Single().pieces);
             Assert.IsTrue(s.IsRuneUnlocked(chargeFull));
-            Assert.IsFalse(Row().IsOrphaned);
+            Assert.IsFalse(RelayDead());
 
             Assert.IsTrue(s.UnequipToInventory(EquipmentSlot.Shield));
             Assert.IsFalse(s.IsRuneUnlocked(chargeFull));
-            Assert.IsTrue(Row().IsOrphaned, "Ohne Schild fehlt auch der Skill");
+            Assert.IsTrue(RelayDead(), "Ohne Schild fehlt das Set");
+            Assert.AreEqual(SkillIds.EmpBash, Compiled().Rows[0].Skill.Id, "A-05: Der Skill gehört der Komponente, nicht dem Schild");
         }
 
         [Test]

@@ -1,6 +1,7 @@
 using System.Linq;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Exploration;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Hex;
@@ -16,7 +17,7 @@ namespace Betaknight.Tests.EditMode
 {
     /// <summary>
     /// Die Logik hinter den Drops der Fenster «Build» und «Inventar»: Item-Raster mit fester Reihenfolge, Anlegen auf
-    /// den passenden Platz, Ablegen in eine Zelle, Skills und Runen an der Tafel, Sperre bei offenen Entscheidungen, Stat-Vorschau.
+    /// den passenden Platz, Ablegen in eine Zelle, Komponenten und Relais auf der Platine, Sperre bei offenen Entscheidungen, Stat-Vorschau.
     /// </summary>
     public class BuildWindowLogicTests
     {
@@ -174,52 +175,60 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(s.MoveInventoryItem(0, 1));
         }
 
-        // ------------------------------------------------------------------ Tafel
+        // ------------------------------------------------------------------ Platine
 
         [Test]
-        public void SkillsGoIntoRowsSwapAndComeBackOut()
+        public void SkillsGoOntoTheBoardWithoutOverlapAndComeBackOut()
         {
+            // A-19 (früher: Skills in Zeilen einsetzen und tauschen): Komponenten liegen in ihrer Form auf freien Zellen,
+            // nichts verdrängt etwas anderes; Tauschen zwischen Zeilen gibt es nicht mehr, verschoben wird per Ziehen.
             OverworldSession s = Session();
             SkillInstance drill = s.Skills.Add(SkillIds.Drill);
             SkillInstance bash = s.Skills.Add(SkillIds.ShieldBash);
             SkillInstance ignite = s.Skills.Add(SkillIds.Ignite);
-            Assert.IsTrue(s.Runes.TryAdd(s.RuneCatalog.Get("always"), drill));
-            Assert.IsTrue(s.Runes.TryAdd(s.RuneCatalog.Get("hp_low"), bash));
+            Assert.IsTrue(s.PlaceSkill(drill.InstanceId, new Cell(2, 0)), "2×2 oben rechts");
+            Assert.IsTrue(s.PlaceSkill(bash.InstanceId, new Cell(0, 1)), "1×2 links unten");
 
-            Assert.IsTrue(s.PlaceSkill(ignite.InstanceId, 0), "auf eine besetzte Zeile: einsetzen, der alte wird frei");
-            Assert.AreSame(ignite, s.Runes.Rows[0].Skill);
-            Assert.IsTrue(drill.IsFree);
-
-            Assert.IsTrue(s.SwapSkills(0, 1), "Zeile auf Zeile: tauschen");
-            Assert.AreSame(bash, s.Runes.Rows[0].Skill);
-            Assert.AreSame(ignite, s.Runes.Rows[1].Skill);
-
-            Assert.IsTrue(s.RemoveSkill(1), "zurück ins Skill-Inventar");
+            Assert.IsFalse(s.CanPlaceSkill(ignite.InstanceId, new Cell(2, 1)));
+            Assert.IsFalse(s.PlaceSkill(ignite.InstanceId, new Cell(2, 1)), "auf eine besetzte Zelle: nichts wird verdrängt");
+            Assert.AreSame(drill, s.Board.At(new Cell(2, 1)) is ComponentSlot c ? c.Skill : null);
             Assert.IsTrue(ignite.IsFree);
-            Assert.IsNull(s.Runes.Rows[1].Skill);
+
+            Assert.IsTrue(s.PlaceSkill(ignite.InstanceId, new Cell(1, 2), rotated: true), "gedreht als 2×1 unter den Kern");
+            Assert.AreEqual(3, s.Board.Components.Count);
+
+            Assert.IsTrue(s.PlaceSkill(bash.InstanceId, new Cell(0, 0)), "erneut ziehen verschiebt");
+            Assert.AreEqual(new Cell(0, 0), s.Board.ComponentOf(bash).Origin);
+
+            Assert.IsTrue(s.RemoveComponent(s.Board.IndexOf(s.Board.ComponentOf(ignite))), "zurück ins Skill-Inventar");
+            Assert.IsTrue(ignite.IsFree);
+            Assert.IsNull(s.Board.ComponentOf(ignite));
+            Assert.AreEqual(2, s.Board.Components.Count);
         }
 
         [Test]
-        public void RunesFromTheInventorySwapIntoRowsOrBecomeANewRowAtTheDropPosition()
+        public void RunesFromTheInventorySwapIntoRelaysOrBecomeANewRelayAtTheDropCell()
         {
             OverworldSession s = Session();
-            s.Runes.TryAdd(s.RuneCatalog.Get("always"), s.Skills.Add(SkillIds.Drill));
-            s.Runes.TryAdd(s.RuneCatalog.Get("hp_low"), s.Skills.Add(SkillIds.Repair));
+            s.Board.AddRelay(s.RuneCatalog.Get("clock"), new Cell(0, 0));
+            s.Board.AddRelay(s.RuneCatalog.Get("hp_low"), new Cell(3, 2));
             s.ExpandBoard(2);
             s.RuneInventory.TryAdd(new StoredRune(s.RuneCatalog.Get("enemy_low"), 1));
             s.RuneInventory.TryAdd(new StoredRune(s.RuneCatalog.Get("hp_critical"), 0));
 
-            Assert.IsTrue(s.SwapRune(0, 0), "auf eine Zeile: tauschen");
-            Assert.AreEqual("enemy_low", s.Runes.Rows[0].Rune.Id);
-            Assert.AreEqual(1, s.Runes.Rows[0].Level, "Stufe kommt mit");
-            Assert.AreEqual("always", s.RuneInventory.Runes[0].Rune.Id);
+            Assert.IsTrue(s.SwapRune(0, 0), "auf ein Relais: tauschen");
+            Assert.AreEqual("enemy_low", s.Board.Relays[0].Rune.Id);
+            Assert.AreEqual(1, s.Board.Relays[0].Level, "Stufe kommt mit");
+            Assert.AreEqual(new Cell(0, 0), s.Board.Relays[0].Position, "Lage bleibt");
+            Assert.AreEqual("clock", s.RuneInventory.Runes[0].Rune.Id);
 
             int hpCritical = s.RuneInventory.Runes.ToList().FindIndex(r => r.Rune.Id == "hp_critical");
-            Assert.IsTrue(s.EquipRuneFromInventory(hpCritical, 1), "auf freien Platz zwischen Zeile 1 und 2");
-            Assert.AreEqual(new[] { "enemy_low", "hp_critical", "hp_low" }, s.Runes.Rows.Select(r => r.Rune.Id).ToArray());
+            Assert.IsFalse(s.EquipRuneFromInventory(hpCritical, new Cell(1, 1)), "nicht auf den Kern");
+            Assert.IsTrue(s.EquipRuneFromInventory(hpCritical, new Cell(2, 0)), "auf die freie Zelle, auf die gezogen wurde");
+            Assert.AreEqual(new[] { "enemy_low", "hp_critical", "hp_low" }, s.Board.Relays.Select(r => r.Rune.Id).ToArray());
 
-            Assert.IsTrue(s.MoveRow(2, 0), "Zeilen untereinander ziehen");
-            Assert.AreEqual("hp_low", s.Runes.Rows[0].Rune.Id);
+            Assert.IsTrue(s.MoveRelay(2, new Cell(1, 0)), "Relais auf der Platine ziehen");
+            Assert.AreEqual(new[] { "enemy_low", "hp_low", "hp_critical" }, s.Board.Relays.Select(r => r.Rune.Id).ToArray(), "Lesereihenfolge");
         }
 
         // ------------------------------------------------------------------ Stat-Leiste

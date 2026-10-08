@@ -69,11 +69,23 @@ namespace Betaknight.Tests.EditMode
             var factory = BoardFactory.CreateDefault();
             var gear = new Equipment();
             gear.Equip(EquipmentCatalog.CreateDefault().Get("holo_barrier"));
-            var row = new[] { new BoardRowSpec("charge_full", SkillIds.EmpBash) };
+            // «Charge Full» (◆◆◆) versorgt den EMP-Schildschlag (2×2) rechts daneben; die Ladung ist von Anfang an voll.
+            var spec = new CircuitSpec();
+            spec.Relays.Add(new RelaySpec("charge_full", new Betaknight.Core.Circuit.Cell(0, 0)));
+            spec.Components.Add(new ComponentSpec(SkillIds.EmpBash, new Betaknight.Core.Circuit.Cell(1, 0)));
+            int Bashes()
+            {
+                LogicBoard board = factory.Create(spec, gear);
+                Assert.IsTrue(board.Rows[0].IsPowered);
+                CombatantSetup knight = ArenaSimulationTests.Fighter("A", 1000, 1, board: board);
+                knight.Resources[ResourceIds.Charge] = 5;
+                BattleResult r = CombatSimulation.Run(ArenaSimulationTests.Duel(knight, ArenaSimulationTests.Fighter("B", 100000, 0, 1000)));
+                return r.Events.Count(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.EmpBash);
+            }
 
-            Assert.IsTrue(factory.Create(row, gear).Rows[0].IsOrphaned, "1 Teil reicht nicht.");
+            Assert.AreEqual(0, Bashes(), "1 Teil reicht nicht: das Relais löst nie aus.");
             gear.Equip(EquipmentCatalog.CreateDefault().Get("mag_anchors"));
-            Assert.IsFalse(factory.Create(row, gear).Rows[0].IsOrphaned);
+            Assert.Greater(Bashes(), 0);
         }
 
         [Test]

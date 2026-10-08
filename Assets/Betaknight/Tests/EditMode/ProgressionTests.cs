@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Exploration;
 using Betaknight.Core.Gear;
@@ -11,12 +12,13 @@ using Betaknight.Core.Map;
 using Betaknight.Core.Movement;
 using Betaknight.Core.Run;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Skills;
 using Betaknight.Core.Turns;
 using NUnit.Framework;
 
 namespace Betaknight.Tests.EditMode
 {
-    /// <summary>Build verbessern statt austauschen: Tafel-Erweiterung, Stufen, Angebote mit Verbesserung, Shop-Preis, Elite.</summary>
+    /// <summary>Build verbessern statt austauschen: Platinen-Erweiterung, Stufen, Angebote mit Verbesserung, Shop-Preis, Elite.</summary>
     public class ProgressionTests
     {
         private static readonly HexCoord East = new HexCoord(1, 0);
@@ -39,13 +41,13 @@ namespace Betaknight.Tests.EditMode
                 : new EquipmentDefinition(i.Id, i.BaseName, i.Slot, i.Stats.ToDictionary(p => p.Key, p => p.Value), i.Passives, i.SetId, i.TwoHanded, 0)));
 
         private static OverworldSession Session(EquipmentCatalog items = null, RuneCatalog runes = null, ICombatResolver combat = null,
-            int gold = 200, int seed = 11)
+            int gold = 200, int seed = 11, CircuitBoard board = null)
         {
             var map = new HexMap(HexCoord.Zero, 4, seed);
             foreach (HexCoord c in HexCoord.Spiral(HexCoord.Zero, 4))
                 map.AddCell(new HexCell(c, CellContent.Empty));
             return new OverworldSession(map, new PlayerModel(HexCoord.Zero), new TurnSystem(), new ExplorationService(map),
-                new PlayerStats(40, gold), null, null, runes, combat ?? new RecordingCombat(), null, items ?? Offering());
+                new PlayerStats(40, gold), null, board, runes, combat ?? new RecordingCombat(), null, items ?? Offering());
         }
 
         private static List<string> Messages(OverworldSession s)
@@ -55,26 +57,26 @@ namespace Betaknight.Tests.EditMode
             return list;
         }
 
-        // ------------------------------------------------------------------ Tafel-Erweiterung
+        // ------------------------------------------------------------------ Platinen-Erweiterung
 
         [Test]
         public void BoardExpandsUpToTheLimit()
         {
             OverworldSession s = Session();
             List<string> messages = Messages(s);
-            Assert.AreEqual(3, s.Runes.Slots);
+            Assert.AreEqual("4×3", s.BoardSize);
 
             while (s.ExpandBoard(1)) { }
 
-            Assert.AreEqual(8, s.Runes.Slots);
-            Assert.AreEqual(s.Progression.MaxBoardRows, s.Runes.Slots);
+            Assert.AreEqual("6×6", s.BoardSize);
+            Assert.AreEqual(s.MaxBoardSize, s.BoardSize);
             Assert.IsFalse(s.CanExpandBoard);
             Assert.AreEqual(5, messages.Count);
-            Assert.AreEqual("Board 3 → 4 rows", messages[0]);
+            Assert.AreEqual("Board 4×3 → 4×4", messages[0]);
         }
 
         [Test]
-        public void BossEscapeAndNewActEachGrantARow()
+        public void BossEscapeAndNewActEachGrantAnExpansion()
         {
             OverworldSession s = Session();
             while (!s.PendingPortal && s.Turns.CurrentTurn < OverworldSession.BossInterval)
@@ -82,12 +84,12 @@ namespace Betaknight.Tests.EditMode
                 if (s.PendingRuneOffer != null) s.SkipRuneOffer();
                 s.TryStep(s.Player.Position == HexCoord.Zero ? East : HexCoord.Zero);
             }
-            Assert.AreEqual(4, s.Runes.Slots, "Boss-Flucht");
+            Assert.AreEqual("4×4", s.BoardSize, "Boss-Flucht");
 
             Assert.IsTrue(s.EnterPortal());
-            Assert.AreEqual(5, s.Runes.Slots, "Akt-Wechsel");
+            Assert.AreEqual("5×4", s.BoardSize, "Akt-Wechsel");
             OverworldSession next = OverworldSession.CreateNextAct(new MapGenerationConfig { Seed = 2 }, s);
-            Assert.AreEqual(5, next.Runes.Slots);
+            Assert.AreEqual("5×4", next.BoardSize);
         }
 
         [Test]
@@ -107,7 +109,7 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(s.PendingRuneOffer.BoardExpansion);
 
             Assert.IsTrue(s.TakeBoardExpansion());
-            Assert.AreEqual(4, s.Runes.Slots);
+            Assert.AreEqual("4×4", s.BoardSize);
             Assert.IsNull(s.PendingRuneOffer);
         }
 
@@ -115,8 +117,8 @@ namespace Betaknight.Tests.EditMode
         public void ElitesAreScaledInTheArena()
         {
             var resolver = new ArenaCombatResolver();
-            var normal = resolver.Resolve(new CombatRequest(CellContent.Enemy, 3, new PlayerStats(40, 0), new RuneLoadout()), new Random(4));
-            var elite = resolver.Resolve(new CombatRequest(CellContent.Elite, 3, new PlayerStats(40, 0), new RuneLoadout(),
+            var normal = resolver.Resolve(new CombatRequest(CellContent.Enemy, 3, new PlayerStats(40, 0), new CircuitBoard()), new Random(4));
+            var elite = resolver.Resolve(new CombatRequest(CellContent.Elite, 3, new PlayerStats(40, 0), new CircuitBoard(),
                 enemyHpPercent: 150, enemyDamagePercent: 125), new Random(4));
 
             StringAssert.StartsWith("Elite: ", elite.EnemyName);
@@ -142,14 +144,14 @@ namespace Betaknight.Tests.EditMode
             RuneCatalog runes = new RuneCatalog(new[] { RuneCatalog.CreateDefault().Get("hp_low") });
             OverworldSession s = Session(runes: runes);
             List<string> messages = Messages(s);
-            s.Runes.TryAdd(runes.Get("hp_low"), SkillIds.BasicAttack);
+            s.Board.AddRelay(runes.Get("hp_low"));
 
             RuneOffer offer = s.OfferRunes(RewardSources.Victory);
             Assert.AreEqual("hp_low", offer.Options.Single().Id, "Die einzige Verbesserung ist die vorhandene Rune");
             Assert.IsTrue(s.TakeRune(0));
 
-            Assert.AreEqual(1, s.Runes.Rows.Single().Level);
-            Assert.AreEqual("HP Below 40 %", s.Runes.Rows.Single().Name);
+            Assert.AreEqual(1, s.Board.Relays.Single().Level);
+            Assert.AreEqual("HP Below 40 %", s.Board.Relays.Single().Name);
             Assert.AreEqual("Rune HP Below 30 % → HP Below 40 %", messages.Last());
         }
 
@@ -164,18 +166,19 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(s.TakeRune(0));
 
             Assert.AreEqual(2, s.RuneInventory.Runes.Single().Level);
-            Assert.AreEqual(0, s.Runes.Rows.Count);
+            Assert.AreEqual(0, s.Board.Relays.Count);
         }
 
         [Test]
         public void DuplicateItemRaisesLevelAndStats()
         {
-            // Nur eine Rune im Katalog, damit keine passende neue Rune die Verbesserung schon stellt.
-            RuneCatalog runes = new RuneCatalog(new[] { RuneCatalog.CreateDefault().Get("always") });
+            // Nur eine Rune ohne Stufen im Katalog, damit keine passende neue Rune und keine Runen-Stufe die Verbesserung schon stellt.
+            RuneCatalog runes = new RuneCatalog(new[] { RuneCatalog.CreateDefault().Get("battle_start") });
             OverworldSession s = Session(runes: runes);
             List<string> messages = Messages(s);
             s.Gear.Equip(s.Items.Get("short_blade"));
-            s.Runes.TryAdd(runes.Get("always"), SkillIds.ArmorBreak);
+            s.Board.AddRelay(runes.Get("battle_start"), new Cell(1, 0));
+            Assert.IsTrue(s.PlaceSkill(s.Skills.Add(SkillIds.ArmorBreak).InstanceId, new Cell(2, 0)));
 
             RuneOffer offer = s.OfferRunes(RewardSources.Victory);
             Assert.Contains("short_blade", offer.ItemIds.ToList(), "Stufe für das getragene Teil wird angeboten");
@@ -190,7 +193,7 @@ namespace Betaknight.Tests.EditMode
 
             // A-05: Die Teilstufe hebt nur Werte; die Skill-Stufe gehört dem Skill-Exemplar.
             SkillInfo info = s.DescribeSkill(SkillIds.ArmorBreak);
-            Assert.AreEqual(BasisPoints.Percent(190), info.Effects.First(e => e.IsDamage).DamageBp, "Rüstungsbruch seit A-12: 190 %");
+            Assert.AreEqual(BasisPoints.Percent(300), info.Effects.First(e => e.IsDamage).DamageBp, "Rüstungsbruch seit A-19 (2×2): 300 %");
             StringAssert.Contains("Short Blade → Short Blade +1", messages.Last());
             StringAssert.Contains("Weapon Damage 2 → 3", messages.Last());
         }
@@ -205,11 +208,15 @@ namespace Betaknight.Tests.EditMode
             var skills = new Betaknight.Core.Skills.SkillCollection();
             Betaknight.Core.Skills.SkillInstance breaker = skills.Add(SkillIds.ArmorBreak);
             skills.Grow(breaker, 7);
-            var loadout = new RuneLoadout();
-            loadout.TryAdd(RuneCatalog.CreateDefault().Get("always"), breaker);
+            // A-19: Der 2×2-Rüstungsbruch braucht ein Relais mit Grenze von mindestens 4 Zellen an seiner Kante. «Vs. Boss»
+            // (Schwierigkeit 3, 6 Zellen) löst zu Kampfbeginn aus; sein Schwierigkeits-Bonus (+60 %) wirkt auf den ganzen Treffer.
+            var board = new CircuitBoard();
+            board.AddRelay(RuneCatalog.CreateDefault().Get("vs_boss"), new Cell(1, 0));
+            Assert.IsNotNull(board.Place(breaker, new Cell(2, 0)));
             var rules = new SkillLevelRules();
 
-            var request = new CombatRequest(CellContent.Enemy, 0, new PlayerStats(30, 0), loadout, gear, null, rules);
+            var request = new CombatRequest(CellContent.Enemy, 0, new PlayerStats(30, 0), board, gear,
+                new BattleContext { VsBoss = true }, rules);
             var dummy = new CombatantSetup { Name = "Sandsack", Stats = new CombatStats(9999, 0) };
             BattleSetup setup = new ArenaCombatResolver().CreateSetup(request, new List<CombatantSetup> { dummy }, 1);
             setup.MaxTicks = Ticks.FromSeconds(3);
@@ -217,7 +224,9 @@ namespace Betaknight.Tests.EditMode
 
             int weapon = 5 + 2 + 2 * 1;
             BattleEvent hit = r.Events.First(e => e.Kind == BattleEventKind.Damage && e.Detail == SkillIds.ArmorBreak);
-            Assert.AreEqual(BasisPoints.Of(weapon, BasisPoints.Percent(190)) + 7, hit.Amount);
+            int grown = BasisPoints.Of(weapon, BasisPoints.Percent(300)) + 7;
+            int bonus = DifficultyBonusConfig.Default[3].PowerPercent;
+            Assert.AreEqual(BasisPoints.Of(grown, BasisPoints.Percent(100 + bonus)), hit.Amount);
         }
 
         [Test]
@@ -240,8 +249,8 @@ namespace Betaknight.Tests.EditMode
                 OverworldSession s = Session(items: AllItems, seed: seed);
                 RuneCatalog runes = s.RuneCatalog;
                 if (seed % 3 == 0) s.Gear.Equip(s.Items.Get("thermo_blade"));
-                if (seed % 2 == 0) s.Runes.TryAdd(runes.Get("hp_low"));
-                else s.Runes.TryAdd(runes.Get("every_5s"));
+                if (seed % 2 == 0) s.Board.AddRelay(runes.Get("hp_low"));
+                else s.Board.AddRelay(runes.Get("every_5s"));
 
                 RuneOffer offer = s.OfferRunes(seed % 4 == 0 ? RewardSources.MineDefended : RewardSources.Victory);
                 bool improves = offer.Options.Any(s.IsImprovement)
@@ -253,52 +262,57 @@ namespace Betaknight.Tests.EditMode
         // ------------------------------------------------------------------ Shop
 
         [Test]
-        public void ShopSlotPriceRisesPerRun()
+        public void ShopBoardExpansionPriceRisesPerRun()
         {
             OverworldSession s = Session(gold: 200);
             HexCoord west = new HexCoord(-1, 0);
             s.Map.SetContent(East, CellContent.Shop);
             s.Map.SetContent(west, CellContent.Shop);
 
-            Assert.AreEqual(20, s.RuneSlotPrice);
+            Assert.AreEqual(20, s.BoardExpansionPrice);
             s.TryStep(East);
-            Assert.IsTrue(s.BuyRuneSlot());
+            Assert.IsTrue(s.BuyBoardExpansion());
             Assert.AreEqual(180, s.Stats.Gold);
-            Assert.AreEqual(35, s.RuneSlotPrice);
-            Assert.IsFalse(s.CanBuyRuneSlot, "Ein Platz pro Shop");
+            Assert.AreEqual(35, s.BoardExpansionPrice);
+            Assert.IsFalse(s.CanBuyBoardExpansion, "Eine Erweiterung pro Shop");
             s.LeaveShop();
 
             s.TryStep(HexCoord.Zero);
             s.TryStep(west);
-            Assert.IsTrue(s.BuyRuneSlot());
+            Assert.IsTrue(s.BuyBoardExpansion());
             Assert.AreEqual(145, s.Stats.Gold);
-            Assert.AreEqual(50, s.RuneSlotPrice);
-            Assert.AreEqual(5, s.Runes.Slots);
+            Assert.AreEqual(50, s.BoardExpansionPrice);
+            Assert.AreEqual(2, s.BoardExpansionsBought);
+            Assert.AreEqual("5×4", s.BoardSize);
         }
 
         [Test]
-        public void ShopSlotRespectsTheBoardLimit()
+        public void ShopBoardExpansionRespectsTheBoardLimit()
         {
             OverworldSession s = Session(gold: 500);
             while (s.ExpandBoard(1)) { }
             s.Map.SetContent(East, CellContent.Shop);
             s.TryStep(East);
 
-            Assert.IsFalse(s.CanBuyRuneSlot);
-            Assert.IsFalse(s.BuyRuneSlot());
+            Assert.IsFalse(s.CanBuyBoardExpansion);
+            Assert.IsFalse(s.BuyBoardExpansion());
         }
 
         [Test]
         public void ProgressionValuesComeFromOneConfig()
         {
-            var config = new ProgressionConfig { MaxBoardRows = 4, SlotPriceBase = 10, SlotPriceStep = 5 };
-            OverworldSession s = Session();
+            // Preise kommen aus der ProgressionConfig, die Grössen der Platine aus der CircuitConfig.
+            var config = new ProgressionConfig { SlotPriceBase = 10, SlotPriceStep = 5 };
+            var circuit = new CircuitConfig { Sizes = new[] { new Shape(4, 3), new Shape(4, 4) } };
+            OverworldSession s = Session(board: new CircuitBoard(circuit));
             s.UseProgression(config);
 
-            Assert.AreEqual(10, s.RuneSlotPrice);
+            Assert.AreEqual(10, s.BoardExpansionPrice);
             Assert.AreEqual(20, config.SlotPrice(2));
+            Assert.AreEqual("4×4", s.MaxBoardSize);
             Assert.IsTrue(s.ExpandBoard(5));
-            Assert.AreEqual(4, s.Runes.Slots);
+            Assert.AreEqual("4×4", s.BoardSize);
+            Assert.IsFalse(s.CanExpandBoard);
         }
     }
 }

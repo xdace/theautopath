@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Betaknight.Core;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Exploration;
 using Betaknight.Core.Hex;
 using Betaknight.Core.Map;
@@ -16,7 +17,7 @@ namespace Betaknight.Tests.EditMode
     {
         private static readonly RuneCatalog Catalog = RuneCatalog.CreateDefault();
 
-        private static OverworldSession Session(PlayerStats stats = null, RuneLoadout runes = null)
+        private static OverworldSession Session(PlayerStats stats = null, CircuitBoard runes = null)
         {
             var map = new HexMap(HexCoord.Zero, 4, 3);
             foreach (HexCoord c in HexCoord.Spiral(HexCoord.Zero, 4))
@@ -26,11 +27,15 @@ namespace Betaknight.Tests.EditMode
                 stats, null, runes, Catalog);
         }
 
+        /// <summary>Platine mit genau einer freien Zelle (2×1, Kern rechts): ein Relais darauf, und sie ist voll.</summary>
+        private static CircuitBoard OneCellBoard() =>
+            new CircuitBoard(new CircuitConfig { Sizes = new[] { new Shape(2, 1) }, Core = new Cell(1, 0) });
+
         [Test]
         public void OfferHasDistinctRunesNotYetOwned()
         {
-            var loadout = new RuneLoadout();
-            loadout.TryAdd(Catalog.Get("on_hit"));
+            var loadout = new CircuitBoard();
+            loadout.AddRelay(Catalog.Get("on_hit"));
 
             for (int seed = 0; seed < 100; seed++)
             {
@@ -44,8 +49,8 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void OfferAlwaysContainsAMatchingTag()
         {
-            var loadout = new RuneLoadout();
-            loadout.TryAdd(Catalog.Get("when_hit"));
+            var loadout = new CircuitBoard();
+            loadout.AddRelay(Catalog.Get("when_hit"));
 
             for (int seed = 0; seed < 100; seed++)
             {
@@ -87,34 +92,38 @@ namespace Betaknight.Tests.EditMode
 
             Assert.IsTrue(s.TakeRune(1));
 
-            Assert.AreSame(chosen, s.Runes.Runes.Single());
+            Assert.AreSame(chosen, s.Board.Runes.Single());
             Assert.IsFalse(s.IsBusy);
         }
 
         [Test]
         public void FullBoardSendsNewRunesToTheInventory()
         {
-            var runes = new RuneLoadout(slots: 1);
-            runes.TryAdd(Catalog.Get("on_hit"));
+            // Volle Platine: keine freie Zelle für ein weiteres Relais.
+            CircuitBoard runes = OneCellBoard();
+            Assert.IsNotNull(runes.AddRelay(Catalog.Get("on_hit")));
+            Assert.IsTrue(runes.IsFull);
             OverworldSession s = Session(runes: runes);
             RuneOffer offer = s.OfferRunes("Test");
 
             Assert.IsTrue(s.TakeRune(0));
-            Assert.AreEqual("on_hit", s.Runes.Runes.Single().Id, "Die Tafel bleibt unverändert.");
+            Assert.AreEqual("on_hit", s.Board.Runes.Single().Id, "Die Platine bleibt unverändert.");
             Assert.AreSame(offer.Options[0], s.RuneInventory.Runes.Single().Rune);
             Assert.IsFalse(s.IsBusy);
         }
 
         [Test]
-        public void ReplacingARowMovesTheOldRuneToTheInventory()
+        public void ReplacingARelaysRuneMovesTheOldRuneToTheInventory()
         {
-            var runes = new RuneLoadout(slots: 1);
-            runes.TryAdd(Catalog.Get("on_hit"));
+            CircuitBoard runes = OneCellBoard();
+            RelayChip relay = runes.AddRelay(Catalog.Get("on_hit"));
             OverworldSession s = Session(runes: runes);
             RuneOffer offer = s.OfferRunes("Test");
 
+            // Das Relais bleibt liegen, nur seine Rune wechselt.
             Assert.IsTrue(s.TakeRune(0, replaceSlot: 0));
-            Assert.AreSame(offer.Options[0], s.Runes.Runes[0]);
+            Assert.AreSame(offer.Options[0], s.Board.Runes[0]);
+            Assert.AreSame(relay, s.Board.Relays.Single());
             Assert.AreEqual("on_hit", s.RuneInventory.Runes.Single().Rune.Id);
         }
 
@@ -166,7 +175,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreSame(kit, s.Kit);
             Assert.AreEqual(kit.MaxHp, s.Stats.MaxHp);
             Assert.AreEqual(kit.Gold, s.Stats.Gold);
-            Assert.AreEqual("when_hit", s.Runes.Runes.Single().Id);
+            Assert.AreEqual("when_hit", s.Board.Runes.Single().Id);
         }
 
         [Test]
@@ -177,11 +186,11 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void LoadoutRejectsDuplicates()
+        public void BoardRejectsDuplicateRunes()
         {
-            var loadout = new RuneLoadout();
-            Assert.IsTrue(loadout.TryAdd(Catalog.Get("hp_low")));
-            Assert.IsFalse(loadout.TryAdd(Catalog.Get("hp_low")));
+            var loadout = new CircuitBoard();
+            Assert.IsNotNull(loadout.AddRelay(Catalog.Get("hp_low")));
+            Assert.IsNull(loadout.AddRelay(Catalog.Get("hp_low")));
             Assert.AreEqual(1, loadout.CountByTag()[RuneTag.Ember]);
         }
     }

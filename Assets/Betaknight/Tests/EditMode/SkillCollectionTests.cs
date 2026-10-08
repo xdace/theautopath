@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Map;
@@ -12,7 +13,10 @@ using NUnit.Framework;
 
 namespace Betaknight.Tests.EditMode
 {
-    /// <summary>A-05: Skills als eigene Exemplare, getrennt von Runen (Wann) und Ausrüstung (Werte und Passive).</summary>
+    /// <summary>
+    /// A-05: Skills als eigene Exemplare, getrennt von Runen (Wann) und Ausrüstung (Werte und Passive). Seit A-19 liegen sie
+    /// als Komponenten auf der Platine, Runen als Relais daneben.
+    /// </summary>
     public class SkillCollectionTests
     {
         private static readonly EquipmentCatalog Items = EquipmentCatalog.CreateDefault();
@@ -21,95 +25,100 @@ namespace Betaknight.Tests.EditMode
         private static KnightKit Kit(string id) => KnightKit.Defaults.Single(k => k.Id == id);
 
         /// <summary>
-        /// Session mit Start-Kit. Beim Schildritter sitzt hier Schildschlag an der Start-Rune (seit A-12 startet dort Bohrstoß),
-        /// damit die Tests weiter einen Skill mit Betäubung an Zeile 1 haben; Bohrstoß und Schildwall liegen frei.
+        /// Session mit Start-Kit. Beim Schildritter liegt Schildschlag (Betäubung) als Komponente am Start-Relais «When Hit»
+        /// auf (0, 0); Bohrstoß und Schildwall liegen frei in der Sammlung.
         /// </summary>
-        private static OverworldSession Session(string kit = "shield", int seed = 3)
-        {
-            OverworldSession s = OverworldSession.Create(new MapGenerationConfig { Radius = 4, Seed = seed }, kit: Kit(kit));
-            if (kit == "shield") s.PlaceSkill(s.Skills.All.Single(i => i.SkillId == SkillIds.ShieldBash).InstanceId, 0);
-            return s;
-        }
+        private static OverworldSession Session(string kit = "shield", int seed = 3) =>
+            OverworldSession.Create(new MapGenerationConfig { Radius = 4, Seed = seed }, kit: Kit(kit));
 
-        /// <summary>Session mit drei Zeilen: Start-Rune plus zwei weitere.</summary>
-        private static OverworldSession ThreeRows()
-        {
-            OverworldSession s = Session();
-            s.Runes.TryAdd(s.RuneCatalog.Get("hp_low"), SkillInstance.BasicAttack());
-            s.Runes.TryAdd(s.RuneCatalog.Get("enemy_charging"), SkillInstance.BasicAttack());
-            return s;
-        }
+        private static SkillInstance First(OverworldSession s) => s.Board.Components[0].Skill;
+
+        private static BattleSetup Setup(CircuitBoard board, Equipment gear, PlayerStats stats = null, SkillLevelRules levels = null) =>
+            new ArenaCombatResolver().CreateSetup(
+                new CombatRequest(CellContent.Enemy, 0, stats ?? new PlayerStats(30, 0), board, gear, null, levels),
+                new List<CombatantSetup> { new CombatantSetup { Name = "Sandsack", Stats = new CombatStats(9999, 0) } }, 1);
 
         // ------------------------------------------------------------------ Ein Exemplar, ein Ort
 
         [Test]
         public void ASkillSitsInExactlyOnePlace()
         {
-            OverworldSession s = ThreeRows();
-            SkillInstance bash = s.Runes.Rows[0].Skill;
-            Assert.AreSame(s.Runes.Rows[0], bash.Holder);
+            OverworldSession s = Session();
+            SkillInstance bash = First(s);
+            ComponentSlot slot = s.Board.ComponentOf(bash);
+            Assert.AreSame(slot, bash.Holder);
+            Cell old = slot.Origin;
 
-            Assert.IsTrue(s.PlaceSkill(bash.InstanceId, 2));
-            Assert.AreSame(bash, s.Runes.Rows[2].Skill);
-            Assert.AreSame(s.Runes.Rows[2], bash.Holder);
-            Assert.IsNull(s.Runes.Rows[0].Skill, "Der alte Ort ist leer");
-            Assert.AreEqual(1, s.Runes.Rows.Count(r => r.Skill == bash));
+            // Erneutes Legen verschiebt die Komponente, statt das Exemplar zu verdoppeln.
+            Assert.IsTrue(s.PlaceSkill(bash.InstanceId, new Cell(3, 1)));
+            Assert.AreSame(slot, bash.Holder);
+            Assert.AreEqual(new Cell(3, 1), slot.Origin);
+            Assert.IsNull(s.Board.At(old), "Der alte Ort ist leer");
+            Assert.AreEqual(1, s.Board.Components.Count(c => c.Skill == bash));
         }
 
         [Test]
-        public void PlacingOverAnotherSkillFreesIt()
+        public void PlacingOnAnOccupiedSpotIsRejected()
         {
-            OverworldSession s = ThreeRows();
-            SkillInstance bash = s.Runes.Rows[0].Skill;
+            // A-19: nichts überlappt. Früher verdrängte ein Skill den anderen aus der Zeile, jetzt wird das Legen abgelehnt.
+            OverworldSession s = Session();
+            SkillInstance bash = First(s);
             SkillInstance wall = s.Skills.All.Single(i => i.SkillId == SkillIds.ShieldWall);
             Assert.IsTrue(wall.IsFree, "Zweiter Start-Skill liegt frei in der Sammlung");
 
-            Assert.IsTrue(s.PlaceSkill(wall.InstanceId, 0));
-            Assert.AreSame(wall, s.Runes.Rows[0].Skill);
-            Assert.IsTrue(bash.IsFree);
-            CollectionAssert.Contains(s.Skills.Free.ToList(), bash);
+            Assert.IsFalse(s.CanPlaceSkill(wall.InstanceId, s.Board.ComponentOf(bash).Origin));
+            Assert.IsFalse(s.PlaceSkill(wall.InstanceId, s.Board.ComponentOf(bash).Origin));
+            Assert.IsTrue(wall.IsFree);
+            Assert.IsFalse(bash.IsFree);
+            Assert.AreSame(bash, s.Board.Components.Single().Skill);
         }
 
         [Test]
-        public void SkillsMoveBetweenRows()
+        public void ComponentsAndRelaysMoveIndependently()
         {
-            OverworldSession s = ThreeRows();
-            SkillInstance bash = s.Runes.Rows[0].Skill;
+            OverworldSession s = Session();
+            SkillInstance bash = First(s);
             SkillInstance wall = s.Skills.All.Single(i => i.SkillId == SkillIds.ShieldWall);
-            s.PlaceSkill(wall.InstanceId, 1);
+            Assert.IsTrue(s.PlaceSkill(wall.InstanceId, new Cell(3, 0)));
+            ComponentSlot bashSlot = s.Board.ComponentOf(bash);
+            ComponentSlot wallSlot = s.Board.ComponentOf(wall);
 
-            Assert.IsTrue(s.SwapSkills(0, 1));
-            Assert.AreSame(wall, s.Runes.Rows[0].Skill);
-            Assert.AreSame(bash, s.Runes.Rows[1].Skill);
-            Assert.AreSame(s.Runes.Rows[0], wall.Holder);
-            Assert.AreSame(s.Runes.Rows[1], bash.Holder);
+            // Verschieben nimmt das Exemplar mit: dieselbe Komponente, neuer Ort.
+            Assert.IsTrue(s.MoveComponent(s.Board.IndexOf(bashSlot), new Cell(0, 1), false));
+            Assert.AreSame(bashSlot, bash.Holder);
+            Assert.AreSame(wallSlot, wall.Holder);
+            Assert.AreEqual(new Cell(0, 1), bashSlot.Origin);
+            Assert.IsTrue(s.IsPowered(bashSlot), "Unter dem Relais auf (0, 0)");
 
-            // Rune und Skill sind getrennt: Zeilen verschieben nimmt den Skill mit, Runen tauschen lässt ihn stehen.
-            Assert.IsTrue(s.MoveRow(1, 2));
-            Assert.AreSame(bash, s.Runes.Rows[2].Skill);
+            // Relais und Skill sind getrennt: das Relais verschieben lässt die Komponenten liegen.
+            Assert.IsTrue(s.MoveRelay(0, new Cell(2, 2)));
+            Assert.AreEqual(new Cell(0, 1), bashSlot.Origin);
+            Assert.AreEqual(new Cell(3, 0), wallSlot.Origin);
+            Assert.IsFalse(s.IsPowered(bashSlot), "Das Relais berührt die Komponente nicht mehr");
         }
 
         [Test]
-        public void OrphanedRowsOnlyWhenASkillIsTakenOut()
+        public void RemovingAComponentKeepsTheSkillInTheCollection()
         {
-            OverworldSession s = ThreeRows();
-            Assert.IsTrue(s.Runes.Rows.All(r => r.Skill != null), "Neue Zeilen bekommen einen Skill oder den Basisangriff");
-
-            SkillInstance bash = s.Runes.Rows[0].Skill;
-            Assert.IsTrue(s.RemoveSkill(0));
-            Assert.IsNull(s.Runes.Rows[0].Skill);
+            OverworldSession s = Session();
+            SkillInstance bash = First(s);
+            Assert.IsTrue(s.RemoveComponent(0));
+            Assert.IsEmpty(s.Board.Components);
             Assert.IsTrue(bash.IsFree);
+            Assert.AreEqual(1, s.Board.Relays.Count, "Das Relais bleibt liegen");
             Assert.AreEqual(3, s.Skills.Count, "Das Exemplar bleibt in der Sammlung");
         }
 
         [Test]
-        public void RemovingARowFreesItsSkill()
+        public void RemovingARelayLeavesItsComponentUnpowered()
         {
+            // A-19: Relais und Komponente sind getrennte Teile; das Relais ins Inventar nehmen lässt die Komponente liegen.
             OverworldSession s = Session();
-            SkillInstance bash = s.Runes.Rows[0].Skill;
+            SkillInstance bash = First(s);
             Assert.IsTrue(s.UnequipRune(0));
-            Assert.IsTrue(bash.IsFree);
+            Assert.IsFalse(bash.IsFree);
             Assert.IsTrue(s.Skills.Contains(bash));
+            Assert.IsFalse(s.IsPowered(s.Board.ComponentOf(bash)));
         }
 
         // ------------------------------------------------------------------ Duplikate und Stufen
@@ -118,7 +127,7 @@ namespace Betaknight.Tests.EditMode
         public void DuplicateRaisesTheLevelOrStaysAsSecondCopy()
         {
             OverworldSession s = Session();
-            SkillInstance bash = s.Runes.Rows[0].Skill;
+            SkillInstance bash = First(s);
             var messages = new List<string>();
             s.BuildImproved += messages.Add;
 
@@ -137,17 +146,16 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(2, s.Skills.OfSkill(SkillIds.ShieldBash).Count);
             Assert.AreNotEqual(bash.InstanceId, copy.InstanceId);
 
-            // Zwei Exemplare: derselbe Skill an zwei Zeilen.
-            s.Runes.TryAdd(s.RuneCatalog.Get("hp_low"), SkillInstance.BasicAttack());
-            Assert.IsTrue(s.PlaceSkill(copy.InstanceId, 1));
-            Assert.AreEqual(2, s.Runes.Rows.Count(r => r.SkillId == SkillIds.ShieldBash));
+            // Zwei Exemplare: derselbe Skill als zwei Komponenten auf der Platine.
+            Assert.IsTrue(s.PlaceSkill(copy.InstanceId, new Cell(3, 1)));
+            Assert.AreEqual(2, s.Board.Components.Count(c => c.Skill.SkillId == SkillIds.ShieldBash));
         }
 
         [Test]
         public void SkillsStopAtTheMaximumLevel()
         {
             OverworldSession s = Session();
-            SkillInstance bash = s.Runes.Rows[0].Skill;
+            SkillInstance bash = First(s);
             // Begründet angepasst (A-08): je Duplikat +5 Wachstum, Stufe 3 liegt bei 30.
             int duplicates = 0;
             while (s.CanUpgradeSkill(SkillIds.ShieldBash) && duplicates < 20)
@@ -171,28 +179,32 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void SkillGrowthChangesTheNumbersAndTheFight()
         {
-            // Begründet angepasst (A-08): Duplikate geben Wachstum, Rüstungsbruch wächst um +1 Schaden pro Punkt.
+            // Begründet angepasst (A-08): Duplikate geben Wachstum, Schockstich wächst um +1 Schaden pro Punkt (Kills).
+            // A-19: Start-Komponente des Klingenritters ist jetzt Schockstich (früher Rüstungsbruch, beide wachsen gleich).
             OverworldSession s = Session("blade");
-            SkillInstance breaker = s.Runes.Rows[0].Skill;
-            int before = s.DescribeSkill(breaker).Effects.First(e => e.IsDamage).Amount;
+            SkillInstance stab = First(s);
+            Assert.AreEqual(SkillIds.ShockStab, stab.SkillId);
+            int before = s.DescribeSkill(stab).Effects.First(e => e.IsDamage).Amount;
 
-            s.GainSkill(SkillIds.ArmorBreak);
-            s.GainSkill(SkillIds.ArmorBreak);
-            SkillInfo info = s.DescribeSkill(breaker);
+            s.GainSkill(SkillIds.ShockStab);
+            s.GainSkill(SkillIds.ShockStab);
+            SkillInfo info = s.DescribeSkill(stab);
             Assert.AreEqual(before + 10, info.Effects.First(e => e.IsDamage).Amount);
 
-            // Der Kampf rechnet mit demselben Wachstum wie die Anzeige.
-            var loadout = new RuneLoadout();
+            // Der Kampf rechnet mit demselben Wachstum wie die Anzeige. Relais «Clock» (Schwierigkeit 0, kein Bonus) und
+            // Komponente abseits des Kerns, damit nur das Wachstum zählt.
+            var board = new CircuitBoard();
             var copy = new SkillCollection();
-            SkillInstance grown = copy.Add(SkillIds.ArmorBreak);
-            copy.Grow(grown, breaker.Growth);
-            loadout.TryAdd(s.RuneCatalog.Get("always"), grown);
-            BattleSetup setup = new ArenaCombatResolver().CreateSetup(
-                new CombatRequest(CellContent.Enemy, 0, new PlayerStats(30, 0), loadout, s.Gear, null, s.Progression.SkillLevels),
-                new List<CombatantSetup> { new CombatantSetup { Name = "Sandsack", Stats = new CombatStats(9999, 0) } }, 1);
-            setup.MaxTicks = Ticks.FromSeconds(3);
+            SkillInstance grown = copy.Add(SkillIds.ShockStab);
+            copy.Grow(grown, stab.Growth);
+            Assert.IsNotNull(board.AddRelay(s.RuneCatalog.Get("clock"), new Cell(2, 0)));
+            ComponentSlot slot = board.Place(grown, new Cell(3, 0));
+            Assert.IsNotNull(slot);
+            Assert.IsFalse(board.TouchesCore(slot));
+            BattleSetup setup = Setup(board, s.Gear, levels: s.Progression.SkillLevels);
+            setup.MaxTicks = Ticks.FromSeconds(4);
             BattleResult r = CombatSimulation.Run(setup);
-            BattleEvent hit = r.Events.First(e => e.Kind == BattleEventKind.Damage && e.Detail == SkillIds.ArmorBreak);
+            BattleEvent hit = r.Events.First(e => e.Kind == BattleEventKind.Damage && e.Detail == SkillIds.ShockStab);
             Assert.AreEqual(info.Effects.First(e => e.IsDamage).Amount, hit.Amount);
         }
 
@@ -203,11 +215,12 @@ namespace Betaknight.Tests.EditMode
         {
             OverworldSession s = Session();
             Assert.IsTrue(s.UnequipToInventory(EquipmentSlot.Shield));
-            Assert.AreEqual(SkillIds.ShieldBash, s.Runes.Rows[0].SkillId);
+            Assert.AreEqual(SkillIds.ShieldBash, First(s).SkillId);
 
             BattleSetup setup = new ArenaCombatResolver().CreateSetup(
-                new CombatRequest(CellContent.Enemy, 0, s.Stats, s.Runes, s.Gear), new List<CombatantSetup> { new CombatantSetup() }, 1);
+                new CombatRequest(CellContent.Enemy, 0, s.Stats, s.Board, s.Gear), new List<CombatantSetup> { new CombatantSetup() }, 1);
             Assert.IsFalse(setup.Player.Board.Rows[0].IsOrphaned);
+            Assert.IsTrue(setup.Player.Board.Rows[0].IsPowered);
             Assert.AreEqual(SkillIds.ShieldBash, setup.Player.Board.Rows[0].Skill.Id);
         }
 
@@ -216,17 +229,18 @@ namespace Betaknight.Tests.EditMode
         {
             var gear = new Equipment();
             gear.Equip(Items.Get("shock_dagger")); // Schock-Skills +20 % Wirkung
-            gear.Equip(Items.Get("tower_shield")); // Schild-Skills −1 s Cooldown
+            gear.Equip(Items.Get("tower_shield")); // Schild-Skills −15 % Cast-Zeit
 
             SkillDefinition stab = gear.Boost(Catalog.Get(SkillIds.ShockStab));
             SkillDefinition breaker = gear.Boost(Catalog.Get(SkillIds.ArmorBreak));
             SkillDefinition bash = gear.Boost(Catalog.Get(SkillIds.ShieldBash));
             SkillDefinition ignite = gear.Boost(Catalog.Get(SkillIds.Ignite));
 
-            Assert.AreEqual(BasisPoints.Percent(96), ((DamageEffect)stab.Effects[0]).DamageBp, "80 % + 20 %");
-            Assert.AreEqual(BasisPoints.Percent(190), ((DamageEffect)breaker.Effects[0]).DamageBp, "Klinge ohne Schock: unverändert");
-            Assert.AreEqual(Ticks.FromSeconds(5), bash.CooldownTicks, "6 s − 1 s");
-            Assert.AreEqual(Catalog.Get(SkillIds.Ignite).CooldownTicks, ignite.CooldownTicks);
+            Assert.AreEqual(BasisPoints.Percent(72), ((DamageEffect)stab.Effects[0]).DamageBp, "60 % + 20 %");
+            Assert.AreEqual(BasisPoints.Percent(300), ((DamageEffect)breaker.Effects[0]).DamageBp, "Klinge ohne Schock: unverändert");
+            Assert.AreEqual(-15, bash.CastBonusPercent);
+            Assert.AreEqual(CastTime.Medium * 85 / 100, bash.CastTicks(), "0,8 s − 15 %");
+            Assert.AreEqual(Catalog.Get(SkillIds.Ignite).CastTicks(), ignite.CastTicks());
             Assert.AreSame(Catalog.Get(SkillIds.Ignite), ignite, "Ohne passenden Tag derselbe Skill");
             Assert.AreSame(SkillDefinition.BasicAttack, gear.Boost(SkillDefinition.BasicAttack), "Basisangriff hat keine Tags");
         }
@@ -234,25 +248,24 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void TagPassivesWorkInTheFight()
         {
-            var gear = new Equipment();
-            gear.Equip(Items.Get("short_sword"));
-            gear.Equip(Items.Get("tower_shield"));
-            var loadout = new RuneLoadout();
-            loadout.TryAdd(RuneCatalog.CreateDefault().Get("always"), SkillIds.ShieldBash);
+            // A-19: keine Cooldowns mehr; der Turmschild verkürzt die Cast-Zeit von Schild-Skills um 15 %, auch im Kampf.
+            int CastInFight(params string[] items)
+            {
+                var gear = new Equipment();
+                foreach (string id in items) gear.Equip(Items.Get(id));
+                var board = new CircuitBoard();
+                board.AddRelay(RuneCatalog.CreateDefault().Get("on_hit"), new Cell(0, 0));
+                Assert.IsNotNull(board.Place(new SkillInstance(SkillIds.ShieldBash), new Cell(0, 1)));
+                BattleSetup setup = Setup(board, gear);
+                setup.MaxTicks = Ticks.FromSeconds(6);
+                BattleResult r = CombatSimulation.Run(setup);
+                List<BattleEvent> bashes = r.Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.ShieldBash).ToList();
+                Assert.GreaterOrEqual(bashes.Count, 1, "«On Hit» versorgt den Schildschlag");
+                return bashes[0].Amount;
+            }
 
-            BattleSetup setup = new ArenaCombatResolver().CreateSetup(
-                new CombatRequest(CellContent.Enemy, 0, new PlayerStats(30, 0), loadout, gear),
-                new List<CombatantSetup> { new CombatantSetup { Name = "Sandsack", Stats = new CombatStats(9999, 0) } }, 1);
-            setup.MaxTicks = Ticks.FromSeconds(12);
-            BattleResult r = CombatSimulation.Run(setup);
-
-            List<int> bashes = r.Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.ShieldBash).Select(e => e.Tick).ToList();
-            Assert.GreaterOrEqual(bashes.Count, 2);
-            // Jeder Treffer des Basisangriffs dazwischen verkürzt den laufenden Cooldown um 0,25 s (A-12).
-            int hits = r.Events.Count(e => e.Kind == BattleEventKind.Hit && e.Detail == SkillIds.BasicAttack && e.Tick > bashes[0] && e.Tick < bashes[1]);
-            Assert.Greater(hits, 0);
-            Assert.AreEqual(Ticks.FromSeconds(5) - hits * SkillBudgetConfig.Default.BasicAttackCooldownCutTicks, bashes[1] - bashes[0],
-                "Cooldown 5 s statt 6 s, abzüglich der Basisangriff-Treffer");
+            Assert.AreEqual(CastTime.Medium, CastInFight("short_sword"));
+            Assert.AreEqual(CastTime.Medium * 85 / 100, CastInFight("short_sword", "tower_shield"), "−15 % Cast-Zeit");
         }
 
         [Test]
@@ -276,8 +289,8 @@ namespace Betaknight.Tests.EditMode
                 OverworldSession s = OverworldSession.Create(new MapGenerationConfig { Radius = 4, Seed = 3 }, kit: kit);
                 Assert.That(s.Skills.Count, Is.InRange(2, 3), kit.Id);
                 CollectionAssert.AreEquivalent(kit.StartSkillIds, s.Skills.All.Select(i => i.SkillId), kit.Id);
-                Assert.AreEqual(kit.StartSkillId, s.Runes.Rows[0].SkillId, kit.Id);
-                Assert.AreSame(s.Runes.Rows[0].Skill, s.Skills.All[0], "Das Exemplar an der Tafel gehört zur Sammlung");
+                Assert.AreEqual(kit.StartSkillId, First(s).SkillId, kit.Id);
+                Assert.AreSame(First(s), s.Skills.All[0], "Das Exemplar auf der Platine gehört zur Sammlung");
             }
         }
 
@@ -335,7 +348,7 @@ namespace Betaknight.Tests.EditMode
             OverworldSession next = OverworldSession.CreateNextAct(new MapGenerationConfig { Radius = 4, Seed = 3 }, s);
             Assert.AreSame(s.Skills, next.Skills);
             Assert.IsTrue(next.OwnsSkill(SkillIds.Drill));
-            Assert.IsTrue(next.Skills.Contains(next.Runes.Rows[0].Skill), "Das Exemplar an der Tafel reist mit");
+            Assert.IsTrue(next.Skills.Contains(First(next)), "Das Exemplar auf der Platine reist mit");
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Map;
 using Betaknight.Core.Run;
@@ -19,6 +20,9 @@ namespace Betaknight.Tests.EditMode
 
         private static LogicRow Row(string runeId, SkillDefinition skill, int parameter = 0) =>
             new LogicRow(Conditions.Create(runeId, parameter), skill, runeId);
+
+        /// <summary>Takt, der jeden Tick auslöst: ersetzt das frühere «Immer», hält die Komponente dauernd in der Warteschlange.</summary>
+        private static LogicRow EveryTick(SkillDefinition skill) => new LogicRow(new ClockCondition(1), skill, "every tick");
 
         private static BattleResult Run(BattleSetup setup, int seconds = 20)
         {
@@ -74,7 +78,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(2, CastTime.Apply(8, -1000));
             Assert.AreEqual(4, CastTime.Apply(8, -1000, minTicks: 4), "Untergrenze ist einstellbar");
 
-            SkillDefinition stab = Skills.Get(SkillIds.ShockStab).WithBonus(0, 0, -50).WithBonus(0, 0, -60);
+            SkillDefinition stab = Skills.Get(SkillIds.ShockStab).WithBonus(0, -50).WithBonus(0, -60);
             Assert.AreEqual(-110, stab.CastBonusPercent, "Reduktionen addieren sich");
             Assert.AreEqual(2, stab.CastTicks());
             Assert.AreEqual(8, stab.WindupTicks, "Grundwert bleibt");
@@ -88,10 +92,11 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void EveryExecutionNeedsItsCastEvenRepeats()
         {
-            // Schockstich ohne Cast-Zeit und fast ohne Cooldown, Echo ohne Cooldown: alles läuft so schnell es geht.
-            SkillDefinition stab = Skills.Get(SkillIds.ShockStab).WithBonus(0, -Ticks.FromSeconds(3) + 10, -1000);
-            SkillDefinition echo = Skills.Get(SkillIds.Echo).WithBonus(0, -Ticks.FromSeconds(100), -1000);
-            var board = new LogicBoard(new[] { Row("always", stab), Row("always", echo) });
+            // Schockstich und Echo ohne Cast-Zeit: der Stich an einem Takt, der jeden Tick auslöst, Echo (zuerst in
+            // Lesereihenfolge) nach jedem eigenen Skill. Alles läuft so schnell es geht.
+            SkillDefinition stab = Skills.Get(SkillIds.ShockStab).WithBonus(0, -1000);
+            SkillDefinition echo = Skills.Get(SkillIds.Echo).WithBonus(0, -1000);
+            var board = new LogicBoard(new[] { Row("after_own_skill", echo), EveryTick(stab) });
 
             foreach (int min in new[] { CastTime.DefaultMinTicks, 5 })
             {
@@ -108,10 +113,10 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void AbsurdValuesStayStable()
         {
-            SkillDefinition slow = Skills.Get(SkillIds.Drill).WithBonus(1000000, 100000000, 100000000);
-            SkillDefinition fast = Skills.Get(SkillIds.ShockStab).WithBonus(-1000, -100000000, -100000000);
-            SkillDefinition echo = Skills.Get(SkillIds.Echo).WithBonus(0, -100000000, -100000000);
-            var board = new LogicBoard(new[] { Row("always", fast), Row("always", echo), Row("always", slow) });
+            SkillDefinition slow = Skills.Get(SkillIds.Drill).WithBonus(1000000, 100000000);
+            SkillDefinition fast = Skills.Get(SkillIds.ShockStab).WithBonus(-1000, -100000000);
+            SkillDefinition echo = Skills.Get(SkillIds.Echo).WithBonus(0, -100000000);
+            var board = new LogicBoard(new[] { EveryTick(fast), EveryTick(echo), EveryTick(slow) });
 
             CombatantSetup a = Fighter("A", 1000, int.MaxValue / 4, 0, board: board);
             a.Stats[StatKind.AttackSpeed] = int.MaxValue / 2;
@@ -128,8 +133,11 @@ namespace Betaknight.Tests.EditMode
         public void CastPassivesSpeedUpTheFight()
         {
             Equipment gear = Wearing(T(SynergyTagIds.Tempo), T(SynergyTagIds.Tempo), T(SynergyTagIds.Tempo), T(SynergyTagIds.Tempo));
-            CombatantSetup knight = PlayerLoadout.CreateCombatant("Ritter", new CombatStats(100, 5, 20), gear,
-                new[] { new BoardRowSpec("always", SkillIds.ShockStab) });
+            // «Battle Start» versorgt den Schockstich rechts daneben.
+            var circuit = new CircuitSpec();
+            circuit.Relays.Add(new RelaySpec("battle_start", new Cell(0, 0)));
+            circuit.Components.Add(new ComponentSpec(SkillIds.ShockStab, new Cell(1, 0)));
+            CombatantSetup knight = PlayerLoadout.CreateCombatant("Ritter", new CombatStats(100, 5, 20), gear, circuit);
             BattleResult r = Run(Duel(knight, Fighter("B", 100000, 0, 1000)), 5);
 
             BattleEvent start = r.Events.First(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.ShockStab);

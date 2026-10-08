@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Encounters;
 using Betaknight.Core.Exploration;
@@ -11,12 +12,13 @@ using Betaknight.Core.Map;
 using Betaknight.Core.Movement;
 using Betaknight.Core.Run;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Skills;
 using Betaknight.Core.Turns;
 using NUnit.Framework;
 
 namespace Betaknight.Tests.EditMode
 {
-    /// <summary>Die Arena hinter der Oberwelt: Ausrüstung, Tafel aus Runen-Plätzen, Belohnungen, Lagerfeuer.</summary>
+    /// <summary>Die Arena hinter der Oberwelt: Ausrüstung, Platine aus Relais und Komponenten, Belohnungen, Lagerfeuer.</summary>
     public class ArenaSessionTests
     {
         private static readonly HexCoord East = new HexCoord(1, 0);
@@ -32,11 +34,13 @@ namespace Betaknight.Tests.EditMode
             var gear = new Equipment();
             foreach (string id in kit.StartItemIds) gear.Equip(items.Get(id));
             var runeCatalog = RuneCatalog.CreateDefault();
-            var runes = new RuneLoadout();
-            runes.TryAdd(runeCatalog.Get(kit.StartRuneId), kit.StartSkillId);
+            var skills = new SkillCollection();
+            foreach (string id in kit.StartSkillIds) skills.Add(id);
+            var board = new CircuitBoard();
+            KnightKit.LayOut(board, runeCatalog.Get(kit.StartRuneId), skills.All.First(k => k.SkillId == kit.StartSkillId));
 
             return new OverworldSession(map, new PlayerModel(HexCoord.Zero), new TurnSystem(), new ExplorationService(map),
-                stats ?? kit.CreateStats(), null, runes, runeCatalog, combat, gear, items);
+                stats ?? kit.CreateStats(), null, board, runeCatalog, combat, gear, items, skills: skills);
         }
 
         [Test]
@@ -46,7 +50,8 @@ namespace Betaknight.Tests.EditMode
             {
                 OverworldSession s = OverworldSession.Create(new MapGenerationConfig { Radius = 4, Seed = 3 }, kit: kit);
                 CollectionAssert.AreEquivalent(kit.StartItemIds, s.Gear.Items.Select(i => i.Id), kit.Id);
-                Assert.AreEqual(kit.StartSkillId, s.Runes.Rows.Single().SkillId, kit.Id);
+                Assert.AreEqual(kit.StartSkillId, s.Board.Components.Single().Skill.SkillId, kit.Id);
+                Assert.AreEqual(kit.StartRuneId, s.Board.Relays.Single().Rune.Id, kit.Id);
             }
         }
 
@@ -70,25 +75,26 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void TheBoardComesFromRuneRowsAndGear()
+        public void TheBoardComesFromTheCircuitAndGear()
         {
             OverworldSession s = Session(Kit("shield"));
             var resolver = new ArenaCombatResolver();
-            BattleSetup setup = resolver.CreateSetup(new CombatRequest(CellContent.Enemy, 1, s.Stats, s.Runes, s.Gear), new List<CombatantSetup> { new CombatantSetup() }, 1);
+            BattleSetup setup = resolver.CreateSetup(new CombatRequest(CellContent.Enemy, 1, s.Stats, s.Board, s.Gear), new List<CombatantSetup> { new CombatantSetup() }, 1);
 
-            Assert.AreEqual(SkillIds.Drill, setup.Player.Board.Rows[0].Skill.Id);
+            Assert.AreEqual(SkillIds.ShieldBash, setup.Player.Board.Rows[0].Skill.Id);
+            Assert.IsTrue(setup.Player.Board.Rows[0].IsPowered, "«When Hit» versorgt den Start-Skill");
             Assert.AreEqual(s.Stats.MaxHp, setup.Player.Stats[StatKind.MaxHp]);
             Assert.AreEqual(2, setup.Player.Stats[StatKind.Armor], "Rundschild");
 
             s.Gear.Unequip(EquipmentSlot.Shield);
-            setup = resolver.CreateSetup(new CombatRequest(CellContent.Enemy, 1, s.Stats, s.Runes, s.Gear), new List<CombatantSetup> { new CombatantSetup() }, 1);
-            // A-05: Der Skill gehört der Zeile, nicht dem Schild. Ablegen kostet nur die Werte.
-            Assert.AreEqual(SkillIds.Drill, setup.Player.Board.Rows[0].Skill.Id);
+            setup = resolver.CreateSetup(new CombatRequest(CellContent.Enemy, 1, s.Stats, s.Board, s.Gear), new List<CombatantSetup> { new CombatantSetup() }, 1);
+            // A-05: Der Skill gehört der Komponente, nicht dem Schild. Ablegen kostet nur die Werte.
+            Assert.AreEqual(SkillIds.ShieldBash, setup.Player.Board.Rows[0].Skill.Id);
             Assert.AreEqual(0, setup.Player.Stats[StatKind.Armor]);
         }
 
         [Test]
-        public void TreasureOffersEquipmentThatRewiresOrphanedRows()
+        public void TreasureOffersEquipmentWithoutTouchingTheBoard()
         {
             OverworldSession s = Session(Kit("shield"));
             s.Gear.Unequip(EquipmentSlot.Shield);
@@ -103,40 +109,52 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(s.TakeItem(0));
             Assert.AreSame(item, s.Gear.Get(item.Slot));
             Assert.IsNull(s.PendingRuneOffer);
-            Assert.AreEqual(Kit("shield").StartSkillId, s.Runes.Rows[0].SkillId, "Ein neues Teil ändert keine Skills an der Tafel.");
+            Assert.AreEqual(Kit("shield").StartSkillId, s.Board.Components.Single().Skill.SkillId, "Ein neues Teil ändert keine Komponenten auf der Platine.");
         }
 
         [Test]
-        public void NewRunesGetAFreeSkillOrTheBasicAttack()
+        public void NewRunesBecomeRelaysNextToUnpoweredComponents()
         {
-            // Begründet angepasst (A-05): Skills kommen nicht mehr aus der Ausrüstung, sondern aus der Sammlung.
+            // A-19 (früher: neue Rune bekommt einen freien Skill oder den Basisangriff): Ein neues Relais landet neben einer
+            // Komponente, die noch kein Relais hat; sonst auf der ersten freien Zelle.
             OverworldSession s = Session(Kit("blade"));
-            s.Skills.Add(SkillIds.ShieldBash);
-            s.OfferRunes("Test");
-            Assert.IsTrue(s.TakeRune(0));
-
-            Assert.AreEqual(SkillIds.ArmorBreak, s.Runes.Rows[0].SkillId);
-            Assert.AreEqual(SkillIds.ShieldBash, s.Runes.Rows[1].SkillId);
+            SkillInstance bash = s.Skills.Add(SkillIds.ShieldBash);
+            Assert.IsTrue(s.PlaceSkill(bash.InstanceId, new Cell(3, 0)));
+            ComponentSlot bashSlot = s.Board.ComponentOf(bash);
+            Assert.IsEmpty(s.Board.RelaysTouching(bashSlot));
 
             s.OfferRunes("Test");
             Assert.IsTrue(s.TakeRune(0));
-            Assert.AreEqual(SkillIds.BasicAttack, s.Runes.Rows[2].SkillId, "Kein freier Skill mehr: Basisangriff statt verwaist.");
+            Assert.AreEqual(2, s.Board.Relays.Count);
+            Assert.AreEqual(1, s.Board.RelaysTouching(bashSlot).Count, "Das neue Relais berührt die unversorgte Komponente.");
+
+            Cell? free = s.Board.FreeCellFor(Shape.One);
+            s.OfferRunes("Test");
+            Assert.IsTrue(s.TakeRune(0));
+            Assert.AreEqual(3, s.Board.Relays.Count);
+            Assert.IsTrue(s.Board.Relays.Any(r => r.Position == free.Value), "Alle Komponenten haben ein Relais: erste freie Zelle.");
         }
 
         [Test]
-        public void RowsCanBeReorderedAndRewired()
+        public void RelaysAndComponentsCanBeMovedAndRemoved()
         {
+            // A-19 (früher: Zeilen umsortieren und neu verdrahten): Relais und Komponenten werden verschoben, die Lesereihenfolge folgt.
             OverworldSession s = Session(Kit("shield"));
             s.OfferRunes("Test");
             s.TakeRune(0);
-            string second = s.Runes.Rows[1].Rune.Id;
+            Assert.AreEqual(2, s.Board.Relays.Count);
+            string second = s.Board.Relays[1].Rune.Id;
 
-            Assert.IsTrue(s.MoveRow(1, 0));
-            Assert.AreEqual(second, s.Runes.Rows[0].Rune.Id);
-            Assert.IsFalse(s.PlaceSkill(999, 0), "Nur Exemplare aus der Sammlung.");
-            Assert.IsTrue(s.PlaceBasicAttack(0));
-            Assert.IsTrue(s.RemoveSkill(0));
-            Assert.IsTrue(s.Runes.Rows[0].Skill == null);
+            Cell before = s.Board.Relays[0].Position;
+            Assert.IsTrue(s.MoveRelay(0, new Cell(0, 2)));
+            Assert.IsTrue(s.MoveRelay(s.Board.Relays.ToList().FindIndex(r => r.Rune.Id == second), before));
+            Assert.AreEqual(second, s.Board.Relays[0].Rune.Id);
+            Assert.IsFalse(s.PlaceSkill(999, new Cell(3, 2)), "Nur Exemplare aus der Sammlung.");
+
+            SkillInstance skill = s.Board.Components[0].Skill;
+            Assert.IsTrue(s.RemoveComponent(0));
+            Assert.IsEmpty(s.Board.Components);
+            Assert.IsTrue(skill.IsFree);
         }
 
         [Test]
@@ -144,15 +162,16 @@ namespace Betaknight.Tests.EditMode
         {
             OverworldSession s = Session(Kit("shield"));
             var hpLow = s.RuneCatalog.Get("hp_low");
-            s.Runes.TryAdd(hpLow, SkillIds.ShieldBash);
-            s.Runes.Upgrade(1);
+            RelayChip low = s.Board.AddRelay(hpLow);
+            Assert.IsTrue(s.Board.Upgrade(s.Board.IndexOf(low)));
+            RelayChip whenHit = s.Board.Relays.Single(r => r != low);
 
-            var resolver = new EncounterResolver(s.Map, s.Exploration, s.Stats, new System.Random(1), s.Runes);
+            var resolver = new EncounterResolver(s.Map, s.Exploration, s.Stats, new System.Random(1), s.Board);
             List<string> lines = resolver.Apply(new EncounterOption("Rune verstärken", EncounterEffect.UpgradeRune()), HexCoord.Zero);
 
-            Assert.AreEqual(0, s.Runes.Rows[0].Level, "when_hit hat keine Stufen.");
-            Assert.AreEqual(2, s.Runes.Rows[1].Level);
-            Assert.AreEqual(hpLow.NameAt(2), s.Runes.Rows[1].Name);
+            Assert.AreEqual(0, whenHit.Level, "when_hit hat keine Stufen.");
+            Assert.AreEqual(2, low.Level);
+            Assert.AreEqual(hpLow.NameAt(2), low.Name);
             StringAssert.Contains("Rune upgraded", lines.Single());
         }
 
@@ -167,7 +186,7 @@ namespace Betaknight.Tests.EditMode
                 int wins = 0;
                 for (int seed = 1; seed <= 10; seed++)
                 {
-                    BattleSetup setup = resolver.CreateSetup(new CombatRequest(CellContent.Enemy, enemy.MinTier, s.Stats, s.Runes, s.Gear), enemy.Create(), seed);
+                    BattleSetup setup = resolver.CreateSetup(new CombatRequest(CellContent.Enemy, enemy.MinTier, s.Stats, s.Board, s.Gear), enemy.Create(), seed);
                     BattleResult r = CombatSimulation.Run(setup);
                     Assert.AreNotEqual(BattleOutcome.Timeout, r.Outcome, enemy.Id);
                     if (r.IsVictory) wins++;

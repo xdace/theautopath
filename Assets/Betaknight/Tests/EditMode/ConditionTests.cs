@@ -14,9 +14,9 @@ namespace Betaknight.Tests.EditMode
         private static LogicRow Row(string runeId, SkillDefinition skill, int parameter = 0) =>
             new LogicRow(Registry.Create(runeId, parameter), skill, runeId);
 
-        /// <summary>Skill ohne Schaden und ohne Cooldown, zählt nicht als Angriff. Zum Beobachten, wann eine Zeile feuert.</summary>
-        private static SkillDefinition Ping(string id = "ping", int cooldown = 0) =>
-            new SkillDefinition(id, id, 1, 0, cooldown, new ISkillEffect[0]);
+        /// <summary>Skill ohne Schaden, zählt nicht als Angriff. Zum Beobachten, wann ein Relais auslöst.</summary>
+        private static SkillDefinition Ping(string id = "ping") =>
+            new SkillDefinition(id, id, 1, 0, new ISkillEffect[0]);
 
         private static List<int> Starts(BattleResult r, string skillId) =>
             r.Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == skillId).Select(e => e.Tick).ToList();
@@ -57,17 +57,24 @@ namespace Betaknight.Tests.EditMode
         {
             BattleResult r = Run(new LogicBoard(new[] { Row("every_5s", Ping(), 5) }), enemyHp: 1000, tweak: s => s.TimeLimitTicks = 400);
 
+            // Der Takt selbst läuft genau alle 5 s, unabhängig davon, wann der Ping drankommt.
+            List<int> ticks = r.Events.Where(e => e.Kind == BattleEventKind.RelayTriggered && e.Source.Name == "A").Select(e => e.Tick).ToList();
+            Assert.GreaterOrEqual(ticks.Count, 3);
+            for (int i = 0; i < ticks.Count; i++) Assert.AreEqual(Ticks.FromSeconds(5) * (i + 1), ticks[i]);
+
+            // Jedes Ticken startet genau einen Ping, sobald der Ritter frei ist (fällig bleibt fällig, er wartet in der Warteschlange).
             List<int> pings = Starts(r, "ping");
-            Assert.GreaterOrEqual(pings[0], Ticks.FromSeconds(5));
-            for (int i = 1; i < pings.Count; i++) Assert.GreaterOrEqual(pings[i] - pings[i - 1], Ticks.FromSeconds(5));
-            Assert.LessOrEqual(pings[1] - pings[0], Ticks.FromSeconds(5) + Ticks.PerSecond, "Fällig bleibt fällig, feuert sobald frei.");
+            Assert.That(pings.Count, Is.InRange(ticks.Count - 1, ticks.Count));
+            for (int i = 0; i < pings.Count; i++)
+                Assert.That(pings[i] - ticks[i], Is.InRange(0, Ticks.PerSecond), "Fällig bleibt fällig, feuert sobald frei.");
         }
 
         [Test]
         public void DueClockIsNotSwallowedByHigherRow()
         {
-            var busy = new SkillDefinition("busy", "busy", 30, 0, 40, new ISkillEffect[0]);
-            BattleResult r = Run(new LogicBoard(new[] { new LogicRow(AlwaysCondition.Instance, busy), Row("every_5s", Ping(), 5) }),
+            // Eine frühere Komponente hält den Ritter beschäftigt (Takt 2 s, Cast 1,5 s); der fällige Takt geht trotzdem nicht verloren.
+            var busy = new SkillDefinition("busy", "busy", 30, 0, new ISkillEffect[0]);
+            BattleResult r = Run(new LogicBoard(new[] { Row("clock", busy, 2), Row("every_5s", Ping(), 5) }),
                 enemyHp: 1000, tweak: s => s.TimeLimitTicks = 600);
 
             List<int> pings = Starts(r, "ping");
@@ -91,7 +98,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void HealLoopDoesNotRecurseWithinATick()
         {
-            var heal = new SkillDefinition("heal", "heal", 1, 0, 0, new ISkillEffect[] { new HealEffect(100) });
+            var heal = new SkillDefinition("heal", "heal", 1, 0, new ISkillEffect[] { new HealEffect(100) });
             var setup = Duel(Fighter("A", 1000, 1, board: new LogicBoard(new[] { Row("after_heal", heal), Row("hp_low", heal, 99) })),
                 Fighter("B", 100000, 3, 5));
             BattleResult r = CombatSimulation.Run(setup);
@@ -111,13 +118,24 @@ namespace Betaknight.Tests.EditMode
                 Row("chain", Ping("c")),
             }), enemyHp: 1000, tweak: s => s.TimeLimitTicks = 300);
 
+            // Ein Takt startet die Kombo: a, dann b und c in Lesereihenfolge. Danach ketten sich b und c gegenseitig weiter
+            // («Chain» löst nach jeder anderen Komponente aus), bis der Takt wieder a dazwischenschiebt.
             List<string> order = r.Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Source.Name == "A")
                 .Select(e => e.Detail).Where(d => d != SkillDefinition.BasicAttackId).ToList();
-            Assert.AreEqual(new[] { "a", "b", "c", "a", "b", "c" }, order.Take(6).ToArray());
+            Assert.AreEqual(new[] { "a", "b", "c" }, order.Take(3).ToArray());
+
+            // Jede fertige andere Komponente löst eine «Chain» genau einmal aus, nicht in mehreren Ticks hintereinander.
+            List<BattleEvent> own = r.Events.Where(e => e.Source?.Name == "A").ToList();
+            for (int relay = 1; relay <= 2; relay++)
+            {
+                int triggers = own.Count(e => e.Kind == BattleEventKind.RelayTriggered && e.Relay == relay);
+                int others = own.Count(e => e.Kind == BattleEventKind.ActionExecuted && e.Detail != SkillDefinition.BasicAttackId && e.RowIndex != relay);
+                Assert.LessOrEqual(triggers, others, $"Relais {relay + 1}");
+            }
         }
 
         [Test]
-        public void ChainNeedsARowAbove()
+        public void ChainNeedsAnotherComponent()
         {
             BattleResult r = Run(new LogicBoard(new[] { Row("chain", Ping()) }));
             Assert.IsEmpty(Starts(r, "ping"));

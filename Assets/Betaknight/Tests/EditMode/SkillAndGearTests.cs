@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Run;
 using NUnit.Framework;
@@ -95,7 +96,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void DodgeStreakNeedsConsecutiveDodges()
         {
-            var ping = new SkillDefinition("ping", "ping", 1, 0, 0, new ISkillEffect[0]);
+            var ping = new SkillDefinition("ping", "ping", 1, 0, new ISkillEffect[0]);
             CombatantSetup a = With(Fighter("A", 100000, 1, 1000, board: Board(new LogicRow(Conditions.Create("dodge_streak", 2), ping))),
                 StatKind.Dodge, BasisPoints.Percent(50));
             BattleResult r = LongDuel(a, Fighter("B", 100000, 1, 5), 30);
@@ -124,7 +125,7 @@ namespace Betaknight.Tests.EditMode
             {
                 var setup = new BattleSetup
                 {
-                    Player = Fighter("A", 200, 4, board: Board(new LogicRow(AlwaysCondition.Instance, skill))),
+                    Player = Fighter("A", 200, 4, board: Board(new LogicRow(new ClockCondition(Ticks.FromSeconds(2)), skill, "Clock 2 s"))),
                     Enemies = new List<CombatantSetup> { Fighter("B", 60, 2), Fighter("C", 60, 2) },
                     Seed = 5,
                 };
@@ -142,7 +143,7 @@ namespace Betaknight.Tests.EditMode
 
             List<BattleEvent> basics = On(r, "B", BattleEventKind.Damage).Where(e => e.Detail == SkillIds.BasicAttack).ToList();
             BattleEvent broken = On(r, "B", BattleEventKind.Damage).First(e => e.Detail == SkillIds.ArmorBreak);
-            Assert.AreEqual(19, broken.Amount, "Der Bruch-Treffer selbst (190 %) trifft noch volle Rüstung.");
+            Assert.AreEqual(30, broken.Amount, "Der Bruch-Treffer selbst (300 %) trifft noch volle Rüstung.");
             Assert.IsTrue(basics.Where(e => e.Tick <= broken.Tick + Ticks.FromSeconds(6)).All(e => e.Amount == 13));
             Assert.IsTrue(basics.Where(e => e.Tick > broken.Tick + Ticks.FromSeconds(6)).All(e => e.Amount == 10));
         }
@@ -155,7 +156,7 @@ namespace Betaknight.Tests.EditMode
 
             List<BattleEvent> burns = On(r, "B", BattleEventKind.Damage).Where(e => e.Detail == StatusIds.Burn).ToList();
             Assert.AreEqual(5, burns.Count);
-            Assert.IsTrue(burns.All(e => e.Amount == 7), "70 % Waffenschaden, Rüstung zählt nicht.");
+            Assert.IsTrue(burns.All(e => e.Amount == 3), "32 % Waffenschaden, Rüstung zählt nicht.");
             Assert.IsEmpty(r.Events.Where(e => e.Kind == BattleEventKind.Hit && e.Detail == StatusIds.Burn), "Brennen ist kein Treffer.");
         }
 
@@ -188,10 +189,11 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void EchoRepeatsTheLastSkillButNeverItself()
         {
-            BattleResult r = LongDuel(Fighter("A", 1000, 20, 1000, board: Board(Row("battle_start", SkillIds.ArmorBreak), Row("always", SkillIds.Echo))),
+            // Echo hängt an «After Own Skill»: nach dem Rüstungsbruch löst es aus, seine eigene Wiederholung zählt nicht (versorgt).
+            BattleResult r = LongDuel(Fighter("A", 1000, 20, 1000, board: Board(Row("battle_start", SkillIds.ArmorBreak), Row("after_own_skill", SkillIds.Echo))),
                 Fighter("B", 100000, 0, 1000), 8);
 
-            // Bis zum zweiten Echo (12 s Cooldown): ein Rüstungsbruch aus seiner Zeile, einer als Wiederholung mit eigener Cast-Zeit.
+            // Ein Rüstungsbruch aus seiner Komponente, einer als Wiederholung mit eigener Cast-Zeit, danach nichts mehr.
             int window = Ticks.FromSeconds(10);
             Assert.AreEqual(1, r.Events.Count(e => e.Tick < window && e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.ArmorBreak && !e.IsRepeat));
             BattleEvent repeat = r.Events.Single(e => e.Tick < window && e.Kind == BattleEventKind.ActionStarted && e.IsRepeat);
@@ -200,7 +202,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(CastTime.Medium, repeated.Tick - repeat.Tick, "Die Wiederholung braucht die Cast-Zeit des Rüstungsbruchs.");
             Assert.AreEqual(2, On(r, "B", BattleEventKind.Damage).Count(e => e.Tick < window && e.Detail == SkillIds.ArmorBreak), "Echo wiederholt den Rüstungsbruch.");
 
-            r = LongDuel(Fighter("A", 1000, 20, board: Board(Row("always", SkillIds.Echo))), Fighter("B", 200, 1), 20);
+            r = LongDuel(Fighter("A", 1000, 20, board: Board(Row("clock", SkillIds.Echo, 2))), Fighter("B", 200, 1), 20);
             Assert.AreEqual(BattleOutcome.Victory, r.Outcome, "Echo ohne Vorlage tut nichts, der Kampf läuft weiter.");
         }
 
@@ -256,28 +258,39 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void RowsWithoutASkillAreOrphanedAndSkipped()
+        public void ComponentsWithoutASkillAreOrphanedAndSkipped()
         {
-            // Begründet angepasst (A-05): Ein abgelegtes Teil nimmt keinen Skill mehr weg. Verwaist ist nur eine Zeile
-            // ohne Skill (bewusst herausgenommen) oder mit unbekannter Rune.
+            // Begründet angepasst (A-05, A-19): Ein abgelegtes Teil nimmt keinen Skill mehr weg. Verwaist ist nur eine
+            // Komponente mit unbekanntem Skill; ein Relais mit unbekannter Rune löst nie aus.
             var factory = BoardFactory.CreateDefault();
             var gear = new Equipment();
             gear.Equip(Items.Get("round_shield"));
-            var rows = new[] { new BoardRowSpec("battle_start", SkillIds.ShieldBash), new BoardRowSpec("no_such_rune", SkillIds.ShieldBash) };
+            var spec = new CircuitSpec { Width = 4, Height = 3 };
+            spec.Relays.Add(new RelaySpec("battle_start", new Cell(0, 0)));
+            spec.Relays.Add(new RelaySpec("no_such_rune", new Cell(0, 2)));
+            spec.Components.Add(new ComponentSpec(SkillIds.ShieldBash, new Cell(1, 0)));
+            spec.Components.Add(new ComponentSpec("no_such_skill", new Cell(1, 2)));
 
-            LogicBoard board = factory.Create(rows, gear);
+            LogicBoard board = factory.Create(spec, gear);
             Assert.IsFalse(board.Rows[0].IsOrphaned);
-            Assert.IsTrue(board.Rows[1].IsOrphaned, "Unbekannte Rune bleibt als leere Zeile stehen.");
+            Assert.IsTrue(board.Rows[1].IsOrphaned, "Unbekannter Skill bleibt als leere Komponente liegen.");
+            Assert.AreEqual(2, board.Relays.Count, "das unbekannte Relais bleibt liegen");
 
             gear.Unequip(EquipmentSlot.Shield);
-            Assert.IsFalse(factory.Create(rows, gear).Rows[0].IsOrphaned, "Teil ablegen nimmt keinen Skill weg.");
+            Assert.IsFalse(factory.Create(spec, gear).Rows[0].IsOrphaned, "Teil ablegen nimmt keinen Skill weg.");
 
-            board = factory.Create(new[] { new BoardRowSpec("battle_start", null) }, gear);
-            Assert.IsTrue(board.Rows[0].IsOrphaned);
-
+            // Im Kampf: das Relais mit unbekannter Rune löst nie aus, das Auslösen der verwaisten Komponente verpufft.
             BattleResult r = CombatSimulation.Run(Duel(Fighter("A", 100, 5, board: board), Fighter("B", 20, 1)));
             Assert.AreEqual(BattleOutcome.Victory, r.Outcome);
             Assert.IsFalse(r.Events.Any(e => e.Kind == BattleEventKind.ActionStarted && e.Source.Name == "A" && e.Detail != SkillIds.BasicAttack));
+            Assert.IsFalse(r.Events.Any(e => e.Kind == BattleEventKind.RelayTriggered && e.Source.Name == "A" && e.Relay == 1));
+
+            var orphan = new CircuitSpec();
+            orphan.Relays.Add(new RelaySpec("battle_start", new Cell(0, 0)));
+            orphan.Components.Add(new ComponentSpec("no_such_skill", new Cell(1, 0)));
+            r = CombatSimulation.Run(Duel(Fighter("A", 100, 5, board: factory.Create(orphan, gear)), Fighter("B", 20, 1)));
+            Assert.AreEqual(BattleOutcome.Victory, r.Outcome);
+            Assert.IsTrue(r.Events.Any(e => e.Kind == BattleEventKind.TriggerMissed && e.Source.Name == "A" && e.Amount == (int)MissReason.Orphaned));
         }
 
         [Test]
@@ -305,8 +318,12 @@ namespace Betaknight.Tests.EditMode
                 foreach (string id in kit.StartItemIds) Assert.IsNotNull(gear.Equip(Items.Get(id)), $"{kit.Id}: {id}");
 
                 Assert.IsNotNull(gear.Get(EquipmentSlot.Weapon), kit.Id);
-                LogicBoard board = factory.Create(new[] { new BoardRowSpec(kit.StartRuneId, kit.StartSkillId) }, gear);
+                var spec = new CircuitSpec();
+                spec.Relays.Add(new RelaySpec(kit.StartRuneId, new Cell(0, 0)));
+                spec.Components.Add(new ComponentSpec(kit.StartSkillId, new Cell(1, 0)));
+                LogicBoard board = factory.Create(spec, gear);
                 Assert.IsFalse(board.Rows[0].IsOrphaned, kit.Id);
+                Assert.IsTrue(board.Rows[0].IsPowered, $"{kit.Id}: die Start-Rune versorgt den Start-Skill");
             }
         }
     }
