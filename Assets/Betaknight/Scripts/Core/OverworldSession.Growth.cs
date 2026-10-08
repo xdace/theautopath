@@ -159,8 +159,8 @@ namespace Betaknight.Core
                     if (!skill.Modules.Any(m => m.ModuleId == recipe.RequirementId)) missing.Add(RequirementText(recipe));
                     break;
                 case EvolutionRequirement.BlockInRow:
-                    // A-19: «in derselben Zeile» heisst jetzt: ein Relais mit dieser Rune versorgt die Komponente (berührt sie).
-                    if (!onBoard || !Board.RelaysTouching(slot).Any(r => r.Rune.Id == recipe.RequirementId)) missing.Add(RequirementText(recipe));
+                    // A-19: «in derselben Zeile» heisst jetzt: ein Relais mit dieser Rune versorgt die Komponente (berührt sie innerhalb seiner Grenze).
+                    if (!onBoard || !PoweringRelays(slot).Any(r => r.Rune.Id == recipe.RequirementId)) missing.Add(RequirementText(recipe));
                     break;
                 case EvolutionRequirement.Tag:
                     AddTagMissing(missing, recipe);

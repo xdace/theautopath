@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Betaknight.Core.Arena;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Gear;
 
@@ -46,6 +47,16 @@ namespace Betaknight.Core
             var resolver = _combat as ArenaCombatResolver ?? new ArenaCombatResolver();
             return BuildStats.From(resolver.PreviewCombatant(Stats, Board, equipment, null, Progression.SkillLevels), Stats.Hp,
                 BonusesFor(equipment));
+        }
+
+        /// <summary>
+        /// Die Platine so, wie sie im Kampf gebaut wird (Versorgung, Grenzen, Kern, Module, Wachstum, Ausrüstung). Für das
+        /// Build-Fenster: welche Komponente versorgt ist, was sie im Kampf kann. Gekämpft wird nicht.
+        /// </summary>
+        public LogicBoard CompileBoard()
+        {
+            var resolver = _combat as ArenaCombatResolver ?? new ArenaCombatResolver();
+            return resolver.PreviewCombatant(Stats, Board, Gear, null, Progression.SkillLevels).Board;
         }
 
         /// <summary>Aktive Set-Boni (ab 2 Teilen), erreichte Tag-Stufen und aktive Duos.</summary>
