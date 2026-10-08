@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
-using Betaknight.Core.Circuit;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Map;
@@ -81,6 +81,7 @@ namespace Betaknight.Core.Autoplay
                 Report.BoardRows.Clear();
                 for (int i = 0; i < s.Board.Components.Count; i++) Report.BoardRows.Add(ComponentText(s, i));
                 for (int i = 0; i < s.Board.Relays.Count; i++) Report.BoardRows.Add(RelayText(s, i));
+                foreach (BoardChip chip in s.Board.Chips) Report.BoardRows.Add(AutoplayTexts.ChipRow(chip.Name, chip.Position.X + 1, chip.Position.Y + 1));
 
                 Report.Modules.Clear();
                 foreach (ModuleInstance m in s.Modules.All.Where(m => !m.IsFree))

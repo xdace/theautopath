@@ -28,6 +28,7 @@ namespace Betaknight.Core.Autoplay
         public const string RewardItem = "Item";
         public const string RewardRune = "Rune";
         public const string RewardBoardExpansion = "Board Expansion";
+        public const string RewardChip = "Chip";
 
         // ------------------------------------------------------------------ Bot: keine Aktion
 
@@ -55,6 +56,7 @@ namespace Betaknight.Core.Autoplay
         public static string ShopItem(string name) => $"Shop: Item {name}";
         public const string ShopBoardRow = "Shop: Board Expansion";
         public static string ShopRune(string name) => $"Shop: Rune {name}";
+        public static string ShopChip(string name) => $"Shop: Chip {name}";
         public const string ShopLeave = "Leave shop";
 
         public static string EnterPortal(int act) => $"Through the portal to Act {act}";
@@ -62,6 +64,8 @@ namespace Betaknight.Core.Autoplay
         public static string Equip(string name) => $"Equip: {name}";
         public static string PlaceRune(string name) => $"Place rune: {name}";
         public static string PlaceSkill(string name, int column, int row) => $"Place component: {name} → column {column}, row {row}";
+        public static string ChipRow(string name, int column, int row) => $"Chip {name} (column {column}, row {row})";
+        public static string PlaceChip(string name, int column, int row) => $"Place chip: {name} → column {column}, row {row}";
         public static string PlaceModuleOnSkill(string name, int component) => $"Place module: {name} → component #{component}";
         public static string PlaceModuleOnRune(string name, int relay) => $"Place module: {name} → Relay {relay}";
         public static string SetTriggerTarget(int instanceId) => $"Set trigger target: Module #{instanceId}";

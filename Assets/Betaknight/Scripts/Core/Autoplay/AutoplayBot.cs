@@ -271,6 +271,13 @@ namespace Betaknight.Core.Autoplay
                     a = Try(BotActionKind.Shop, AutoplayTexts.ShopRune(stock.Runes[i].Name), () => s.BuyShopRune(index), AutoplayTexts.RewardRune);
             }
 
+            for (int i = 0; a == null && i < stock.ChipIds.Count; i++)
+            {
+                int index = i;
+                if (s.CanBuyShopChip(i) && s.ChipCatalog.TryGet(stock.ChipIds[i], out ChipDefinition chip))
+                    a = Try(BotActionKind.Shop, AutoplayTexts.ShopChip(chip.Name), () => s.BuyShopChip(index), AutoplayTexts.RewardChip);
+            }
+
             return a ?? Try(BotActionKind.Shop, AutoplayTexts.ShopLeave, () =>
             {
                 s.LeaveShop();
@@ -374,6 +381,16 @@ namespace Betaknight.Core.Autoplay
                 }
             }
 
+            // Chips aus dem Inventar dorthin, wo sie am meisten verbinden (A-20); sonst bleiben sie liegen.
+            for (int i = 0; i < s.ChipInventory.Count && s.CanEditChips; i++)
+            {
+                if (!ChipSpot(s, s.ChipInventory[i], out Cell at, out int turns)) continue;
+                int index = i;
+                BotAction a = Try(BotActionKind.Build, AutoplayTexts.PlaceChip(s.ChipInventory[i].Name, at.X + 1, at.Y + 1),
+                    () => s.PlaceChip(index, at, turns));
+                if (a != null) return a;
+            }
+
             // Gesetzte Auslöser ohne Ziel bekommen eines.
             foreach (ModuleInstance module in s.Modules.All)
             {
@@ -384,6 +401,48 @@ namespace Betaknight.Core.Autoplay
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Beste freie Zelle und Drehung für einen Chip: probiert jede Lage auf der Platine aus und nimmt die mit dem
+        /// höchsten Wert (<see cref="ChipValue"/>), nur wenn sie besser ist als ohne den Chip. Erste in Lesereihenfolge gewinnt.
+        /// </summary>
+        private static bool ChipSpot(OverworldSession s, ChipDefinition chip, out Cell at, out int turns)
+        {
+            at = default;
+            turns = 0;
+            CircuitBoard board = s.Board;
+            int best = ChipValue(s.CompileBoard());
+            bool found = false;
+            int turnCount = chip.Openings.Count == 0 || chip.Kind == ChipKind.TraceCross || chip.Kind == ChipKind.Capacitor ? 1 : 4;
+            for (int y = 0; y < board.Height; y++)
+                for (int x = 0; x < board.Width; x++)
+                {
+                    var cell = new Cell(x, y);
+                    if (!board.IsFree(new CellRect(cell, Shape.One))) continue;
+                    for (int turn = 0; turn < turnCount; turn++)
+                    {
+                        BoardChip trial = board.AddChip(chip, cell, turn);
+                        if (trial == null) continue;
+                        int value = ChipValue(s.CompileBoard());
+                        board.RemoveChip(trial);
+                        if (value <= best) continue;
+                        best = value;
+                        at = cell;
+                        turns = turn;
+                        found = true;
+                    }
+                }
+            return found;
+        }
+
+        /// <summary>Wert der Verdrahtung: jede Pulsverbindung zählt 1, jede von einem bereiten Gatter versorgte Komponente 2.</summary>
+        private static int ChipValue(LogicBoard board)
+        {
+            int value = board.Links.Count;
+            foreach (LogicRelay relay in board.Relays)
+                if (relay.Gate != null && relay.IsGateReady) value += 2 * relay.Powered.Count;
+            return value;
         }
 
         /// <summary>
