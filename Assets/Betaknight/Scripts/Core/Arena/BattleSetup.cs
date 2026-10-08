@@ -18,8 +18,11 @@ namespace Betaknight.Core.Arena
         public int Seed;
         public BattleContext Context = new BattleContext();
 
-        /// <summary>Danach beginnt die Überhitzung (steigender Prozent-Schaden für beide Seiten).</summary>
-        public int TimeLimitTicks = Ticks.FromSeconds(90);
+        /// <summary>Ab hier heizen beide Platinen auf (Thermal Throttling, A-21): Startwert aus <see cref="ThermalConfig.StartTicks"/>.</summary>
+        public int TimeLimitTicks = ThermalConfig.Default.StartTicks;
+
+        /// <summary>Thermal Throttling (A-21): Stufen nach <see cref="TimeLimitTicks"/>.</summary>
+        public ThermalConfig Thermal = ThermalConfig.Default;
 
         /// <summary>Untergrenze der Cast-Zeit jeder Ausführung (Standard 0,1 s). Keine Ausführung ohne Cast.</summary>
         public int MinCastTicks = CastTime.DefaultMinTicks;

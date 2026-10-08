@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Betaknight.Core.Circuit;
 using ChipKind = Betaknight.Core.Circuit.ChipKind;
 
 namespace Betaknight.Core.Arena
@@ -36,6 +37,9 @@ namespace Betaknight.Core.Arena
         private readonly Dictionary<Combatant, List<PulseInFlight>> _pulses = new Dictionary<Combatant, List<PulseInFlight>>();
         private readonly Dictionary<Combatant, CapacitorState[]> _capacitors = new Dictionary<Combatant, CapacitorState[]>();
 
+        // Eigene Effekte (A-21): Hitze, Hacks, Firewall, letzte Ausführung je Kämpfer.
+        private readonly Dictionary<Combatant, EffectRuntime> _fx = new Dictionary<Combatant, EffectRuntime>();
+
         public int Tick { get; private set; }
         public Random Random { get; }
         public BattleContext Context { get; }
@@ -45,8 +49,13 @@ namespace Betaknight.Core.Arena
         public IReadOnlyList<BattleEvent> Events => _events;
 
         public int TimeLimitTicks => _setup.TimeLimitTicks;
-        public bool IsOverheated => Tick > _setup.TimeLimitTicks;
+        /// <summary>Thermal Throttling läuft (A-21): ab dem Zeitlimit heizen beide Platinen auf.</summary>
+        public bool IsOverheated => OverheatLevel > 0;
+
+        /// <summary>Stufe des Thermal Throttling (0 = noch nicht).</summary>
         public int OverheatLevel { get; private set; }
+
+        private ThermalConfig Thermal => _setup.Thermal ?? ThermalConfig.Default;
         public int BonusGold { get; private set; }
 
         public Battle(BattleSetup setup)
@@ -75,6 +84,11 @@ namespace Betaknight.Core.Arena
             var caps = new CapacitorState[c.Board.Chips.Count];
             for (int i = 0; i < caps.Length; i++) caps[i] = new CapacitorState();
             _capacitors.Add(c, caps);
+            CircuitEffectConfig fx = c.Board.EffectConfig;
+            _fx.Add(c, new EffectRuntime(c.Board.Rows.Count, relays.Length)
+            {
+                Firewall = c.Board.BoardEffectCount(CircuitEffectIds.Firewall) * Math.Max(0, fx.FirewallCharges),
+            });
             return c;
         }
 
@@ -166,16 +180,37 @@ namespace Betaknight.Core.Arena
                 }
             }
 
-            if (IsOverheated && (Tick - _setup.TimeLimitTicks) % Ticks.PerSecond == 0)
+            // Thermal Throttling (A-21): ab dem Zeitlimit jede Stufe längere Cast-Zeiten und mehr Schaden für beide Seiten.
+            int start = Math.Max(1, _setup.TimeLimitTicks);
+            if (Tick >= start && (Tick - start) % Math.Max(1, Thermal.StepTicks) == 0)
             {
                 OverheatLevel++;
                 Emit(new BattleEvent(Tick, BattleEventKind.Overheat, null, null, OverheatLevel));
-                foreach (Combatant c in _all.ToArray())
-                {
-                    if (!c.IsAlive) continue;
-                    int amount = Math.Max(1, c.MaxHp * OverheatLevel / 100);
-                    ResolveHit(HitInfo.True(c, amount, "overheat"));
-                }
+            }
+
+            // Bit Flip endet.
+            foreach (Combatant c in _all)
+            {
+                int[] flipped = _fx[c].FlippedUntil;
+                for (int i = 0; i < flipped.Length; i++)
+                    if (flipped[i] == Tick) Emit(new BattleEvent(Tick, BattleEventKind.FlipEnded, c, null, 0, c.Board.Relays[i].Label) { Extra = i, Relay = i });
+            }
+        }
+
+        /// <summary>Cast-Zeit-Aufschlag des Thermal Throttling in Prozent.</summary>
+        public int ThermalCastPercent => OverheatLevel * Thermal.CastPercentPerStep;
+
+        /// <summary>
+        /// Schadens-Aufschlag des Thermal Throttling in Prozent. Die Stufen bauen aufeinander auf (+15 % auf den Wert der
+        /// Stufe davor), so endet auch ein Patt mit hoher Rüstung.
+        /// </summary>
+        public int ThermalDamagePercent
+        {
+            get
+            {
+                long factor = 100;
+                for (int i = 0; i < OverheatLevel && factor < 10_000_000; i++) factor = factor * (100 + Thermal.DamagePercentPerStep) / 100;
+                return (int)(factor - 100);
             }
         }
 
@@ -184,29 +219,64 @@ namespace Betaknight.Core.Arena
             foreach (Combatant c in _all)
             {
                 ActionState a = c.Action;
-                if (a == null || !c.IsAlive || c.IsStunned) continue;
+                if (a != null && c.IsAlive && !c.IsStunned)
+                {
+                    if (a.InWindup)
+                    {
+                        a.WindupLeft--;
+                        if (a.WindupLeft <= 0)
+                        {
+                            Execute(c, a);
+                            if (c.Action == a) // sonst durch Tod oder Betäubung abgebrochen
+                            {
+                                a.EffectApplied = true;
+                                AfterExecution(c, a);
+                                if (a.RecoveryLeft <= 0) Finish(c, a);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        a.RecoveryLeft--;
+                        if (a.RecoveryLeft <= 0) Finish(c, a);
+                    }
+                }
+                AdvanceThreads(c);
+            }
+        }
 
+        /// <summary>Parallel Threads (A-21) laufen neben der Hauptaktion mit eigener Cast-Zeit und Erholung.</summary>
+        private void AdvanceThreads(Combatant c)
+        {
+            if (c.ThreadList.Count == 0) return;
+            if (!c.IsAlive || c.IsStunned) return;
+            foreach (ActionState a in c.ThreadList.ToArray())
+            {
+                if (!c.ThreadList.Contains(a)) continue;
                 if (a.InWindup)
                 {
-                    a.WindupLeft--;
-                    if (a.WindupLeft > 0) continue;
-
+                    if (--a.WindupLeft > 0) continue;
                     Execute(c, a);
-                    if (c.Action != a) continue; // durch Tod oder Betäubung abgebrochen
+                    if (!c.ThreadList.Contains(a)) continue;
                     a.EffectApplied = true;
                     AfterExecution(c, a);
-                    if (a.RecoveryLeft <= 0) Finish(c, a);
+                    if (a.RecoveryLeft <= 0) c.ThreadList.Remove(a);
                 }
-                else
+                else if (--a.RecoveryLeft <= 0)
                 {
-                    a.RecoveryLeft--;
-                    if (a.RecoveryLeft <= 0) Finish(c, a);
+                    c.ThreadList.Remove(a);
                 }
             }
         }
 
         private void Execute(Combatant c, ActionState a)
         {
+            if (!a.Skill.IsBasicAttack) _fx[c].LastComponentTick = Tick;
+            if (a.HijackedBy != null && a.HijackedBy.IsAlive)
+            {
+                ExecuteHijacked(c, a);
+                return;
+            }
             Combatant target = a.Target != null && a.Target.IsAlive ? a.Target : DefaultTarget(c);
             Emit(new BattleEvent(Tick, BattleEventKind.ActionExecuted, c, target, a.Skill.CountsAsAttack ? 1 : 0, a.Skill.Id, a.RowIndex)
                 { Cause = a.Cause, CauseRow = a.CauseRow, Relay = a.Relay });
@@ -235,6 +305,10 @@ namespace Betaknight.Core.Arena
                         if (c.IsAlive && SkillEffects.HitsTarget(effect)) effect.Apply(chained);
                 }
             }
+
+            // Hacks (A-21): jede Ausführung eines Trägers hackt die gegnerische Platine.
+            foreach (string id in a.Skill.CircuitEffects)
+                if (c.IsAlive && IsHack(id)) Hack(c, target, id, a.RowIndex);
             EndActor();
         }
 
@@ -244,8 +318,8 @@ namespace Betaknight.Core.Arena
         /// </summary>
         private void AfterExecution(Combatant c, ActionState a)
         {
-            if (!c.IsAlive) return;
-            if (a.RepeatsLeft > 0)
+            if (!c.IsAlive || a.HijackedBy != null) return;
+            if (a.RepeatsLeft > 0 && !a.IsThread)
             {
                 c.Pending.Insert(0, new PendingAction
                 {
@@ -256,10 +330,36 @@ namespace Betaknight.Core.Arena
             if (a.IsRepeat || a.RowIndex < 0 || a.RowIndex >= c.Board.Rows.Count) return;
 
             LogicRelay relay = a.Relay >= 0 && a.Relay < c.Board.Relays.Count ? c.Board.Relays[a.Relay] : null;
+            LogicRow row = c.Board.Rows[a.RowIndex];
+            CircuitEffectConfig fx = c.Board.EffectConfig;
             // Der Bonus und die Grenze wandern mit: ausgelöste Ziele laufen mit Stufe und Grenze dieser Ausführung.
             FireEdges(c, GraphNode.Skill(a.RowIndex), a.BonusTier, a.Relay, relay?.MaxCells ?? int.MaxValue);
             // A-20: die Komponente schickt Pulse über ihre Verbindungen; Ziele zählen als versorgt vom ursprünglichen Relais.
-            SendPulses(c, PulseNode.Component(a.RowIndex), a.RowIndex, a.Relay, a.BonusTier, relay?.MaxCells ?? int.MaxValue);
+            // A-21: ein Verstärker als eigener Effekt der Komponente verstärkt ihre Pulse.
+            int pulsePower = row.Has(CircuitEffectIds.Amplifier) ? fx.AmplifierPowerPercent : 0;
+            SendPulses(c, PulseNode.Component(a.RowIndex), a.RowIndex, a.Relay, a.BonusTier, relay?.MaxCells ?? int.MaxValue, pulsePower);
+
+            // Overclock (A-21): berührte Komponenten bekommen Hitze.
+            if (row.Has(CircuitEffectIds.Overclock))
+                foreach (int n in row.Neighbours) AddHeat(c, n, fx.OverclockHeatPerExecution, a.RowIndex);
+
+            bool holds = relay != null && relay.Gate == null && relay.Condition.IsMet(new ConditionContext(this, c, _relays[c][a.Relay]), out _);
+            // Recursion (A-21): gilt die Bedingung noch, ruft sich die Komponente erneut auf, eine Tiefe weiter.
+            if (row.Has(CircuitEffectIds.Recursion) && holds)
+            {
+                int depth = a.Depth + 1;
+                if (depth > Math.Max(0, fx.RecursionMaxDepth))
+                {
+                    Emit(new BattleEvent(Tick, BattleEventKind.RecursionLimit, c, null, a.Depth, row.Skill.Id, a.RowIndex) { Relay = a.Relay });
+                }
+                else
+                {
+                    Emit(new BattleEvent(Tick, BattleEventKind.RecursionCall, c, null, depth, row.Skill.Id, a.RowIndex) { Relay = a.Relay, Depth = depth });
+                    Enqueue(c, a.RowIndex, a.Relay, ActionCause.Recursion, a.RowIndex, a.BonusTier, relay.MaxCells, null,
+                        depth * fx.RecursionPowerPercentPerDepth, depth);
+                }
+                return;
+            }
 
             if (relay != null && relay.RepeatWhileTrue && relay.Condition.IsMet(new ConditionContext(this, c, _relays[c][a.Relay]), out Combatant target))
                 Enqueue(c, a.RowIndex, a.Relay, ActionCause.Board, -1, a.BonusTier, relay.MaxCells, target);
@@ -346,9 +446,22 @@ namespace Betaknight.Core.Arena
                     if (relay.Gate != null) continue;
                     var context = new ConditionContext(this, c, states[i]);
                     if (relay.Condition is IObservingCondition observing) observing.Observe(context);
-                    bool fired = Triggers(relay.Condition, context, states[i], out Combatant target);
+                    bool flipped = _fx[c].FlippedUntil[i] > Tick;
+                    Combatant target;
+                    bool fired;
+                    if (flipped)
+                    {
+                        // Bit Flip (A-21): die Bedingung gilt umgekehrt, mit steigender Flanke.
+                        bool met = !relay.Condition.IsMet(context, out target);
+                        fired = met && !states[i].WasMet;
+                        states[i].WasMet = met;
+                    }
+                    else
+                    {
+                        fired = Triggers(relay.Condition, context, states[i], out target);
+                    }
                     if (fired) Fire(c, i, target);
-                    bool active = relay.IsEventTrigger ? states[i].FireCount > 0 && Tick - states[i].LastFiredTick < hold : states[i].WasMet;
+                    bool active = relay.IsEventTrigger && !flipped ? states[i].FireCount > 0 && Tick - states[i].LastFiredTick < hold : states[i].WasMet;
                     SetActive(c, i, active);
                 }
                 for (int i = 0; i < states.Length; i++)
@@ -367,6 +480,15 @@ namespace Betaknight.Core.Arena
         {
             RowRuntime state = _relays[c][i];
             LogicRelay relay = c.Board.Relays[i];
+            // Jam (A-21): das Relais ignoriert dieses Auslösen. Es gilt trotzdem als verbraucht (Takt und Zähler beginnen neu).
+            int[] jam = _fx[c].JamLeft;
+            if (jam[i] > 0)
+            {
+                jam[i]--;
+                state.LastFiredTick = Tick;
+                Emit(new BattleEvent(Tick, BattleEventKind.RelayJammed, c, null, jam[i], relay.Label) { Extra = i, Relay = i });
+                return;
+            }
             state.LastFiredTick = Tick;
             state.FireCount++;
             state.TriggeredNow = true;
@@ -420,6 +542,11 @@ namespace Betaknight.Core.Arena
                 case ChipKind.Fuse:
                     level = own.FireCount == 0;
                     return own.FireCount == 0 && states[gate.Inputs[0]].TriggeredNow;
+                case ChipKind.Watchdog:
+                    // Watchdog (A-21): hat seit der letzten Ausführung (oder seinem letzten Auslösen) nichts gefeuert?
+                    int since = Math.Max(_fx[c].LastComponentTick, own.FireCount > 0 ? own.LastFiredTick : 0);
+                    level = Tick - since >= Math.Max(1, c.Board.EffectConfig.WatchdogIdleTicks);
+                    return level;
                 default:
                     level = false;
                     return false;
@@ -429,18 +556,21 @@ namespace Betaknight.Core.Arena
         // ------------------------------------------------------------------ Pulse (A-20)
 
         /// <summary>Schickt einen Puls über jede Verbindung des Knotens; er kommt nach der Laufzeit der Verbindung an.</summary>
-        private void SendPulses(Combatant c, PulseNode from, int sourceRow, int relay, int tier, int maxCells)
+        /// <param name="power">Zusätzliche Wirkung, die der Puls schon trägt (A-21); Verstärker auf dem Weg legen dazu.</param>
+        private void SendPulses(Combatant c, PulseNode from, int sourceRow, int relay, int tier, int maxCells, int power = 0)
         {
             IReadOnlyList<PulseLink> links = c.Board.Links;
             for (int i = 0; i < links.Count; i++)
             {
                 PulseLink link = links[i];
                 if (!link.From.Equals(from)) continue;
+                int carried = power + link.Amplifiers * c.Board.EffectConfig.AmplifierPowerPercent;
                 _pulses[c].Add(new PulseInFlight
                 {
-                    Link = i, ArriveTick = Tick + link.Delay, SourceRow = sourceRow, Relay = relay, Tier = tier, MaxCells = maxCells,
+                    Link = i, ArriveTick = Tick + link.Delay, SourceRow = sourceRow, Relay = relay, Tier = tier, MaxCells = maxCells, Power = carried,
                 });
-                Emit(new BattleEvent(Tick, BattleEventKind.PulseSent, c, null, link.Delay, null, sourceRow) { Extra = i, Relay = relay, Tier = tier });
+                Emit(new BattleEvent(Tick, BattleEventKind.PulseSent, c, null, link.Delay, null, sourceRow)
+                    { Extra = i, Relay = relay, Tier = tier, Power = carried });
             }
         }
 
@@ -468,7 +598,7 @@ namespace Betaknight.Core.Arena
                 {
                     PulseLink link = c.Board.Links[p.Link];
                     if (link.To.IsCapacitor) Store(c, link.To.Index, p);
-                    else Enqueue(c, link.To.Index, p.Relay, ActionCause.Pulse, p.SourceRow, p.Tier, p.MaxCells, null);
+                    else Enqueue(c, link.To.Index, p.Relay, ActionCause.Pulse, p.SourceRow, p.Tier, p.MaxCells, null, p.Power);
                 }
             }
         }
@@ -503,7 +633,7 @@ namespace Betaknight.Core.Arena
             var stored = new List<PulseInFlight>(cap.Stored);
             cap.Stored.Clear();
             Emit(new BattleEvent(Tick, BattleEventKind.CapacitorReleased, c, null, stored.Count) { Extra = chip });
-            foreach (PulseInFlight p in stored) SendPulses(c, PulseNode.Capacitor(chip), p.SourceRow, p.Relay, p.Tier, p.MaxCells);
+            foreach (PulseInFlight p in stored) SendPulses(c, PulseNode.Capacitor(chip), p.SourceRow, p.Relay, p.Tier, p.MaxCells, p.Power);
         }
 
         /// <summary>Gespeicherte Pulse eines Kondensators (Anzeige, Tests).</summary>
@@ -520,6 +650,25 @@ namespace Betaknight.Core.Arena
             public int Relay;
             public int Tier;
             public int MaxCells;
+            public int Power;
+        }
+
+        /// <summary>Laufzeit der eigenen Effekte (A-21) eines Kämpfers.</summary>
+        private sealed class EffectRuntime
+        {
+            public readonly int[] Heat;
+            public readonly int[] FlippedUntil;
+            public readonly int[] JamLeft;
+            public readonly Dictionary<int, Combatant> Hijacked = new Dictionary<int, Combatant>();
+            public int Firewall;
+            public int LastComponentTick;
+
+            public EffectRuntime(int rows, int relays)
+            {
+                Heat = new int[rows];
+                FlippedUntil = new int[relays];
+                JamLeft = new int[relays];
+            }
         }
 
         private sealed class CapacitorState
@@ -589,7 +738,8 @@ namespace Betaknight.Core.Arena
         /// Reiht eine Komponente ein. Steht sie schon so oft wie erlaubt, ist das ein «Missed Trigger»; ein Auslösen mit
         /// höherer Stufe hebt nur den Bonus der wartenden Ausführung (nicht stapelnd).
         /// </summary>
-        private void Enqueue(Combatant c, int row, int relay, ActionCause cause, int causeRow, int tier, int maxCells, Combatant target)
+        private void Enqueue(Combatant c, int row, int relay, ActionCause cause, int causeRow, int tier, int maxCells, Combatant target,
+            int power = 0, int depth = 0)
         {
             if (row < 0 || row >= c.Board.Rows.Count) return;
             LogicRow r = c.Board.Rows[row];
@@ -609,6 +759,17 @@ namespace Betaknight.Core.Arena
                 return;
             }
 
+            CircuitEffectConfig fx = c.Board.EffectConfig;
+
+            // Parallel Thread (A-21): läuft gerade eine andere Ausführung, startet die Komponente sofort daneben.
+            if (r.Has(CircuitEffectIds.ParallelThread) && c.Action != null && !c.Action.Skill.IsBasicAttack && c.Action.RowIndex != row
+                && !c.ThreadList.Exists(a => a.RowIndex == row) && !c.IsStunned)
+            {
+                Emit(new BattleEvent(Tick, BattleEventKind.ParallelThread, c, target, 0, r.Skill.Id, row) { Cause = cause, CauseRow = causeRow, Relay = relay });
+                StartAction(c, r.Skill, target, row, cause, causeRow, null, tier, -1, relay, power, depth, thread: true);
+                return;
+            }
+
             QueuedRow existing = null;
             int entries = 0;
             foreach (QueuedRow q in c.QueueList)
@@ -617,25 +778,63 @@ namespace Betaknight.Core.Arena
                 entries++;
                 existing = existing ?? q;
             }
-            if (entries >= Math.Max(1, _queue.MaxEntriesPerComponent))
+            int allowed = r.Has(CircuitEffectIds.Buffer) ? Math.Max(1, fx.BufferEntries) : Math.Max(1, _queue.MaxEntriesPerComponent);
+            if (entries >= allowed)
             {
                 if (tier > existing.BonusTier)
                 {
                     existing.BonusTier = tier;
                     existing.Relay = relay;
                 }
+                existing.PowerPercent = Math.Max(existing.PowerPercent, power);
                 Missed(c, row, relay, MissReason.AlreadyQueued);
+                return;
+            }
+
+            // Overflow (A-21): ist die Warteschlange voll, wird der Eintrag sofort zum Schock gegen alle Gegner.
+            if (c.Board.HasBoardEffect(CircuitEffectIds.Overflow) && c.QueueList.Count >= Math.Max(1, fx.OverflowQueueLimit))
+            {
+                Overflow(c, row, relay);
                 return;
             }
 
             c.QueueList.Add(new QueuedRow
             {
                 Row = row, SinceTick = Tick, Cause = cause, CauseRow = causeRow, Relay = relay, BonusTier = DifficultyBonusConfig.Clamp(tier),
-                Target = target,
+                Target = target, PowerPercent = power, Depth = depth,
             });
             Emit(new BattleEvent(Tick, BattleEventKind.RowQueued, c, target, 0, r.Skill.Id, row)
-                { Cause = cause, CauseRow = causeRow, Tier = tier, Relay = relay });
+                { Cause = cause, CauseRow = causeRow, Tier = tier, Relay = relay, Power = power, Depth = depth });
+            if (r.Has(CircuitEffectIds.Interrupt) && c.QueueList.Count > 1)
+                Emit(new BattleEvent(Tick, BattleEventKind.QueueJump, c, null, c.QueueList.Count - 1, r.Skill.Id, row) { Relay = relay });
         }
+
+        /// <summary>Overflow (A-21): Schock an alle Gegner, Schaden nach Grösse der Komponente (Grössen-Wucht × Anteil).</summary>
+        private void Overflow(Combatant c, int row, int relay)
+        {
+            LogicRow r = c.Board.Rows[row];
+            CircuitEffectConfig fx = c.Board.EffectConfig;
+            Missed(c, row, relay, MissReason.Overflow);
+            Emit(new BattleEvent(Tick, BattleEventKind.OverflowShock, c, null, c.QueueList.Count, r.Skill.Id, row) { Relay = relay });
+            int percent = SkillBudgetConfig.Default.PowerPercent(r.Cells) * Math.Max(0, fx.OverflowDamagePercent) / 100;
+            int amount = Math.Max(1, BasisPoints.Of(c.GetStat(StatKind.Damage), BasisPoints.Percent(percent)));
+            BeginActor(c, row);
+            foreach (Combatant enemy in OpponentsOf(c))
+                ResolveHit(new HitInfo { Source = c, Target = enemy, Amount = amount, SkillId = "overflow", IsArea = true, IgnoreArmor = true });
+            EndActor();
+        }
+
+        /// <summary>Overclock (A-21): Hitze für eine Komponente. Volle Hitze lässt die nächste Ausführung ausfallen.</summary>
+        private void AddHeat(Combatant c, int row, int amount, int sourceRow)
+        {
+            if (amount <= 0 || row < 0 || row >= c.Board.Rows.Count || c.Board.Rows[row].IsOrphaned) return;
+            int[] heat = _fx[c].Heat;
+            heat[row] += amount;
+            Emit(new BattleEvent(Tick, BattleEventKind.HeatChanged, c, null, heat[row], c.Board.Rows[row].Skill.Id, row) { Extra = sourceRow });
+        }
+
+        /// <summary>Hitze einer Komponente (Anzeige, Tests).</summary>
+        public int Heat(Combatant c, int row) => row >= 0 && row < _fx[c].Heat.Length ? _fx[c].Heat[row] : 0;
 
         /// <summary>Freie Kämpfer starten die erste wartende Komponente in Lesereihenfolge, sonst den Basisangriff.</summary>
         private void Decide()
@@ -647,6 +846,7 @@ namespace Betaknight.Core.Arena
                 if (c.Action != null && !basicWindup) continue;
 
                 QueuedRow next = NextQueued(c);
+                while (next != null && SkipsForHeat(c, next)) next = NextQueued(c);
                 if (next != null)
                 {
                     if (c.Action != null) Interrupt(c);
@@ -663,12 +863,33 @@ namespace Betaknight.Core.Arena
         private QueuedRow NextQueued(Combatant c)
         {
             QueuedRow best = null;
+            bool bestJumps = false;
             foreach (QueuedRow q in c.QueueList)
             {
                 if (c.IsFrozen(q.Row, Tick)) continue;
-                if (best == null || q.Row < best.Row) best = q;
+                // Interrupt (A-21): springt an die Spitze, sonst Lesereihenfolge.
+                bool jumps = c.Board.Rows[q.Row].Has(CircuitEffectIds.Interrupt);
+                if (best == null || (jumps && !bestJumps) || (jumps == bestJumps && q.Row < best.Row))
+                {
+                    best = q;
+                    bestJumps = jumps;
+                }
             }
             return best;
+        }
+
+        /// <summary>Hitze (A-21): bei voller Hitze fällt diese Ausführung aus, danach ist die Hitze wieder 0.</summary>
+        private bool SkipsForHeat(Combatant c, QueuedRow q)
+        {
+            int[] heat = _fx[c].Heat;
+            int limit = c.Board.EffectConfig.HeatSkipAt;
+            if (limit <= 0 || heat[q.Row] < limit) return false;
+            c.QueueList.Remove(q);
+            Emit(new BattleEvent(Tick, BattleEventKind.HeatSkip, c, null, heat[q.Row], c.Board.Rows[q.Row].Skill.Id, q.Row) { Relay = q.Relay });
+            Missed(c, q.Row, q.Relay, MissReason.Overheated);
+            heat[q.Row] = 0;
+            Emit(new BattleEvent(Tick, BattleEventKind.HeatChanged, c, null, 0, c.Board.Rows[q.Row].Skill.Id, q.Row) { Extra = -1 });
+            return true;
         }
 
         /// <summary>Startet eine wartende Komponente ohne erneute Prüfung, mit dem Bonus, den sie verdient hat.</summary>
@@ -677,7 +898,7 @@ namespace Betaknight.Core.Arena
             c.QueueList.Remove(q);
             LogicRow row = c.Board.Rows[q.Row];
             Combatant target = q.Target != null && q.Target.IsAlive ? q.Target : null;
-            StartAction(c, row.Skill, target, q.Row, q.Cause, q.CauseRow, null, q.BonusTier, q.WaitedTicks(Tick), q.Relay);
+            StartAction(c, row.Skill, target, q.Row, q.Cause, q.CauseRow, null, q.BonusTier, q.WaitedTicks(Tick), q.Relay, q.PowerPercent, q.Depth);
         }
 
         /// <summary>Haste: −<paramref name="percent"/> % Cast-Zeit für <paramref name="ticks"/> (A-19, ersetzt «senkt Cooldowns»).</summary>
@@ -704,6 +925,190 @@ namespace Betaknight.Core.Arena
             target.Freeze(best, Tick + ticks);
             Emit(new BattleEvent(Tick, BattleEventKind.Frozen, source, target, ticks, target.Board.Rows[best].Skill.Id) { Extra = best });
             if (target.Action != null && target.Action.RowIndex == best && target.Action.InWindup) Interrupt(target);
+        }
+
+        // ------------------------------------------------------------------ Hacks (A-21)
+
+        private static bool IsHack(string id) => CircuitEffectCatalog.Shared.TryGet(id, out CircuitEffectDefinition e) && e.IsHack;
+
+        /// <summary>
+        /// Ein Hack gegen die gegnerische Platine: Bit Flip, Jam, Hijack, Short Circuit oder Latency. Die Firewall des Opfers
+        /// blockt ihn, solange sie Ladungen hat. Gegner hacken mit denselben Regeln.
+        /// </summary>
+        public void Hack(Combatant hacker, Combatant victim, string id, int sourceRow = -1)
+        {
+            if (hacker == null || !hacker.IsAlive) return;
+            if (victim == null || !victim.IsAlive || victim.Side == hacker.Side) victim = DefaultTarget(hacker);
+            if (victim == null) return;
+            CircuitEffectConfig fx = hacker.Board.EffectConfig;
+
+            if (id == CircuitEffectIds.Latency)
+            {
+                foreach (Combatant enemy in OpponentsOf(hacker))
+                {
+                    if (Blocked(hacker, enemy, id, sourceRow)) continue;
+                    ApplyStatus(enemy, new StatModifierStatus(StatusIds.Latency, StatKind.CastPercent, fx.LatencyCastPercent, fx.LatencyTicks), hacker);
+                    Emit(new BattleEvent(Tick, BattleEventKind.Hacked, hacker, enemy, fx.LatencyTicks, id, sourceRow) { Extra = -1 });
+                }
+                return;
+            }
+
+            if (Blocked(hacker, victim, id, sourceRow)) return;
+            EffectRuntime v = _fx[victim];
+            switch (id)
+            {
+                case CircuitEffectIds.BitFlip:
+                {
+                    int relay = FlipTarget(victim);
+                    if (relay < 0) break;
+                    v.FlippedUntil[relay] = Tick + Math.Max(1, fx.BitFlipTicks);
+                    Emit(new BattleEvent(Tick, BattleEventKind.Hacked, hacker, victim, fx.BitFlipTicks, id, sourceRow) { Extra = relay });
+                    return;
+                }
+                case CircuitEffectIds.Jam:
+                {
+                    int relay = MostImportantRelay(victim);
+                    if (relay < 0) break;
+                    v.JamLeft[relay] += Math.Max(1, fx.JamTriggers);
+                    Emit(new BattleEvent(Tick, BattleEventKind.Hacked, hacker, victim, v.JamLeft[relay], id, sourceRow) { Extra = relay });
+                    return;
+                }
+                case CircuitEffectIds.Hijack:
+                {
+                    int row = LargestPowered(victim);
+                    if (row < 0) break;
+                    v.Hijacked[row] = hacker;
+                    Emit(new BattleEvent(Tick, BattleEventKind.Hacked, hacker, victim, 1, id, sourceRow) { Extra = row });
+                    return;
+                }
+                case CircuitEffectIds.ShortCircuit:
+                {
+                    int row = LargestPowered(victim);
+                    if (row < 0) break;
+                    Emit(new BattleEvent(Tick, BattleEventKind.Hacked, hacker, victim, 0, id, sourceRow) { Extra = row });
+                    ShortCircuit(victim, row);
+                    return;
+                }
+                default:
+                    return;
+            }
+            Emit(new BattleEvent(Tick, BattleEventKind.HackFailed, hacker, victim, 0, id, sourceRow));
+        }
+
+        /// <summary>Firewall: blockt einen Hack, solange Ladungen da sind.</summary>
+        private bool Blocked(Combatant hacker, Combatant victim, string id, int sourceRow)
+        {
+            EffectRuntime v = _fx[victim];
+            if (v.Firewall <= 0) return false;
+            v.Firewall--;
+            Emit(new BattleEvent(Tick, BattleEventKind.HackBlocked, hacker, victim, v.Firewall, id, sourceRow));
+            return true;
+        }
+
+        /// <summary>Verbleibende Firewall-Ladungen (Anzeige, Tests).</summary>
+        public int FirewallCharges(Combatant c) => _fx[c].Firewall;
+
+        /// <summary>Ist ein Relais gerade umgekehrt (Bit Flip)?</summary>
+        public bool IsFlipped(Combatant c, int relay) => relay >= 0 && relay < _fx[c].FlippedUntil.Length && _fx[c].FlippedUntil[relay] > Tick;
+
+        /// <summary>Wie viele Auslösungen ein Relais noch ignoriert (Jam).</summary>
+        public int JamLeft(Combatant c, int relay) => relay >= 0 && relay < _fx[c].JamLeft.Length ? _fx[c].JamLeft[relay] : 0;
+
+        /// <summary>Ist die nächste Ausführung einer Komponente gekapert (Hijack)?</summary>
+        public bool IsHijacked(Combatant c, int row) => _fx[c].Hijacked.ContainsKey(row);
+
+        /// <summary>Zellen, die ein Relais versorgt (Wichtigkeit für Hacks).</summary>
+        private static int PoweredCells(Combatant c, LogicRelay relay)
+        {
+            int cells = 0;
+            foreach (int row in relay.Powered) cells += c.Board.Rows[row].Cells;
+            return cells;
+        }
+
+        /// <summary>Wichtigstes Relais: versorgt die meisten Zellen (bei Gleichstand das erste in Lesereihenfolge).</summary>
+        private static int MostImportantRelay(Combatant c)
+        {
+            int best = -1, bestCells = 0;
+            for (int i = 0; i < c.Board.Relays.Count; i++)
+            {
+                int cells = PoweredCells(c, c.Board.Relays[i]);
+                if (cells > bestCells)
+                {
+                    best = i;
+                    bestCells = cells;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Bit Flip: ein Zustands-Relais, das gerade gilt (umgekehrt hört es auf zu gelten), das wichtigste davon.
+        /// Ereignis-Relais (Clock, On Hit …) haben keinen Zustand zum Umkehren.
+        /// </summary>
+        private int FlipTarget(Combatant c)
+        {
+            int best = -1, bestCells = 0;
+            for (int i = 0; i < c.Board.Relays.Count; i++)
+            {
+                LogicRelay relay = c.Board.Relays[i];
+                if (relay.Gate != null || relay.IsEventTrigger || IsFlipped(c, i)) continue;
+                int cells = PoweredCells(c, relay);
+                if (cells <= bestCells || !relay.Condition.IsMet(new ConditionContext(this, c, _relays[c][i]), out _)) continue;
+                best = i;
+                bestCells = cells;
+            }
+            return best;
+        }
+
+        /// <summary>Grösste versorgte Komponente (bei Gleichstand die erste in Lesereihenfolge).</summary>
+        private static int LargestPowered(Combatant c)
+        {
+            int best = -1;
+            for (int i = 0; i < c.Board.Rows.Count; i++)
+            {
+                LogicRow r = c.Board.Rows[i];
+                if (r.IsOrphaned || !r.IsPowered) continue;
+                if (best < 0 || r.Cells > c.Board.Rows[best].Cells) best = i;
+            }
+            return best;
+        }
+
+        /// <summary>Short Circuit: die Komponente feuert sofort, ihre gezielten Wirkungen treffen die eigene Seite.</summary>
+        private void ShortCircuit(Combatant victim, int row)
+        {
+            LogicRow r = victim.Board.Rows[row];
+            Combatant ally = victim;
+            for (int k = 1; k < _all.Count; k++)
+            {
+                Combatant other = _all[(victim.Index + k) % _all.Count];
+                if (other.Side == victim.Side && other.IsAlive)
+                {
+                    ally = other;
+                    break;
+                }
+            }
+            Emit(new BattleEvent(Tick, BattleEventKind.ShortCircuit, victim, ally, 0, r.Skill.Id, row) { Extra = row });
+            var context = new SkillContext(this, victim, ally, r.Skill, row);
+            BeginActor(victim, row);
+            foreach (ISkillEffect effect in r.Skill.Effects)
+                if (victim.IsAlive && SkillEffects.HitsTarget(effect)) effect.Apply(context);
+            EndActor();
+        }
+
+        /// <summary>Hijack: die gekaperte Ausführung wirkt für den Hacker, gegen dessen Gegner.</summary>
+        private void ExecuteHijacked(Combatant c, ActionState a)
+        {
+            Combatant hacker = a.HijackedBy;
+            Combatant target = DefaultTarget(hacker);
+            Emit(new BattleEvent(Tick, BattleEventKind.HijackedExecution, hacker, c, 0, a.Skill.Id) { Extra = a.RowIndex });
+            var context = new SkillContext(this, hacker, target, a.Skill, -1);
+            BeginActor(hacker, -1);
+            foreach (ISkillEffect effect in a.Skill.Effects)
+            {
+                if (!hacker.IsAlive) break;
+                effect.Apply(context);
+            }
+            EndActor();
         }
 
         /// <summary>
@@ -733,7 +1138,7 @@ namespace Betaknight.Core.Arena
         /// </summary>
         public void StartAction(Combatant c, SkillDefinition skill, Combatant target, int rowIndex,
             ActionCause cause = ActionCause.Board, int causeRow = -1, int? repeatsLeft = null, int bonusTier = 0, int queuedTicks = -1,
-            int relay = -1)
+            int relay = -1, int power = 0, int depth = 0, bool thread = false)
         {
             bool repeat = cause == ActionCause.Repeat;
 
@@ -749,9 +1154,12 @@ namespace Betaknight.Core.Arena
                 skill = own != null && own.Skill == skill ? own.SkillAt(tier, c.Board.Bonus) : c.Board.Bonus.Apply(skill, tier);
             }
             if (skill.DifficultyTier == 0) tier = 0;
-            ActionTiming(skill, c.AttackIntervalTicks, out int windup, out int recovery, _setup.MinCastTicks, skill.IsBasicAttack ? 0 : c.CastPercent);
+            // Verstärker und Recursion (A-21): zusätzliche Wirkung dieser Ausführung.
+            if (power != 0 && !skill.IsBasicAttack) skill = skill.WithBonus(power);
+            int castPercent = skill.IsBasicAttack ? 0 : c.CastPercent + ThermalCastPercent;
+            ActionTiming(skill, c.AttackIntervalTicks, out int windup, out int recovery, _setup.MinCastTicks, castPercent);
 
-            c.Action = new ActionState
+            var action = new ActionState
             {
                 Skill = skill,
                 Target = target ?? DefaultTarget(c),
@@ -762,14 +1170,25 @@ namespace Betaknight.Core.Arena
                 Cause = cause,
                 CauseRow = causeRow,
                 Relay = relay,
-                RepeatsLeft = repeatsLeft ?? (repeat ? 0 : skill.ExtraCasts),
+                RepeatsLeft = thread ? 0 : repeatsLeft ?? (repeat ? 0 : skill.ExtraCasts),
                 BonusTier = tier,
+                Depth = depth,
+                PowerPercent = skill.IsBasicAttack ? 0 : power,
+                IsThread = thread,
             };
+            // Hijack (A-21): die nächste Ausführung dieser Komponente geschieht für den Hacker.
+            if (!repeat && rowIndex >= 0 && _fx[c].Hijacked.TryGetValue(rowIndex, out Combatant hijacker))
+            {
+                _fx[c].Hijacked.Remove(rowIndex);
+                action.HijackedBy = hijacker;
+            }
+            if (thread) c.ThreadList.Add(action);
+            else c.Action = action;
 
-            Emit(new BattleEvent(Tick, BattleEventKind.ActionStarted, c, c.Action.Target, windup, skill.Id, rowIndex)
+            Emit(new BattleEvent(Tick, BattleEventKind.ActionStarted, c, action.Target, windup, skill.Id, rowIndex)
             {
                 Cause = cause, CauseRow = causeRow, Tier = tier, QueuedTicks = queuedTicks, Relay = relay,
-                Bonus = tier > 0 ? Math.Max(0, castBefore - windup) : 0,
+                Bonus = tier > 0 ? Math.Max(0, castBefore - windup) : 0, Depth = depth, Power = action.PowerPercent,
             });
             foreach (BattleModifier m in c.ModifierList.ToArray()) m.OnActionStarted(this, c, skill, rowIndex);
 
@@ -857,6 +1276,8 @@ namespace Betaknight.Core.Arena
                 }
 
                 if (!hit.IgnoreArmor) amount = Defense.ApplyArmor(amount, hit.Target.EffectiveArmor);
+                // Thermal Throttling (A-21): nach der Rüstung, jede Stufe mehr Schaden für beide Seiten.
+                if (ThermalDamagePercent > 0) amount = (int)Math.Min(int.MaxValue / 2, (long)amount * (100 + ThermalDamagePercent) / 100);
             }
 
             hit.Final = Math.Max(1, amount);
@@ -883,6 +1304,7 @@ namespace Betaknight.Core.Arena
             {
                 target.Hp = 0;
                 target.Action = null;
+                target.ThreadList.Clear();
                 target.StatusList.Clear();
                 target.QueueList.Clear();
                 Emit(new BattleEvent(Tick, BattleEventKind.Death, hit.Source, target, 0, hit.SkillId));
@@ -921,6 +1343,7 @@ namespace Betaknight.Core.Arena
             {
                 Interrupt(target);
                 target.Pending.Clear();
+                target.ThreadList.Clear();
             }
         }
 

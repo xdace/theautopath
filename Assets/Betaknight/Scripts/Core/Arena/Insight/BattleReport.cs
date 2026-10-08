@@ -374,6 +374,8 @@ namespace Betaknight.Core.Arena
                 case MissReason.TooLarge: return ArenaTexts.MissTooLarge;
                 case MissReason.Frozen: return ArenaTexts.MissFrozen;
                 case MissReason.Orphaned: return ArenaTexts.MissOrphaned;
+                case MissReason.Overflow: return ArenaTexts.MissOverflow;
+                case MissReason.Overheated: return ArenaTexts.MissOverheated;
                 default: return ArenaTexts.MissAlreadyQueued;
             }
         }

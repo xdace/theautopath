@@ -92,6 +92,7 @@ namespace Betaknight.Core.Arena
             {
                 case StatusIds.Burn: return "Burn";
                 case "overheat": return "Overheat";
+                case "overflow": return "Overflow";
                 case "heat": return "Heat";
                 case "discharge": return "Discharge";
                 case "hp_cost": return "HP Cost";
@@ -116,6 +117,7 @@ namespace Betaknight.Core.Arena
                 case StatusIds.Haste: return "hasted";
                 case StatusIds.Slow: return "slowed";
                 case StatusIds.Freeze: return "frozen";
+                case StatusIds.Latency: return "lagging";
                 default: return null;
             }
         }
@@ -156,7 +158,41 @@ namespace Betaknight.Core.Arena
         public static string LogDodged(string whom) => $"{whom} dodges";
         public static string LogBlocked(string whom) => $"{whom} blocks";
         public static string LogCrit(string who, int amount) => $"{who}: Crit! {amount}";
-        public static string LogOverheat(int level) => $"Overheat level {level}";
+        public static string LogOverheat(int level) => $"Thermal Throttling step {level}: computing time and damage up";
+
+        // ------------------------------------------------------------------ Eigene Effekte (A-21)
+
+        public const string MissOverflow = "queue overflow, turned into a shock";
+        public const string MissOverheated = "overheated, skipped";
+
+        /// <summary>Name eines eigenen Effekts (Overclock, Bit Flip …).</summary>
+        public static string EffectName(string id) =>
+            Circuit.CircuitEffectCatalog.Shared.TryGet(id, out Circuit.CircuitEffectDefinition e) ? e.Name : id;
+
+        public static string LogHeat(string who, string component, int heat, int skipAt, string from) =>
+            from != null ? $"{who}: {component} Heat {heat}/{skipAt} (Overclock {from})" : $"{who}: {component} Heat {heat}/{skipAt}";
+        public static string LogHeatReset(string who, string component) => $"{who}: {component} cooled down (Heat 0)";
+        public static string LogHeatSkip(string who, string component, int heat) => $"{who}: {component} overheated at {heat} Heat and skips this execution";
+        public static string LogRecursion(string who, string component, int depth, int percent) =>
+            $"{who}: {component} calls itself again (Recursion depth {depth}, +{percent} % effect)";
+        public static string LogRecursionLimit(string who, string component, int depth) => $"{who}: {component} hits the stack limit at depth {depth}";
+        public static string LogParallel(string who, string component) => $"{who}: {component} starts on a Parallel Thread";
+        public static string LogQueueJump(string who, string component) => $"{who}: {component} jumps to the front of the queue (Interrupt)";
+        public static string LogOverflow(string who, string component, int entries) =>
+            $"{who}: queue full ({entries}), {component} overflows into a shock on all enemies";
+        public static string LogHack(string who, string whom, string hack, string what) => $"{who} hacks {whom}: {hack}{(what != null ? " → " + what : "")}";
+        public static string LogHackFailed(string who, string hack) => $"{who}: {hack} finds no target";
+        public static string LogHackBlocked(string whom, string hack, int left) => $"{whom}'s Firewall blocks {hack} ({left} left)";
+        public static string LogJammed(string who, string relay, int left) => $"{who}: {relay} is jammed and ignores this trigger ({left} left)";
+        public static string LogFlipEnded(string who, string relay) => $"{who}: {relay} flips back";
+        public static string LogHijacked(string who, string whom, string component) => $"{who} runs {whom}'s {component} (Hijack)";
+        public static string LogShortCircuit(string who, string whom, string component) => $"{who}: {component} short-circuits and hits {whom}";
+        public static string HackFlip(string relay, string time) => $"{relay} inverted for {time}";
+        public static string HackJam(string relay, int left) => $"{relay} ignores the next {left} triggers";
+        public static string HackHijack(string component) => $"next {component} runs for the hacker";
+        public static string HackShort(string component) => $"{component} fires at once";
+        public static string HackLatency(string time, int percent) => $"computing time +{percent} % for {time}";
+        public static string LogAmplified(int percent) => $" (+{percent} % amplified)";
 
         public const string Victory = "Victory";
         public const string Defeat = "Defeat";

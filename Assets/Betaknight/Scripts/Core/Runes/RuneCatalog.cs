@@ -82,7 +82,7 @@ namespace Betaknight.Core.Runes
             new RuneDefinition("after_heal", "After Healing", RuneTag.Ember, ConditionKind.Event, "Shortly after the knight was healed.", difficulty: 2, invertedDifficulty: 0),
             new RuneDefinition("enemy_burning", "Enemy Burning", RuneTag.Ember, ConditionKind.State, "While an enemy is burning.", difficulty: 1, invertedDifficulty: 1),
             new RuneDefinition("enemy_dies", "Enemy Falls", RuneTag.Ember, ConditionKind.Event, "Shortly after an enemy was defeated.", difficulty: 2, invertedDifficulty: 0),
-            new RuneDefinition("overheat", "Overheat", RuneTag.Ember, ConditionKind.State, "Once the fight exceeds the time limit.", null, Uncommon, difficulty: 3, invertedDifficulty: 0),
+            new RuneDefinition("overheat", "Overheat", RuneTag.Ember, ConditionKind.State, "While Thermal Throttling is active (from 30 s on).", null, Uncommon, difficulty: 3, invertedDifficulty: 0),
 
             // Bewegung und Ausweichen
             new RuneDefinition("after_dodge", "After Dodge", RuneTag.Phantom, ConditionKind.Event, "Shortly after the knight dodged.", difficulty: 2, invertedDifficulty: 0),

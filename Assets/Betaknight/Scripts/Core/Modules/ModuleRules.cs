@@ -61,7 +61,10 @@ namespace Betaknight.Core.Modules
                     return skill.WithModule(name, castPercent: QuickcastPercent + QuickcastPercentPerLevel * level)
                         .WithBonus(QuickcastPowerPercent);
                 default:
-                    return skill;
+                    // Eigene Effekte der Platine (A-21): die Komponente hat den Effekt, die Wirkung steht im Kampf.
+                    return Circuit.CircuitEffectCatalog.Shared.Contains(module.ModuleId)
+                        ? skill.WithModule(name).WithCircuitEffect(module.ModuleId)
+                        : skill;
             }
         }
 

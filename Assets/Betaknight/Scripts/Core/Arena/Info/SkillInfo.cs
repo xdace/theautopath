@@ -155,6 +155,10 @@ namespace Betaknight.Core.Arena
             Battle.ActionTiming(skill, stats.AttackIntervalTicks, out int windup, out int recovery);
             var builder = new SkillInfoBuilder(stats);
             foreach (ISkillEffect effect in skill.Effects) effect.Describe(builder);
+            // Eigene Effekte der Platine (A-21): Overclock, Hacks … mit Name und Text aus den Daten.
+            foreach (string id in skill.CircuitEffects)
+                if (Circuit.CircuitEffectCatalog.Shared.TryGet(id, out Circuit.CircuitEffectDefinition e))
+                    builder.Add(new EffectInfo(EffectInfoKind.Other, $"{e.Name}: {e.Description}"));
             return new SkillInfo(skill, stats, windup, recovery, builder.Effects);
         }
 

@@ -35,6 +35,12 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Kein Skill (verwaist).</summary>
         Orphaned,
+
+        /// <summary>Overflow (A-21): die Warteschlange war voll, der Eintrag wurde zum Schock.</summary>
+        Overflow,
+
+        /// <summary>Hitze (A-21): die Komponente hat bei voller Hitze eine Ausführung übersprungen.</summary>
+        Overheated,
     }
 
     /// <summary>Eine wartende Komponente: eingereiht zu <see cref="SinceTick"/>, startet ohne erneute Prüfung.</summary>
@@ -60,6 +66,12 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Ziel aus der Bedingung (falls es eins gab); ist es tot, nimmt die Ausführung das Standardziel.</summary>
         public Combatant Target { get; internal set; }
+
+        /// <summary>Recursion (A-21): Tiefe des Aufrufs.</summary>
+        public int Depth { get; internal set; }
+
+        /// <summary>Zusätzliche Wirkung in Prozent aus Verstärkern und Recursion (A-21).</summary>
+        public int PowerPercent { get; internal set; }
 
         public int WaitedTicks(int tick) => Math.Max(0, tick - SinceTick);
     }

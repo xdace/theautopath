@@ -96,7 +96,8 @@ namespace Betaknight.Core.Modules
 
         public bool Contains(string id) => TryGet(id, out _);
 
-        public static ModuleCatalog CreateDefault()
+        /// <param name="effects">Eigene Effekte der Platine (A-21): die in Form «Modul» kommen als Skill-Module dazu.</param>
+        public static ModuleCatalog CreateDefault(Circuit.CircuitEffectCatalog effects = null)
         {
             var c = new ModuleCatalog();
             c.Register(new ModuleDefinition(ModuleIds.Multicast, "Multicast", ModuleKind.Skill, new[]
@@ -155,6 +156,8 @@ namespace Betaknight.Core.Modules
             {
                 "Easer: \"Enemy Below x %\" triggers 10 percentage points earlier. The bonus stays.",
             }, weight: 6));
+            foreach (Circuit.CircuitEffectDefinition e in (effects ?? Circuit.CircuitEffectCatalog.Shared).InForm(Circuit.CircuitEffectForm.Module))
+                c.Register(new ModuleDefinition(e.Id, e.Name, ModuleKind.Skill, new[] { $"{e.Name}: {e.Description}" }, e.Weight));
             return c;
         }
     }

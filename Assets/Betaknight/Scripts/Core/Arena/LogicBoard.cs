@@ -124,6 +124,14 @@ namespace Betaknight.Core.Arena
         /// <summary>Position in <see cref="LogicBoard.Rows"/>.</summary>
         public int Index { get; internal set; } = -1;
 
+        internal readonly List<int> NeighbourList = new List<int>();
+
+        /// <summary>Komponenten, die diese an einer Kante berühren (A-21: Overclock gibt ihnen Hitze).</summary>
+        public IReadOnlyList<int> Neighbours => NeighbourList;
+
+        /// <summary>Hat die Komponente diesen eigenen Effekt der Platine (vom Skill, Modul oder berührten Chip)?</summary>
+        public bool Has(string circuitEffect) => Skill != null && Skill.HasCircuitEffect(circuitEffect);
+
         internal readonly List<LogicRelay> RelayList = new List<LogicRelay>();
         internal readonly List<LogicRelay> TooLargeList = new List<LogicRelay>();
 
@@ -251,6 +259,19 @@ namespace Betaknight.Core.Arena
         /// <summary>Werte der Chips (Kondensator, Gatter) für diesen Kampf.</summary>
         public ChipConfig ChipConfig { get; private set; } = ChipConfig.Default;
 
+        /// <summary>Werte der eigenen Effekte (A-21) für diesen Kampf.</summary>
+        public CircuitEffectConfig EffectConfig { get; private set; } = CircuitEffectConfig.Default;
+
+        private readonly Dictionary<string, int> _boardEffects = new Dictionary<string, int>();
+
+        /// <summary>
+        /// Wie viele Träger eines Effekts für die ganze Platine (Overflow, Firewall) liegen: Chips plus Komponenten mit dem
+        /// Effekt. 0 = nicht aktiv.
+        /// </summary>
+        public int BoardEffectCount(string id) => id != null && _boardEffects.TryGetValue(id, out int n) ? n : 0;
+
+        public bool HasBoardEffect(string id) => BoardEffectCount(id) > 0;
+
         /// <summary>Verbindungen, die von diesem Knoten ausgehen (Reihenfolge der Ziele: kürzester Weg, dann Fundort).</summary>
         public IEnumerable<PulseLink> LinksFrom(PulseNode node)
         {
@@ -259,7 +280,7 @@ namespace Betaknight.Core.Arena
         }
 
         /// <summary>Eingänge, die ein Gatter braucht: UND und ODER zwei, NICHT und Sicherung eines.</summary>
-        public static int InputsNeeded(ChipKind gate) => gate == ChipKind.And || gate == ChipKind.Or ? 2 : 1;
+        public static int InputsNeeded(ChipKind gate) => gate == ChipKind.And || gate == ChipKind.Or ? 2 : gate == ChipKind.Watchdog ? 0 : 1;
 
         /// <summary>Direkt verdrahtete Komponenten (jede mit eigenem Relais), Reihenfolge wie übergeben.</summary>
         public LogicBoard(IEnumerable<LogicRow> rows, SkillDefinition fallbackSkill = null, LogicGraph graph = null,
@@ -311,11 +332,14 @@ namespace Betaknight.Core.Arena
         public static LogicBoard Compile(BoardLayout layout, IEnumerable<LogicRow> components, IEnumerable<LogicRelay> relays,
             SkillDefinition fallbackSkill = null, DifficultyBonusConfig bonus = null, int coreBonusPercent = 0,
             Func<IReadOnlyList<LogicRow>, IReadOnlyList<LogicRelay>, LogicGraph> graph = null,
-            IEnumerable<LogicChip> chips = null, ChipConfig chipConfig = null, PinConfig pinConfig = null)
+            IEnumerable<LogicChip> chips = null, ChipConfig chipConfig = null, PinConfig pinConfig = null,
+            CircuitEffectConfig effectConfig = null, CircuitEffectCatalog effects = null)
         {
             bonus = bonus ?? DifficultyBonusConfig.Default;
             chipConfig = chipConfig ?? ChipConfig.Default;
             pinConfig = pinConfig ?? PinConfig.Default;
+            effectConfig = effectConfig ?? CircuitEffectConfig.Default;
+            effects = effects ?? CircuitEffectCatalog.Shared;
             var raw = new List<LogicRow>();
             foreach (LogicRow c in components ?? Array.Empty<LogicRow>())
             {
@@ -324,7 +348,12 @@ namespace Betaknight.Core.Arena
             }
             raw.Sort((a, b) => Cell.CompareReading(a.Rect.Value.Origin, b.Rect.Value.Origin));
 
-            // Kern-Bonus und Pin-Bonus (typisierte Pins mit passendem Nachbarn) gehen in den Skill ein.
+            var chipList = new List<LogicChip>(chips ?? Array.Empty<LogicChip>());
+            chipList.Sort((a, b) => Cell.CompareReading(a.Rect.Origin, b.Rect.Origin));
+            for (int i = 0; i < chipList.Count; i++) chipList[i].Index = i;
+
+            // Kern-Bonus und Pin-Bonus (typisierte Pins mit passendem Nachbarn) gehen in den Skill ein, ebenso die Effekte
+            // berührter Effekt-Chips (A-21) und die kürzere Cast-Zeit von Overclock.
             var rows = new List<LogicRow>();
             for (int i = 0; i < raw.Count; i++)
             {
@@ -332,15 +361,23 @@ namespace Betaknight.Core.Arena
                 bool core = layout?.Core != null && c.Rect.Value.Touches(new CellRect(layout.Core.Value, Shape.One));
                 int matched = CircuitWiring.MatchedTypedPins(raw, i);
                 int percent = (core ? coreBonusPercent : 0) + matched * pinConfig.TypedPinBonusPercent;
-                LogicRow row = percent != 0 && c.Skill != null ? new LogicRow(c.Skill.WithBonus(percent, 0), c.Rect, c.Label, c.Pins) : c;
+                SkillDefinition skill = c.Skill;
+                if (skill != null)
+                {
+                    if (percent != 0) skill = skill.WithBonus(percent, 0);
+                    foreach (LogicChip chip in chipList)
+                        if (chip.Kind == ChipKind.Effect && chip.Rect.Touches(c.Rect.Value) && !IsBoardScope(effects, chip.Definition.EffectId))
+                            skill = skill.WithCircuitEffect(chip.Definition.EffectId);
+                    if (skill.HasCircuitEffect(CircuitEffectIds.Overclock)) skill = skill.WithBonus(0, effectConfig.OverclockCastPercent);
+                }
+                LogicRow row = skill != c.Skill ? new LogicRow(skill, c.Rect, c.Label, c.Pins) : c;
                 row.TouchesCore = core;
                 row.MatchedPins = matched;
                 rows.Add(row);
             }
-
-            var chipList = new List<LogicChip>(chips ?? Array.Empty<LogicChip>());
-            chipList.Sort((a, b) => Cell.CompareReading(a.Rect.Origin, b.Rect.Origin));
-            for (int i = 0; i < chipList.Count; i++) chipList[i].Index = i;
+            for (int i = 0; i < rows.Count; i++)
+                for (int j = 0; j < rows.Count; j++)
+                    if (i != j && rows[i].Rect.Value.Touches(rows[j].Rect.Value)) rows[i].NeighbourList.Add(j);
 
             var relayList = new List<LogicRelay>(relays ?? Array.Empty<LogicRelay>());
             var plainRelays = new List<LogicRelay>(relayList);
@@ -352,7 +389,9 @@ namespace Betaknight.Core.Arena
                 var inputs = new List<LogicRelay>();
                 foreach (LogicRelay r in plainRelays)
                     if (r.Rect.HasValue && r.Rect.Value.Touches(chip.Rect) && inputs.Count < InputsNeeded(chip.Kind)) inputs.Add(r);
-                int difficulty = GateDifficulty(chip.Kind, inputs, chipConfig);
+                int difficulty = chip.Kind == ChipKind.Watchdog
+                    ? DifficultyBonusConfig.Clamp(effectConfig.WatchdogDifficulty)
+                    : GateDifficulty(chip.Kind, inputs, chipConfig);
                 var gate = new LogicRelay(chip.Kind, GateLabel(chip, inputs), difficulty, bonus.MaxCells(difficulty), chip.Rect) { ChipIndex = chip.Index };
                 gateInputs[gate] = inputs;
                 relayList.Add(gate);
@@ -374,8 +413,11 @@ namespace Betaknight.Core.Arena
             foreach (LogicRelay relay in relayList)
             {
                 if (!relay.Rect.HasValue) continue;
+                LogicRow largest = relay.Gate == ChipKind.Watchdog ? LargestTouching(relay, rows) : null;
                 foreach (LogicRow row in rows)
                 {
+                    // Watchdog (A-21): nur die grösste berührte Komponente, die er versorgen kann.
+                    if (relay.Gate == ChipKind.Watchdog && row != largest) continue;
                     if (!relay.Rect.Value.Touches(row.Rect.Value)) continue;
                     if (row.Cells <= relay.MaxCells)
                     {
@@ -396,7 +438,31 @@ namespace Betaknight.Core.Arena
             board._chips.AddRange(chipList);
             board._links.AddRange(links);
             board.ChipConfig = chipConfig;
+            board.EffectConfig = effectConfig;
+            foreach (LogicChip chip in chipList)
+                if (chip.Kind == ChipKind.Effect && IsBoardScope(effects, chip.Definition.EffectId)) board.CountBoardEffect(chip.Definition.EffectId);
+            foreach (LogicRow row in rows)
+                if (row.Skill != null)
+                    foreach (string id in row.Skill.CircuitEffects)
+                        if (IsBoardScope(effects, id)) board.CountBoardEffect(id);
             return board;
+        }
+
+        private void CountBoardEffect(string id) => _boardEffects[id] = BoardEffectCount(id) + 1;
+
+        private static bool IsBoardScope(CircuitEffectCatalog effects, string id) =>
+            effects.TryGet(id, out CircuitEffectDefinition e) && e.Scope == CircuitEffectScope.Board;
+
+        /// <summary>Grösste berührte Komponente innerhalb der Grenze des Relais (bei Gleichstand die erste in Lesereihenfolge).</summary>
+        private static LogicRow LargestTouching(LogicRelay relay, IReadOnlyList<LogicRow> rows)
+        {
+            LogicRow best = null;
+            foreach (LogicRow row in rows)
+            {
+                if (row.Skill == null || row.Cells > relay.MaxCells || !relay.Rect.Value.Touches(row.Rect.Value)) continue;
+                if (best == null || row.Cells > best.Cells) best = row;
+            }
+            return best;
         }
 
         /// <summary>Schwierigkeit eines Gatters: UND = höhere + Bonus (höchstens 3), ODER = niedrigere, NICHT = umgekehrter Wert, Sicherung fest.</summary>

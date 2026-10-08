@@ -77,6 +77,9 @@ namespace Betaknight.Core.Arena
         public Cell FromCell { get; }
         public Cell ToCell { get; }
 
+        /// <summary>Verstärker (A-21) auf dem Weg: jeder gibt dem Puls mehr Wirkung.</summary>
+        public int Amplifiers { get; internal set; }
+
         public PulseLink(PulseNode from, PulseNode to, IReadOnlyList<Cell> path, Cell fromCell, Cell toCell)
         {
             From = from;
@@ -125,6 +128,12 @@ namespace Betaknight.Core.Arena
                 foreach (PinSide s in chips[k].Openings) starts.Add((chips[k].Rect.Origin, s));
                 AddFrom(links, rows, chips, PulseNode.Capacitor(k), starts);
             }
+            foreach (PulseLink link in links)
+                foreach (Cell cell in link.Path)
+                {
+                    int chip = ChipIndexAt(chips, cell);
+                    if (chip >= 0 && chips[chip].Kind == ChipKind.Amplifier) link.Amplifiers++;
+                }
             return links;
         }
 

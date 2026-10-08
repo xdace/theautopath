@@ -30,6 +30,8 @@ namespace Betaknight.Core.Arena
                     else if (e.IsPulse && e.CauseRow >= 0) text += ArenaTexts.LogPulsedBy(e.CauseRow);
                     else if (e.IsRepeat) text += ArenaTexts.LogRepeat;
                     if (e.FromQueue) text += ArenaTexts.LogFromQueue(Time(e.QueuedTicks));
+                    if (e.Cause == ActionCause.Recursion) text += $"  ↻ Recursion depth {e.Depth}";
+                    if (e.Power > 0) text += ArenaTexts.LogAmplified(e.Power);
                     break;
                 case BattleEventKind.RowQueued:
                     text = e.IsPulse && e.CauseRow >= 0
@@ -48,6 +50,53 @@ namespace Betaknight.Core.Arena
                     break;
                 case BattleEventKind.PulseSent:
                     text = PulseText(e, who);
+                    if (e.Power > 0) text += ArenaTexts.LogAmplified(e.Power);
+                    break;
+                case BattleEventKind.HeatChanged:
+                    text = e.Amount == 0
+                        ? ArenaTexts.LogHeatReset(who, Component(e.RowIndex, e.Detail))
+                        : ArenaTexts.LogHeat(who, Component(e.RowIndex, e.Detail), e.Amount, e.Source?.Board.EffectConfig.HeatSkipAt ?? 0,
+                            e.Extra >= 0 ? ComponentOf(e.Source, e.Extra) : null);
+                    break;
+                case BattleEventKind.HeatSkip:
+                    text = ArenaTexts.LogHeatSkip(who, Component(e.RowIndex, e.Detail), e.Amount);
+                    break;
+                case BattleEventKind.RecursionCall:
+                    text = ArenaTexts.LogRecursion(who, Component(e.RowIndex, e.Detail), e.Amount,
+                        e.Amount * (e.Source?.Board.EffectConfig.RecursionPowerPercentPerDepth ?? 0));
+                    break;
+                case BattleEventKind.RecursionLimit:
+                    text = ArenaTexts.LogRecursionLimit(who, Component(e.RowIndex, e.Detail), e.Amount);
+                    break;
+                case BattleEventKind.ParallelThread:
+                    text = ArenaTexts.LogParallel(who, Component(e.RowIndex, e.Detail));
+                    break;
+                case BattleEventKind.QueueJump:
+                    text = ArenaTexts.LogQueueJump(who, Component(e.RowIndex, e.Detail));
+                    break;
+                case BattleEventKind.OverflowShock:
+                    text = ArenaTexts.LogOverflow(who, Component(e.RowIndex, e.Detail), e.Amount);
+                    break;
+                case BattleEventKind.Hacked:
+                    text = ArenaTexts.LogHack(who, whom, ArenaTexts.EffectName(e.Detail), HackWhat(e));
+                    break;
+                case BattleEventKind.HackFailed:
+                    text = ArenaTexts.LogHackFailed(who, ArenaTexts.EffectName(e.Detail));
+                    break;
+                case BattleEventKind.HackBlocked:
+                    text = ArenaTexts.LogHackBlocked(whom, ArenaTexts.EffectName(e.Detail), e.Amount);
+                    break;
+                case BattleEventKind.RelayJammed:
+                    text = ArenaTexts.LogJammed(who, ArenaTexts.RelayName(e.Relay, e.Detail), e.Amount);
+                    break;
+                case BattleEventKind.FlipEnded:
+                    text = ArenaTexts.LogFlipEnded(who, ArenaTexts.RelayName(e.Relay, e.Detail));
+                    break;
+                case BattleEventKind.HijackedExecution:
+                    text = ArenaTexts.LogHijacked(who, whom, ComponentOf(e.Target, e.Extra));
+                    break;
+                case BattleEventKind.ShortCircuit:
+                    text = ArenaTexts.LogShortCircuit(who, whom, ComponentOf(e.Source, e.Extra));
                     break;
                 case BattleEventKind.CapacitorStored:
                     text = ArenaTexts.LogCapacitorStored(who, ArenaTexts.CapacitorName(e.Extra), e.Amount,
@@ -113,6 +162,22 @@ namespace Betaknight.Core.Arena
             if (board == null || e.Extra < 0 || e.Extra >= board.Links.Count) return $"{who}: pulse";
             PulseLink link = board.Links[e.Extra];
             return ArenaTexts.LogPulse(who, NodeName(e.Source, link.From), NodeName(e.Source, link.To), link.Delay);
+        }
+
+        /// <summary>Was ein Hack beim Opfer getroffen hat.</summary>
+        private static string HackWhat(BattleEvent e)
+        {
+            Combatant victim = e.Target;
+            switch (e.Detail)
+            {
+                case Circuit.CircuitEffectIds.BitFlip: return ArenaTexts.HackFlip(RelayOf(victim, e.Extra), ArenaTexts.Seconds(e.Amount));
+                case Circuit.CircuitEffectIds.Jam: return ArenaTexts.HackJam(RelayOf(victim, e.Extra), e.Amount);
+                case Circuit.CircuitEffectIds.Hijack: return ArenaTexts.HackHijack(ComponentOf(victim, e.Extra));
+                case Circuit.CircuitEffectIds.ShortCircuit: return ArenaTexts.HackShort(ComponentOf(victim, e.Extra));
+                case Circuit.CircuitEffectIds.Latency:
+                    return ArenaTexts.HackLatency(ArenaTexts.Seconds(e.Amount), e.Source?.Board.EffectConfig.LatencyCastPercent ?? 0);
+                default: return null;
+            }
         }
 
         private static string RowLabel(BattleEvent e, BattleResult result)

@@ -168,6 +168,7 @@ namespace Betaknight.Core.Arena
                 ExtraTargets = ExtraTargets,
                 HpCostBp = HpCostBp,
                 _modules = new List<string>(_modules),
+                _circuitEffects = new List<string>(_circuitEffects),
                 DifficultyTier = DifficultyTier,
                 Difficulty = Difficulty,
             };
@@ -205,6 +206,27 @@ namespace Betaknight.Core.Arena
             copy.HpCostBp = Math.Max(copy.HpCostBp, hpCostBp);
             copy.CastBonusPercent += castPercent;
             if (!string.IsNullOrEmpty(moduleName)) copy._modules.Add(moduleName);
+            return copy;
+        }
+
+        // ------------------------------------------------------------------ Eigene Effekte der Platine (A-21)
+
+        private List<string> _circuitEffects = new List<string>();
+
+        /// <summary>
+        /// Effekte der Platine, die diese Komponente hat (Overclock, Recursion, Hacks …, siehe <see cref="Circuit.CircuitEffectIds"/>),
+        /// gleich ob sie vom Skill selbst, von einem Modul oder von einem berührten Chip kommen.
+        /// </summary>
+        public IReadOnlyList<string> CircuitEffects => _circuitEffects;
+
+        public bool HasCircuitEffect(string id) => id != null && _circuitEffects.Contains(id);
+
+        /// <summary>Kopie mit einem weiteren Effekt der Platine (ein Effekt zählt nur einmal).</summary>
+        public SkillDefinition WithCircuitEffect(string id)
+        {
+            if (IsBasicAttack || string.IsNullOrEmpty(id) || _circuitEffects.Contains(id)) return this;
+            SkillDefinition copy = Clone();
+            copy._circuitEffects.Add(id);
             return copy;
         }
 

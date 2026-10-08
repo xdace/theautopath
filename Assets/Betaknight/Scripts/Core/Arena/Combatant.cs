@@ -55,6 +55,18 @@ namespace Betaknight.Core.Arena
         /// <summary>Schwierigkeits-Stufe, mit der diese Ausführung läuft (die des auslösenden Relais).</summary>
         public int BonusTier { get; internal set; }
 
+        /// <summary>Recursion (A-21): Tiefe dieser Ausführung (0 = erster Aufruf).</summary>
+        public int Depth { get; internal set; }
+
+        /// <summary>Zusätzliche Wirkung in Prozent aus Verstärkern und Recursion (A-21), schon im Skill eingerechnet.</summary>
+        public int PowerPercent { get; internal set; }
+
+        /// <summary>Parallel Thread (A-21): läuft neben der Hauptaktion, ohne Warteschlange.</summary>
+        public bool IsThread { get; internal set; }
+
+        /// <summary>Hijack (A-21): diese Ausführung geschieht für den Gegner, der sie gekapert hat.</summary>
+        public Combatant HijackedBy { get; internal set; }
+
         public bool IsRepeat => Cause == ActionCause.Repeat;
 
         public bool InWindup => !EffectApplied;
@@ -74,6 +86,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Puls über Pins und Leiterbahnen (A-20): normaler Cast, mit Grenze und Bonus des ursprünglichen Relais.</summary>
         Pulse,
+
+        /// <summary>Recursion (A-21): die Komponente ruft sich selbst erneut auf, mit mehr Wirkung je Tiefe.</summary>
+        Recursion,
     }
 
     /// <summary>Vorgemerkte Aktion, die nach der laufenden startet (Wiederholung oder Auslöser).</summary>
@@ -114,6 +129,10 @@ namespace Betaknight.Core.Arena
         public bool IsAlive => Hp > 0;
         public LogicBoard Board { get; }
         public ActionState Action { get; internal set; }
+
+        /// <summary>Parallel Threads (A-21): Ausführungen, die neben <see cref="Action"/> laufen.</summary>
+        internal readonly List<ActionState> ThreadList = new List<ActionState>();
+        public IReadOnlyList<ActionState> Threads => ThreadList;
 
         public IReadOnlyList<StatusEffect> Statuses => StatusList;
         public IReadOnlyList<BattleModifier> Modifiers => ModifierList;

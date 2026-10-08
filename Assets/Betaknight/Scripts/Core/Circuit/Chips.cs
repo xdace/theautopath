@@ -36,6 +36,15 @@ namespace Betaknight.Core.Circuit
 
         /// <summary>Sicherung: einmal pro Kampf ein Relais der Schwierigkeit 3, ausgelöst vom berührten Relais.</summary>
         Fuse,
+
+        /// <summary>Verstärker (A-21): leitet wie eine gerade Leiterbahn, jeder durchlaufende Puls wird stärker.</summary>
+        Amplifier,
+
+        /// <summary>Watchdog (A-21): ein Relais, das bei Stillstand die grösste berührte Komponente auslöst.</summary>
+        Watchdog,
+
+        /// <summary>Effekt-Chip (A-21): berührte Komponenten haben seinen Effekt (<see cref="ChipDefinition.EffectId"/>).</summary>
+        Effect,
     }
 
     /// <summary>Werte der Chips als Daten.</summary>
@@ -73,8 +82,13 @@ namespace Betaknight.Core.Circuit
         /// <summary>Gewicht beim Würfeln einer Belohnung.</summary>
         public int Weight { get; }
 
-        public ChipDefinition(string id, ChipKind kind, string name, string description, IEnumerable<Edge> openings, int weight)
+        /// <summary>Eigener Effekt der Platine (A-21), den der Chip trägt, sonst null.</summary>
+        public string EffectId { get; }
+
+        public ChipDefinition(string id, ChipKind kind, string name, string description, IEnumerable<Edge> openings, int weight,
+            string effectId = null)
         {
+            EffectId = effectId;
             Id = id ?? throw new ArgumentNullException(nameof(id));
             Kind = kind;
             Name = name ?? id;
@@ -86,10 +100,10 @@ namespace Betaknight.Core.Circuit
         public bool IsTrace => Kind == ChipKind.Trace || Kind == ChipKind.TraceCorner || Kind == ChipKind.TraceTee || Kind == ChipKind.TraceCross;
 
         /// <summary>Leitet Pulse (Leiterbahn, Diode, Kondensator).</summary>
-        public bool Conducts => IsTrace || Kind == ChipKind.Diode || Kind == ChipKind.Capacitor;
+        public bool Conducts => IsTrace || Kind == ChipKind.Diode || Kind == ChipKind.Capacitor || Kind == ChipKind.Amplifier;
 
         /// <summary>Gatter oder Sicherung: wirkt wie ein Relais, gespeist von berührten Relais.</summary>
-        public bool IsGate => Kind == ChipKind.And || Kind == ChipKind.Or || Kind == ChipKind.Not || Kind == ChipKind.Fuse;
+        public bool IsGate => Kind == ChipKind.And || Kind == ChipKind.Or || Kind == ChipKind.Not || Kind == ChipKind.Fuse || Kind == ChipKind.Watchdog;
 
         /// <summary>Öffnungen nach <paramref name="turns"/> Vierteldrehungen im Uhrzeigersinn.</summary>
         public IEnumerable<Edge> OpeningsAt(int turns) => Openings.Select(s => s.Turn(turns));
@@ -156,12 +170,28 @@ namespace Betaknight.Core.Circuit
             return _all[_all.Count - 1];
         }
 
+        /// <summary>Chip eines eigenen Effekts (A-21): Verstärker leitet links–rechts, Watchdog ist ein Relais, sonst Effekt-Chip.</summary>
+        public static ChipDefinition EffectChip(CircuitEffectDefinition e)
+        {
+            switch (e.Id)
+            {
+                case CircuitEffectIds.Amplifier:
+                    return new ChipDefinition(e.Id, ChipKind.Amplifier, e.Name, e.Description, new[] { Edge.Left, Edge.Right }, e.Weight, e.Id);
+                case CircuitEffectIds.Watchdog:
+                    return new ChipDefinition(e.Id, ChipKind.Watchdog, e.Name, e.Description, null, e.Weight, e.Id);
+                default:
+                    string text = e.Scope == CircuitEffectScope.Board ? e.Description : $"Touching components get: {e.Description}";
+                    return new ChipDefinition(e.Id, ChipKind.Effect, e.Name, text, null, e.Weight, e.Id);
+            }
+        }
+
         private static ChipCatalog _default;
 
         /// <summary>Gemeinsamer Standard-Katalog (nur lesend genutzt).</summary>
         public static ChipCatalog Shared => _default ?? (_default = CreateDefault());
 
-        public static ChipCatalog CreateDefault(ChipConfig config = null)
+        /// <param name="effects">Eigene Effekte der Platine (A-21): die in Form «Chip» kommen als Chips dazu.</param>
+        public static ChipCatalog CreateDefault(ChipConfig config = null, CircuitEffectCatalog effects = null)
         {
             config = config ?? ChipConfig.Default;
             var c = new ChipCatalog(config);
@@ -187,6 +217,8 @@ namespace Betaknight.Core.Circuit
                 Edges.All, 2));
             c.Register(new ChipDefinition(ChipIds.Fuse, ChipKind.Fuse, "Fuse",
                 $"Once per fight: when the touching relay triggers, it powers touching components as a difficulty {config.FuseDifficulty} relay.", null, 2));
+            foreach (CircuitEffectDefinition e in (effects ?? CircuitEffectCatalog.Shared).InForm(CircuitEffectForm.Chip))
+                c.Register(EffectChip(e));
             return c;
         }
     }

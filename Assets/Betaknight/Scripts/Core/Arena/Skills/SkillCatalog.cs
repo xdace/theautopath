@@ -84,7 +84,8 @@ namespace Betaknight.Core.Arena
         /// 1 Zelle ≈ 60 %, 2 ≈ 150 %, 4 ≈ 350 %, 6 ≈ 600 % Waffenschaden). Nutzen-Skills tauschen Schaden gegen Wirkung.
         /// Evolutionen behalten die Form ihres Grund-Skills, damit sie auf der Platine an ihrem Platz bleiben.
         /// </summary>
-        public static SkillCatalog CreateDefault()
+        /// <param name="effects">Eigene Effekte der Platine (A-21): die in Form «Skill» kommen als Skills dazu.</param>
+        public static SkillCatalog CreateDefault(CircuitEffectCatalog effects = null)
         {
             var c = new SkillCatalog();
             // Der Basisangriff des Ritters: füllt die Lücken der Warteschlange (60 %), siehe SkillBudgetConfig.
@@ -186,8 +187,20 @@ namespace Betaknight.Core.Arena
                 new DamageEffect(BasisPoints.Percent(600)),
             }, "600 % Weapon Damage. Needs a very hard relay.", countsAsAttack: true, kinds: SkillKind.Attack, shape: S2x3));
 
+            RegisterCircuitEffects(c, effects);
             RegisterEvolutions(c);
             return c;
+        }
+
+        /// <summary>
+        /// Eigene Effekte der Platine in Form «Skill» (A-21, meist Hacks): ein Skill mit Form und Cast-Zeit aus den Daten,
+        /// dessen Ausführung den Effekt auslöst.
+        /// </summary>
+        private static void RegisterCircuitEffects(SkillCatalog c, CircuitEffectCatalog effects)
+        {
+            foreach (CircuitEffectDefinition e in (effects ?? CircuitEffectCatalog.Shared).InForm(CircuitEffectForm.Skill))
+                c.Register(new SkillDefinition(e.Id, e.Name, e.SkillCastTicks, 4, Array.Empty<ISkillEffect>(), e.Description,
+                    kinds: SkillKind.Shock, shape: e.SkillShape).WithCircuitEffect(e.Id));
         }
 
         /// <summary>Evolutionsformen: stärkere Fassungen bestehender Skills, entstehen nur über ein Rezept. Gleiche Form wie der Grund-Skill.</summary>

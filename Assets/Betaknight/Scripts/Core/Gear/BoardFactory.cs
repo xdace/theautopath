@@ -100,16 +100,21 @@ namespace Betaknight.Core.Gear
 
         public DifficultyBonusConfig Bonus { get; }
 
+        private readonly CircuitEffectCatalog _effects;
+
+        /// <param name="effects">Eigene Effekte der Platine (A-21) mit ihrer Form; bestimmt, welche Module, Chips und Skills es gibt.</param>
         public BoardFactory(RuneCatalog runes, ConditionRegistry conditions, SkillCatalog skills, ModuleCatalog modules = null,
-            GrowthCatalog growth = null, DifficultyBonusConfig bonus = null, PinCatalog pins = null, ChipCatalog chips = null)
+            GrowthCatalog growth = null, DifficultyBonusConfig bonus = null, PinCatalog pins = null, ChipCatalog chips = null,
+            CircuitEffectCatalog effects = null)
         {
+            _effects = effects ?? CircuitEffectCatalog.Shared;
             _pins = pins ?? PinCatalog.CreateDefault();
-            _chips = chips ?? ChipCatalog.CreateDefault();
+            _chips = chips ?? ChipCatalog.CreateDefault(null, _effects);
             _growth = growth ?? GrowthCatalog.CreateDefault();
-            _modules = modules ?? ModuleCatalog.CreateDefault();
+            _modules = modules ?? ModuleCatalog.CreateDefault(_effects);
             _runes = runes ?? RuneCatalog.CreateDefault();
             _conditions = conditions ?? ConditionRegistry.CreateDefault();
-            _skills = skills ?? SkillCatalog.CreateDefault();
+            _skills = skills ?? SkillCatalog.CreateDefault(_effects);
             Bonus = bonus ?? DifficultyBonusConfig.Default;
         }
 
@@ -137,7 +142,7 @@ namespace Betaknight.Core.Gear
             SkillDefinition basic = _skills.TryGet(SkillDefinition.BasicAttackId, out SkillDefinition b) ? b : null;
             return LogicBoard.Compile(new BoardLayout(spec.Width, spec.Height, spec.Core), components, relays, basic, Bonus,
                 spec.CoreBonusPercent, edges.Count > 0 ? (_, __) => new LogicGraph(edges) : (Func<IReadOnlyList<LogicRow>, IReadOnlyList<LogicRelay>, LogicGraph>)null,
-                chips, _chips.Config, _pins.Config);
+                chips, _chips.Config, _pins.Config, _effects.Config, _effects);
         }
 
         /// <summary>Auslöser werden zu Kanten: vom Skill bzw. Relais zur Ziel-Komponente.</summary>

@@ -14,6 +14,7 @@ namespace Betaknight.Core.Arena
         public const string Haste = "haste";
         public const string Slow = "slow";
         public const string Freeze = "freeze";
+        public const string Latency = "latency";
     }
 
     /// <summary>Betäubt: keine Aktionen, laufende Aktion wird abgebrochen.</summary>

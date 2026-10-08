@@ -32,7 +32,7 @@ namespace Betaknight.Core.Arena
         ResourceChanged,
         Death,
 
-        /// <summary>Zeitlimit überschritten, Überhitzung beginnt bzw. steigt.</summary>
+        /// <summary>Thermal Throttling (A-21): eine weitere Stufe. Amount = Stufe.</summary>
         Overheat,
         BattleEnd,
 
@@ -74,6 +74,53 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Ein Relais oder Gatter geht an (Amount = 1) oder aus (0). Extra = Index des Relais.</summary>
         RelayState,
+
+        // ------------------------------------------------------------------ Eigene Effekte (A-21)
+
+        /// <summary>Hitze einer Komponente ändert sich (Overclock). RowIndex = Komponente, Amount = neue Hitze, Extra = Overclock-Komponente.</summary>
+        HeatChanged,
+
+        /// <summary>Eine Komponente überspringt bei voller Hitze eine Ausführung. RowIndex = Komponente, Amount = Hitze davor.</summary>
+        HeatSkip,
+
+        /// <summary>Recursion ruft sich erneut auf. RowIndex = Komponente, Amount = neue Tiefe.</summary>
+        RecursionCall,
+
+        /// <summary>Recursion erreicht die grösste Tiefe und endet. RowIndex = Komponente, Amount = Tiefe.</summary>
+        RecursionLimit,
+
+        /// <summary>Parallel Thread: die Komponente startet neben der laufenden Aktion. RowIndex = Komponente.</summary>
+        ParallelThread,
+
+        /// <summary>Interrupt: die Komponente springt an die Spitze der Warteschlange. RowIndex = Komponente.</summary>
+        QueueJump,
+
+        /// <summary>Overflow: ein Eintrag wird zum Schock. RowIndex = Komponente, Amount = Zahl der Einträge.</summary>
+        OverflowShock,
+
+        /// <summary>
+        /// Ein Hack trifft (Quelle = Hacker, Ziel = gehackter Kämpfer). Detail = Effekt-Id, RowIndex = Komponente des Hackers,
+        /// Extra = Relais bzw. Komponente des Opfers (-1 ohne), Amount = Dauer in Ticks oder Zahl.
+        /// </summary>
+        Hacked,
+
+        /// <summary>Ein Hack findet kein Ziel (z. B. Bit Flip ohne Zustands-Relais). Detail = Effekt-Id.</summary>
+        HackFailed,
+
+        /// <summary>Die Firewall des Ziels blockt einen Hack. Detail = Effekt-Id, Amount = verbleibende Ladungen.</summary>
+        HackBlocked,
+
+        /// <summary>Ein gestörtes Relais (Jam) ignoriert ein Auslösen. Extra = Relais, Amount = verbleibende.</summary>
+        RelayJammed,
+
+        /// <summary>Bit Flip endet. Extra = Relais.</summary>
+        FlipEnded,
+
+        /// <summary>Eine gekaperte Ausführung (Hijack) geschieht für den Hacker. Source = Hacker, Target = Opfer, Extra = Komponente des Opfers.</summary>
+        HijackedExecution,
+
+        /// <summary>Short Circuit: die Komponente des Opfers feuert sofort gegen die eigene Seite. Source = Opfer, Extra = Komponente.</summary>
+        ShortCircuit,
     }
 
     /// <summary>Ein Eintrag im Kampfprotokoll. Bedingungen und Set-Boni lesen dieselben Einträge.</summary>
@@ -123,6 +170,12 @@ namespace Betaknight.Core.Arena
         /// <see cref="BattleEventKind.ActionStarted"/> die gesparte Cast-Zeit in Ticks.
         /// </summary>
         public int Bonus { get; internal set; }
+
+        /// <summary>Recursion (A-21): Tiefe der Ausführung bei Aktionen und Einreihen.</summary>
+        public int Depth { get; internal set; }
+
+        /// <summary>Zusätzliche Wirkung in Prozent aus Verstärkern und Recursion (A-21), bei Pulsen, Einreihen und Aktionen.</summary>
+        public int Power { get; internal set; }
 
         /// <summary>Bei <see cref="BattleEventKind.ActionStarted"/>: Wartezeit in der Warteschlange in Ticks, -1 = nicht eingereiht.</summary>
         public int QueuedTicks { get; internal set; } = -1;
