@@ -132,10 +132,16 @@ namespace Betaknight.Core.Arena
                 _hints.Add($"{row.Name} hat nie gefeuert: {NeverFiredReason(row)}.");
             }
 
+            // Wer trägt den Schaden? Nur sinnvoll, wenn mehrere Zeilen Schaden machen.
             RowReport best = null;
+            int dealing = 0;
             foreach (RowReport row in _rows)
-                if (row.Damage > 0 && (best == null || row.Damage > best.Damage)) best = row;
-            if (best != null && TotalDamage > 0)
+            {
+                if (row.Damage <= 0) continue;
+                dealing++;
+                if (best == null || row.Damage > best.Damage) best = row;
+            }
+            if (best != null && dealing > 1)
                 _hints.Add($"{best.Name} ({best.Skill}) macht {SkillInfo.Percent(best.DamageShareBp)} des Schadens.");
 
             foreach (RowReport row in _rows)

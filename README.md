@@ -25,7 +25,7 @@ Es sind keine Prefabs, Sprites oder Fonts nötig. Hexfelder, Spielfigur und Labe
 | Runenwahl | Eine Rune oder ein Ausrüstungsteil nehmen (★ = passt zu einem vorhandenen Tag) oder für 3 Gold verzichten. Teile: «Anlegen» oder «Ins Inventar»; Runen bei voller Tafel: «Ins Runen-Inventar» oder eine Zeile tauschen |
 | Button «Tafel bearbeiten» | Zeilen der Logik-Tafel umsortieren (▲▼), jeder Rune einen Skill aus der Ausrüstung zuordnen (◀▶), Runen ablegen («ab») und aus dem Runen-Inventar einsetzen oder tauschen (↔) |
 | Button «Inventar» | Links die 7 Ausrüstungsplätze, rechts das Inventar, darunter Runentafel und Runen-Inventar. Klick auf ein Teil zeigt Werte, Skills, Set und den Vergleich mit dem angelegten Teil (grün besser, rot schlechter) |
-| Arena nach jedem Kampf | Spielt den Kampf ab: Tempo 1×/2×/4×, Pause, «Überspringen», danach das ganze Protokoll und «Weiter» |
+| Arena nach jedem Kampf | Spielt den Kampf ab: Tempo 1×/2×/4×, Pause, «Überspringen». Tafel live mit Zustand pro Zeile, Zustände, Ressourcen und schwebende Zahlen. Danach Auswertung pro Zeile, Protokoll mit Filter, «Tafel bearbeiten» oder «Weiter» (siehe «Die Arena lesen») |
 | Button «Shop öffnen» | Erscheint auf einem bereits besuchten Shop-Feld |
 | Button «Neuer Run» | Zurück zur Kit-Auswahl, neue Karte |
 
@@ -68,6 +68,20 @@ Kämpfe laufen automatisch in festen Ticks (20 pro Sekunde). Jede Rune ist eine 
 - **Akte:** Das Fluchtportal führt auf eine neue Karte (Akt 2, 3 …). Ritter, Ausrüstung, Tafel, Gold und Splitter kommen mit, eroberte Minen bleiben zurück. Das Portal heilt 50 % der Max-HP, Gegner sind pro Akt 2 Stufen stärker, der Zugzähler und der Boss-Takt laufen weiter.
 
 Konzept: `/mnt/project-files/design/kampfsystem-konzept.md` im Projekt.
+
+### Die Arena lesen
+
+Die Arena zeigt nicht nur, *welche* Zeile feuert, sondern auch *warum* die anderen nicht.
+
+- **Tafel live:** Jede Zeile hat links einen Farbstreifen (ihre Farbe) und ein Zustand-Symbol: ✔ Bedingung erfüllt und Skill bereit, ✖ Bedingung nicht erfüllt, ⏳ Skill im Cooldown (mit Restzeit-Balken unter der Zeile), ⌀ verwaist (kein Skill). Die feuernde Zeile leuchtet gelb. Mit der Maus über einer Zeile steht der Zustand jetzt und der letzte Grund, warum sie übersprungen wurde, z. B. «4,2s: Skill im Cooldown (noch 1,8 s)».
+- **Gründe fürs Überspringen:** «Bedingung nicht erfüllt», «Skill im Cooldown (noch x,y s)», «verwaist (kein Skill)» und «Bedingung erfüllt, aber Aktion läuft» (eine höhere Zeile war bereit, während eine Aktion lief, die sich nicht abbrechen lässt; nur das Ausholen eines Basisangriffs darf noch unterbrochen werden).
+- **Kämpfer:** Unter dem Lebensbalken stehen Ressourcen als Balken (Hitze, Ladung, Tempo-Stapel …) und aktive Zustände als kleine Kästchen (Brand, Betäubt, R.-Bruch, Schild …) mit Restdauer, Restzeit-Balken und Stapeln (×2). Tooltip mit vollem Namen.
+- **Schwebende Zahlen am Ziel:** Schaden weiss, Krit gelb und grösser, Heilung grün, «Block» und «Ausgewichen» als Wort. Kommt die Wirkung von einer Tafel-Zeile, liegt die Zahl auf einem Feld in der Farbe dieser Zeile. Auch Brennen zählt zur Zeile, die es gesetzt hat.
+- **Auswertung nach dem Kampf** (vor «Weiter»): Tabelle pro Zeile mit «gefeuert», Schaden und Heilung gesamt, Anteil am Gesamtschaden, wie oft übersprungen und häufigster Grund. Dazu Hinweise wie «Zeile 3 hat nie gefeuert: Bedingung nie erfüllt» oder «Zeile 2 (Bohrstoß) macht 64 % des Schadens». «Tafel bearbeiten» öffnet direkt den Tafel-Editor.
+- **Protokoll-Filter:** «Alles», «Meine Aktionen» oder «Nur Schaden». Einträge einer Zeile tragen deren Farbstreifen.
+- **Bei 4×:** Hervorhebungen (feuernde Zeile, Treffer-Blitz) bleiben mindestens 0,35 s Echtzeit sichtbar, schwebende Zahlen gut 1 s.
+
+Im Core: `Battle` hält bei jeder Entscheidung des Spielers eine `BattleDecision` fest (gewählte Zeile, Zustand und Cooldown jeder Zeile), nur wenn eine neue Aktion startet oder eine höhere Zeile auf eine laufende Aktion warten muss, nicht jeden Tick. Bedingungen sind zustandslos, das Mitprüfen ändert keinen Kampf (Test mit Fingerabdrücken aus Bot-Runs). Schaden, Heilung und Zustände einer Aktion tragen die Zeile (`BattleEvent.RowIndex`). `BattleReport.Create(result)` rechnet die Auswertung aus dem Protokoll, `BattlePlayback` liefert Zeilen-Zustand, Zustände, Ressourcen, schwebende Zahlen und gefilterte Protokollzeilen.
 
 ### Feldsymbole (Platzhalter)
 
@@ -115,7 +129,8 @@ Assets/Betaknight/
 │   │   ├── Run/           PlayerStats (HP, Gold, Splitter), KnightKit, ProgressionConfig
 │   │   ├── Runes/         Runen (Bedingungen der Logik-Tafel), Loadout, Runenwahl, RuneInventory
 │   │   ├── Arena/         Kampfsimulator: Battle (Tick-Schleife), Combatant, LogicBoard, Conditions/ (Runen-Bedingungen + ConditionRegistry),
-│   │   │                  Effects/ (ISkillEffect), Statuses/, Skills/ (SkillCatalog), BattleModifier, Playback/ (Wiedergabe + Protokolltext)
+│   │   │                  Effects/ (ISkillEffect), Statuses/, Skills/ (SkillCatalog), BattleModifier, Playback/ (Wiedergabe + Protokolltext),
+│   │   │                  Insight/ (BattleDecision: Gründe je Zeile, BattleReport: Auswertung nach dem Kampf)
 │   │   ├── Gear/          Ausrüstung: EquipmentCatalog, Equipment, Inventory, BoardFactory (Runen-Zeilen → Tafel), Sets/ (SetBonusRegistry)
 │   │   ├── Combat/        ICombatResolver, ArenaCombatResolver, EnemyCatalog (Platzhalter-Resolver nur noch für Tests)
 │   │   ├── Shop/          Shop-Bestand und Preise
