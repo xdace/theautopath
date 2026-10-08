@@ -582,9 +582,12 @@ namespace Betaknight.Overworld.UI
 
         private void DrawTooltip()
         {
-            if (string.IsNullOrEmpty(GUI.tooltip)) return;
+            string text = GUI.tooltip;
+            // Wie UiTheme.DrawTooltip: zurücksetzen, sonst bleibt der letzte Tooltip stehen.
+            if (Event.current.type == EventType.Repaint) GUI.tooltip = string.Empty;
+            if (string.IsNullOrEmpty(text)) return;
             Vector2 mouse = Event.current.mousePosition;
-            var content = new GUIContent(GUI.tooltip);
+            var content = new GUIContent(text);
             float width = 320f;
             float height = _tooltip.CalcHeight(content, width) + 10f;
             var rect = new Rect(Mathf.Min(mouse.x + 16f, Screen.width - width - 8f), Mathf.Min(mouse.y + 16f, Screen.height - height - 8f), width, height);
