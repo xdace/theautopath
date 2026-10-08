@@ -19,6 +19,15 @@ namespace Betaknight.Core.Arena
         private readonly List<BattleEvent> _events = new List<BattleEvent>();
         private List<BattleEvent> _pending = new List<BattleEvent>();
         private readonly Dictionary<Combatant, RowRuntime[]> _rows = new Dictionary<Combatant, RowRuntime[]>();
+        private readonly List<BattleDecision> _decisions = new List<BattleDecision>();
+
+        // Wer gerade wirkt und aus welcher Zeile: Ereignisse dieses Kämpfers bekommen die Zeile angeheftet.
+        private Combatant _actor;
+        private int _actorRow = -1;
+
+        // Zeilen, die während der laufenden Aktion des Spielers schon als «Aktion läuft» festgehalten sind.
+        private ActionState _busyAction;
+        private readonly HashSet<int> _busyRows = new HashSet<int>();
 
         public int Tick { get; private set; }
         public Random Random { get; }
@@ -27,6 +36,9 @@ namespace Betaknight.Core.Arena
         public IReadOnlyList<Combatant> Enemies => _enemies;
         public IReadOnlyList<Combatant> All => _all;
         public IReadOnlyList<BattleEvent> Events => _events;
+
+        /// <summary>Entscheidungen des Spielers mit Gründen je Zeile (nur bei Entscheidungen, nicht jeden Tick).</summary>
+        public IReadOnlyList<BattleDecision> Decisions => _decisions;
 
         public int TimeLimitTicks => _setup.TimeLimitTicks;
         public bool IsOverheated => Tick > _setup.TimeLimitTicks;
@@ -64,7 +76,7 @@ namespace Betaknight.Core.Arena
         public BattleResult Run()
         {
             var fighters = new List<FighterInfo>();
-            foreach (Combatant c in _all) fighters.Add(new FighterInfo(c, c.MaxHp, c.Hp));
+            foreach (Combatant c in _all) fighters.Add(new FighterInfo(c, c.MaxHp, c.Hp, c.ResourceSnapshot()));
 
             Emit(new BattleEvent(0, BattleEventKind.BattleStart, null, null));
             foreach (Combatant c in _all)
@@ -103,7 +115,7 @@ namespace Betaknight.Core.Arena
             }
 
             return new BattleResult(outcome.Value, Tick, Math.Max(0, Player.Hp), Player.MaxHp, defeated, BonusGold, _events, labels,
-                skills, fighters) { SurviveTicks = _setup.SurviveTicks };
+                skills, fighters) { SurviveTicks = _setup.SurviveTicks, Decisions = _decisions };
         }
 
         private void UpdateTime()
@@ -124,7 +136,9 @@ namespace Betaknight.Core.Arena
                 {
                     if (i >= c.StatusList.Count) continue;
                     StatusEffect s = c.StatusList[i];
+                    BeginActor(s.Source, s.SourceRow);
                     s.OnTick(this, c);
+                    EndActor();
                     s.TicksLeft--;
                     if (s.TicksLeft <= 0 && c.StatusList.Remove(s))
                         Emit(new BattleEvent(Tick, BattleEventKind.StatusExpired, s.Source, c, 0, s.Id));
@@ -177,11 +191,25 @@ namespace Betaknight.Core.Arena
             if (!a.Skill.IsBasicAttack && a.Skill.CanBeRepeated) c.LastRepeatableSkill = a.Skill;
 
             var context = new SkillContext(this, c, target, a.Skill, a.RowIndex);
+            BeginActor(c, a.RowIndex);
             foreach (ISkillEffect effect in a.Skill.Effects)
             {
                 if (!c.IsAlive) break;
                 effect.Apply(context);
             }
+            EndActor();
+        }
+
+        private void BeginActor(Combatant c, int row)
+        {
+            _actor = c;
+            _actorRow = row;
+        }
+
+        private void EndActor()
+        {
+            _actor = null;
+            _actorRow = -1;
         }
 
         private void Finish(Combatant c, ActionState a)
@@ -197,7 +225,11 @@ namespace Betaknight.Core.Arena
             {
                 if (!c.IsAlive || c.IsStunned) continue;
                 bool basicWindup = c.Action != null && c.Action.InWindup && c.Action.Skill.IsBasicAttack;
-                if (c.Action != null && !basicWindup) continue;
+                if (c.Action != null && !basicWindup)
+                {
+                    if (c == Player && OpponentsOf(c).Count > 0) RecordBusy(c);
+                    continue;
+                }
                 if (OpponentsOf(c).Count == 0) continue;
 
                 DecideFor(c, basicWindup);
@@ -207,21 +239,99 @@ namespace Betaknight.Core.Arena
         private void DecideFor(Combatant c, bool basicWindup)
         {
             LogicBoard board = c.Board;
+            RowCheckState[] states = c == Player ? new RowCheckState[board.Rows.Count + 1] : null;
             for (int i = 0; i <= board.Rows.Count; i++)
             {
                 LogicRow row = board.RowAt(i);
-                if (row.IsOrphaned || !c.IsReady(row.Skill)) continue;
+                if (row.IsOrphaned || !c.IsReady(row.Skill))
+                {
+                    if (states != null) states[i] = row.IsOrphaned ? RowCheckState.Orphaned : RowCheckState.Cooldown;
+                    continue;
+                }
 
                 RowRuntime state = _rows[c][i];
-                if (!row.Condition.IsMet(new ConditionContext(this, c, state), out Combatant target)) continue;
+                if (!row.Condition.IsMet(new ConditionContext(this, c, state), out Combatant target))
+                {
+                    if (states != null) states[i] = RowCheckState.ConditionFalse;
+                    continue;
+                }
 
                 // Ein laufender Basisangriff wird nicht durch einen neuen Basisangriff ersetzt.
                 if (basicWindup && row.Skill.IsBasicAttack) return;
 
                 if (c.Action != null) Interrupt(c);
                 StartAction(c, row.Skill, target, i);
+                if (states != null) RecordDecision(c, i, states);
                 return;
             }
+        }
+
+        // ------------------------------------------------------------------ Entscheidungs-Protokoll (nur Spieler, ändert nichts am Kampf)
+
+        /// <summary>
+        /// Hält eine Entscheidung fest: Gründe der Zeilen darüber stehen schon in <paramref name="states"/>, die Zeilen
+        /// darunter werden zur Anzeige nur geprüft. Bedingungen sind zustandslos, das Prüfen ändert also nichts.
+        /// </summary>
+        private void RecordDecision(Combatant c, int chosen, RowCheckState[] states)
+        {
+            for (int i = chosen + 1; i < states.Length; i++) states[i] = Probe(c, i);
+            _decisions.Add(new BattleDecision(Tick, chosen, Checks(c, states)));
+        }
+
+        /// <summary>
+        /// Während eine Aktion läuft, die keine Zeile abbrechen darf: Zeilen über der laufenden, die bereit und erfüllt
+        /// sind, einmal pro Aktion als «Aktion läuft» festhalten. Zeilen darunter hätten ohnehin nicht Vorrang.
+        /// </summary>
+        private void RecordBusy(Combatant c)
+        {
+            if (c.IsStunned || c.Action == null) return;
+            if (_busyAction != c.Action)
+            {
+                _busyAction = c.Action;
+                _busyRows.Clear();
+            }
+
+            RowCheckState[] states = null;
+            int above = Math.Min(c.Action.RowIndex, c.Board.Rows.Count + 1);
+            for (int i = 0; i < above; i++)
+            {
+                if (_busyRows.Contains(i) || Probe(c, i) != RowCheckState.Ready) continue;
+                if (states == null)
+                {
+                    states = new RowCheckState[c.Board.Rows.Count + 1];
+                    for (int j = 0; j < states.Length; j++) states[j] = Probe(c, j);
+                }
+                states[i] = RowCheckState.ActionRunning;
+                _busyRows.Add(i);
+            }
+            if (states == null) return;
+            // Schon gemeldete Zeilen stehen hier als bereit und zählen nicht doppelt.
+            _decisions.Add(new BattleDecision(Tick, -1, Checks(c, states), c.Action.RowIndex));
+        }
+
+        private RowCheckState Probe(Combatant c, int index)
+        {
+            LogicRow row = c.Board.RowAt(index);
+            if (row.IsOrphaned) return RowCheckState.Orphaned;
+            if (!c.IsReady(row.Skill)) return RowCheckState.Cooldown;
+            return row.Condition.IsMet(new ConditionContext(this, c, _rows[c][index]), out _) ? RowCheckState.Ready : RowCheckState.ConditionFalse;
+        }
+
+        private RowCheck[] Checks(Combatant c, RowCheckState[] states)
+        {
+            var checks = new RowCheck[states.Length];
+            for (int i = 0; i < states.Length; i++)
+            {
+                LogicRow row = c.Board.RowAt(i);
+                if (row.IsOrphaned)
+                {
+                    checks[i] = new RowCheck(states[i], 0, 0);
+                    continue;
+                }
+                bool met = row.Condition.IsMet(new ConditionContext(this, c, _rows[c][i]), out _);
+                checks[i] = new RowCheck(states[i], c.Cooldown(row.Skill.Id), row.Skill.CooldownTicks, met);
+            }
+            return checks;
         }
 
         /// <summary>
@@ -283,6 +393,7 @@ namespace Betaknight.Core.Arena
 
         public void Emit(BattleEvent e)
         {
+            if (e.RowIndex < 0 && _actor != null && e.Source == _actor) e.RowIndex = _actorRow;
             _events.Add(e);
             _pending.Add(e);
         }
@@ -391,10 +502,13 @@ namespace Betaknight.Core.Arena
         {
             if (target == null || !target.IsAlive || status == null || status.TicksLeft <= 0) return;
             status.Source = source;
+            status.SourceRow = source != null && source == _actor ? _actorRow : -1;
 
             if (!status.Stacks) target.StatusList.RemoveAll(s => s.Id == status.Id);
             target.StatusList.Add(status);
-            Emit(new BattleEvent(Tick, BattleEventKind.StatusApplied, source, target, status.TicksLeft, status.Id));
+            int stacks = 0;
+            foreach (StatusEffect s in target.StatusList) if (s.Id == status.Id) stacks++;
+            Emit(new BattleEvent(Tick, BattleEventKind.StatusApplied, source, target, status.TicksLeft, status.Id) { Extra = stacks });
 
             if (status.Stuns) Interrupt(target);
         }
@@ -406,7 +520,7 @@ namespace Betaknight.Core.Arena
             int after = Math.Max(min, Math.Min(max, before + delta));
             if (after == before) return after;
             c.SetResourceRaw(id, after);
-            Emit(new BattleEvent(Tick, BattleEventKind.ResourceChanged, c, c, after, id));
+            Emit(new BattleEvent(Tick, BattleEventKind.ResourceChanged, c, c, after, id) { Extra = max == int.MaxValue ? 0 : max });
             return after;
         }
 

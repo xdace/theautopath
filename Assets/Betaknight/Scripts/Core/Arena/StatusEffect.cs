@@ -12,6 +12,9 @@ namespace Betaknight.Core.Arena
         /// <summary>Wer den Zustand verursacht hat (für Schaden über Zeit).</summary>
         public Combatant Source { get; internal set; }
 
+        /// <summary>Tafel-Zeile, deren Aktion den Zustand gesetzt hat, sonst -1 (für die Zuordnung von Brennen).</summary>
+        public int SourceRow { get; internal set; } = -1;
+
         protected StatusEffect(string id, int ticks)
         {
             Id = id;

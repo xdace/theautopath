@@ -153,6 +153,9 @@ namespace Betaknight.Core.Arena
         public int GetResource(string id) => _resources.TryGetValue(id, out int v) ? v : 0;
         internal void SetResourceRaw(string id, int value) => _resources[id] = value;
 
+        /// <summary>Kopie aller Ressourcen-Zähler (für die Wiedergabe).</summary>
+        public Dictionary<string, int> ResourceSnapshot() => new Dictionary<string, int>(_resources);
+
         /// <summary>Fehlversuche seit dem letzten Erfolg je Wurf-Art (Pseudo-Zufall).</summary>
         internal int RollFailures(string key) => _rollFailures.TryGetValue(key, out int v) ? v : 0;
         internal void SetRollFailures(string key, int value) => _rollFailures[key] = value;

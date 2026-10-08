@@ -49,8 +49,14 @@ namespace Betaknight.Core.Arena
         /// <summary>Skill-, Status- oder Ressourcen-Id, je nach Art.</summary>
         public string Detail { get; }
 
-        /// <summary>Zeile der Logik-Tafel, die die Aktion ausgelöst hat, sonst -1.</summary>
-        public int RowIndex { get; }
+        /// <summary>
+        /// Zeile der Logik-Tafel, die die Aktion ausgelöst hat, sonst -1. Schaden, Heilung und Zustände einer Aktion
+        /// (auch späteres Brennen) tragen die Zeile ebenfalls, damit Auswertung und Anzeige sie zuordnen können.
+        /// </summary>
+        public int RowIndex { get; internal set; }
+
+        /// <summary>Zusatzwert nur für die Anzeige: Stapel bei Zuständen, Obergrenze bei Ressourcen (0 = offen).</summary>
+        public int Extra { get; internal set; }
 
         public BattleEvent(int tick, BattleEventKind kind, Combatant source, Combatant target, int amount = 0, string detail = null, int rowIndex = -1)
         {

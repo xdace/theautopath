@@ -3,9 +3,155 @@ using System.Collections.Generic;
 
 namespace Betaknight.Core.Arena
 {
+    /// <summary>Ein aktiver Zustand in der Wiedergabe: Restdauer und Stapel.</summary>
+    public sealed class StatusView
+    {
+        public string Id { get; }
+        public int Stacks { get; internal set; }
+        public int StartTick { get; internal set; }
+        public int EndTick { get; internal set; }
+
+        internal StatusView(string id) => Id = id;
+
+        public int TicksLeft(int tick) => Math.Max(0, EndTick - tick);
+
+        /// <summary>Verbleibender Anteil 0–1 für den Balken.</summary>
+        public float Remaining(int tick) => EndTick <= StartTick ? 0f : Math.Min(1f, TicksLeft(tick) / (float)(EndTick - StartTick));
+    }
+
+    /// <summary>Ein Ressourcen-Zähler in der Wiedergabe. Ohne feste Obergrenze dient der Höchststand als Massstab.</summary>
+    public sealed class ResourceView
+    {
+        public string Id { get; }
+        public int Value { get; internal set; }
+
+        /// <summary>Feste Obergrenze, 0 = offen.</summary>
+        public int Max { get; internal set; }
+        public int Peak { get; internal set; }
+
+        internal ResourceView(string id) => Id = id;
+
+        public float Fill => Value <= 0 ? 0f : Math.Min(1f, Value / (float)Math.Max(1, Max > 0 ? Max : Math.Max(Peak, 5)));
+    }
+
+    public enum PopupKind
+    {
+        Damage,
+        Crit,
+        Heal,
+        Blocked,
+        Dodged,
+        SelfDamage,
+    }
+
+    /// <summary>Schwebende Zahl oder schwebendes Wort am Ziel. Row = auslösende Zeile des Spielers, sonst -1.</summary>
+    public readonly struct Popup
+    {
+        public readonly int Tick;
+        public readonly int TargetIndex;
+        public readonly PopupKind Kind;
+        public readonly int Amount;
+        public readonly int Row;
+        public readonly bool FromPlayer;
+
+        public Popup(int tick, int targetIndex, PopupKind kind, int amount, int row, bool fromPlayer)
+        {
+            Tick = tick;
+            TargetIndex = targetIndex;
+            Kind = kind;
+            Amount = amount;
+            Row = row;
+            FromPlayer = fromPlayer;
+        }
+
+        public string Text
+        {
+            get
+            {
+                switch (Kind)
+                {
+                    case PopupKind.Heal: return $"+{Amount}";
+                    case PopupKind.Blocked: return "Block";
+                    case PopupKind.Dodged: return "Ausgewichen";
+                    case PopupKind.Crit: return $"{Amount}!";
+                    default: return Amount.ToString();
+                }
+            }
+        }
+    }
+
+    [Flags]
+    public enum LogCategory
+    {
+        None = 0,
+
+        /// <summary>Aktionen, Abbrüche, Zustände und Heilung, die vom Spieler ausgehen.</summary>
+        Mine = 1,
+
+        /// <summary>Schaden, Krit, Block, Ausweichen.</summary>
+        Damage = 2,
+    }
+
+    public enum LogFilter
+    {
+        All,
+        Mine,
+        Damage,
+    }
+
+    /// <summary>Eine Protokollzeile mit Kategorie für den Filter.</summary>
+    public readonly struct LogEntry
+    {
+        public readonly int Tick;
+        public readonly string Text;
+        public readonly LogCategory Category;
+        public readonly int Row;
+
+        public LogEntry(int tick, string text, LogCategory category, int row)
+        {
+            Tick = tick;
+            Text = text;
+            Category = category;
+            Row = row;
+        }
+
+        public bool Matches(LogFilter filter) =>
+            filter == LogFilter.All || (filter == LogFilter.Mine && (Category & LogCategory.Mine) != 0)
+            || (filter == LogFilter.Damage && (Category & LogCategory.Damage) != 0);
+    }
+
+    /// <summary>Live-Zustand einer Tafel-Zeile in der Wiedergabe.</summary>
+    public enum RowDisplay
+    {
+        /// <summary>✔ Bedingung erfüllt und Skill bereit.</summary>
+        Ready,
+
+        /// <summary>✖ Bedingung nicht erfüllt.</summary>
+        ConditionFalse,
+
+        /// <summary>⏳ Skill im Cooldown.</summary>
+        Cooldown,
+
+        /// <summary>⌀ verwaist.</summary>
+        Orphaned,
+
+        /// <summary>Noch keine Entscheidung.</summary>
+        Unknown,
+    }
+
     /// <summary>Zustand eines Kämpfers zu einem Zeitpunkt der Wiedergabe.</summary>
     public sealed class FighterView
     {
+        internal readonly List<StatusView> StatusList = new List<StatusView>();
+        internal readonly List<ResourceView> ResourceList = new List<ResourceView>();
+        internal int PendingCritTick = -1;
+
+        /// <summary>Aktive Zustände, älteste zuerst.</summary>
+        public IReadOnlyList<StatusView> Statuses => StatusList;
+
+        /// <summary>Ressourcen (Hitze, Ladung, Tempo ...), sobald sie einmal über 0 waren.</summary>
+        public IReadOnlyList<ResourceView> Resources => ResourceList;
+
         public FighterInfo Info { get; }
         public int Hp { get; internal set; }
         public bool Alive => Hp > 0;
@@ -25,6 +171,23 @@ namespace Betaknight.Core.Arena
         {
             Info = info;
             Hp = info.StartHp;
+            var ids = new List<string>(info.StartResources.Keys);
+            ids.Sort(StringComparer.Ordinal);
+            foreach (string id in ids) SetResource(id, info.StartResources[id], 0);
+        }
+
+        internal void SetResource(string id, int value, int max)
+        {
+            ResourceView view = ResourceList.Find(r => r.Id == id);
+            if (view == null)
+            {
+                if (value == 0) return;
+                view = new ResourceView(id);
+                ResourceList.Add(view);
+            }
+            view.Value = value;
+            if (max > 0) view.Max = max;
+            view.Peak = Math.Max(view.Peak, value);
         }
 
         /// <summary>Fortschritt des Ausholens 0–1, 1 wenn keine Aktion ausholt.</summary>
@@ -45,7 +208,13 @@ namespace Betaknight.Core.Arena
         private readonly Dictionary<Combatant, FighterView> _byCombatant = new Dictionary<Combatant, FighterView>();
         private readonly List<FighterView> _fighters = new List<FighterView>();
         private readonly List<string> _lines = new List<string>();
+        private readonly List<LogEntry> _entries = new List<LogEntry>();
+        private readonly List<Popup> _popups = new List<Popup>();
         private int _next;
+        private int _nextDecision;
+        private BattleDecision _lastDecision;
+        private readonly string[] _skipReasons;
+        private readonly int[] _skipTicks;
 
         public int Tick { get; private set; }
         public int EndTick => _result.EndTick;
@@ -60,6 +229,12 @@ namespace Betaknight.Core.Arena
         /// <summary>Protokollzeilen bis zum aktuellen Tick, älteste zuerst.</summary>
         public IReadOnlyList<string> Lines => _lines;
 
+        /// <summary>Protokoll mit Kategorien (inklusive Schadenszeilen) für den Filter.</summary>
+        public IReadOnlyList<LogEntry> Entries => _entries;
+
+        /// <summary>Letzte Entscheidung des Spielers bis zum aktuellen Tick.</summary>
+        public BattleDecision LastDecision => _lastDecision;
+
         public BattlePlayback(BattleResult result)
         {
             _result = result ?? throw new ArgumentNullException(nameof(result));
@@ -69,7 +244,49 @@ namespace Betaknight.Core.Arena
                 _fighters.Add(view);
                 _byCombatant[f.Combatant] = view;
             }
+            _skipReasons = new string[result.PlayerRowLabels.Count];
+            _skipTicks = new int[result.PlayerRowLabels.Count];
+            for (int i = 0; i < _skipTicks.Length; i++) _skipTicks[i] = -1;
         }
+
+        /// <summary>Holt die schwebenden Zahlen, die seit dem letzten Aufruf entstanden sind.</summary>
+        public List<Popup> TakePopups()
+        {
+            var taken = new List<Popup>(_popups);
+            _popups.Clear();
+            return taken;
+        }
+
+        /// <summary>Live-Zustand einer Zeile: aus der letzten Entscheidung, Cooldown läuft bis jetzt weiter.</summary>
+        public RowDisplay RowStateAt(int row)
+        {
+            if (_lastDecision == null || row < 0 || row >= _lastDecision.Rows.Count) return RowDisplay.Unknown;
+            RowCheck check = _lastDecision.Rows[row];
+            if (check.State == RowCheckState.Orphaned) return RowDisplay.Orphaned;
+            if (CooldownLeft(row) > 0) return RowDisplay.Cooldown;
+            return check.ConditionMet ? RowDisplay.Ready : RowDisplay.ConditionFalse;
+        }
+
+        /// <summary>Rest-Cooldown einer Zeile in Ticks zum aktuellen Tick.</summary>
+        public int CooldownLeft(int row)
+        {
+            if (_lastDecision == null || row < 0 || row >= _lastDecision.Rows.Count) return 0;
+            return Math.Max(0, _lastDecision.Rows[row].CooldownLeft - (Tick - _lastDecision.Tick));
+        }
+
+        /// <summary>Verbleibender Cooldown-Anteil 0–1 für den Restzeit-Balken.</summary>
+        public float CooldownFraction(int row)
+        {
+            if (_lastDecision == null || row < 0 || row >= _lastDecision.Rows.Count) return 0f;
+            int total = _lastDecision.Rows[row].CooldownTotal;
+            return total <= 0 ? 0f : Math.Min(1f, CooldownLeft(row) / (float)total);
+        }
+
+        /// <summary>Warum die Zeile zuletzt übersprungen wurde, mit Zeitpunkt, oder null.</summary>
+        public string LastSkipReason(int row) =>
+            row >= 0 && row < _skipReasons.Length && _skipReasons[row] != null
+                ? $"{BattleLogText.Time(_skipTicks[row])}: {_skipReasons[row]}"
+                : null;
 
         public FighterView Player => _fighters.Count > 0 ? _fighters[0] : null;
 
@@ -82,11 +299,42 @@ namespace Betaknight.Core.Arena
             Tick = Math.Min(_result.EndTick, Tick + ticks);
             while (_next < _result.Events.Count && _result.Events[_next].Tick <= Tick)
                 Apply(_result.Events[_next++]);
+            while (_nextDecision < _result.Decisions.Count && _result.Decisions[_nextDecision].Tick <= Tick)
+                ApplyDecision(_result.Decisions[_nextDecision++]);
             foreach (FighterView f in _fighters)
+            {
                 if (f.StunnedUntil > 0 && Tick >= f.StunnedUntil) f.StunnedUntil = 0;
+                f.StatusList.RemoveAll(st => st.EndTick <= Tick);
+            }
         }
 
         public void SkipToEnd() => Advance(int.MaxValue / 2);
+
+        private void ApplyDecision(BattleDecision d)
+        {
+            _lastDecision = d;
+            for (int i = 0; i < d.Rows.Count && i < _skipReasons.Length; i++)
+            {
+                if (!d.Skipped(i)) continue;
+                _skipReasons[i] = RowStateText.Reason(d.Rows[i]);
+                _skipTicks[i] = d.Tick;
+            }
+        }
+
+        private void Log(BattleEvent e, LogCategory category, bool classic = true)
+        {
+            string text = BattleLogText.Describe(e, _result);
+            if (classic) _lines.Add(text);
+            if (e.Source != null && e.Source.Side == Side.Player && e.Kind != BattleEventKind.Damage) category |= LogCategory.Mine;
+            _entries.Add(new LogEntry(e.Tick, text, category, e.Source != null && e.Source.Side == Side.Player ? e.RowIndex : -1));
+        }
+
+        private void AddPopup(BattleEvent e, FighterView target, PopupKind kind)
+        {
+            if (target == null) return;
+            bool fromPlayer = e.Source != null && e.Source.Side == Side.Player;
+            _popups.Add(new Popup(e.Tick, _fighters.IndexOf(target), kind, e.Amount, fromPlayer ? e.RowIndex : -1, fromPlayer));
+        }
 
         private FighterView View(Combatant c) => c != null && _byCombatant.TryGetValue(c, out FighterView v) ? v : null;
 
@@ -108,7 +356,8 @@ namespace Betaknight.Core.Arena
                         LastPlayerRow = e.RowIndex;
                         LastPlayerRowTick = e.Tick;
                     }
-                    if (e.Detail != SkillDefinition.BasicAttackId) _lines.Add(BattleLogText.Describe(e, _result));
+                    if (e.Detail != SkillDefinition.BasicAttackId) Log(e, LogCategory.None);
+                    else if (source.Info.Side == Side.Player) Log(e, LogCategory.None, classic: false);
                     break;
 
                 case BattleEventKind.ActionExecuted:
@@ -117,7 +366,7 @@ namespace Betaknight.Core.Arena
 
                 case BattleEventKind.ActionInterrupted:
                     if (source != null) source.ActionSkill = null;
-                    _lines.Add(BattleLogText.Describe(e, _result));
+                    Log(e, LogCategory.None);
                     break;
 
                 case BattleEventKind.Damage:
@@ -125,16 +374,45 @@ namespace Betaknight.Core.Arena
                     if (target == null) break;
                     target.Hp = Math.Max(0, target.Hp - e.Amount);
                     target.LastHitTick = e.Tick;
+                    bool crit = e.Kind == BattleEventKind.Damage && target.PendingCritTick == e.Tick;
+                    target.PendingCritTick = -1;
+                    AddPopup(e, target, e.Kind == BattleEventKind.SelfDamage ? PopupKind.SelfDamage : crit ? PopupKind.Crit : PopupKind.Damage);
+                    Log(e, LogCategory.Damage, classic: false);
                     break;
 
                 case BattleEventKind.Healed:
                     if (target != null) target.Hp = Math.Min(target.Info.MaxHp, target.Hp + e.Amount);
-                    _lines.Add(BattleLogText.Describe(e, _result));
+                    AddPopup(e, target, PopupKind.Heal);
+                    Log(e, LogCategory.None);
                     break;
 
                 case BattleEventKind.StatusApplied:
-                    if (target != null && e.Detail == StatusIds.Stun) target.StunnedUntil = e.Tick + e.Amount;
-                    _lines.Add(BattleLogText.Describe(e, _result));
+                    if (target != null)
+                    {
+                        if (e.Detail == StatusIds.Stun) target.StunnedUntil = e.Tick + e.Amount;
+                        StatusView status = target.StatusList.Find(st => st.Id == e.Detail);
+                        if (status == null)
+                        {
+                            status = new StatusView(e.Detail);
+                            target.StatusList.Add(status);
+                        }
+                        status.Stacks = Math.Max(1, e.Extra);
+                        status.StartTick = e.Tick;
+                        status.EndTick = Math.Max(status.EndTick, e.Tick + e.Amount);
+                    }
+                    Log(e, LogCategory.None);
+                    break;
+
+                case BattleEventKind.StatusExpired:
+                    if (target != null)
+                    {
+                        StatusView status = target.StatusList.Find(st => st.Id == e.Detail);
+                        if (status != null && --status.Stacks <= 0) target.StatusList.Remove(status);
+                    }
+                    break;
+
+                case BattleEventKind.ResourceChanged:
+                    source?.SetResource(e.Detail, e.Amount, e.Extra);
                     break;
 
                 case BattleEventKind.Death:
@@ -142,16 +420,29 @@ namespace Betaknight.Core.Arena
                     {
                         target.Hp = 0;
                         target.ActionSkill = null;
+                        target.StatusList.Clear();
                     }
-                    _lines.Add(BattleLogText.Describe(e, _result));
+                    Log(e, LogCategory.None);
+                    break;
+
+                case BattleEventKind.Crit:
+                    if (target != null) target.PendingCritTick = e.Tick;
+                    Log(e, LogCategory.Damage);
                     break;
 
                 case BattleEventKind.Dodged:
+                    AddPopup(e, target, PopupKind.Dodged);
+                    Log(e, LogCategory.Damage);
+                    break;
+
                 case BattleEventKind.Blocked:
-                case BattleEventKind.Crit:
+                    AddPopup(e, target, PopupKind.Blocked);
+                    Log(e, LogCategory.Damage);
+                    break;
+
                 case BattleEventKind.Overheat:
                 case BattleEventKind.BattleEnd:
-                    _lines.Add(BattleLogText.Describe(e, _result));
+                    Log(e, LogCategory.None);
                     break;
             }
         }
