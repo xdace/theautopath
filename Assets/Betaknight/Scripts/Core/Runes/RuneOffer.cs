@@ -27,7 +27,7 @@ namespace Betaknight.Core.Runes
             if (loadout == null) throw new ArgumentNullException(nameof(loadout));
             if (random == null) throw new ArgumentNullException(nameof(random));
 
-            List<RuneDefinition> pool = catalog.All.Where(r => r.Weight > 0 && !loadout.Contains(r)).ToList();
+            List<RuneDefinition> pool = catalog.All.Where(r => r.Weight > 0 && !r.IsExclusive && !loadout.Contains(r)).ToList();
             var picked = new List<RuneDefinition>();
 
             List<RuneDefinition> matching = pool.Where(r => loadout.HasTag(r.Tag)).ToList();
