@@ -70,6 +70,7 @@ namespace Betaknight.Overworld
             _portalWindow.Hidden = arenaOpen;
             _inventoryFullWindow.Hidden = arenaOpen;
             _hud.OnEditBoard = () => _boardWindow.Toggle();
+            _arenaWindow.OnEditBoard = () => _boardWindow.Open();
             _hud.OnOpenInventory = () => _inventoryWindow.Toggle();
         }
 

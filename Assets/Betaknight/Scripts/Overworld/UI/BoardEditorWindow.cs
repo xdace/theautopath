@@ -37,6 +37,9 @@ namespace Betaknight.Overworld.UI
 
         public void Toggle() => IsOpen = !IsOpen && _session != null;
 
+        /// <summary>Öffnet den Editor, z. B. direkt aus der Kampf-Auswertung.</summary>
+        public void Open() => IsOpen = _session != null;
+
         private void OnGUI()
         {
             if (!IsOpen || _session == null) return;

@@ -49,8 +49,12 @@ namespace Betaknight.Core.Arena
         public int MaxHp { get; }
         public int StartHp { get; }
 
-        public FighterInfo(Combatant combatant, int maxHp, int startHp)
+        /// <summary>Ressourcen zu Kampfbeginn (Hitze, Ladung, ...).</summary>
+        public IReadOnlyDictionary<string, int> StartResources { get; }
+
+        public FighterInfo(Combatant combatant, int maxHp, int startHp, IReadOnlyDictionary<string, int> startResources = null)
         {
+            StartResources = startResources ?? new Dictionary<string, int>();
             Combatant = combatant;
             MaxHp = maxHp;
             StartHp = startHp;
@@ -84,6 +88,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Alle Kämpfer mit Start-Leben, Spieler zuerst.</summary>
         public IReadOnlyList<FighterInfo> Fighters { get; }
+
+        /// <summary>Entscheidungen des Spielers mit Gründen je Zeile, siehe <see cref="BattleDecision"/>.</summary>
+        public IReadOnlyList<BattleDecision> Decisions { get; internal set; } = new BattleDecision[0];
 
         public BattleResult(BattleOutcome outcome, int endTick, int playerHp, int playerMaxHp, int enemiesDefeated, int bonusGold,
             IReadOnlyList<BattleEvent> events, IReadOnlyList<string> playerRowLabels,
