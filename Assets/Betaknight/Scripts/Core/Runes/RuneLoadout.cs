@@ -97,7 +97,7 @@ namespace Betaknight.Core.Runes
             return true;
         }
 
-        internal int IndexOfRow(RuneSlot row) => _rows.IndexOf(row);
+        public int IndexOfRow(RuneSlot row) => _rows.IndexOf(row);
 
         internal void NotifyChanged() => Changed?.Invoke();
 

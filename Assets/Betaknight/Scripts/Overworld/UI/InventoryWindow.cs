@@ -1,14 +1,16 @@
 using System.Collections.Generic;
 using Betaknight.Core;
+using Betaknight.Core.Arena;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Skills;
 using UnityEngine;
 
 namespace Betaknight.Overworld.UI
 {
     /// <summary>
-    /// Inventar per IMGUI: links die 7 Ausrüstungsplätze, rechts das Inventar, darunter Runentafel und Runen-Inventar.
-    /// Ein Klick auf ein Teil zeigt Werte, Skills und Set und vergleicht mit dem angelegten Teil.
+    /// Inventar per IMGUI: links die 7 Ausrüstungsplätze, rechts das Inventar, darunter Runentafel, Runen-Inventar und Skills.
+    /// Ein Klick auf ein Teil zeigt Werte, passive Effekte und Set und vergleicht mit dem angelegten Teil.
     /// Alle Änderungen laufen über die Fassade und sind im Kampf und bei offenen Fenstern gesperrt.
     /// </summary>
     public sealed class InventoryWindow : MonoBehaviour
@@ -72,10 +74,27 @@ namespace Betaknight.Overworld.UI
             DrawSelection();
             GUILayout.Space(8f);
             DrawRunes();
+            GUILayout.Space(8f);
+            DrawSkills();
             GUILayout.EndScrollView();
 
             if (GUILayout.Button("Schliessen", GUILayout.Height(30f))) IsOpen = false;
             GUILayout.EndArea();
+            DrawTooltip();
+        }
+
+        /// <summary>Details eines Skills beim Überfahren mit der Maus.</summary>
+        private void DrawTooltip()
+        {
+            if (string.IsNullOrEmpty(GUI.tooltip)) return;
+            var style = new GUIStyle(GUI.skin.box) { fontSize = 13, richText = true, wordWrap = true, alignment = TextAnchor.UpperLeft };
+            var content = new GUIContent(GUI.tooltip);
+            const float tipWidth = 340f;
+            float tipHeight = style.CalcHeight(content, tipWidth);
+            Vector2 mouse = Event.current.mousePosition;
+            float x = Mathf.Min(mouse.x + 16f, Screen.width - tipWidth - 8f);
+            float y = Mathf.Min(mouse.y + 16f, Screen.height - tipHeight - 8f);
+            GUI.Label(new Rect(x, y, tipWidth, tipHeight), content, style);
         }
 
         // ------------------------------------------------------------------ Ausrüstung
@@ -224,6 +243,30 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndVertical();
 
             GUILayout.EndHorizontal();
+        }
+
+        // ------------------------------------------------------------------ Skills
+
+        /// <summary>Alle Skill-Exemplare mit Stufe, Arten und Ort. Einsetzen und Umsetzen geht im Tafel-Editor.</summary>
+        private void DrawSkills()
+        {
+            IReadOnlyList<SkillInstance> all = _session.Skills.All;
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label($"<b>Skills</b> ({all.Count}, davon {_session.Skills.Free.Count} frei)", _text);
+            if (all.Count == 0) GUILayout.Label("<color=#666666>keine</color>", _small);
+            SkillUserStats stats = all.Count > 0 ? _session.SkillUserStats() : null;
+            foreach (SkillInstance skill in all)
+            {
+                SkillInfo info = _session.DescribeSkill(skill, stats);
+                string kinds = info != null ? SkillKinds.Names(info.Skill.Kinds) : string.Empty;
+                string where = skill.IsFree ? "<color=#7ddc6f>frei</color>" : SkillText.Where(_session, skill);
+                string text = $"<b>{skill.NameFrom(_session.SkillCatalog)}</b>  Stufe {skill.Level}/{_session.Progression.MaxSkillLevel}"
+                    + $"  [{kinds}]  {where}\n<size=11>{info?.Summary}</size>";
+                GUILayout.Label(new GUIContent(text, info?.Details), _small);
+            }
+            if (_session.Skills.Free.Count > 0)
+                GUILayout.Label("<size=11>Freie Skills setzt du im Tafel-Editor an eine Zeile.</size>", _small);
+            GUILayout.EndVertical();
         }
 
         private string SetTag(EquipmentDefinition item) =>

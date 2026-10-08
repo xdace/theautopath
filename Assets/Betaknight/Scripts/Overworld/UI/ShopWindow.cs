@@ -93,6 +93,16 @@ namespace Betaknight.Overworld.UI
                 GUILayout.EndVertical();
             }
 
+            IReadOnlyList<string> skills = shop.Inventory.SkillIds;
+            for (int i = 0; i < skills.Count; i++)
+            {
+                int index = i;
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label(SkillText.Describe(_session, skills[i], $"  – {prices.Skill} Gold"), _plainStyle);
+                SkillText.DrawChoice(_session, skills[i], _session.CanBuyShopSkill(i), "Skill kaufen", choice => _session.BuyShopSkill(index, choice));
+                GUILayout.EndVertical();
+            }
+
             DrawSell(prices);
 
             GUILayout.Space(8f);
@@ -105,7 +115,7 @@ namespace Betaknight.Overworld.UI
             if (GUILayout.Button(slot, GUILayout.Height(30f))) _session.BuyRuneSlot();
 
             GUI.enabled = _session.CanRerollShop;
-            if (GUILayout.Button($"Runen neu würfeln – {prices.Reroll} Gold", GUILayout.Height(30f))) _session.RerollShop();
+            if (GUILayout.Button($"Angebot neu würfeln – {prices.Reroll} Gold", GUILayout.Height(30f))) _session.RerollShop();
 
             GUI.enabled = true;
             GUILayout.EndScrollView();

@@ -3,13 +3,15 @@ using Betaknight.Core;
 using Betaknight.Core.Arena;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Skills;
 using UnityEngine;
 
 namespace Betaknight.Overworld.UI
 {
     /// <summary>
-    /// Tafel-Editor per IMGUI: Zeilen nach oben/unten schieben (Priorität) und jeder Rune einen Skill aus der
-    /// Ausrüstung zuordnen. Unter jedem Skill stehen seine Kennzahlen (aus den Effekten abgeleitet, siehe SkillInfo).
+    /// Tafel-Editor per IMGUI: Zeilen nach oben/unten schieben (Priorität), Rune und Skill pro Zeile getrennt wählen.
+    /// Runen kommen aus dem Runen-Inventar, Skills aus der Skill-Sammlung (jedes Exemplar sitzt an genau einer Zeile).
+    /// Unter jedem Skill stehen seine Kennzahlen (aus den Effekten abgeleitet, siehe SkillInfo).
     /// Ändert nur die Session, gerechnet wird erst im nächsten Kampf.
     /// </summary>
     public sealed class BoardEditorWindow : MonoBehaviour
@@ -48,7 +50,8 @@ namespace Betaknight.Overworld.UI
             }
 
             const float width = 700f;
-            float content = 112f * (_session.Runes.Rows.Count + 1) + 90f * _session.WornSets().Count + 44f * (_session.RuneInventory.Count + 1);
+            float content = 112f * (_session.Runes.Rows.Count + 1) + 90f * _session.WornSets().Count + 44f * (_session.RuneInventory.Count + 1)
+                + 44f * (_session.Skills.Count + 1);
             float height = Mathf.Min(Screen.height - 40f, 150f + content);
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUILayout.BeginArea(rect, GUI.skin.box);
@@ -60,15 +63,15 @@ namespace Betaknight.Overworld.UI
 
             // Bei vielen Zeilen und Sets scrollt der Inhalt, das Fenster läuft nie über den Bildschirm.
             _scroll = GUILayout.BeginScrollView(_scroll);
-            List<string> options = SkillOptions();
             IReadOnlyList<RuneSlot> rows = _session.Runes.Rows;
-            for (int i = 0; i < rows.Count; i++) DrawRow(i, rows[i], options, rows.Count);
+            for (int i = 0; i < rows.Count; i++) DrawRow(i, rows[i], rows.Count);
 
             GUILayout.BeginVertical(GUI.skin.box);
             GUILayout.Label("↓  [Immer] → <b>Basisangriff</b> (fest, ganz unten)", _text);
-            DrawSkillInfo(SkillDefinition.BasicAttackId);
+            DrawSkillInfo(SkillInstance.BasicAttack());
             GUILayout.EndVertical();
 
+            DrawSkillCollection(rows.Count);
             DrawRuneInventory(rows.Count);
             DrawSets();
             GUILayout.EndScrollView();
@@ -79,7 +82,7 @@ namespace Betaknight.Overworld.UI
             DrawTooltip();
         }
 
-        private void DrawRow(int index, RuneSlot row, List<string> options, int count)
+        private void DrawRow(int index, RuneSlot row, int count)
         {
             GUILayout.BeginVertical(GUI.skin.box);
             GUILayout.BeginHorizontal();
@@ -94,24 +97,29 @@ namespace Betaknight.Overworld.UI
 
             GUILayout.Label($"{index + 1}. <b>{row.Name}</b>\n<size=12>{row.Description}</size>", _text, GUILayout.Width(330f));
 
-            int current = options.IndexOf(_session.Gear.ProvidesSkill(row.SkillId) ? row.SkillId : null);
-            if (GUILayout.Button("◀", GUILayout.Width(28f))) Assign(index, options, current - 1);
-            GUILayout.Label(current >= 0 ? SkillLabel(options[current]) : "<color=#888888>— (leer)</color>", _text, GUILayout.Width(190f));
-            if (GUILayout.Button("▶", GUILayout.Width(28f))) Assign(index, options, current + 1);
+            List<SkillInstance> options = SkillOptions(row);
+            int current = row.Skill == null ? -1 : options.FindIndex(o => o == row.Skill || (o.IsBasicAttack && row.Skill.IsBasicAttack));
+            GUI.enabled = _session.CanEditSkills;
+            if (GUILayout.Button(new GUIContent("◀", "Vorheriger freier Skill aus der Sammlung"), GUILayout.Width(28f))) Assign(index, options, current - 1);
+            GUILayout.Label(SkillLabel(row.Skill), _text, GUILayout.Width(150f));
+            if (GUILayout.Button(new GUIContent("▶", "Nächster freier Skill aus der Sammlung"), GUILayout.Width(28f))) Assign(index, options, current + 1);
+            GUI.enabled = _session.CanEditSkills && row.Skill != null;
+            if (GUILayout.Button(new GUIContent("×", "Skill herausnehmen: zurück in die Sammlung, die Zeile pausiert"), GUILayout.Width(26f)))
+                _session.RemoveSkill(index);
             GUI.enabled = _session.CanChangeLoadout && !_session.RuneInventory.IsFull;
             if (GUILayout.Button(new GUIContent("ab", "Rune ablegen (ins Runen-Inventar, behält ihre Stufe)"), GUILayout.Width(32f)))
                 _session.UnequipRune(index);
             GUI.enabled = true;
 
             GUILayout.EndHorizontal();
-            DrawSkillInfo(current >= 0 ? options[current] : null);
+            DrawSkillInfo(row.Skill);
             GUILayout.EndVertical();
         }
 
         /// <summary>Infozeile unter dem Skill: Wirkung, Schaden (Prozent und konkret), CD, Ausholen, Erholung. Tooltip mit allen Details.</summary>
-        private void DrawSkillInfo(string skillId)
+        private void DrawSkillInfo(SkillInstance skill)
         {
-            SkillInfo info = skillId != null ? _session.DescribeSkill(skillId, _stats) : null;
+            SkillInfo info = skill != null ? _session.DescribeSkill(skill, _stats) : null;
             if (info == null)
             {
                 GUILayout.Label("<size=12><color=#888888>Kein Skill: die Zeile pausiert und wird übersprungen.</color></size>", _info);
@@ -187,26 +195,71 @@ namespace Betaknight.Overworld.UI
             }
         }
 
-        private void Assign(int row, List<string> options, int index)
+        /// <summary>
+        /// Sammlung: alle Skill-Exemplare mit Stufe, Arten und Ort. Ein freies Exemplar an eine Zeile setzen,
+        /// ein eingesetztes mit dem Skill einer anderen Zeile tauschen (so verwaist keine Zeile).
+        /// </summary>
+        private void DrawSkillCollection(int rowCount)
+        {
+            IReadOnlyList<SkillInstance> all = _session.Skills.All;
+            GUILayout.Space(4f);
+            GUILayout.Label($"<b>Skill-Sammlung</b> ({all.Count}, davon {_session.Skills.Free.Count} frei)"
+                + (all.Count == 0 ? "  <color=#888888>leer</color>" : string.Empty), _text);
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                SkillInstance skill = all[i];
+                SkillInfo info = _session.DescribeSkill(skill, _stats);
+                int at = skill.Holder is RuneSlot slot ? _session.Runes.IndexOfRow(slot) : -1;
+                string where = at >= 0 ? $"Zeile {at + 1}" : "<color=#7ddc6f>frei</color>";
+                string kinds = info != null ? SkillKinds.Names(info.Skill.Kinds) : string.Empty;
+
+                GUILayout.BeginHorizontal(GUI.skin.box);
+                GUILayout.Label(new GUIContent($"<b>{skill.NameFrom(_session.SkillCatalog)}</b>  <size=12>{where}"
+                    + (kinds.Length > 0 ? $" · {kinds}" : string.Empty) + $"\n<color=#ffd75e>{info?.Summary}</color></size>", info?.Details),
+                    _info, GUILayout.Width(380f));
+                GUI.enabled = _session.CanEditSkills;
+                for (int row = 0; row < rowCount; row++)
+                {
+                    if (row == at) continue;
+                    string tip = at >= 0 ? $"Mit dem Skill von Zeile {row + 1} tauschen" : $"An Zeile {row + 1} setzen";
+                    if (GUILayout.Button(new GUIContent($"→{row + 1}", tip), GUILayout.Width(40f)))
+                    {
+                        if (at >= 0) _session.SwapSkills(at, row);
+                        else _session.PlaceSkill(skill.InstanceId, row);
+                        GUI.enabled = true;
+                        GUILayout.EndHorizontal();
+                        return;
+                    }
+                }
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
+            }
+        }
+
+        private void Assign(int row, List<SkillInstance> options, int index)
         {
             if (options.Count == 0) return;
             index = ((index % options.Count) + options.Count) % options.Count;
-            _session.AssignSkill(row, options[index]);
+            SkillInstance pick = options[index];
+            if (pick.IsBasicAttack) _session.PlaceBasicAttack(row);
+            else _session.PlaceSkill(pick.InstanceId, row);
         }
 
-        /// <summary>Getragene Skills, dann Basisangriff, dann leer (Zeile pausiert).</summary>
-        private List<string> SkillOptions()
+        /// <summary>Für eine Zeile wählbar: ihr eigener Skill und alle freien Exemplare (Reihenfolge der Sammlung), dann der Basisangriff.</summary>
+        private List<SkillInstance> SkillOptions(RuneSlot row)
         {
-            var options = new List<string>(_session.Gear.SkillIds);
-            options.Add(SkillDefinition.BasicAttackId);
-            options.Add(null);
+            var options = new List<SkillInstance>();
+            foreach (SkillInstance s in _session.Skills.All)
+                if (s.IsFree || s == row.Skill) options.Add(s);
+            options.Add(row.Skill != null && row.Skill.IsBasicAttack ? row.Skill : SkillInstance.BasicAttack());
             return options;
         }
 
-        private string SkillLabel(string id)
+        private string SkillLabel(SkillInstance skill)
         {
-            if (id == null) return "<color=#888888>— (leer)</color>";
-            return _session.SkillCatalog.TryGet(id, out SkillDefinition s) ? s.Name : id;
+            if (skill == null) return "<color=#888888>— (leer)</color>";
+            return skill.IsBasicAttack ? "Basisangriff" : skill.NameFrom(_session.SkillCatalog);
         }
 
         private void EnsureStyles()

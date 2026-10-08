@@ -8,7 +8,8 @@ using UnityEngine;
 namespace Betaknight.Overworld.UI
 {
     /// <summary>
-    /// Fenster für eine Belohnung: eine Rune oder ein Teil nehmen oder verzichten. Teile werden angelegt oder kommen
+    /// Fenster für eine Belohnung: eine Rune, ein Teil oder einen Skill nehmen oder verzichten. Ein doppelter Skill
+    /// steigt eine Stufe oder bleibt als zweites Exemplar. Teile werden angelegt oder kommen
     /// ins Inventar; bei voller Tafel kommt eine Rune ins Runen-Inventar oder tauscht eine Zeile (die alte Rune wandert
     /// ins Inventar). Nichts geht verloren.
     /// </summary>
@@ -95,7 +96,7 @@ namespace Betaknight.Overworld.UI
                 string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)} ({_session.Gear.SetPieces(item.SetId)}/3)" : string.Empty;
                 if (_session.CanUpgradeItem(item.Id))
                 {
-                    // Doppeltes Teil: das vorhandene wird aufgewertet (Werte und Skill-Stärke).
+                    // Doppeltes Teil: das vorhandene wird aufgewertet (Werte und passive Effekte).
                     string where = worn != null && worn.Id == item.Id ? "angelegt" : "im Inventar";
                     string text = $"<color=#7ddc6f>▲ Aufwerten</color>  <b>{item.BaseName}</b> ({where}) → Stufe +{OwnedLevel(item) + 1}\n{ItemText.Describe(item)}";
                     if (GUILayout.Button(text, _nameStyle, GUILayout.Height(64f))) _session.TakeItem(i);
@@ -111,6 +112,16 @@ namespace Betaknight.Overworld.UI
                 if (GUILayout.Button("Ins Inventar", GUILayout.Height(28f))) _session.TakeItem(i, ItemPlacement.Inventory);
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
+                GUILayout.EndVertical();
+            }
+
+            for (int i = 0; i < offer.SkillIds.Count; i++)
+            {
+                int index = i;
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label(SkillText.Describe(_session, offer.SkillIds[i]), _plainStyle);
+                SkillText.DrawChoice(_session, offer.SkillIds[i], _session.CanTakeSkill(i), "Skill nehmen (frei in die Sammlung)",
+                    choice => _session.TakeSkill(index, choice));
                 GUILayout.EndVertical();
             }
 

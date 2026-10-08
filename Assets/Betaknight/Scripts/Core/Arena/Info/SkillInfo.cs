@@ -187,6 +187,18 @@ namespace Betaknight.Core.Arena
         /// <summary>Kompakte Infozeile: Schaden, dann Zeiten.</summary>
         public string Summary => $"{DamageText} · {TimingText}";
 
+        /// <summary>Passive Boni der Ausrüstung auf diesen Skill, z. B. «+20 % Wirkung, −1 s CD». Leer ohne Bonus.</summary>
+        public string BonusText
+        {
+            get
+            {
+                var parts = new List<string>();
+                if (Skill.PowerBonusPercent != 0) parts.Add($"{(Skill.PowerBonusPercent > 0 ? "+" : "−")}{Math.Abs(Skill.PowerBonusPercent)} % Wirkung");
+                if (Skill.CooldownBonusTicks != 0) parts.Add($"{(Skill.CooldownBonusTicks < 0 ? "−" : "+")}{Seconds(Math.Abs(Skill.CooldownBonusTicks))} CD");
+                return string.Join(", ", parts);
+            }
+        }
+
         /// <summary>Alle Details, eine Wirkung pro Zeile (für Tooltips).</summary>
         public string Details
         {
@@ -199,6 +211,9 @@ namespace Betaknight.Core.Arena
                 foreach (EffectInfo e in Effects) sb.Append("\n• ").Append(e.Text);
                 if (!DealsDamage && Effects.Count > 0) sb.Append("\n• kein Schaden");
                 sb.Append('\n').Append(TimingText);
+                if (Skill.Kinds != SkillKind.None) sb.Append("\nArt: ").Append(SkillKinds.Names(Skill.Kinds));
+                string bonus = BonusText;
+                if (bonus.Length > 0) sb.Append("\nAusrüstung: ").Append(bonus);
                 return sb.ToString();
             }
         }

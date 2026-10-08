@@ -23,8 +23,8 @@ Es sind keine Prefabs, Sprites oder Fonts nötig. Hexfelder, Spielfigur und Labe
 | Klick auf ein entferntes, erforschtes Feld | Reise über bekannte Routen, Schritt für Schritt, jeder Schritt kostet einen Zug |
 | Fenster bei mittleren Events | Eine der Optionen wählen (ausgegraute sind nicht bezahlbar) |
 | Runenwahl | Eine Rune oder ein Ausrüstungsteil nehmen (★ = passt zu einem vorhandenen Tag) oder für 3 Gold verzichten. Teile: «Anlegen» oder «Ins Inventar»; Runen bei voller Tafel: «Ins Runen-Inventar» oder eine Zeile tauschen |
-| Button «Tafel bearbeiten» | Zeilen der Logik-Tafel umsortieren (▲▼), jeder Rune einen Skill aus der Ausrüstung zuordnen (◀▶), Runen ablegen («ab») und aus dem Runen-Inventar einsetzen oder tauschen (↔) |
-| Button «Inventar» | Links die 7 Ausrüstungsplätze, rechts das Inventar, darunter Runentafel und Runen-Inventar. Klick auf ein Teil zeigt Werte, Skills, Set und den Vergleich mit dem angelegten Teil (grün besser, rot schlechter) |
+| Button «Tafel bearbeiten» | Zeilen der Logik-Tafel umsortieren (▲▼). Rune und Skill pro Zeile getrennt wählen: den Skill mit ◀▶ aus den freien Skills der Sammlung (oder Basisangriff), mit × herausnehmen; die Rune aus dem Runen-Inventar einsetzen oder tauschen (↔) und ablegen («ab»). Darunter die Skill-Sammlung: freie Skills an eine Zeile setzen (→n), eingesetzte mit einer anderen Zeile tauschen |
+| Button «Inventar» | Links die 7 Ausrüstungsplätze, rechts das Inventar, darunter Runentafel, Runen-Inventar und «Skills» (jedes Exemplar mit Stufe, Arten und Ort). Klick auf ein Teil zeigt Werte, passive Effekte, Set und den Vergleich mit dem angelegten Teil (grün besser, rot schlechter) |
 | Arena nach jedem Kampf | Spielt den Kampf ab: Tempo 1×/2×/4×, Pause, «Überspringen», danach das ganze Protokoll und «Weiter» |
 | Button «Shop öffnen» | Erscheint auf einem bereits besuchten Shop-Feld |
 | Button «Neuer Run» | Zurück zur Kit-Auswahl, neue Karte |
@@ -33,7 +33,7 @@ Eine Reise stoppt automatisch auf feindlichen Feldern (Gegner, Boss), auf neu en
 
 ### Ablauf eines frühen Runs
 
-1. **Kit wählen:** Klingen-, Schild- oder Funkenritter. Jedes Kit bringt HP, Gold und eine Start-Rune mit.
+1. **Kit wählen:** Klingen-, Schild- oder Funkenritter. Jedes Kit bringt HP, Gold, eine Start-Rune und zwei Start-Skills mit (der erste sitzt an der Start-Rune, der zweite liegt frei in der Sammlung).
 2. **Ring 1** um den Start hat nur kleine Events (Münzen, Kräuter, Runensplitter, Wegweiser). Sie wirken sofort und melden sich unten links.
 3. **Ab Ring 2** kommen mittlere Events mit einer Entscheidung und die ersten Kämpfe. Truhen sind selten, Shops gibt es erst ab Ring 3. **Ab Ring 3** gibt es Elite-Gegner (Feld «E»): zwei Stufen stärker, mit mehr Leben und Schaden, dafür mehr Gold und oft eine Tafel-Erweiterung.
 4. **3 Runensplitter** öffnen eine Runenwahl, ebenso jeder gewonnene Kampf und jede Truhe. Die Tafel startet mit 3 Zeilen und wächst bis 8 (siehe «Belohnungen»).
@@ -46,15 +46,21 @@ Eine Reise stoppt automatisch auf feindlichen Feldern (Gegner, Boss), auf neu en
 | Belohnung | Quelle | Wirkung |
 |---|---|---|
 | Rune | Runenwahl (Sieg, Truhe, 3 Splitter), Shop | Neue Rune auf eine freie Zeile oder ins Runen-Inventar; schon vorhandene Rune: +1 Stufe |
-| Ausrüstung | Sieg (50 %), Truhe, Shop | Anlegen oder ins Inventar; schon vorhandenes Teil: +1 Stufe (bis +3), jede Stufe +50 % der Grundwerte und stärkere Skills (+15 % Waffenschaden, +10 % Brennen pro Sekunde, +5 % Heilung) |
+| Ausrüstung | Sieg (50 %), Truhe, Shop | Anlegen oder ins Inventar; schon vorhandenes Teil: +1 Stufe (bis +3), jede Stufe +50 % der Grundwerte |
+| Skill | Sieg (35 %), Elite (60 %), Truhe (50 %), Mine (35 %), Runensplitter (30 %), Shop (1 Skill, 14 Gold) | Neues Exemplar frei in die Sammlung. Schon vorhanden: «Stufe erhöhen» (bis +3; jede Stufe +15 % Waffenschaden, +10 % Brennen pro Sekunde, +5 % Heilung) oder «Zweites Exemplar» für eine weitere Zeile |
 | Tafel-Erweiterung: +1 Zeile | Garantiert bei jeder Boss-Flucht und beim Akt-Wechsel, als Wahl bei Elite-Siegen (50 %) und seltenen Truhen (10 %), Shop-Platz (20, 35, 50 … Gold pro Run, einer pro Shop) | Bis höchstens 8 Zeilen |
 | Gold, Splitter | Kämpfe, Events, Minen, Boss-Flucht | Elite-Siege geben +4 Gold |
 
-Kampfbelohnungen bieten bevorzugt Verbesserungen an: Stufe für ein getragenes Teil, ein fehlendes Set-Teil, Stufe für eine vorhandene Rune oder eine Rune zu einem vorhandenen Tag. Mindestens eine Option ist immer eine Verbesserung. Gegner skalieren weiter über Ring und Akt, die Schutzregeln (eine Aktion pro Tick, Überhitzung ab 90 s) bleiben. Alle Werte stehen in `Core/Run/ProgressionConfig.cs`.
+Kampfbelohnungen bieten bevorzugt Verbesserungen an: Stufe für einen eigenen Skill, Stufe für ein getragenes Teil, ein fehlendes Set-Teil, Stufe für eine vorhandene Rune oder eine Rune zu einem vorhandenen Tag. Mindestens eine Option ist immer eine Verbesserung. Skill-Angebote bevorzugen Skills, deren Art zum Build passt (×3 Gewicht): Arten eigener Skills, Ziele der passiven Effekte der Ausrüstung und die Runen (Klinge → Angriff, Schild → Schild, Funke → Schock, Glut → Feuer und Heilung, Phantom → Bewegung). Gegner skalieren weiter über Ring und Akt, die Schutzregeln (eine Aktion pro Tick, Überhitzung ab 90 s) bleiben. Alle Werte stehen in `Core/Run/ProgressionConfig.cs`.
 
 ### Kampf: die Logik-Tafel
 
-Kämpfe laufen automatisch in festen Ticks (20 pro Sekunde). Jede Rune ist eine Zeile der Tafel: **Rune = Wann** (Bedingung), **Skill = Was** (kommt aus der Ausrüstung). Von oben nach unten feuert die erste Zeile, deren Bedingung erfüllt und deren Skill bereit ist. Ganz unten steht fest `[Immer] → Basisangriff`. Fehlt der Skill einer Zeile (Teil abgelegt), wird sie grau und übersprungen.
+Kämpfe laufen automatisch in festen Ticks (20 pro Sekunde). Jede Zeile der Tafel ist **Rune + Skill**: **Rune = Wann** (Bedingung), **Skill = Was** (ein Exemplar aus der Skill-Sammlung). Von oben nach unten feuert die erste Zeile, deren Bedingung erfüllt und deren Skill bereit ist. Ganz unten steht fest `[Immer] → Basisangriff`. Eine Zeile ohne Skill wird grau und übersprungen; das passiert nur, wenn man den Skill bewusst herausnimmt.
+
+- **Skills sind eigene Exemplare** (`Core/Skills/`: `SkillInstance`, `SkillCollection`): Skill-Id, Stufe, Instanz-Id. Jedes Exemplar sitzt an höchstens einem Ort (`ISkillHolder`, heute eine Tafelzeile, später ein Ausrüstungs-Sockel). Die Stufe gehört dem Exemplar, nicht dem Skill. Die Sammlung hat keine Obergrenze und wandert durch die Akte mit. Den Basisangriff gibt es ohne Exemplar beliebig oft.
+- **Ausrüstung = Werte + passive Effekte.** Teile liefern keine Skills mehr. Die Waffe bestimmt Waffenschaden und Basisangriff, alle Teile geben Werte und manche passive Effekte auf eine Skill-Art, z. B. «Schock-Skills +20 % Wirkung» (Schaden, Brennen, Heilung, Chancen) oder «Schild-Skills −1 s Cooldown». Ablegen eines Teils nimmt keinen Skill weg.
+- **Skill-Arten** stehen im `SkillCatalog` (Angriff, Schild, Feuer, Schock, Heilung, Bewegung; ein Skill kann mehrere haben) und im Tooltip. Sie dienen nur als Ziel der passiven Effekte und für passende Angebote.
+- **Gegner** haben feste Tafeln wie bisher; ein neuer Run spielt mit den Start-Skills der Kits gleich wie vorher (die Start-Teile haben keine passiven Effekte).
 
 - **Skill-Kennzahlen im Tafel-Editor:** Unter jedem Skill (auch beim Durchblättern mit ◀▶ und beim festen Basisangriff) steht eine Infozeile: Wirkung, Schaden, CD, Ausholen und Erholung. Schaden steht doppelt, als Prozent vom Waffenschaden und als Wert mit der aktuellen Ausrüstung samt aktiver Set-Boni, gegen ein Ziel ohne Rüstung, ohne Block und Krit (z. B. «120 % Waffenschaden ≈ 10 an allen Gegnern», «Brennen 50 % Waffenschaden/s ≈ 3/s, 15 über 5 s», «20 % Chance: betäubt 1 s»). Skills ohne Schaden zeigen «kein Schaden». Mit der Maus über der Zeile erscheinen alle Details als Tooltip, bei vielen Zeilen scrollt das Fenster.
   Die Werte stehen nicht in der UI, sondern kommen aus den Effekten: Jede `ISkillEffect` meldet über `Describe(SkillInfoBuilder)` ihre Kennzahlen mit denselben Formeln wie `Apply`. `SkillInfo.Create(skill, stats)` fasst sie zusammen, `OverworldSession.SkillUserStats()` liefert die Werte des Ritters zu Kampfbeginn. Neue Effekte müssen `Describe` umsetzen und erscheinen dann automatisch richtig.
@@ -121,7 +127,9 @@ Assets/Betaknight/
 │   │   ├── Shop/          Shop-Bestand und Preise
 │   │   ├── OverworldSession.cs              Fassade: Bewegung, kleine/mittlere Events, Runenwahl
 │   │   ├── OverworldSession.MajorEvents.cs  Fassade: Kampf, Truhe, Goldmine, Shop
-│   │   ├── OverworldSession.Gear.cs         Fassade: Ausrüstung, Skill-Zuordnung, Tafel umsortieren
+│   │   ├── Skills/        SkillInstance (Exemplar), ISkillHolder (Ort), SkillCollection (Sammlung)
+│   │   ├── OverworldSession.Gear.cs         Fassade: Ausrüstung, Skill-Kennzahlen mit passiven Boni, Tafel umsortieren
+│   │   ├── OverworldSession.Skills.cs       Fassade: Skill-Sammlung, Einsetzen/Tauschen, Erhalt, Stufe oder zweites Exemplar, Angebote
 │   │   ├── OverworldSession.Inventory.cs    Fassade: Inventar, anlegen/ablegen/tauschen, verwerfen, verkaufen
 │   │   ├── OverworldSession.Progression.cs  Fassade: Tafel-Erweiterung, Stufen, Angebote mit Verbesserung
 │   │   ├── OverworldSession.Mines.cs        Fassade: Goldminen-Raids und Verteidigung
@@ -170,7 +178,7 @@ Falls der Test Runner fehlt, im Package Manager das Paket **Test Framework** ins
 | Konzept-Feature | Andockpunkt |
 |---|---|
 | Neue Rune | Eintrag in `RuneCatalog` + `ConditionRegistry.Register(id, parameter => new …Condition())` |
-| Neuer Skill | Eintrag in `SkillCatalog` aus `ISkillEffect`-Bausteinen; neue Wirkung = neue `ISkillEffect`-Klasse mit `Apply` und `Describe` (Kennzahlen für den Tafel-Editor) |
+| Neuer Skill | Eintrag in `SkillCatalog` aus `ISkillEffect`-Bausteinen mit mindestens einer Skill-Art (`kinds:`); neue Wirkung = neue `ISkillEffect`-Klasse mit `Apply` und `Describe` (Kennzahlen für den Tafel-Editor) |
 | Neues Ausrüstungsteil | Eintrag in `EquipmentCatalog` |
 | Neues Set | Teile mit Set-Id + `SetBonusRegistry.Register(id, name, teile => new …Set())` (ein `BattleModifier`) |
 | Neuer Gegner | Eintrag in `EnemyCatalog` mit Stufenbereich und fester Tafel |

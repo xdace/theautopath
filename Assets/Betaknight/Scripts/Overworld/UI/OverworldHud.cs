@@ -112,15 +112,12 @@ namespace Betaknight.Overworld.UI
             for (int i = 0; i < _session.Runes.Rows.Count; i++)
             {
                 RuneSlot row = _session.Runes.Rows[i];
-                bool orphaned = !_session.Gear.ProvidesSkill(row.SkillId);
-                string skill = orphaned ? "<color=#888888>—</color>" : SkillName(row.SkillId);
+                string skill = row.Skill == null ? "<color=#888888>—</color>" : row.Skill.IsBasicAttack ? "Basisangriff" : row.Skill.NameFrom(Skills);
                 lines.Add($"{i + 1}. [{row.Name}] → {skill}");
             }
             lines.Add("↓ [Immer] → Basisangriff");
             return string.Join("\n", lines);
         }
-
-        private static string SkillName(string id) => Skills.TryGet(id, out SkillDefinition skill) ? skill.Name : id;
 
         /// <summary>Getragene Sets mit Teilezahl; aktive Boni (ab 2 Teilen) hervorgehoben.</summary>
         private string SetList()

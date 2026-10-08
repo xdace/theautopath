@@ -4,16 +4,13 @@ using Betaknight.Core.Gear;
 
 namespace Betaknight.Overworld.UI
 {
-    /// <summary>Kurztexte für Ausrüstung in Fenstern: Skills, Werte, Besonderheiten.</summary>
+    /// <summary>Kurztexte für Ausrüstung in Fenstern: passive Effekte, Werte, Besonderheiten.</summary>
     public static class ItemText
     {
-        private static readonly SkillCatalog Skills = SkillCatalog.CreateDefault();
-
         public static string Describe(EquipmentDefinition item)
         {
             var parts = new List<string>();
-            foreach (string id in item.SkillIds)
-                parts.Add(Skills.TryGet(id, out SkillDefinition skill) ? $"Skill: {skill.Name}" : id);
+            foreach (SkillPassive passive in item.Passives) parts.Add(passive.Text);
             foreach (KeyValuePair<StatKind, int> stat in item.Stats)
                 if (stat.Value != 0) parts.Add(Stat(stat.Key, stat.Value));
             if (item.TwoHanded) parts.Add("zweihändig, sperrt Schild");
@@ -44,7 +41,7 @@ namespace Betaknight.Overworld.UI
             return (worn != null ? $"statt {worn.Name}: " : "Platz frei: ") + string.Join(", ", parts);
         }
 
-        /// <summary>Alle Angaben zu einem Teil: Platz, Werte, Skills mit Kurzbeschreibung, Set.</summary>
+        /// <summary>Alle Angaben zu einem Teil: Platz, Werte, passive Effekte auf Skill-Arten, Set.</summary>
         public static string Details(EquipmentDefinition item, SetBonusRegistry sets)
         {
             var lines = new List<string> { $"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{(item.TwoHanded ? ", zweihändig" : string.Empty)}" };
@@ -52,8 +49,7 @@ namespace Betaknight.Overworld.UI
             foreach (KeyValuePair<StatKind, int> stat in item.Stats)
                 if (stat.Value != 0) stats.Add(Stat(stat.Key, stat.Value));
             lines.Add(stats.Count > 0 ? "Werte: " + string.Join(", ", stats) : "Werte: keine");
-            foreach (string id in item.SkillIds)
-                lines.Add(Skills.TryGet(id, out SkillDefinition skill) ? $"Skill: <b>{skill.Name}</b> – {skill.Description}" : $"Skill: {id}");
+            foreach (SkillPassive passive in item.Passives) lines.Add($"Passiv: <color=#ffd75e>{passive.Text}</color>");
             if (item.SetId != null) lines.Add($"Set: {sets?.NameOf(item.SetId) ?? item.SetId}");
             if (item.Description.Length > 0) lines.Add($"<i>{item.Description}</i>");
             return string.Join("\n", lines);
