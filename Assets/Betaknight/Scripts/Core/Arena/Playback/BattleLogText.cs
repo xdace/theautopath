@@ -69,6 +69,7 @@ namespace Betaknight.Core.Arena
             {
                 case BattleOutcome.Victory: return "Sieg";
                 case BattleOutcome.Defeat: return "Niederlage";
+                case BattleOutcome.Escaped: return "Durchs Portal entkommen";
                 default: return "Zeit abgelaufen";
             }
         }

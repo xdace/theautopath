@@ -180,6 +180,7 @@ namespace Betaknight.Core
 
             TriggerEncounter(cell);
             TriggerMajorEvent(cell, firstVisit);
+            TriggerBossIfDue();
 
             StepResult result = StepResult.Ok(cell, firstVisit);
             CellEntered?.Invoke(result);

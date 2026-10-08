@@ -46,6 +46,9 @@ Kämpfe laufen automatisch in festen Ticks (20 pro Sekunde). Jede Rune ist eine 
 - 4 Sets mit Boni ab 2 und 3 Teilen: Überlast-Protokoll, Aegis-Firewall, Schrott-Ernter, Phantom-Signal.
 - Schutzregeln statt Balance-Bremsen: höchstens eine Aktion pro Tick, Reaktionen erst im nächsten Tick, ab 90 s Überhitzung. Kaputte Builds sind erlaubt, die Engine bleibt stabil.
 - Lagerfeuer kann eine Rune eine Stufe verstärken (z. B. «HP unter 30 %» → «HP unter 40 %»).
+- Sets: Fortschritt steht im HUD und im Tafel-Editor. Teile angefangener Sets kommen 3× häufiger in Angebote, Shops verkaufen 2 Teile. Aegis-Firewall (ab 2 Teilen) schaltet die Rune «Ladung voll» frei.
+- **Goldminen-Verteidigung:** Alle 8 Züge wird eine eigene Mine angegriffen (rot, «!G»). 6 Züge Zeit, sonst ist sie verloren, bis sie zurückerobert ist. Der Kampf dort läuft «auf der Goldmine» (Schrott-Ernter, Rune «Auf Goldmine»).
+- **Boss alle 25 Züge:** Er taucht beim Ritter auf und ist unbesiegbar. Wer 15 s überlebt, entkommt durchs Portal (+8 Gold, +2 Splitter). Ausweichen und Betäuben helfen, Phantom-Signal ist dafür gebaut.
 
 Konzept: `/mnt/project-files/design/kampfsystem-konzept.md` im Projekt.
 
@@ -149,9 +152,8 @@ Falls der Test Runner fehlt, im Package Manager das Paket **Test Framework** ins
 | Neues Set | Teile mit Set-Id + `SetBonusRegistry.Register(id, name, teile => new …Set())` (ein `BattleModifier`) |
 | Neuer Gegner | Eintrag in `EnemyCatalog` mit Stufenbereich und fester Tafel |
 | Inverter-Rune | `NotCondition` / `condition.Not()` existiert bereits |
-| Boss-Flucht (Phantom-Signal) | zweites Kampfende in `BattleOutcome`, Abbruchbedingung in `Battle.CheckEnd` |
+| Portal-Felder auf der Karte | Boss-Flucht endet heute an Ort und Stelle (`OverworldSession.Boss.cs`), Ziel des Portals ist noch offen |
 | Gegneralarme beim Zurückreisen | `StepResult.FirstVisit == false` und `HexCell.VisitCount` |
-| Boss alle ~25 Züge | `TurnSystem.IsIntervalTurn(turn, 25)` und `HexMap.SetContent(..., CellContent.Boss)` |
 | Hindernisse | `HexCell.IsWalkable` (Regeln und Pfadsuche berücksichtigen es bereits) |
 | Neue Events | Eintrag in `EncounterCatalog.CreateDefault()` |
 

@@ -37,6 +37,7 @@ namespace Betaknight.Core.Combat
 
     public readonly struct CombatResult
     {
+        /// <summary>Run geht weiter: gewonnen oder (beim Boss) entkommen.</summary>
         public readonly bool Victory;
         public readonly int DamageTaken;
 
@@ -59,6 +60,8 @@ namespace Betaknight.Core.Combat
         }
 
         public BattleOutcome Outcome => Battle?.Outcome ?? (Victory ? BattleOutcome.Victory : BattleOutcome.Defeat);
+
+        public bool Escaped => Outcome == BattleOutcome.Escaped;
     }
 
     /// <summary>

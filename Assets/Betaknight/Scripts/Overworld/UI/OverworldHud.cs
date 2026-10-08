@@ -55,7 +55,9 @@ namespace Betaknight.Overworld.UI
             GUILayout.BeginArea(PanelRect, GUI.skin.box);
             string kit = _session.Kit != null ? $" – {_session.Kit.Name}" : string.Empty;
             GUILayout.Label($"<b>Betaknight{kit}</b>", _style);
-            GUILayout.Label($"Zug: {_session.Turns.CurrentTurn}", _style);
+            int boss = _session.TurnsUntilBoss;
+            string bossText = boss <= 3 ? $"<color=#ff7a6b>Boss in {boss} Zügen</color>" : $"Boss in {boss} Zügen";
+            GUILayout.Label($"Zug: {_session.Turns.CurrentTurn}   {bossText}", _style);
             GUILayout.Label($"HP: {_session.Stats.Hp}/{_session.Stats.MaxHp}   Gold: {_session.Stats.Gold}   Splitter: {_session.Stats.Shards}", _style);
             GUILayout.Label($"Logik-Tafel ({_session.Runes.Rows.Count}/{_session.Runes.Slots}):\n{BoardList()}", _style);
             GUILayout.Label($"Ausrüstung: {GearList()}", _style);

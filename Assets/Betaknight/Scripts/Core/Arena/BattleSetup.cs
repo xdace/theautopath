@@ -23,6 +23,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Sicherheitsnetz. Durch die Überhitzung wird es nie erreicht.</summary>
         public int MaxTicks = 10000;
+
+        /// <summary>Überlebens-Kampf: lebt der Spieler nach so vielen Ticks noch, entkommt er. 0 = aus.</summary>
+        public int SurviveTicks;
     }
 
     public enum BattleOutcome
@@ -32,6 +35,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Nur wenn das Sicherheitsnetz greift. Zählt als Niederlage.</summary>
         Timeout,
+
+        /// <summary>Überlebt, bis das Fluchtportal offen war (Boss). Kein Sieg, aber auch keine Niederlage.</summary>
+        Escaped,
     }
 
     /// <summary>Ein Kämpfer, wie er in den Kampf ging. Für die Wiedergabe des Protokolls.</summary>
@@ -55,6 +61,12 @@ namespace Betaknight.Core.Arena
     {
         public BattleOutcome Outcome { get; }
         public bool IsVictory => Outcome == BattleOutcome.Victory;
+
+        /// <summary>Gewonnen oder entkommen: der Run geht weiter.</summary>
+        public bool IsSurvived => Outcome == BattleOutcome.Victory || Outcome == BattleOutcome.Escaped;
+
+        /// <summary>Ticks bis zur Flucht bei Überlebens-Kämpfen, sonst 0.</summary>
+        public int SurviveTicks { get; internal set; }
         public int EndTick { get; }
         public int PlayerHp { get; }
         public int PlayerMaxHp { get; }

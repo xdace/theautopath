@@ -128,10 +128,11 @@ namespace Betaknight.Core.Combat
                 Always(Charge("slam", "Hammerschlag", 36, 400, 7))))),
 
             // Boss alle 25 Züge.
-            new EnemyDefinition("overseer", "Der Verwalter", 0, 99, () => One(Enemy("Der Verwalter", 160, 3, 20, 4,
+            // Boss alle 25 Züge: unbesiegbar, der Ritter muss bis zum Fluchtportal überleben.
+            new EnemyDefinition("overseer", "Der Verwalter", 0, 99, () => One(Enemy("Der Verwalter", 99999, 1, 20, 4,
                 When(new ClockCondition(Ticks.FromSeconds(15)), new SkillDefinition("pulse", "Systempuls", 30, 10, Ticks.FromSeconds(15),
                     new ISkillEffect[] { new StunEffect(Ticks.FromSeconds(2)), new DamageEffect(BasisPoints.Percent(100)) }, countsAsAttack: true), "Alle 15 s"),
-                Always(Charge("beam", "Vernichtungsstrahl", 40, 400, 8)))), isBoss: true),
+                Always(Charge("beam", "Vernichtungsstrahl", 40, 500, 8)))), isBoss: true),
         });
     }
 }

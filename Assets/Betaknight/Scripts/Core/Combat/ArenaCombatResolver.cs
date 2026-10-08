@@ -16,6 +16,9 @@ namespace Betaknight.Core.Combat
         public int BaseDamage = 5;
         public int BaseAttackInterval = Ticks.PerSecond;
 
+        /// <summary>Gegen den Boss muss der Ritter so lange überleben, bis das Fluchtportal offen ist.</summary>
+        public int BossSurviveTicks = Ticks.FromSeconds(15);
+
         private readonly EnemyCatalog _enemies;
         private readonly BoardFactory _boards;
         private readonly SetBonusRegistry _sets;
@@ -39,7 +42,7 @@ namespace Betaknight.Core.Combat
 
             int damageTaken = Math.Max(0, request.Stats.Hp - battle.PlayerHp);
             int gold = battle.IsVictory ? random.Next(2, 5) + request.Tier / 2 + battle.BonusGold : 0;
-            return new CombatResult(battle.IsVictory, damageTaken, gold, battle, enemy.Name);
+            return new CombatResult(battle.IsSurvived, damageTaken, gold, battle, enemy.Name);
         }
 
         public BattleSetup CreateSetup(CombatRequest request, List<CombatantSetup> enemies, int seed)
@@ -54,6 +57,7 @@ namespace Betaknight.Core.Combat
                 Enemies = enemies,
                 Seed = seed,
                 Context = request.Context,
+                SurviveTicks = request.Context.VsBoss ? BossSurviveTicks : 0,
             };
         }
     }

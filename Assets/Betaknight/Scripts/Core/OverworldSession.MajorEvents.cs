@@ -168,6 +168,7 @@ namespace Betaknight.Core
             if (ClaimedMines > 0 && TurnSystem.IsIntervalTurn(turn, MineIncomeInterval))
                 Stats.AddGold(ClaimedMines * MineIncomeGold);
             UpdateMineRaids(turn);
+            ScheduleBoss(turn);
         }
 
         /// <summary>Steht der Spieler auf einem Shop-Feld und wartet nichts anderes?</summary>

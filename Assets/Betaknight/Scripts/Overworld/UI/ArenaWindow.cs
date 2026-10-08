@@ -94,8 +94,15 @@ namespace Betaknight.Overworld.UI
             var controls = new Rect(pad, Screen.height - pad - 36f, Screen.width - pad * 2, 36f);
 
             string enemy = string.IsNullOrEmpty(_current.EnemyName) ? "Gegner" : _current.EnemyName;
+            string portal = string.Empty;
+            int survive = _playback.Result.SurviveTicks;
+            if (survive > 0)
+            {
+                int left = Mathf.Max(0, survive - _playback.Tick);
+                portal = left > 0 ? $"   <color=#b18cff>Portal öffnet in {BattleLogText.Time(left)}</color>" : "   <color=#b18cff>Portal offen</color>";
+            }
             GUI.Label(new Rect(pad, 12f, Screen.width - pad * 2, 36f),
-                $"<b>Arena</b> – Ritter gegen {enemy}   <color=#9aa4b2>{BattleLogText.Time(_playback.Tick)}</color>", _title);
+                $"<b>Arena</b> – Ritter gegen {enemy}   <color=#9aa4b2>{BattleLogText.Time(_playback.Tick)}</color>{portal}", _title);
 
             DrawStage(stage);
             DrawBoard(board);

@@ -103,7 +103,7 @@ namespace Betaknight.Core.Arena
             }
 
             return new BattleResult(outcome.Value, Tick, Math.Max(0, Player.Hp), Player.MaxHp, defeated, BonusGold, _events, labels,
-                skills, fighters);
+                skills, fighters) { SurviveTicks = _setup.SurviveTicks };
         }
 
         private void UpdateTime()
@@ -265,8 +265,11 @@ namespace Betaknight.Core.Arena
         private BattleOutcome? CheckEnd()
         {
             if (!Player.IsAlive) return BattleOutcome.Defeat;
-            foreach (Combatant e in _enemies) if (e.IsAlive) return null;
-            return BattleOutcome.Victory;
+            bool anyEnemy = false;
+            foreach (Combatant e in _enemies) if (e.IsAlive) anyEnemy = true;
+            if (!anyEnemy) return BattleOutcome.Victory;
+            if (_setup.SurviveTicks > 0 && Tick >= _setup.SurviveTicks) return BattleOutcome.Escaped;
+            return null;
         }
 
         // ------------------------------------------------------------------ Werkzeuge für Effekte, Bedingungen, Modifikatoren
