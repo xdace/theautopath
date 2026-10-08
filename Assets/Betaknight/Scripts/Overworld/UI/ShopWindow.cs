@@ -8,7 +8,10 @@ using UnityEngine;
 
 namespace Betaknight.Overworld.UI
 {
-    /// <summary>Shop-Fenster: Runen und Teile kaufen (anlegen oder ins Inventar), Inventar verkaufen, heilen, Platinen-Erweiterung, neu würfeln.</summary>
+    /// <summary>
+    /// Shop-Fenster: Runen und Teile kaufen (anlegen oder ins Inventar), Logik-Chips (A-20, ins Chip-Inventar), Inventar
+    /// verkaufen, heilen, Platinen-Erweiterung, neu würfeln.
+    /// </summary>
     public sealed class ShopWindow : MonoBehaviour
     {
         private OverworldSession _session;
@@ -118,6 +121,7 @@ namespace Betaknight.Overworld.UI
                 GUILayout.EndVertical();
             }
 
+            DrawChips(shop, prices);
             DrawSell(prices);
 
             GUILayout.Space(8f);
@@ -136,6 +140,26 @@ namespace Betaknight.Overworld.UI
             GUI.enabled = true;
             GUILayout.EndScrollView();
             if (GUILayout.Button(UiTexts.Shop.Leave, GUILayout.Height(32f))) _session.LeaveShop();
+        }
+
+        /// <summary>Logik-Chips im Angebot (A-20): Knopf mit Name, Preis und Text; gekauft landet der Chip im Chip-Inventar.</summary>
+        private void DrawChips(ShopVisit shop, ShopPrices prices)
+        {
+            IReadOnlyList<string> chips = shop.Inventory.ChipIds;
+            for (int i = 0; i < chips.Count; i++)
+            {
+                if (!_session.ChipCatalog.TryGet(chips[i], out ChipDefinition chip)) continue;
+                GUI.enabled = _session.CanBuyShopChip(i);
+                bool bought = GUILayout.Button(new GUIContent(UiTexts.Shop.ChipLabel(chip.Name, prices.Chip, chip.Description), UiTexts.Shop.ChipTip),
+                    _itemStyle, GUILayout.Height(58f));
+                GUI.enabled = true;
+                if (bought)
+                {
+                    _session.BuyShopChip(i);
+                    return;
+                }
+            }
+            GUI.enabled = true;
         }
 
         /// <summary>«4×4»: Grösse nach der nächsten Erweiterung.</summary>

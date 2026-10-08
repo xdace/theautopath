@@ -27,6 +27,12 @@ namespace Betaknight.Overworld.UI
 
         /// <summary>Angelegtes Teil an der Figur (A = Platz).</summary>
         Equipped,
+
+        /// <summary>Logik-Chip aus dem Chip-Inventar (A = Index), A-20.</summary>
+        LogicChip,
+
+        /// <summary>Logik-Chip auf der Platine (A = Index in Lesereihenfolge), A-20.</summary>
+        BoardChip,
     }
 
     /// <summary>Ein gezogenes Element mit Anzeigetext für das Mitzieh-Bild.</summary>

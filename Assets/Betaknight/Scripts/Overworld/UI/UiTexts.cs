@@ -88,6 +88,9 @@ namespace Betaknight.Overworld.UI
                 $"<color=#ff7a6b><b>Gold Mine {coord} lost.</b></color> Recapture it to win it back";
 
             public static string Improved(string text) => $"<color=#7ddc6f><b>Improved:</b> {text}</color>";
+
+            public static string ChipGained(string name) =>
+                $"<color=#ffd75e><b>New logic chip:</b> {name}</color> – place it on the board in Build (B)";
         }
 
         // ------------------------------------------------------------------ Portal, Game Over, Kit-Wahl
@@ -243,6 +246,9 @@ namespace Betaknight.Overworld.UI
             public static string SellTitle(int item, int rune) => $"<b>Sell</b> (half price: item {item} Gold, rune {rune} Gold)";
             public static string SellItem(string name, string slot, int price) => $"Sell {name} [{slot}]  +{price} Gold";
             public static string SellRune(string name, int price) => $"Sell Rune {name}  +{price} Gold";
+            public static string ChipLabel(string name, int price, string description) =>
+                $"<color=#ffd75e>▣</color>  <b>{name}</b>  [Logic Chip]  – {price} Gold\n{description}";
+            public const string ChipTip = "Logic chip (rare): goes to your logic chip inventory. Place, move and rotate it in Build (B).";
         }
 
         // ------------------------------------------------------------------ Belohnung (Angebot)
@@ -318,7 +324,7 @@ namespace Betaknight.Overworld.UI
             public const string BoardTitle = "<b>Circuit Board</b>";
             public const string BoardLegend = "drag to move · right-click rotates · R rotates while dragging";
             public const string CoreName = "CORE";
-            public const string EmptyCellTip = "Free cell: drop a skill (component) or a rune (relay) here.";
+            public const string EmptyCellTip = "Free cell: drop a skill (component), a rune (relay) or a logic chip here.";
             public const string ComponentsTitle = "<b>Components</b>";
             public const string RelaysTitle = "<b>Relays</b>";
             public const string NoComponents = "no components yet – drag a skill from the left onto the board";
@@ -344,12 +350,14 @@ namespace Betaknight.Overworld.UI
             public const string RuneDropHint = "Drag onto a free cell = new relay, onto a relay = swap · double-click = best free cell";
             public const string Hint = "Drag: skill onto the board = place, component or relay = move (R rotates while dragging), right-click a component = rotate, "
                 + "rune onto a free cell = new relay, rune onto a relay = swap, module onto a part or ◇ = place, back into a list = remove. "
+                + "Logic chips: drag from the strip onto a free cell, right-click rotates, back onto the strip = take off. "
                 + "Double-click: place on the best cell / take off.";
 
             public static string BoardSize(string size, string max, bool canGrow) =>
                 canGrow ? $"{size} (grows to {max} via Board Expansions)" : $"{size} (maximum)";
             public static string Dragging(string label) => $"Dragging: {label}";
             public static string DraggingRotated(string label) => $"Dragging: {label} (rotated)";
+            public static string DraggingTurned(string label, int degrees) => degrees == 0 ? Dragging(label) : $"Dragging: {label} (rotated {degrees}°)";
             public static string FreeOf(int free, int all) => $"{free} free of {all}";
             public static string BoardRule(string limits, int corePercent, string rule) =>
                 "<b>Circuit Board</b>: A relay powers every component it touches at an edge (not a corner), up to its size limit "
@@ -373,6 +381,56 @@ namespace Betaknight.Overworld.UI
             public static string GrowsRelay(string rule, string effect, string milestone) =>
                 $"Grows: {rule}{(effect.Length > 0 ? $" · {effect}" : string.Empty)} ({milestone})";
             public static string ModuleSlots(int used, int slots) => $"Module slots {used}/{slots}";
+        }
+
+        // ------------------------------------------------------------------ Pins, Logik-Chips und Pulse (A-20)
+
+        public static class Circuit
+        {
+            public const string ChipsTitle = "<b>Logic Chips</b>";
+            public const string ChipsEmpty = "none yet – rare from elites, chests, boss escape and shop";
+            public const string ChipsLegend = "drag onto a free cell · R rotates while dragging · drop a placed chip here to take it off";
+            public const string StripDropHint = "Drop a placed logic chip here to take it off the board.";
+            public const string ChipDragHint = "Drag to move · right-click = rotate · onto the logic chip strip = take off";
+            public const string InventoryDragHint = "Drag onto a free cell = place · R rotates while dragging · double-click = first free cell";
+            public const string And = "AND";
+            public const string Or = "OR";
+            public const string Not = "NOT";
+            public const string Fuse = "FUSE";
+            public const string Open = "open";
+            public const string Closed = "closed";
+            public const string Blown = "blown";
+            public const string NoInputs = "no touching relay yet – place it next to a relay";
+            public const string PlainPin = "Pin";
+            public const string PulseLegend = "⚡ pulses run along the lines";
+
+            public static string ChipTip(string name, string description) => $"<b>{name}</b>: {description}";
+            public static string GateInputs(string inputs) => $"Inputs: {inputs}";
+            public static string GateDifficulty(string tooltip) => $"Difficulty: {tooltip}";
+            public static string GatePowers(string components) => $"powers {components}";
+            public const string GatePowersNothing = "powers nothing yet – place a component next to it";
+            public static string GateState(string state, int count) => $"Now: {state} · triggered {count}× so far";
+            public static string DiodeDirection(string from, string to) => $"Pulses pass only from {from} to {to}.";
+            public static string Capacitor(int stored, int capacity) => $"Stored pulses: {stored}/{capacity}";
+            public static string CarriesLinks(string links) => $"Carries: {links}";
+            public static string Link(string from, string to, int hops) =>
+                hops <= 1 ? $"{from} → {to}" : $"{from} → {to} ({hops - 1} chip{(hops - 1 == 1 ? "" : "s")})";
+            public static string PulsesTo(string links) => $"⚡ Pulses to: {links}";
+            public static string PulsesFrom(string links) => $"⚡ Pulses from: {links}";
+            public static string PulsePath(string path) => $"⚡ Path: {path}";
+            public static string PinsLine(string pins) => $"Pins: {pins}";
+            public static string TypedPin(string kind, bool matched, int percent) =>
+                matched ? $"{kind} pin ✔ +{percent} %" : $"{kind} pin (needs a {kind} skill in front)";
+            public static string PinTip(string kind, bool matched, bool linked, int percent)
+            {
+                string head = kind == null ? "<b>Pin</b>: connects to a touching pin or a trace." : matched
+                    ? $"<b>{kind} pin</b>: matched, +{percent} % effect."
+                    : $"<b>{kind} pin</b>: put a {kind} skill in front of it for +{percent} % effect. Also connects like a normal pin.";
+                return linked ? $"{head}\nConnected: pulses run through this pin." : head;
+            }
+            public static string SideName(int side) => side == 0 ? "top" : side == 1 ? "right" : side == 2 ? "bottom" : "left";
+            public static string FiredByPulse(string path) => $"Why: fired by a pulse ({path})";
+            public static string Why(string text) => $"Why: {text}";
         }
 
         // ------------------------------------------------------------------ Arena
@@ -411,7 +469,8 @@ namespace Betaknight.Overworld.UI
             public const string HeaderPower = "<b>Power</b>";
             public const string HeaderPowerTip = "Is a relay powering this component? Unpowered or too large components never fire.";
             public const string HeaderFired = "<b>Fired</b>";
-            public const string HeaderFiredTip = "How often this component started an action (↪ by a trigger module, ↻ repeated).";
+            public const string HeaderFiredTip = "How often this component started an action (↪ by a trigger module, ⚡ by a pulse, ↻ repeated).";
+            public static string PulsedByTip(string by) => $"⚡ started by pulses from {by}";
             public const string HeaderTriggered = "<b>Triggered</b>";
             public const string HeaderTriggeredTip = "How often a relay or trigger reached this component (queued or missed). Hard relays need easers or a build that makes them happen.";
             public const string HeaderDamage = "<b>Damage</b>";

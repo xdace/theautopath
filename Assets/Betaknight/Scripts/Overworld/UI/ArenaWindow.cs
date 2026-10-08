@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Combat;
 using UnityEngine;
 
@@ -13,6 +14,8 @@ namespace Betaknight.Overworld.UI
     /// eingefroren, unversorgt oder zu gross sind (Hovern erklärt den Grund); darunter die Warteschlange. Zustände, Ressourcen
     /// und schwebende Zahlen in der Farbe der auslösenden Komponente zeigen die Wirkung. Gegner-Platinen stehen im Tooltip
     /// des Gegners. Nach dem Kampf folgt eine Auswertung pro Komponente. Platzhalter-Grafik aus Rechtecken, gerechnet wird nichts.
+    /// A-20: Pins, Logik-Chips und Pulsverbindungen auf der Platine; Pulse laufen als Punkte die Verbindung entlang, Gatter
+    /// zeigen offen/geschlossen (Sicherung: durchgebrannt), Kondensatoren ihre Ladung als Punkte, Relais ihren Zustand als Lämpchen.
     /// </summary>
     public sealed class ArenaWindow : MonoBehaviour
     {
@@ -43,6 +46,16 @@ namespace Betaknight.Overworld.UI
             public float Offset;
         }
 
+        /// <summary>Ein Puls in Echtzeit: läuft mindestens <see cref="MinPulseSeconds"/>, damit er auch bei 4× zu sehen ist.</summary>
+        private sealed class ActivePulse
+        {
+            public int Link;
+            public float Start;
+            public float Duration;
+        }
+
+        private const float MinPulseSeconds = 0.45f;
+
         private OverworldSession _session;
         private readonly Queue<CombatResult> _queue = new Queue<CombatResult>();
         private BattlePlayback _playback;
@@ -55,6 +68,8 @@ namespace Betaknight.Overworld.UI
         private LogFilter _filter;
         private BattleReport _report;
         private readonly List<ActivePopup> _popups = new List<ActivePopup>();
+        private readonly List<ActivePulse> _pulses = new List<ActivePulse>();
+        private readonly HashSet<(int link, int start)> _seenPulses = new HashSet<(int, int)>();
         private readonly Dictionary<int, Rect> _bodies = new Dictionary<int, Rect>();
         private readonly Dictionary<int, int> _seenHitTick = new Dictionary<int, int>();
         private readonly Dictionary<int, float> _flashUntil = new Dictionary<int, float>();
@@ -132,6 +147,8 @@ namespace Betaknight.Overworld.UI
             _logScroll = Vector2.zero;
             _reportScroll = Vector2.zero;
             _popups.Clear();
+            _pulses.Clear();
+            _seenPulses.Clear();
             _seenHitTick.Clear();
             _flashUntil.Clear();
             _enemyTips.Clear();
@@ -143,6 +160,7 @@ namespace Betaknight.Overworld.UI
         {
             if (_playback == null) return;
             _popups.RemoveAll(p => Time.unscaledTime - p.Start > PopupSeconds);
+            _pulses.RemoveAll(p => Time.unscaledTime - p.Start > p.Duration);
             if (_paused || _playback.IsFinished) return;
             _tickBuffer += Time.unscaledDeltaTime * Ticks.PerSecond * Speeds[_speedIndex] * Mathf.Max(0.01f, SpeedFactor);
             int ticks = Mathf.FloorToInt(_tickBuffer);
@@ -169,6 +187,15 @@ namespace Betaknight.Overworld.UI
                 if (_seenHitTick.TryGetValue(i, out int seen) && seen == hit) continue;
                 _seenHitTick[i] = hit;
                 if (hit >= 0) _flashUntil[i] = now + MinHighlightSeconds;
+            }
+
+            // Pulse: in Spielzeit oft nur wenige Ticks unterwegs; in Echtzeit mindestens kurz sichtbar.
+            float speed = Speeds[_speedIndex] * Mathf.Max(0.01f, SpeedFactor);
+            foreach (PulseView p in _playback.Pulses)
+            {
+                if (!_seenPulses.Add((p.Link, p.StartTick))) continue;
+                float seconds = (p.ArriveTick - p.StartTick) / (float)Ticks.PerSecond / speed;
+                _pulses.Add(new ActivePulse { Link = p.Link, Start = now, Duration = Mathf.Max(MinPulseSeconds, seconds) });
             }
 
             // Viele Zahlen im selben Moment fächern sich leicht auf, statt sich zu überdecken.
@@ -362,9 +389,10 @@ namespace Betaknight.Overworld.UI
         private void DrawBoard(Rect area)
         {
             GUILayout.BeginArea(area, GUI.skin.box);
-            GUILayout.Label(new GUIContent($"{UiTexts.Arena.BoardTitle}  <size=13><color=#9aa4b2>{UiTexts.Arena.BoardLegend}</color></size>", QueueRule), _text);
             BattleResult r = _playback.Result;
             LogicBoard board = r.PlayerBoard;
+            string legend = board != null && board.Links.Count > 0 ? $"{UiTexts.Arena.BoardLegend} · {UiTexts.Circuit.PulseLegend}" : UiTexts.Arena.BoardLegend;
+            GUILayout.Label(new GUIContent($"{UiTexts.Arena.BoardTitle}  <size=13><color=#9aa4b2>{legend}</color></size>", QueueRule), _text);
             if (board?.Layout != null && board.Rows.All(x => x.Rect.HasValue) && board.Relays.All(x => x.Rect.HasValue))
                 DrawCircuit(board, area.width - 16f, area.height * 0.5f);
             else
@@ -412,6 +440,11 @@ namespace Betaknight.Overworld.UI
                     if (row >= 0 && row < board.Rows.Count) CircuitGrid.DrawTrace(from, CircuitGrid.RectOf(grid, size, board.Rows[row].Rect.Value), trace);
                 foreach (int row in relay.TooLarge)
                     if (row >= 0 && row < board.Rows.Count) CircuitGrid.DrawTrace(from, CircuitGrid.RectOf(grid, size, board.Rows[row].Rect.Value), CircuitGrid.TooLargeBorder);
+                // A-20: Gatter hängen an den berührten Relais.
+                foreach (int input in relay.Inputs)
+                    if (input >= 0 && input < board.Relays.Count && board.Relays[input].Rect.HasValue)
+                        CircuitGrid.DrawTrace(CircuitGrid.RectOf(grid, size, board.Relays[input].Rect.Value), from,
+                            _playback.IsRelayOn(input) ? CircuitGrid.GateOpen : CircuitGrid.GateBorder);
             }
 
             if (layout.Core.HasValue)
@@ -422,15 +455,25 @@ namespace Betaknight.Overworld.UI
                 CircuitGrid.DrawCore(core, UiTexts.Build.CoreName, UiTexts.Build.CoreTip(Betaknight.Core.Circuit.CircuitConfig.Default.CoreBonusPercent), style);
             }
 
+            // A-20: Logik-Chips (Gatter mit Zustand, Kondensator mit Ladung) und Pulsverbindungen unter den Komponenten.
+            for (int i = 0; i < board.Chips.Count; i++) DrawLogicChip(board, grid, size, i, style);
+            DrawLinks(board, grid, size);
+
             for (int i = 0; i < board.Relays.Count; i++)
             {
                 LogicRelay relay = board.Relays[i];
+                if (relay.Gate.HasValue) continue; // als Chip gezeichnet
                 Rect rect = CircuitGrid.RectOf(grid, size, relay.Rect.Value);
                 bool lit = _playback.IsRelayLit(i);
                 Color fill = lit ? CircuitGrid.RelayLit : CircuitGrid.RelayColor;
                 string label = lit ? $"<color=#0b1a1c><b>{relay.Label}</b></color>" : relay.Label;
                 string text = $"{RuneText.Difficulty(relay.Difficulty)}\n{label}\n<color={(lit ? "#0b1a1c" : "#9aa4b2")}>×{_playback.RelayCount(i)}</color>";
                 CircuitGrid.DrawChip(rect, fill, lit ? Color.white : CircuitGrid.RelayLit, lit ? 3f : 1f, text, RelayTooltip(board, i), style);
+                // Lämpchen oben rechts: Relais gerade «an» (Zustand erfüllt), für Gatter wichtig.
+                float lamp = Mathf.Clamp(size * 0.12f, 5f, 9f);
+                var lampRect = new Rect(rect.xMax - lamp - 3f, rect.y + 3f, lamp, lamp);
+                UiTheme.Fill(lampRect, _playback.IsRelayOn(i) ? CircuitGrid.GateOpen : new Color(0f, 0f, 0f, 0.55f));
+                UiTheme.Outline(lampRect, CircuitGrid.GateOpen, 1f);
             }
 
             for (int i = 0; i < board.Rows.Count; i++)
@@ -449,6 +492,156 @@ namespace Betaknight.Overworld.UI
                 CircuitGrid.DrawChip(rect, fill, border, lit ? 3f : 2f, text, RowTooltip(i, state), style);
                 Fill(new Rect(rect.x + 2f, rect.y + 2f, 4f, rect.height - 4f), RowColorFor(i));
             }
+
+            DrawPins(board, grid, size);
+            DrawPulses(board, grid, size);
+        }
+
+        // ------------------------------------------------------------------ Logik-Chips, Pins und Pulse (A-20)
+
+        private void DrawLogicChip(LogicBoard board, Rect grid, float size, int index, GUIStyle style)
+        {
+            LogicChip chip = board.Chips[index];
+            Rect rect = CircuitGrid.RectOf(grid, size, chip.Rect);
+            int relay = chip.RelayIndex;
+            bool gate = chip.Definition.IsGate && relay >= 0;
+            var look = new CircuitGrid.ChipLook
+            {
+                ShowState = gate,
+                Open = gate && (_playback.IsRelayOn(relay) || _playback.IsRelayLit(relay)),
+                Blown = gate && _playback.IsFuseBlown(relay),
+                Charge = _playback.CapacitorCharge(index),
+                Capacity = chip.Kind == ChipKind.Capacitor ? board.ChipConfig.CapacitorCapacity : 0,
+                Border = gate && _playback.IsRelayLit(relay) ? Color.white : (Color?)null,
+            };
+            CircuitGrid.DrawLogicChip(rect, chip.Definition, chip.Turns, look, ChipTooltip(board, index), style);
+        }
+
+        private string ChipTooltip(LogicBoard board, int index)
+        {
+            LogicChip chip = board.Chips[index];
+            var lines = new List<string> { UiTexts.Circuit.ChipTip(chip.Name, chip.Definition.Description) };
+            if (chip.Kind == ChipKind.Diode)
+                lines.Add(UiTexts.Circuit.DiodeDirection(UiTexts.Circuit.SideName((int)ChipDefinition.DiodeIn(chip.Turns)),
+                    UiTexts.Circuit.SideName((int)ChipDefinition.DiodeOut(chip.Turns))));
+            if (chip.Kind == ChipKind.Capacitor)
+                lines.Add(UiTexts.Circuit.Capacitor(_playback.CapacitorCharge(index), board.ChipConfig.CapacitorCapacity));
+            int relay = chip.RelayIndex;
+            if (chip.Definition.IsGate && relay >= 0 && relay < board.Relays.Count)
+            {
+                LogicRelay g = board.Relays[relay];
+                string state = _playback.IsFuseBlown(relay) ? UiTexts.Circuit.Blown
+                    : _playback.IsRelayOn(relay) || _playback.IsRelayLit(relay) ? UiTexts.Circuit.Open : UiTexts.Circuit.Closed;
+                lines.Add(UiTexts.Circuit.GateState(state, _playback.RelayCount(relay)));
+                List<string> inputs = g.Inputs.Where(i => i >= 0 && i < board.Relays.Count).Select(i => board.Relays[i].Label).ToList();
+                lines.Add(inputs.Count > 0 ? UiTexts.Circuit.GateInputs(string.Join(", ", inputs)) : UiTexts.Circuit.NoInputs);
+                lines.Add(g.Powered.Count > 0 ? UiTexts.Circuit.GatePowers(string.Join(", ", g.Powered.Select(i => $"#{i + 1}"))) : UiTexts.Circuit.GatePowersNothing);
+                lines.Add(DifficultyText.Tooltip(g.Difficulty));
+            }
+            List<string> carried = board.Links.Where(l => l.Path.Contains(chip.Rect.Origin)).Select(l => LinkText(board, l)).ToList();
+            if (carried.Count > 0) lines.Add(UiTexts.Circuit.CarriesLinks(string.Join(", ", carried)));
+            return string.Join("\n", lines);
+        }
+
+        /// <summary>Pulsverbindungen als Linien in der Farbe der sendenden Komponente; mit laufendem Puls heller.</summary>
+        private void DrawLinks(LogicBoard board, Rect grid, float size)
+        {
+            if (Event.current.type != EventType.Repaint) return;
+            float thickness = Mathf.Clamp(size * 0.05f, 2f, 4f);
+            for (int i = 0; i < board.Links.Count; i++)
+            {
+                PulseLink link = board.Links[i];
+                bool active = _pulses.Exists(p => p.Link == i);
+                Color color = LinkColorFor(link);
+                color.a = active ? 0.95f : 0.4f;
+                CircuitGrid.DrawLink(CircuitGrid.LinkPoints(grid, size, link), color, active ? thickness + 1f : thickness);
+            }
+        }
+
+        private Color LinkColorFor(PulseLink link) => link.From.IsCapacitor ? CircuitGrid.PulseColor : RowColorFor(link.From.Index);
+
+        /// <summary>Pins der Komponenten: typisiert in der Farbe der Art, passend mit weissem Rahmen, verbunden in Gold.</summary>
+        private void DrawPins(LogicBoard board, Rect grid, float size)
+        {
+            int percent = PinConfig.Default.TypedPinBonusPercent;
+            foreach (LogicRow row in board.Rows)
+                foreach (PlacedPin pin in row.Pins)
+                {
+                    bool matched = CircuitGrid.IsPinMatched(board, row, pin);
+                    bool linked = CircuitGrid.IsPinLinked(board, pin);
+                    string kind = pin.IsTyped ? SkillKinds.DisplayName(pin.Kind) : null;
+                    CircuitGrid.DrawPin(grid, size, pin, matched, linked, UiTexts.Circuit.PinTip(kind, matched, linked, percent));
+                }
+        }
+
+        /// <summary>Laufende Pulse als leuchtende Punkte entlang ihrer Verbindung (Start-Pin → Chips → Ziel).</summary>
+        private void DrawPulses(LogicBoard board, Rect grid, float size)
+        {
+            if (Event.current.type != EventType.Repaint) return;
+            float now = Time.unscaledTime;
+            foreach (ActivePulse p in _pulses)
+            {
+                if (p.Link < 0 || p.Link >= board.Links.Count) continue;
+                PulseLink link = board.Links[p.Link];
+                float t = p.Duration <= 0f ? 1f : Mathf.Clamp01((now - p.Start) / p.Duration);
+                Vector2 at = CircuitGrid.PointOnLink(CircuitGrid.LinkPoints(grid, size, link), t);
+                CircuitGrid.DrawPulse(at, size, Color.Lerp(LinkColorFor(link), CircuitGrid.PulseColor, 0.5f));
+            }
+        }
+
+        private static string NodeName(PulseNode node) => node.IsCapacitor ? ArenaTexts.CapacitorName(node.Index) : $"#{node.Index + 1}";
+
+        private static string LinkText(LogicBoard board, PulseLink link) => UiTexts.Circuit.Link(NodeName(link.From), NodeName(link.To), link.Delay);
+
+        /// <summary>Weg eines Pulses ausgeschrieben: «#1 → Trace (2, 1) → Diode (3, 1) → #2».</summary>
+        private static string PathText(LogicBoard board, PulseLink link)
+        {
+            var parts = new List<string> { NodeName(link.From) };
+            foreach (Cell cell in link.Path)
+            {
+                LogicChip chip = board.Chips.FirstOrDefault(k => k.Rect.Origin == cell);
+                parts.Add(chip != null ? $"{chip.Name} {CircuitGrid.CellText(cell)}" : CircuitGrid.CellText(cell));
+            }
+            parts.Add(NodeName(link.To));
+            return string.Join(" → ", parts);
+        }
+
+        /// <summary>Pulse einer Komponente und warum sie gerade feuert oder wartet (für den Tooltip).</summary>
+        private List<string> PulseLines(LogicBoard board, int row, RowDisplay state)
+        {
+            var lines = new List<string>();
+            if (board == null || row < 0 || row >= board.Rows.Count) return lines;
+            PulseNode node = PulseNode.Component(row);
+
+            FighterView player = _playback.Player;
+            if (state == RowDisplay.Firing && player != null && player.ActionRow == row && player.ActionCause == ActionCause.Pulse && player.ActionCauseRow >= 0)
+            {
+                PulseLink link = board.Links.FirstOrDefault(l => l.To.Equals(node) && l.From.Equals(PulseNode.Component(player.ActionCauseRow)))
+                    ?? board.Links.FirstOrDefault(l => l.To.Equals(node));
+                lines.Add($"<color=#ffd75e>{UiTexts.Circuit.FiredByPulse(link != null ? PathText(board, link) : NodeName(PulseNode.Component(player.ActionCauseRow)))}</color>");
+            }
+            else if (state == RowDisplay.Queued)
+            {
+                // Letzte Protokollzeile zum Einreihen dieser Komponente (nennt bei Pulsen Sender und Relais).
+                QueueView q = _playback.Queue.FirstOrDefault(x => x.Row == row);
+                if (q != null)
+                    for (int i = _playback.Entries.Count - 1; i >= 0; i--)
+                    {
+                        LogEntry e = _playback.Entries[i];
+                        if (e.Tick < q.SinceTick) break;
+                        if (e.Row == row && e.Tick == q.SinceTick)
+                        {
+                            lines.Add(UiTexts.Circuit.Why(e.Text));
+                            break;
+                        }
+                    }
+            }
+
+            List<string> from = board.Links.Where(l => l.To.Equals(node)).Select(l => PathText(board, l)).ToList();
+            if (from.Count > 0) lines.Add($"<color=#ffd75e>{UiTexts.Circuit.PulsesFrom(string.Join(" · ", from))}</color>");
+            List<string> to = board.LinksFrom(node).Select(l => LinkText(board, l)).ToList();
+            if (to.Count > 0) lines.Add($"<color=#ffd75e>{UiTexts.Circuit.PulsesTo(string.Join(", ", to))}</color>");
+            return lines;
         }
 
         /// <summary>Ersatz ohne Raster (Platinen ohne Lage, z. B. aus Tests): eine Zeile pro Komponente.</summary>
@@ -538,6 +731,8 @@ namespace Betaknight.Overworld.UI
             }
             string skipped = _playback.LastSkipReason(row);
             string text = skipped != null ? UiTexts.Arena.NowAndLast(now, skipped) : UiTexts.Arena.Now(now);
+            List<string> pulses = PulseLines(board, row, state);
+            if (pulses.Count > 0) text += "\n" + string.Join("\n", pulses);
             return $"{head}{text}\n{QueueRule}";
         }
 
@@ -583,7 +778,8 @@ namespace Betaknight.Overworld.UI
                 string name = row.IsFallback ? $"↓ {row.Name}" : $"{row.Name} {RuneText.Difficulty(row.Difficulty)} <color=#9aa4b2>[{row.Label}]</color>";
                 var cells = new List<GUIContent>
                 {
-                    new GUIContent(name, row.DifficultyText), PowerCell(row), new GUIContent(FiredText(row)),
+                    new GUIContent(name, row.DifficultyText), PowerCell(row),
+                    new GUIContent(FiredText(row), row.FromPulse > 0 ? UiTexts.Arena.PulsedByTip(row.PulsedByText) : null),
                     new GUIContent(row.IsFallback ? "–" : $"{row.Triggered}×"), new GUIContent(row.Damage.ToString()), new GUIContent(row.Healing.ToString()),
                     new GUIContent(SkillInfo.Percent(row.DamageShareBp)), new GUIContent(BonusText(row)), new GUIContent(QueueCell(row)),
                     new GUIContent(row.Missed > 0 ? $"{row.Missed}×" : "–"),
@@ -636,6 +832,7 @@ namespace Betaknight.Overworld.UI
         {
             string text = $"{row.Fired}×";
             if (row.Triggered > 0) text += $" <color=#ffae42>↪{row.Triggered}</color>";
+            if (row.FromPulse > 0) text += $" <color=#ffd75e>⚡{row.FromPulse}</color>";
             if (row.Repeated > 0) text += $" <color=#9fc7ff>↻{row.Repeated}</color>";
             return text;
         }
@@ -735,6 +932,7 @@ namespace Betaknight.Overworld.UI
                     _playback.SkipToEnd();
                     _playback.TakePopups();
                     _popups.Clear();
+                    _pulses.Clear();
                 }
             }
             GUILayout.EndHorizontal();

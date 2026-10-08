@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Betaknight.Core;
+using Betaknight.Core.Circuit;
 using Betaknight.Core.Encounters;
 using UnityEngine;
 
@@ -32,7 +33,11 @@ namespace Betaknight.Overworld.UI
             _session.MajorEventResolved += OnMajorResolved;
             _session.MineRaidStarted += OnRaid;
             _session.MineLost += OnMineLost;
+            _session.ChipGained += OnChipGained;
         }
+
+        /// <summary>A-20: neuer Logik-Chip (Belohnung oder Shop) mit Hinweis, wo er gelegt wird.</summary>
+        private void OnChipGained(ChipDefinition chip) => Post(UiTexts.Messages.ChipGained(chip.Name));
 
         private void OnRaid(MineRaid raid) =>
             Post(UiTexts.Messages.MineRaid(raid.Coord.ToString(), OverworldSession.MineRaidTurns));
@@ -123,6 +128,7 @@ namespace Betaknight.Overworld.UI
             _session.MajorEventResolved -= OnMajorResolved;
             _session.MineRaidStarted -= OnRaid;
             _session.MineLost -= OnMineLost;
+            _session.ChipGained -= OnChipGained;
         }
 
         private void OnDestroy() => Unsubscribe();
