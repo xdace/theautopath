@@ -26,11 +26,11 @@ namespace Betaknight.Core.Arena
         public bool ForEnemies { get; set; } = true;
 
         /// <summary>
-        /// Eine Bedingung, die seit dem letzten Feuern durchgehend erfüllt ist, reiht während des Cooldowns nicht erneut
-        /// ein (sonst feuerte z. B. «HP unter 30 %» nach jedem Cooldown, auch wenn die HP längst wieder hoch sind). Neu
-        /// erfüllt reiht sie ein; ist der Skill bereit und nur der Ritter beschäftigt, reiht sie immer ein.
+        /// Aus (Standard): Eine durchgehend erfüllte Bedingung reiht sich auch während des Cooldowns wieder ein und feuert
+        /// so nach jedem Cooldown, z. B. «HP unter 30 %» (das ist der Preis für niedrige HP). An: Während des Cooldowns
+        /// reiht nur ein neues Erfüllen ein.
         /// </summary>
-        public bool OnlyNewFulfilmentDuringCooldown { get; set; } = true;
+        public bool OnlyNewFulfilmentDuringCooldown { get; set; } = false;
 
         public static RowQueueConfig Default { get; } = new RowQueueConfig();
 

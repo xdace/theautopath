@@ -80,6 +80,24 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
+        public void ALastingConditionFiresAfterEveryCooldown()
+        {
+            // «Immer» bleibt erfüllt: die Zeile reiht sich im Cooldown wieder ein und startet, sobald der Skill bereit ist.
+            SkillDefinition a = Skill("a", 2, Ticks.FromSeconds(3));
+            BattleResult r = Run(Setup(new LogicBoard(new[] { Row("always", a) })), 13);
+            List<BattleEvent> starts = Starts(r, "a");
+            Assert.GreaterOrEqual(starts.Count, 4);
+            Assert.IsTrue(starts.Skip(1).All(e => e.FromQueue), "jede weitere Ausführung kommt aus der Warteschlange");
+            Assert.IsTrue(Queued(r, 0).Any(e => e.Amount > 0), "eingereiht schon im Cooldown");
+            for (int i = 1; i < starts.Count; i++)
+                Assert.That(starts[i].Tick - starts[i - 1].Tick, Is.InRange(a.CooldownTicks, a.CooldownTicks + 20), $"Start {i}");
+
+            // Als Daten abschaltbar: dann reiht im Cooldown nur ein neues Erfüllen ein (bereit und nur beschäftigt reiht weiter ein).
+            BattleResult fresh = Run(Setup(new LogicBoard(new[] { Row("always", a) }), queue: new RowQueueConfig { OnlyNewFulfilmentDuringCooldown = true }), 13);
+            Assert.IsTrue(Queued(fresh, 0).All(e => e.Amount == 0));
+        }
+
+        [Test]
         public void AnEventIsNotLostDuringALongCast()
         {
             // Der Ritter castet fast ununterbrochen (3 s); «Wenn getroffen» trifft ihn mitten im Cast.
