@@ -28,5 +28,13 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Wird ein gleichartiger Zustand neu angewendet: true = beide behalten, false = ersetzen.</summary>
         public virtual bool Stacks => false;
+
+        /// <summary>Ein Treffer auf den Träger, vor Ausweichen, Krit, Block und Rüstung.</summary>
+        public virtual void ModifyIncomingHit(Battle battle, Combatant owner, HitInfo hit) { }
+
+        public bool IsActive => TicksLeft > 0;
+
+        /// <summary>Verbraucht den Zustand; er wirkt ab sofort nicht mehr und verschwindet im nächsten Tick.</summary>
+        protected void Consume() => TicksLeft = 0;
     }
 }

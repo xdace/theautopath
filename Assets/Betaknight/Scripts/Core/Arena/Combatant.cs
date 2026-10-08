@@ -46,6 +46,7 @@ namespace Betaknight.Core.Arena
         private readonly CombatStats _stats;
         private readonly Dictionary<string, int> _cooldowns = new Dictionary<string, int>();
         private readonly Dictionary<string, int> _resources = new Dictionary<string, int>();
+        private readonly Dictionary<string, int> _rollFailures = new Dictionary<string, int>();
         internal readonly List<StatusEffect> StatusList = new List<StatusEffect>();
         internal readonly List<BattleModifier> ModifierList = new List<BattleModifier>();
 
@@ -67,6 +68,9 @@ namespace Betaknight.Core.Arena
         /// <summary>Zuletzt beendete Aktion: Zeile und Tick. Für Ketten-Bedingungen.</summary>
         public int LastActionRow { get; internal set; } = -1;
         public int LastActionEndTick { get; internal set; } = -1;
+
+        /// <summary>Zuletzt ausgeführter wiederholbarer Skill (für Echo). Basisangriff zählt nicht.</summary>
+        public SkillDefinition LastRepeatableSkill { get; internal set; }
 
         internal Combatant(CombatantSetup setup, Side side, int index)
         {
@@ -148,6 +152,10 @@ namespace Betaknight.Core.Arena
 
         public int GetResource(string id) => _resources.TryGetValue(id, out int v) ? v : 0;
         internal void SetResourceRaw(string id, int value) => _resources[id] = value;
+
+        /// <summary>Fehlversuche seit dem letzten Erfolg je Wurf-Art (Pseudo-Zufall).</summary>
+        internal int RollFailures(string key) => _rollFailures.TryGetValue(key, out int v) ? v : 0;
+        internal void SetRollFailures(string key, int value) => _rollFailures[key] = value;
 
         public override string ToString() => $"{Name} ({Hp}/{MaxHp})";
     }

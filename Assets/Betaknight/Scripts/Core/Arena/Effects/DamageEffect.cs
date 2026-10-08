@@ -20,6 +20,8 @@ namespace Betaknight.Core.Arena
 
             if (AllEnemies)
             {
+                int bonus = System.Math.Max(-BasisPoints.Full, context.User.GetStat(StatKind.AreaDamage));
+                amount = BasisPoints.Of(amount, BasisPoints.Full + bonus);
                 foreach (Combatant enemy in context.Battle.OpponentsOf(context.User))
                     context.Battle.ResolveHit(Hit(context, enemy, amount, true));
             }

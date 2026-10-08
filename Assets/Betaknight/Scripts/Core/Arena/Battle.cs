@@ -163,6 +163,8 @@ namespace Betaknight.Core.Arena
             Combatant target = a.Target != null && a.Target.IsAlive ? a.Target : DefaultTarget(c);
             Emit(new BattleEvent(Tick, BattleEventKind.ActionExecuted, c, target, a.Skill.CountsAsAttack ? 1 : 0, a.Skill.Id, a.RowIndex));
 
+            if (!a.Skill.IsBasicAttack && a.Skill.CanBeRepeated) c.LastRepeatableSkill = a.Skill;
+
             var context = new SkillContext(this, c, target, a.Skill, a.RowIndex);
             foreach (ISkillEffect effect in a.Skill.Effects)
             {
@@ -295,11 +297,14 @@ namespace Betaknight.Core.Arena
             if (hit.Source != null && hit.Source != hit.Target)
                 foreach (BattleModifier m in hit.Source.ModifierList.ToArray()) m.ModifyHit(this, hit.Source, hit);
             foreach (BattleModifier m in hit.Target.ModifierList.ToArray()) m.ModifyHit(this, hit.Target, hit);
+            if (!hit.IsSelfDamage)
+                foreach (StatusEffect s in hit.Target.StatusList.ToArray())
+                    if (s.IsActive) s.ModifyIncomingHit(this, hit.Target, hit);
 
             int amount = hit.Amount;
             if (!hit.IsSelfDamage)
             {
-                if (hit.CanBeDodged && Defense.RollDodge(this, hit.Source, hit.Target))
+                if (hit.CanBeDodged && (hit.ForceDodge || Defense.RollDodge(this, hit.Source, hit.Target)))
                 {
                     hit.Dodged = true;
                     Emit(new BattleEvent(Tick, BattleEventKind.Dodged, hit.Source, hit.Target, hit.Amount, hit.SkillId));
@@ -309,7 +314,7 @@ namespace Betaknight.Core.Arena
                 if (hit.CanCrit && hit.Source != null && Defense.RollCrit(this, hit.Source))
                 {
                     hit.Crit = true;
-                    amount *= 2;
+                    amount = (int)System.Math.Min(int.MaxValue, (long)amount * Defense.CritDamageBp / BasisPoints.Full);
                     Emit(new BattleEvent(Tick, BattleEventKind.Crit, hit.Source, hit.Target, amount, hit.SkillId));
                 }
 

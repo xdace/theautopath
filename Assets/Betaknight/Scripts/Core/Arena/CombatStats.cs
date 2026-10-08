@@ -35,6 +35,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Bonus auf Flächenschaden in Basispunkten.</summary>
         AreaDamage,
+
+        /// <summary>Obergrenze der Blockchance in Basispunkten.</summary>
+        BlockCap,
     }
 
     /// <summary>Grundwerte eines Kämpfers. Nicht gesetzte Werte haben ihren Standard.</summary>
@@ -71,6 +74,7 @@ namespace Betaknight.Core.Arena
                 case StatKind.AttackInterval: return Ticks.PerSecond;
                 case StatKind.ArmorMultiplier: return BasisPoints.Full;
                 case StatKind.DodgeCap: return BasisPoints.Percent(60);
+                case StatKind.BlockCap: return BasisPoints.Percent(75);
                 default: return 0;
             }
         }

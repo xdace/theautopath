@@ -21,6 +21,9 @@ namespace Betaknight.Core.Arena
         public bool CanBeBlocked = true;
         public bool CanCrit = true;
 
+        /// <summary>Weicht sicher aus, sofern der Treffer ausweichbar ist (z. B. Schubdüsen).</summary>
+        public bool ForceDodge;
+
         /// <summary>Selbstschaden: ignoriert Rüstung, Block und Ausweichen und kann töten.</summary>
         public bool IsSelfDamage;
 
@@ -37,6 +40,19 @@ namespace Betaknight.Core.Arena
             Amount = amount,
             SkillId = detail,
             IsSelfDamage = true,
+            IgnoreArmor = true,
+            CanBeDodged = false,
+            CanBeBlocked = false,
+            CanCrit = false,
+        };
+
+        /// <summary>Schaden über Zeit (Brennen): hat einen Verursacher, ignoriert aber Abwehr und Rüstung.</summary>
+        public static HitInfo OverTime(Combatant source, Combatant target, int amount, string detail) => new HitInfo
+        {
+            Source = source,
+            Target = target,
+            Amount = amount,
+            SkillId = detail,
             IgnoreArmor = true,
             CanBeDodged = false,
             CanBeBlocked = false,
