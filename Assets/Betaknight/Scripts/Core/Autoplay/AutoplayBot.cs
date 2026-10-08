@@ -436,12 +436,20 @@ namespace Betaknight.Core.Autoplay
             return found;
         }
 
-        /// <summary>Wert der Verdrahtung: jede Pulsverbindung zählt 1, jede von einem bereiten Gatter versorgte Komponente 2.</summary>
+        /// <summary>
+        /// Wert der Verdrahtung: jede Pulsverbindung zählt 1, jede von einem bereiten Gatter versorgte Komponente 2, jeder
+        /// eigene Effekt an einer Komponente 2 und jeder Effekt für die ganze Platine 1 (A-21).
+        /// </summary>
         private static int ChipValue(LogicBoard board)
         {
             int value = board.Links.Count;
             foreach (LogicRelay relay in board.Relays)
                 if (relay.Gate != null && relay.IsGateReady) value += 2 * relay.Powered.Count;
+            foreach (LogicRow row in board.Rows)
+                if (row.Skill != null) value += 2 * row.Skill.CircuitEffects.Count;
+            foreach (CircuitEffectDefinition e in CircuitEffectCatalog.Shared.All)
+                if (e.Scope == CircuitEffectScope.Board) value += board.BoardEffectCount(e.Id);
+            foreach (PulseLink link in board.Links) value += link.Amplifiers;
             return value;
         }
 

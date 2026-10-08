@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Betaknight.Core.Arena;
 using Betaknight.Core.Circuit;
 
@@ -97,6 +98,14 @@ namespace Betaknight.Core.Combat
                 shape: ShapeFor(damagePercent));
         }
 
+        /// <summary>Ein Hack-Skill (A-21) aus den Effekt-Daten: Gegner hacken mit denselben Regeln wie der Ritter.</summary>
+        private static SkillDefinition Hack(string effectId)
+        {
+            CircuitEffectDefinition e = CircuitEffectCatalog.Shared.All.First(x => x.Id == effectId);
+            return new SkillDefinition(e.Id, e.Name, e.SkillCastTicks, 6, Array.Empty<ISkillEffect>(), e.Description, shape: e.SkillShape)
+                .WithCircuitEffect(e.Id);
+        }
+
         /// <summary>
         /// Leben aller Gegner in Prozent der Werte unten (A-12: der Basisangriff macht nur noch 60 %, Skills tragen den
         /// Schaden; frühe Kämpfe mit 1–2 Start-Skills sollen gut schaffbar bleiben).
@@ -122,7 +131,8 @@ namespace Betaknight.Core.Combat
             new EnemyDefinition("spark_drone", "Spark Drone", 3, 4, () =>
             {
                 CombatantSetup drone = Enemy("Spark Drone", 24, 2, 20, 0,
-                    Every(6, Charge("zap", "Spark Strike", 24, 150, new StunEffect(Ticks.FromSeconds(1)))));
+                    Every(6, Charge("zap", "Spark Strike", 24, 150, new StunEffect(Ticks.FromSeconds(1)))),
+                    Every(9, Hack(CircuitEffectIds.Jam)));
                 drone.Stats[StatKind.Dodge] = BasisPoints.Percent(15);
                 return One(drone);
             }),
@@ -138,11 +148,13 @@ namespace Betaknight.Core.Combat
             new EnemyDefinition("smelter", "Smelter", 4, 99, () => One(Enemy("Smelter", 40, 1, 16, 2,
                 When(new EnemyHasStatusCondition(StatusIds.Burn).Not(), new SkillDefinition("smelt", "Smelt Beam", 20, 6,
                     new ISkillEffect[] { new BurnEffect(Ticks.FromSeconds(4), BasisPoints.Percent(60)) }, shape: new Shape(1, 2)), "Knight not burning"),
-                Every(8, Charge("melt", "Ember Strike", 30, 250))))),
+                Every(8, Charge("melt", "Ember Strike", 30, 250)),
+                Every(11, Hack(CircuitEffectIds.Latency))))),
             new EnemyDefinition("siege_golem", "Siege Golem", 5, 99, () => One(Enemy("Siege Golem", 60, 2, 28, 3,
                 When(new HpBelowCondition(BasisPoints.Percent(40)), new SkillDefinition("patch", "Self-Repair", 30, 6,
                     new ISkillEffect[] { new HealEffect(BasisPoints.Percent(20)) }, shape: new Shape(2, 2)), "HP below 40 %"),
-                Every(7, Charge("slam", "Hammer Slam", 36, 400))))),
+                Every(7, Charge("slam", "Hammer Slam", 36, 400)),
+                Every(10, Hack(CircuitEffectIds.BitFlip))))),
 
             // Boss alle 25 Züge: unbesiegbar, der Ritter muss bis zum Fluchtportal überleben.
             new EnemyDefinition("overseer", "The Overseer", 0, 99, () => One(Enemy("The Overseer", 99999, 1, 20, 4,
