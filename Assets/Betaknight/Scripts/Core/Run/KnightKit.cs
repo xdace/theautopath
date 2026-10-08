@@ -4,7 +4,10 @@ using Betaknight.Core.Runes;
 
 namespace Betaknight.Core.Run
 {
-    /// <summary>Start-Ausrüstung, die der Spieler vor dem Run wählt. Gibt dem Build eine erste Richtung.</summary>
+    /// <summary>
+    /// Start-Ausrüstung, die der Spieler vor dem Run wählt. Gibt dem Build eine erste Richtung.
+    /// Die Startwaffe (liefert die Skills) kommt, sobald es Ausrüstung gibt; bis dahin nur Werte und Start-Rune.
+    /// </summary>
     public sealed class KnightKit
     {
         public string Id { get; }
@@ -31,12 +34,12 @@ namespace Betaknight.Core.Run
 
         public static IReadOnlyList<KnightKit> Defaults { get; } = new[]
         {
-            new KnightKit("blade", "Klingenritter", RuneTag.Blade, "whetstone", 28, 5,
-                "Wird im Kampf mit jedem Treffer stärker."),
-            new KnightKit("shield", "Schildritter", RuneTag.Shield, "bulwark", 36, 3,
-                "Hält viel aus und kontert aus der Deckung."),
-            new KnightKit("spark", "Funkenritter", RuneTag.Spark, "spark_counter", 26, 8,
-                "Zählt Angriffe und entlädt Blitze."),
+            new KnightKit("blade", "Klingenritter", RuneTag.Blade, "on_hit", 28, 5,
+                "Setzt auf Druck: seine Zeilen feuern, wenn Angriffe treffen."),
+            new KnightKit("shield", "Schildritter", RuneTag.Shield, "when_hit", 36, 3,
+                "Hält viel aus und reagiert, wenn er getroffen wird."),
+            new KnightKit("spark", "Funkenritter", RuneTag.Spark, "every_3rd", 26, 8,
+                "Zählt Angriffe und löst im Takt aus."),
         };
     }
 }

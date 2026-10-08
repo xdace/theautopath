@@ -7,16 +7,16 @@ namespace Betaknight.Core.Runes
     /// </summary>
     public enum RuneTag
     {
-        /// <summary>Angriffe werden im Kampf stärker (Stapeln).</summary>
+        /// <summary>Angriff und Druck.</summary>
         Blade = 0,
 
-        /// <summary>Block und Konter.</summary>
+        /// <summary>Verteidigung, Block und Konter.</summary>
         Shield = 1,
 
-        /// <summary>Zähler und Auslöser (jeder n-te Angriff ...).</summary>
+        /// <summary>Takt und Zähler.</summary>
         Spark = 2,
 
-        /// <summary>Brennen und Schaden über Zeit.</summary>
+        /// <summary>Notfall, Feuer und Risiko.</summary>
         Ember = 3,
     }
 
@@ -36,8 +36,8 @@ namespace Betaknight.Core.Runes
     }
 
     /// <summary>
-    /// Eine Logik-Rune als reine Daten. Die Kampfwirkung kommt mit der Kampfarena,
-    /// bis dahin beschreibt <see cref="Description"/> die geplante Regel.
+    /// Eine Logik-Rune als reine Daten: eine Bedingung ("Wann") für eine Zeile der Logik-Tafel.
+    /// Was dann passiert, kommt aus der Ausrüstung. Die Auswertung folgt mit der Kampfarena.
     /// </summary>
     public sealed class RuneDefinition
     {

@@ -30,14 +30,14 @@ namespace Betaknight.Tests.EditMode
         public void OfferHasDistinctRunesNotYetOwned()
         {
             var loadout = new RuneLoadout();
-            loadout.TryAdd(Catalog.Get("whetstone"));
+            loadout.TryAdd(Catalog.Get("on_hit"));
 
             for (int seed = 0; seed < 100; seed++)
             {
                 RuneOffer offer = RuneOffer.Create("Test", Catalog, loadout, new Random(seed));
                 Assert.AreEqual(3, offer.Options.Count);
                 Assert.AreEqual(3, offer.Options.Select(r => r.Id).Distinct().Count());
-                Assert.IsFalse(offer.Options.Any(r => r.Id == "whetstone"));
+                Assert.IsFalse(offer.Options.Any(r => r.Id == "on_hit"));
             }
         }
 
@@ -45,7 +45,7 @@ namespace Betaknight.Tests.EditMode
         public void OfferAlwaysContainsAMatchingTag()
         {
             var loadout = new RuneLoadout();
-            loadout.TryAdd(Catalog.Get("bulwark"));
+            loadout.TryAdd(Catalog.Get("when_hit"));
 
             for (int seed = 0; seed < 100; seed++)
             {
@@ -95,7 +95,7 @@ namespace Betaknight.Tests.EditMode
         public void FullLoadoutNeedsAReplaceSlot()
         {
             var runes = new RuneLoadout(slots: 1);
-            runes.TryAdd(Catalog.Get("whetstone"));
+            runes.TryAdd(Catalog.Get("on_hit"));
             OverworldSession s = Session(runes: runes);
             RuneOffer offer = s.OfferRunes("Test");
 
@@ -154,7 +154,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreSame(kit, s.Kit);
             Assert.AreEqual(kit.MaxHp, s.Stats.MaxHp);
             Assert.AreEqual(kit.Gold, s.Stats.Gold);
-            Assert.AreEqual("bulwark", s.Runes.Runes.Single().Id);
+            Assert.AreEqual("when_hit", s.Runes.Runes.Single().Id);
         }
 
         [Test]
@@ -168,8 +168,8 @@ namespace Betaknight.Tests.EditMode
         public void LoadoutRejectsDuplicates()
         {
             var loadout = new RuneLoadout();
-            Assert.IsTrue(loadout.TryAdd(Catalog.Get("kindling")));
-            Assert.IsFalse(loadout.TryAdd(Catalog.Get("kindling")));
+            Assert.IsTrue(loadout.TryAdd(Catalog.Get("hp_low")));
+            Assert.IsFalse(loadout.TryAdd(Catalog.Get("hp_low")));
             Assert.AreEqual(1, loadout.CountByTag()[RuneTag.Ember]);
         }
     }

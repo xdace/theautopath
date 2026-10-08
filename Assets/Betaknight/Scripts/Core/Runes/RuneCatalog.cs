@@ -36,21 +36,22 @@ namespace Betaknight.Core.Runes
 
         public static RuneCatalog CreateDefault() => new RuneCatalog(new[]
         {
-            new RuneDefinition("whetstone", "Wetzstein", RuneTag.Blade, "Bei Treffer: +1 Angriff bis Kampfende."),
-            new RuneDefinition("frenzy", "Raserei", RuneTag.Blade, "Wenn Angriff 5 erreicht: Angriffe treffen doppelt."),
-            new RuneDefinition("execution", "Hinrichtung", RuneTag.Blade, "Gegner unter 25 % Leben erhalten doppelten Schaden."),
+            // Runen sind Bedingungen ("Wann") für die Logik-Tafel. Das "Was" liefert später die Ausrüstung.
+            new RuneDefinition("on_hit", "Bei Treffer", RuneTag.Blade, "Wenn ein eigener Angriff trifft."),
+            new RuneDefinition("enemy_low", "Gegner geschwächt", RuneTag.Blade, "Solange der Gegner unter 25 % Leben hat."),
+            new RuneDefinition("every_5s", "Alle 5 Sekunden", RuneTag.Blade, "Alle 5 Sekunden einmal."),
 
-            new RuneDefinition("bulwark", "Bollwerk", RuneTag.Shield, "Wenn getroffen: +2 Block."),
-            new RuneDefinition("riposte", "Riposte", RuneTag.Shield, "Wenn Block einen Treffer ganz abfängt: Gegenangriff."),
-            new RuneDefinition("iron_skin", "Eisenhaut", RuneTag.Shield, "Kampfbeginn: Block in Höhe von 10 % Max-HP."),
+            new RuneDefinition("when_hit", "Wenn getroffen", RuneTag.Shield, "Kurz nachdem der Ritter getroffen wurde."),
+            new RuneDefinition("after_block", "Nach Block", RuneTag.Shield, "Kurz nachdem ein Treffer geblockt wurde."),
+            new RuneDefinition("enemy_charging", "Gegner lädt auf", RuneTag.Shield, "Solange ein Gegner einen Angriff auflädt."),
 
-            new RuneDefinition("spark_counter", "Funkenzähler", RuneTag.Spark, "Jeder 3. Angriff: Blitz auf einen zufälligen Gegner."),
-            new RuneDefinition("overload", "Überladung", RuneTag.Spark, "Zähler-Runen lösen einen Schritt früher aus."),
-            new RuneDefinition("chain", "Kettenblitz", RuneTag.Spark, "Blitze springen auf einen zweiten Gegner über."),
+            new RuneDefinition("every_3rd", "Jeder 3. Angriff", RuneTag.Spark, "Bei jedem dritten eigenen Angriff."),
+            new RuneDefinition("battle_start", "Kampfbeginn", RuneTag.Spark, "Einmal zu Beginn des Kampfes."),
+            new RuneDefinition("after_dodge", "Nach Ausweichen", RuneTag.Spark, "Kurz nachdem der Ritter ausgewichen ist."),
 
-            new RuneDefinition("kindling", "Zunder", RuneTag.Ember, "Bei Treffer: Gegner brennt 2 Runden."),
-            new RuneDefinition("wildfire", "Lauffeuer", RuneTag.Ember, "Stirbt ein brennender Gegner, springt das Feuer über."),
-            new RuneDefinition("forge_heart", "Schmiedeherz", RuneTag.Ember, "Pro brennendem Gegner: +1 Angriff."),
+            new RuneDefinition("hp_low", "HP unter 30 %", RuneTag.Ember, "Solange das eigene Leben unter 30 % liegt."),
+            new RuneDefinition("enemy_burning", "Gegner brennt", RuneTag.Ember, "Solange der Gegner brennt."),
+            new RuneDefinition("enemy_dies", "Gegner fällt", RuneTag.Ember, "Kurz nachdem ein Gegner besiegt wurde."),
         });
     }
 }
