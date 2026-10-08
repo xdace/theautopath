@@ -44,15 +44,21 @@ namespace Betaknight.Core.Arena
     {
         public const string BasicAttackId = "basic_attack";
 
-        /// <summary>Ab so vielen Ticks Ausholen gilt eine Aktion als sichtbare Aufladung.</summary>
+        /// <summary>Ab so vielen Ticks Cast-Zeit gilt eine Aktion als sichtbare Aufladung.</summary>
         public const int ChargeThreshold = Ticks.PerSecond;
 
         public string Id { get; }
         public string Name { get; }
         public string Description { get; }
 
-        /// <summary>Ausholen bis zur Wirkung. Beim Basisangriff ergibt es sich aus dem Angriffstempo.</summary>
+        /// <summary>Grund-Cast-Zeit bis zur Wirkung. Beim Basisangriff ergibt sie sich aus dem Angriffstempo.</summary>
         public int WindupTicks { get; }
+
+        /// <summary>Änderung der Cast-Zeit in Prozent aus Ausrüstung und Tags (−20 = 20 % schneller), schon summiert.</summary>
+        public int CastBonusPercent { get; private set; }
+
+        /// <summary>Aktuelle Cast-Zeit mit allen Änderungen, nie unter <paramref name="minTicks"/>.</summary>
+        public int CastTicks(int minTicks = CastTime.DefaultMinTicks) => CastTime.Apply(WindupTicks, CastBonusPercent, minTicks);
         public int RecoveryTicks { get; }
         public int CooldownTicks { get; }
         public IReadOnlyList<ISkillEffect> Effects { get; }
@@ -65,7 +71,7 @@ namespace Betaknight.Core.Arena
         /// <summary>Darf von Wiederholungs-Effekten (Echo) wiederholt werden.</summary>
         public bool CanBeRepeated { get; }
 
-        public bool IsCharge => !IsBasicAttack && WindupTicks >= ChargeThreshold;
+        public bool IsCharge => !IsBasicAttack && CastTicks() >= ChargeThreshold;
 
         /// <summary>Skill-Arten (Angriff, Feuer, Schock ...): Ziel passiver Effekte der Ausrüstung und Grundlage der Angebote.</summary>
         public SkillKind Kinds { get; }
@@ -113,29 +119,31 @@ namespace Betaknight.Core.Arena
             if (level <= 0 || rules == null || IsBasicAttack) return this;
             var effects = new List<ISkillEffect>();
             foreach (ISkillEffect e in Effects) effects.Add(e is ILevelableEffect l ? l.AtLevel(level, rules) : e);
-            return Copy(effects, CooldownTicks, level, PowerBonusPercent, CooldownBonusTicks);
+            return Copy(effects, CooldownTicks, level, PowerBonusPercent, CooldownBonusTicks, CastBonusPercent);
         }
 
         /// <summary>
         /// Derselbe Skill mit passiven Boni der Ausrüstung: Wirkung (Schaden, Brennen, Heilung) +<paramref name="powerPercent"/> %,
-        /// Cooldown um <paramref name="cooldownTicks"/> verändert (nie unter 0). Ohne Boni derselbe Skill.
+        /// Cooldown um <paramref name="cooldownTicks"/> verändert (nie unter 0), Cast-Zeit um <paramref name="castPercent"/> %.
+        /// Ohne Boni derselbe Skill.
         /// </summary>
-        public SkillDefinition WithBonus(int powerPercent, int cooldownTicks)
+        public SkillDefinition WithBonus(int powerPercent, int cooldownTicks, int castPercent = 0)
         {
-            if ((powerPercent == 0 && cooldownTicks == 0) || IsBasicAttack) return this;
+            if ((powerPercent == 0 && cooldownTicks == 0 && castPercent == 0) || IsBasicAttack) return this;
             var effects = new List<ISkillEffect>();
             foreach (ISkillEffect e in Effects) effects.Add(powerPercent != 0 && e is IBoostableEffect b ? b.Boosted(powerPercent) : e);
             return Copy(effects, Math.Max(0, CooldownTicks + cooldownTicks), Level, PowerBonusPercent + powerPercent,
-                CooldownBonusTicks + cooldownTicks);
+                CooldownBonusTicks + cooldownTicks, CastBonusPercent + castPercent);
         }
 
-        private SkillDefinition Copy(List<ISkillEffect> effects, int cooldown, int level, int power, int cooldownBonus) =>
+        private SkillDefinition Copy(List<ISkillEffect> effects, int cooldown, int level, int power, int cooldownBonus, int castBonus) =>
             new SkillDefinition(Id, Name, WindupTicks, RecoveryTicks, cooldown, effects, Description, CountsAsAttack,
                 CanBeRepeated, IsBasicAttack, Kinds)
             {
                 Level = level,
                 PowerBonusPercent = power,
                 CooldownBonusTicks = cooldownBonus,
+                CastBonusPercent = castBonus,
             };
 
         public override string ToString() => Name;

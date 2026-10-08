@@ -37,6 +37,12 @@ namespace Betaknight.Core.Arena
         public int RecoveryLeft { get; internal set; }
         public bool EffectApplied { get; internal set; }
 
+        /// <summary>Wiederholung (Echo): kein Cooldown, startet keine neue Zeile.</summary>
+        public bool IsRepeat { get; internal set; }
+
+        /// <summary>Vorgemerkte Wiederholung, startet nach dieser Aktion mit eigener Cast-Zeit.</summary>
+        public SkillDefinition FollowUp { get; internal set; }
+
         public bool InWindup => !EffectApplied;
     }
 

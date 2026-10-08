@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Betaknight.Core;
 using Betaknight.Core.Arena;
@@ -105,15 +106,18 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void ShopRefusesAShieldNextToATwoHander()
+        public void ShopShieldsNextToATwoHanderOnlyGoToTheInventory()
         {
+            // Seit dem Inventar (A-02) dürfen Schilde trotz Zweihandwaffe ins Angebot, anlegen geht aber nicht.
             OverworldSession s = Session();
             Wear(s, "plasma_drill");
             s.Map.SetContent(East, CellContent.Shop);
             s.TryStep(East);
 
-            Assert.IsTrue(s.PendingShop.Inventory.ItemIds.All(id => s.Items.Get(id).Slot != EquipmentSlot.Shield),
-                "Nicht anlegbare Teile kommen gar nicht ins Angebot.");
+            IReadOnlyList<string> offered = s.PendingShop.Inventory.ItemIds;
+            for (int i = 0; i < offered.Count; i++)
+                if (s.Items.Get(offered[i]).Slot == EquipmentSlot.Shield)
+                    Assert.IsFalse(s.CanBuyShopItem(i, ItemPlacement.Equip), "Die Zweihandwaffe sperrt den Schild.");
         }
     }
 }

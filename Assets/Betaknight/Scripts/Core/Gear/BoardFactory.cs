@@ -42,15 +42,18 @@ namespace Betaknight.Core.Gear
         public static BoardFactory CreateDefault() => new BoardFactory(null, null, null);
 
         /// <param name="skillLevels">Regeln für Skill-Stufen. Null = alle Skills in Grundform.</param>
-        public LogicBoard Create(IEnumerable<BoardRowSpec> rows, Equipment equipment, SkillLevelRules skillLevels = null)
+        /// <param name="extraPassives">Weitere passive Effekte neben denen der Ausrüstung, z. B. aus Tag-Stufen.</param>
+        public LogicBoard Create(IEnumerable<BoardRowSpec> rows, Equipment equipment, SkillLevelRules skillLevels = null,
+            IReadOnlyList<SkillPassive> extraPassives = null)
         {
             var result = new List<LogicRow>();
             if (rows != null)
-                foreach (BoardRowSpec spec in rows) result.Add(CreateRow(spec, equipment, skillLevels));
+                foreach (BoardRowSpec spec in rows) result.Add(CreateRow(spec, equipment, skillLevels, extraPassives));
             return new LogicBoard(result);
         }
 
-        public LogicRow CreateRow(BoardRowSpec spec, Equipment equipment, SkillLevelRules skillLevels = null)
+        public LogicRow CreateRow(BoardRowSpec spec, Equipment equipment, SkillLevelRules skillLevels = null,
+            IReadOnlyList<SkillPassive> extraPassives = null)
         {
             if (!_runes.TryGet(spec.RuneId, out RuneDefinition rune) ||
                 !_conditions.TryCreate(spec.RuneId, rune.ParameterAt(spec.Level), out ICondition condition))
@@ -65,7 +68,8 @@ namespace Betaknight.Core.Gear
                 return new LogicRow(condition, null, label);
 
             SkillDefinition skill = _skills.TryGet(spec.SkillId, out SkillDefinition s) ? s.AtLevel(spec.SkillLevel, skillLevels) : null;
-            if (skill != null && equipment != null) skill = equipment.Boost(skill);
+            if (skill != null && equipment != null) skill = equipment.Boost(skill, extraPassives);
+            else if (skill != null && extraPassives != null) skill = SkillPassive.Apply(skill, extraPassives);
             return new LogicRow(condition, skill, label);
         }
     }

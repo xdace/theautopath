@@ -32,6 +32,7 @@ namespace Betaknight.Core.Arena
                 case StatusIds.Blinded: return "geblendet";
                 case StatusIds.Anchor: return "verankert";
                 case StatusIds.Thrusters: return "Schubdüsen bereit";
+                case StatusIds.Poison: return "vergiftet";
                 default: return id;
             }
         }

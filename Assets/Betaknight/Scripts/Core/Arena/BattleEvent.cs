@@ -55,6 +55,9 @@ namespace Betaknight.Core.Arena
         /// </summary>
         public int RowIndex { get; internal set; }
 
+        /// <summary>Bei Aktionen: Wiederholung (Echo) statt Entscheidung der Tafel. Hat eigene Cast-Zeit, keinen Cooldown.</summary>
+        public bool IsRepeat { get; internal set; }
+
         /// <summary>Zusatzwert nur für die Anzeige: Stapel bei Zuständen, Obergrenze bei Ressourcen (0 = offen).</summary>
         public int Extra { get; internal set; }
 

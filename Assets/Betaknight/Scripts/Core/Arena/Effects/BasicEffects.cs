@@ -202,8 +202,8 @@ namespace Betaknight.Core.Arena
     }
 
     /// <summary>
-    /// Echo: wiederholt die Wirkungen des zuletzt ausgeführten eigenen Skills, ohne dessen Cooldown zu setzen.
-    /// Skills, die sich nicht wiederholen lassen (Echo selbst), werden nie als "zuletzt" gemerkt.
+    /// Echo: wiederholt den zuletzt ausgeführten eigenen Skill als eigene Ausführung mit dessen Cast-Zeit,
+    /// ohne dessen Cooldown zu setzen. Skills, die sich nicht wiederholen lassen (Echo selbst), werden nie als "zuletzt" gemerkt.
     /// </summary>
     public sealed class RepeatLastSkillEffect : ISkillEffect
     {
@@ -211,16 +211,10 @@ namespace Betaknight.Core.Arena
         {
             SkillDefinition last = c.User.LastRepeatableSkill;
             if (last == null || !last.CanBeRepeated || last == c.Skill) return;
-
-            var repeat = new SkillContext(c.Battle, c.User, c.Target, last, c.RowIndex);
-            foreach (ISkillEffect effect in last.Effects)
-            {
-                if (!c.User.IsAlive) break;
-                effect.Apply(repeat);
-            }
+            c.Battle.QueueRepeat(c.User, last);
         }
 
         public void Describe(SkillInfoBuilder info) =>
-            info.Add(new EffectInfo(EffectInfoKind.Repeat, "wiederholt den letzten eigenen Skill (dessen Schaden zählt dort)"));
+            info.Add(new EffectInfo(EffectInfoKind.Repeat, "wiederholt den letzten eigenen Skill mit dessen Cast-Zeit, ohne Cooldown"));
     }
 }

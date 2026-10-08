@@ -186,7 +186,7 @@ namespace Betaknight.Core.Arena
         private void Execute(Combatant c, ActionState a)
         {
             Combatant target = a.Target != null && a.Target.IsAlive ? a.Target : DefaultTarget(c);
-            Emit(new BattleEvent(Tick, BattleEventKind.ActionExecuted, c, target, a.Skill.CountsAsAttack ? 1 : 0, a.Skill.Id, a.RowIndex));
+            Emit(new BattleEvent(Tick, BattleEventKind.ActionExecuted, c, target, a.Skill.CountsAsAttack ? 1 : 0, a.Skill.Id, a.RowIndex) { IsRepeat = a.IsRepeat });
 
             if (!a.Skill.IsBasicAttack && a.Skill.CanBeRepeated) c.LastRepeatableSkill = a.Skill;
 
@@ -217,6 +217,20 @@ namespace Betaknight.Core.Arena
             c.Action = null;
             c.LastActionRow = a.RowIndex;
             c.LastActionEndTick = Tick;
+
+            // Wiederholung (Echo): eigene Ausführung mit eigener Cast-Zeit, direkt im Anschluss.
+            if (a.FollowUp != null && c.IsAlive && !c.IsStunned && OpponentsOf(c).Count > 0)
+                StartAction(c, a.FollowUp, a.Target, a.RowIndex, repeat: true);
+        }
+
+        /// <summary>
+        /// Merkt eine Wiederholung für die laufende Aktion vor. Sie startet nach deren Erholung als eigene Ausführung
+        /// mit voller Cast-Zeit (ohne Cooldown). Keine Ausführung ohne Cast.
+        /// </summary>
+        public void QueueRepeat(Combatant c, SkillDefinition skill)
+        {
+            if (c?.Action == null || skill == null) return;
+            c.Action.FollowUp = skill;
         }
 
         private void Decide()
@@ -335,27 +349,33 @@ namespace Betaknight.Core.Arena
         }
 
         /// <summary>
-        /// Ausholen und Erholung einer Aktion. Der Basisangriff teilt sein Intervall 2:1 auf, andere Skills nutzen ihre Werte.
+        /// Cast-Zeit und Erholung einer Aktion. Der Basisangriff teilt sein Intervall 2:1 auf, andere Skills nutzen ihre
+        /// Cast-Zeit mit allen Änderungen. Beide nie unter <paramref name="minCastTicks"/>.
         /// </summary>
-        public static void ActionTiming(SkillDefinition skill, int attackIntervalTicks, out int windup, out int recovery)
+        public static void ActionTiming(SkillDefinition skill, int attackIntervalTicks, out int windup, out int recovery,
+            int minCastTicks = CastTime.DefaultMinTicks)
         {
+            minCastTicks = Math.Max(1, minCastTicks);
             if (skill.IsBasicAttack)
             {
                 int interval = Math.Max(1, attackIntervalTicks);
-                windup = Math.Max(1, interval * 2 / 3);
+                windup = Math.Max(minCastTicks, interval * 2 / 3);
                 recovery = Math.Max(0, interval - windup);
             }
             else
             {
-                windup = Math.Max(1, skill.WindupTicks);
+                windup = skill.CastTicks(minCastTicks);
                 recovery = skill.RecoveryTicks;
             }
         }
 
-        /// <summary>Startet eine Aktion. Öffentlich für Effekte, die Aktionen auslösen (z. B. Wiederholen).</summary>
-        public void StartAction(Combatant c, SkillDefinition skill, Combatant target, int rowIndex)
+        /// <summary>
+        /// Startet eine Aktion mit voller Cast-Zeit. Öffentlich für Effekte, die Aktionen auslösen.
+        /// <paramref name="repeat"/>: Wiederholung (Echo), setzt keinen Cooldown und zählt nicht als Feuern der Zeile.
+        /// </summary>
+        public void StartAction(Combatant c, SkillDefinition skill, Combatant target, int rowIndex, bool repeat = false)
         {
-            ActionTiming(skill, c.AttackIntervalTicks, out int windup, out int recovery);
+            ActionTiming(skill, c.AttackIntervalTicks, out int windup, out int recovery, _setup.MinCastTicks);
 
             c.Action = new ActionState
             {
@@ -365,17 +385,18 @@ namespace Betaknight.Core.Arena
                 StartTick = Tick,
                 WindupLeft = windup,
                 RecoveryLeft = recovery,
+                IsRepeat = repeat,
             };
-            c.SetCooldown(skill.Id, skill.CooldownTicks);
+            if (!repeat) c.SetCooldown(skill.Id, skill.CooldownTicks);
 
-            if (rowIndex >= 0 && rowIndex < _rows[c].Length)
+            if (!repeat && rowIndex >= 0 && rowIndex < _rows[c].Length)
             {
                 RowRuntime state = _rows[c][rowIndex];
                 state.LastFiredTick = Tick;
                 state.FireCount++;
             }
 
-            Emit(new BattleEvent(Tick, BattleEventKind.ActionStarted, c, c.Action.Target, windup, skill.Id, rowIndex));
+            Emit(new BattleEvent(Tick, BattleEventKind.ActionStarted, c, c.Action.Target, windup, skill.Id, rowIndex) { IsRepeat = repeat });
             foreach (BattleModifier m in c.ModifierList.ToArray()) m.OnActionStarted(this, c, skill, rowIndex);
         }
 

@@ -162,8 +162,9 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void ThrustersMakeTheNextHitMiss()
         {
+            // B holt 13 Ticks aus, die Schubdüsen (Cast 0,4 s) stehen vorher.
             BattleResult r = LongDuel(Fighter("A", 1000, 1, 1000, board: Board(Row("battle_start", SkillIds.Thrusters))),
-                Fighter("B", 100000, 3, 10), 5);
+                Fighter("B", 100000, 3, 20), 5);
 
             List<BattleEvent> onA = r.Events.Where(e => e.Target?.Name == "A" && (e.Kind == BattleEventKind.Dodged || e.Kind == BattleEventKind.Hit)).ToList();
             Assert.AreEqual(BattleEventKind.Dodged, onA[0].Kind);
@@ -190,9 +191,13 @@ namespace Betaknight.Tests.EditMode
             BattleResult r = LongDuel(Fighter("A", 1000, 20, 1000, board: Board(Row("battle_start", SkillIds.ArmorBreak), Row("always", SkillIds.Echo))),
                 Fighter("B", 100000, 0, 1000), 8);
 
-            // Bis zum zweiten Echo (12 s Cooldown): ein Rüstungsbruch gestartet, aber zweimal Schaden.
+            // Bis zum zweiten Echo (12 s Cooldown): ein Rüstungsbruch aus seiner Zeile, einer als Wiederholung mit eigener Cast-Zeit.
             int window = Ticks.FromSeconds(10);
-            Assert.AreEqual(1, r.Events.Count(e => e.Tick < window && e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.ArmorBreak));
+            Assert.AreEqual(1, r.Events.Count(e => e.Tick < window && e.Kind == BattleEventKind.ActionStarted && e.Detail == SkillIds.ArmorBreak && !e.IsRepeat));
+            BattleEvent repeat = r.Events.Single(e => e.Tick < window && e.Kind == BattleEventKind.ActionStarted && e.IsRepeat);
+            Assert.AreEqual(SkillIds.ArmorBreak, repeat.Detail);
+            BattleEvent repeated = r.Events.First(e => e.Tick > repeat.Tick && e.Kind == BattleEventKind.ActionExecuted && e.Detail == SkillIds.ArmorBreak);
+            Assert.AreEqual(CastTime.Medium, repeated.Tick - repeat.Tick, "Die Wiederholung braucht die Cast-Zeit des Rüstungsbruchs.");
             Assert.AreEqual(2, On(r, "B", BattleEventKind.Damage).Count(e => e.Tick < window && e.Detail == SkillIds.ArmorBreak), "Echo wiederholt den Rüstungsbruch.");
 
             r = LongDuel(Fighter("A", 1000, 20, board: Board(Row("always", SkillIds.Echo))), Fighter("B", 200, 1), 20);

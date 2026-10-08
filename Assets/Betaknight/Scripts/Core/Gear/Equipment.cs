@@ -89,27 +89,20 @@ namespace Betaknight.Core.Gear
         }
 
         /// <summary>Summe der passiven Boni für einen Skill (nur Arten, die er hat).</summary>
-        public void SkillBonus(SkillDefinition skill, out int powerPercent, out int cooldownTicks)
-        {
-            powerPercent = 0;
-            cooldownTicks = 0;
-            foreach (EquipmentDefinition item in _worn.Values)
-            {
-                foreach (SkillPassive p in item.Passives)
-                {
-                    if (!p.Affects(skill)) continue;
-                    if (p.Effect == SkillPassiveEffect.PowerPercent) powerPercent += p.Value;
-                    else cooldownTicks += p.Value;
-                }
-            }
-        }
+        public void SkillBonus(SkillDefinition skill, out int powerPercent, out int cooldownTicks) =>
+            SkillPassive.Sum(skill, Passives, out powerPercent, out cooldownTicks, out _);
 
-        /// <summary>Der Skill mit allen passiven Boni der getragenen Ausrüstung.</summary>
-        public SkillDefinition Boost(SkillDefinition skill)
+        /// <summary>
+        /// Der Skill mit allen passiven Boni der getragenen Ausrüstung und optional weiteren passiven Effekten
+        /// (z. B. Tag-Stufen). Alle Prozente addieren sich, die Cast-Zeit fällt nie unter die Untergrenze.
+        /// </summary>
+        public SkillDefinition Boost(SkillDefinition skill, IEnumerable<SkillPassive> extra = null)
         {
             if (skill == null) return null;
-            SkillBonus(skill, out int power, out int cooldown);
-            return skill.WithBonus(power, cooldown);
+            if (extra == null) return SkillPassive.Apply(skill, Passives);
+            var all = new List<SkillPassive>(Passives);
+            all.AddRange(extra);
+            return SkillPassive.Apply(skill, all);
         }
 
         /// <summary>Haben getragene Teile passive Effekte auf diesen Tag?</summary>
@@ -119,6 +112,16 @@ namespace Betaknight.Core.Gear
                 foreach (SkillPassive p in item.Passives)
                     if (p.Target.Overlaps(tag)) return true;
             return false;
+        }
+
+        /// <summary>Wie viele getragene Teile diesen Synergie-Tag tragen. Abgelegte Teile zählen nicht.</summary>
+        public int TagCount(string tagId)
+        {
+            int count = 0;
+            foreach (EquipmentDefinition item in _worn.Values)
+                foreach (string tag in item.Tags)
+                    if (tag == tagId) count++;
+            return count;
         }
 
         public int StatBonus(StatKind kind)

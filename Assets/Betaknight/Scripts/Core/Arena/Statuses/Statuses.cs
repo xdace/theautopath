@@ -10,6 +10,7 @@ namespace Betaknight.Core.Arena
         public const string Blinded = "blinded";
         public const string Anchor = "anchor";
         public const string Thrusters = "thrusters";
+        public const string Poison = "poison";
     }
 
     /// <summary>Betäubt: keine Aktionen, laufende Aktion wird abgebrochen.</summary>
@@ -53,6 +54,37 @@ namespace Betaknight.Core.Arena
             _elapsed++;
             if (_elapsed % Ticks.PerSecond == 0)
                 battle.ResolveHit(HitInfo.OverTime(Source, owner, DamagePerSecond, StatusIds.Burn));
+        }
+    }
+
+    /// <summary>
+    /// Gift: 1 Schaden pro Sekunde und Stapel, ignoriert Abwehr und Rüstung. Stapelt (jeder Stapel läuft für sich ab),
+    /// die Obergrenze prüft, wer vergiftet.
+    /// </summary>
+    public sealed class PoisonStatus : StatusEffect
+    {
+        public int DamagePerSecond { get; }
+        private int _elapsed;
+
+        public PoisonStatus(int ticks, int damagePerSecond = 1) : base(StatusIds.Poison, ticks)
+        {
+            DamagePerSecond = System.Math.Max(1, damagePerSecond);
+        }
+
+        public override bool Stacks => true;
+
+        public override void OnTick(Battle battle, Combatant owner)
+        {
+            _elapsed++;
+            if (_elapsed % Ticks.PerSecond == 0)
+                battle.ResolveHit(HitInfo.OverTime(Source, owner, DamagePerSecond, StatusIds.Poison));
+        }
+
+        public static int StacksOn(Combatant c)
+        {
+            int n = 0;
+            foreach (StatusEffect s in c.Statuses) if (s.Id == StatusIds.Poison && s.IsActive) n++;
+            return n;
         }
     }
 

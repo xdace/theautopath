@@ -116,7 +116,7 @@ namespace Betaknight.Core
             // Eigener Zufall für Events und Angebote, abgeleitet vom Karten-Seed: gleicher Seed, gleiche Beute.
             _random = new Random(unchecked(Map.Seed * 31 + 7));
             _resolver = new EncounterResolver(Map, Exploration, Stats, _random, Runes);
-            _combat = combat ?? new ArenaCombatResolver();
+            _combat = combat ?? new ArenaCombatResolver(synergies: Synergies);
             Turns.TurnEnded += OnTurnEnded;
 
             if (!Map.TryGetCell(Player.Position, out HexCell startCell))

@@ -21,6 +21,9 @@ namespace Betaknight.Core.Arena
         /// <summary>Danach beginnt die Überhitzung (steigender Prozent-Schaden für beide Seiten).</summary>
         public int TimeLimitTicks = Ticks.FromSeconds(90);
 
+        /// <summary>Untergrenze der Cast-Zeit jeder Ausführung (Standard 0,1 s). Keine Ausführung ohne Cast.</summary>
+        public int MinCastTicks = CastTime.DefaultMinTicks;
+
         /// <summary>Sicherheitsnetz. Durch die Überhitzung wird es nie erreicht.</summary>
         public int MaxTicks = 10000;
 

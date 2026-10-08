@@ -49,6 +49,9 @@ namespace Betaknight.Core.Arena
             return string.Join(", ", names);
         }
 
+        /// <summary>Alle Arten zusammen: Ziel für Effekte auf jeden Skill («Alle Skills −15 % Cast-Zeit»).</summary>
+        public const SkillKind Every = SkillKind.Attack | SkillKind.Shield | SkillKind.Fire | SkillKind.Shock | SkillKind.Healing | SkillKind.Movement;
+
         public static bool Overlaps(this SkillKind a, SkillKind b) => (a & b) != 0;
     }
 }

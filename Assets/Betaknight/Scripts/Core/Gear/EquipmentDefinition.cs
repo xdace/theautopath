@@ -44,7 +44,7 @@ namespace Betaknight.Core.Gear
     }
 
     /// <summary>
-    /// Ein Ausrüstungsteil: Platz, Wertebonus, passive Effekte auf Skill-Arten und optional ein Set. Skills liefert es
+    /// Ein Ausrüstungsteil: Platz, Wertebonus, passive Effekte auf Skill-Arten, Synergie-Tags und optional ein Set. Skills liefert es
     /// nicht mehr, die sind eigene Exemplare in der Skill-Sammlung. Die Waffe bestimmt Waffenschaden und Basisangriff.
     /// Reine Daten; neue Teile sind neue Katalog-Einträge.
     /// </summary>
@@ -69,6 +69,9 @@ namespace Betaknight.Core.Gear
         public IReadOnlyList<SkillPassive> Passives { get; }
         public IReadOnlyDictionary<StatKind, int> Stats => _stats;
 
+        /// <summary>Synergie-Tags (1–2 Ids aus <see cref="SynergyTagIds"/>), gezählt über alle getragenen Teile.</summary>
+        public IReadOnlyList<string> Tags { get; }
+
         /// <summary>Set-Zugehörigkeit oder null.</summary>
         public string SetId { get; }
 
@@ -80,7 +83,7 @@ namespace Betaknight.Core.Gear
 
         public EquipmentDefinition(string id, string name, EquipmentSlot slot, IDictionary<StatKind, int> stats = null,
             IEnumerable<SkillPassive> passives = null, string setId = null, bool twoHanded = false, int weight = 10,
-            string description = null)
+            string description = null, IEnumerable<string> tags = null)
         {
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("Id fehlt.", nameof(id));
             if (twoHanded && slot != EquipmentSlot.Weapon) throw new ArgumentException("Nur Waffen sind zweihändig.", nameof(twoHanded));
@@ -95,6 +98,7 @@ namespace Betaknight.Core.Gear
             TwoHanded = twoHanded;
             Weight = Math.Max(0, weight);
             Description = description ?? string.Empty;
+            Tags = new List<string>(tags ?? Array.Empty<string>());
         }
 
         public int StatBonus(StatKind kind) => _stats.TryGetValue(kind, out int v) ? v : 0;
@@ -122,7 +126,7 @@ namespace Betaknight.Core.Gear
                 stats[stat.Key] = stat.Value + bonus;
             }
 
-            var copy = new EquipmentDefinition(Id, BaseName, Slot, stats, Passives, SetId, TwoHanded, Weight, Description);
+            var copy = new EquipmentDefinition(Id, BaseName, Slot, stats, Passives, SetId, TwoHanded, Weight, Description, Tags);
             copy._baseStats.Clear();
             foreach (KeyValuePair<StatKind, int> stat in _baseStats) copy._baseStats[stat.Key] = stat.Value;
             copy.Level = level;

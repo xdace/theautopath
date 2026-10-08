@@ -79,7 +79,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual("100 % Waffenschaden ≈ 7", info.DamageText);
             Assert.AreEqual(Ticks.FromSeconds(6), info.Effects.Single(e => e.Kind == EffectInfoKind.StatChange).DurationTicks);
             StringAssert.Contains("Gegner Rüstung −50 % für 6 s", info.OtherEffectsText);
-            Assert.AreEqual("CD 8 s · Ausholen 0,4 s · Erholung 0,2 s", info.TimingText);
+            Assert.AreEqual("CD 8 s · Cast 0,8 s · Erholung 0,2 s", info.TimingText);
         }
 
         [Test]
@@ -107,7 +107,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(9, info.Stats.WeaponDamage);
             Assert.AreEqual("150 % Waffenschaden ≈ 13 an allen Gegnern", info.DamageText);
             Assert.IsTrue(info.Effects.Single().AllEnemies);
-            Assert.AreEqual("CD 5 s · Ausholen 0,5 s · Erholung 0,3 s", info.TimingText);
+            Assert.AreEqual("CD 5 s · Cast 1,5 s · Erholung 0,3 s", info.TimingText);
         }
 
         [Test]
@@ -141,7 +141,7 @@ namespace Betaknight.Tests.EditMode
 
             Assert.AreEqual("100 % Waffenschaden ≈ 7", info.DamageText);
             Assert.AreEqual(18, info.WindupTicks + info.RecoveryTicks, "Intervall 20 − 2 der Kurzklinge");
-            Assert.AreEqual("Takt 0,9 s · Ausholen 0,6 s · Erholung 0,3 s", info.TimingText);
+            Assert.AreEqual("Takt 0,9 s · Cast 0,6 s · Erholung 0,3 s", info.TimingText);
         }
 
         [Test]

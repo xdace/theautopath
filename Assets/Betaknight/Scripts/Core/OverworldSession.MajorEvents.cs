@@ -133,6 +133,7 @@ namespace Betaknight.Core
                 bool elite = enemy == CellContent.Elite;
                 var request = new CombatRequest(enemy, tier, Stats, Runes, Gear, context, Progression.SkillLevels,
                     elite ? Progression.EliteHpPercent : 100, elite ? Progression.EliteDamagePercent : 100);
+                DiscoverDuos();
                 result = _combat.Resolve(request, _random);
             }
             finally

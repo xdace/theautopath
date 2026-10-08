@@ -149,15 +149,16 @@ namespace Betaknight.Tests.EditMode
         // ------------------------------------------------------------------ Gleiche Ergebnisse wie vorher
 
         /// <summary>
-        /// Fingerabdrücke aller Kämpfe aus Bot-Runs, aufgenommen vor dem Entscheidungs-Protokoll. Das Protokoll darf
-        /// keinen Kampf verändern: gleiche Seeds ergeben dieselben Ereignisse und damit dieselben Entscheidungen.
+        /// Fingerabdrücke aller Kämpfe aus Bot-Runs. Das Protokoll darf keinen Kampf verändern: gleiche Seeds ergeben
+        /// dieselben Ereignisse und damit dieselben Entscheidungen. Neu aufgenommen mit A-06, weil sich Kämpfe dort bewusst
+        /// ändern (neue Cast-Zeiten, Echo mit eigener Cast-Zeit, Synergie-Tags) und Angebote anders würfeln (Skills seit A-05).
         /// </summary>
-        [TestCase("blade", 5, "2 Kämpfe, 155 Ereignisse, 673E2B1F4F7110F1")]
+        [TestCase("blade", 5, "2 Kämpfe, 155 Ereignisse, 585C43CE50272DD0")]
         [TestCase("blade", 21, "3 Kämpfe, 135 Ereignisse, 9B9FFBB272E89AE4")]
-        [TestCase("shield", 5, "3 Kämpfe, 300 Ereignisse, E8567461EE127A6E")]
-        [TestCase("shield", 21, "4 Kämpfe, 269 Ereignisse, DA5FD22A42C52912")]
-        [TestCase("spark", 5, "2 Kämpfe, 153 Ereignisse, 3E5CAB4C14AD0251")]
-        [TestCase("spark", 21, "3 Kämpfe, 127 Ereignisse, AC9908F0FA66FF14")]
+        [TestCase("shield", 5, "6 Kämpfe, 599 Ereignisse, 62651E896AD5E72E")]
+        [TestCase("shield", 21, "4 Kämpfe, 244 Ereignisse, 6F01525699ADB9A7")]
+        [TestCase("spark", 5, "2 Kämpfe, 134 Ereignisse, 4052D2913055051E")]
+        [TestCase("spark", 21, "3 Kämpfe, 133 Ereignisse, CC9411FD625A4ED1")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {
             Assert.AreEqual(fingerprint, Fingerprint(BotBattles(KnightKit.Defaults.Single(k => k.Id == kit), seed)));
@@ -177,7 +178,7 @@ namespace Betaknight.Tests.EditMode
                 // Jede gewählte Zeile ist genau eine gestartete Aktion des Spielers.
                 Combatant player = a[i].Fighters[0].Combatant;
                 CollectionAssert.AreEqual(
-                    a[i].Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Source == player).Select(e => (e.Tick, e.RowIndex)),
+                    a[i].Events.Where(e => e.Kind == BattleEventKind.ActionStarted && e.Source == player && !e.IsRepeat).Select(e => (e.Tick, e.RowIndex)),
                     a[i].Decisions.Where(d => !d.IsBusy).Select(d => (d.Tick, d.ChosenRow)));
             }
         }

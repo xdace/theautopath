@@ -29,14 +29,14 @@ namespace Betaknight.Core
             (_combat as ArenaCombatResolver ?? new ArenaCombatResolver()).PreviewStats(Stats, Runes, Gear, null, Progression.SkillLevels);
 
         /// <summary>
-        /// Skill auf einer Stufe mit den passiven Boni der getragenen Ausrüstung, so wie er im Kampf wirkt.
+        /// Skill auf einer Stufe mit den passiven Boni der getragenen Ausrüstung und der Tag-Stufen, so wie er im Kampf wirkt.
         /// Ohne <paramref name="level"/> gilt die höchste Stufe der eigenen Exemplare. Null bei unbekannter Id.
         /// </summary>
         public SkillDefinition LeveledSkill(string skillId, int level = -1)
         {
             if (!SkillCatalog.TryGet(skillId, out SkillDefinition skill)) return null;
             if (level < 0) level = HighestSkillLevel(skillId);
-            return Gear.Boost(skill.AtLevel(level, Progression.SkillLevels));
+            return Gear.Boost(skill.AtLevel(level, Progression.SkillLevels), Synergies.Passives(Gear));
         }
 
         /// <summary>Kennzahlen eines Skills mit der aktuellen Ausrüstung. Ohne Stufe: höchste eigene Stufe. Null bei unbekannter Id.</summary>

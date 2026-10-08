@@ -116,7 +116,11 @@ namespace Betaknight.Core.Arena
     {
         public SkillDefinition Skill { get; }
         public SkillUserStats Stats { get; }
+        /// <summary>Aktuelle Cast-Zeit (mit allen Änderungen, nie unter der Untergrenze).</summary>
         public int WindupTicks { get; }
+
+        /// <summary>Grund-Cast-Zeit ohne Änderungen. Beim Basisangriff gleich der aktuellen.</summary>
+        public int BaseCastTicks { get; }
         public int RecoveryTicks { get; }
         public int CooldownTicks { get; }
         public IReadOnlyList<EffectInfo> Effects { get; }
@@ -135,6 +139,7 @@ namespace Betaknight.Core.Arena
             Skill = skill;
             Stats = stats;
             WindupTicks = windup;
+            BaseCastTicks = skill.IsBasicAttack ? windup : Math.Max(1, skill.WindupTicks);
             RecoveryTicks = recovery;
             CooldownTicks = cooldown;
             Effects = effects;
@@ -173,21 +178,31 @@ namespace Betaknight.Core.Arena
             }
         }
 
-        /// <summary>"CD 5 s · Ausholen 0,5 s · Erholung 0,3 s"; der Basisangriff zeigt seinen Takt.</summary>
+        /// <summary>"CD 5 s · Cast 0,8 s · Erholung 0,3 s"; geänderte Cast-Zeit mit Grundwert: "Cast 0,6 s (Grund 0,8 s)".</summary>
         public string TimingText
         {
             get
             {
                 string cd = Skill.IsBasicAttack ? $"Takt {Seconds(WindupTicks + RecoveryTicks)}"
                     : CooldownTicks > 0 ? $"CD {Seconds(CooldownTicks)}" : "kein CD";
-                return $"{cd} · Ausholen {Seconds(WindupTicks)} · Erholung {Seconds(RecoveryTicks)}";
+                return $"{cd} · {CastText} · Erholung {Seconds(RecoveryTicks)}";
+            }
+        }
+
+        /// <summary>"Cast 0,8 s" oder mit Änderung "Cast 0,6 s (Grund 0,8 s)".</summary>
+        public string CastText
+        {
+            get
+            {
+                string text = $"Cast {Seconds(WindupTicks)}";
+                return WindupTicks != BaseCastTicks ? $"{text} (Grund {Seconds(BaseCastTicks)})" : text;
             }
         }
 
         /// <summary>Kompakte Infozeile: Schaden, dann Zeiten.</summary>
         public string Summary => $"{DamageText} · {TimingText}";
 
-        /// <summary>Passive Boni der Ausrüstung auf diesen Skill, z. B. «+20 % Wirkung, −1 s CD». Leer ohne Bonus.</summary>
+        /// <summary>Passive Boni von Ausrüstung und Tags auf diesen Skill, z. B. «+20 % Wirkung, −1 s CD, −20 % Cast-Zeit». Leer ohne Bonus.</summary>
         public string BonusText
         {
             get
@@ -195,6 +210,7 @@ namespace Betaknight.Core.Arena
                 var parts = new List<string>();
                 if (Skill.PowerBonusPercent != 0) parts.Add($"{(Skill.PowerBonusPercent > 0 ? "+" : "−")}{Math.Abs(Skill.PowerBonusPercent)} % Wirkung");
                 if (Skill.CooldownBonusTicks != 0) parts.Add($"{(Skill.CooldownBonusTicks < 0 ? "−" : "+")}{Seconds(Math.Abs(Skill.CooldownBonusTicks))} CD");
+                if (Skill.CastBonusPercent != 0) parts.Add($"{(Skill.CastBonusPercent < 0 ? "−" : "+")}{Math.Abs(Skill.CastBonusPercent)} % Cast-Zeit");
                 return string.Join(", ", parts);
             }
         }

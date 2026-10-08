@@ -136,7 +136,8 @@ namespace Betaknight.Tests.EditMode
             BattleResult mine = CombatSimulation.Run(setup);
 
             Assert.AreEqual(BattleOutcome.Victory, mine.Outcome);
-            Assert.AreEqual(2 * ScrapHarvesterSet.GoldPerKill, mine.BonusGold);
+            // Dazu +1 Gold je Gegner aus dem Tag «Schrott» (3 Teile, Stufe 2).
+            Assert.AreEqual(2 * (ScrapHarvesterSet.GoldPerKill + 1), mine.BonusGold);
             Assert.Less(mine.EndTick, off.EndTick, "Auf der Mine räumt der Bohrer schneller ab.");
         }
 

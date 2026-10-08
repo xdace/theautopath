@@ -24,9 +24,12 @@ namespace Betaknight.Core.Combat
         private readonly EnemyCatalog _enemies;
         private readonly BoardFactory _boards;
         private readonly SetBonusRegistry _sets;
+        private readonly SynergyRegistry _synergies;
 
-        public ArenaCombatResolver(EnemyCatalog enemies = null, BoardFactory boards = null, SetBonusRegistry sets = null)
+        public ArenaCombatResolver(EnemyCatalog enemies = null, BoardFactory boards = null, SetBonusRegistry sets = null,
+            SynergyRegistry synergies = null)
         {
+            _synergies = synergies ?? SynergyRegistry.CreateDefault();
             _enemies = enemies ?? EnemyCatalog.CreateDefault();
             _boards = boards ?? BoardFactory.CreateDefault();
             _sets = sets ?? SetBonusRegistry.CreateDefault();
@@ -79,7 +82,7 @@ namespace Betaknight.Core.Combat
         {
             var baseStats = new CombatStats(Math.Max(1, request.Stats.MaxHp), BaseDamage, BaseAttackInterval);
             CombatantSetup player = PlayerLoadout.CreateCombatant("Ritter", baseStats, request.Equipment,
-                request.Runes.ToBoardSpecs(), Math.Max(1, request.Stats.Hp), _boards, _sets, request.SkillLevels);
+                request.Runes.ToBoardSpecs(), Math.Max(1, request.Stats.Hp), _boards, _sets, request.SkillLevels, _synergies);
 
             return new BattleSetup
             {
