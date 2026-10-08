@@ -1,6 +1,8 @@
 using Betaknight.Core;
 using Betaknight.Core.Hex;
 using Betaknight.Core.Map;
+using Betaknight.Core.Run;
+using Betaknight.Core.Runes;
 using Betaknight.Overworld.Config;
 using Betaknight.Overworld.Controllers;
 using Betaknight.Overworld.UI;
@@ -25,6 +27,9 @@ namespace Betaknight.Overworld
         private GameObject _root;
         private OverworldHud _hud;
         private EncounterWindow _encounterWindow;
+        private RuneOfferWindow _runeWindow;
+        private KitSelectionWindow _kitWindow;
+        private KnightKit _kit;
 
         public OverworldSession Session { get; private set; }
 
@@ -38,18 +43,39 @@ namespace Betaknight.Overworld
 
             _hud = gameObject.AddComponent<OverworldHud>();
             _encounterWindow = gameObject.AddComponent<EncounterWindow>();
+            _runeWindow = gameObject.AddComponent<RuneOfferWindow>();
+            _kitWindow = gameObject.AddComponent<KitSelectionWindow>();
         }
 
-        private void Start() => BuildWorld();
+        private void Start() => StartNewRun();
 
-        /// <summary>Erzeugt eine komplett neue Karte. Wird auch vom HUD-Button "Neue Karte" genutzt.</summary>
+        /// <summary>Neuer Run: Welt abbauen und das Ritter-Kit wählen lassen. Danach wird die Karte erzeugt.</summary>
+        public void StartNewRun()
+        {
+            if (_root != null) Destroy(_root);
+            _root = null;
+            Session = null;
+            _hud.Initialize(null, null, null, null);
+            _encounterWindow.enabled = false;
+            _runeWindow.enabled = false;
+
+            _kitWindow.Open(KnightKit.Defaults, RuneCatalog.CreateDefault(), kit =>
+            {
+                _kit = kit;
+                BuildWorld();
+            });
+        }
+
+        /// <summary>Erzeugt eine komplett neue Karte mit dem gewählten Kit.</summary>
         public void BuildWorld()
         {
             if (_root != null) Destroy(_root);
+            _encounterWindow.enabled = true;
+            _runeWindow.enabled = true;
 
             int seed = settings.seed != 0 ? settings.seed : Random.Range(1, int.MaxValue);
             MapGenerationConfig config = settings.ToGenerationConfig(seed);
-            Session = OverworldSession.Create(config, settings.sightRadius);
+            Session = OverworldSession.Create(config, settings.sightRadius, _kit);
 
             _root = new GameObject("Overworld");
             var layout = new HexLayout(settings.hexSize);
@@ -66,10 +92,11 @@ namespace Betaknight.Overworld
             OverworldController controller = _root.AddComponent<OverworldController>();
             controller.Initialize(Session, grid, player, cam);
 
-            _hud.Initialize(Session, controller, config.Encounters, BuildWorld);
+            _hud.Initialize(Session, controller, config.Encounters, StartNewRun);
             _encounterWindow.Initialize(Session);
+            _runeWindow.Initialize(Session);
 
-            Debug.Log($"[Betaknight] Oberwelt erzeugt: {Session.Map.Count} Felder, Seed {seed}.");
+            Debug.Log($"[Betaknight] Oberwelt erzeugt: {Session.Map.Count} Felder, Seed {seed}, Kit {_kit?.Name ?? "keins"}.");
         }
 
         private Camera SetupCamera(Transform followTarget)
