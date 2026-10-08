@@ -86,6 +86,7 @@ namespace Betaknight.Core
             session.BoardExpansionsBought = previous.BoardExpansionsBought;
             session.CarryRecipeBook(previous);
             session.CarryModules(previous);
+            session.CarryChips(previous);
             return session;
         }
     }

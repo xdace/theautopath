@@ -73,6 +73,26 @@ namespace Betaknight.Core.Run
         public int SkillOfferWeight = 10;
         public int SkillKindMatchFactor = 3;
 
+        // ------------------------------------------------------------------ Logik-Chips (A-20, selten)
+
+        /// <summary>Chance in Prozent auf einen Chip nach einem Elite-Sieg bzw. aus einer Truhe. Boss-Flucht gibt immer einen.</summary>
+        public int ChipChanceElite = 35;
+        public int ChipChanceTreasure = 15;
+        public int ChipsOnBossEscape = 1;
+
+        /// <summary>Chance, dass ein Shop einen Chip anbietet.</summary>
+        public int ShopChipChance = 50;
+
+        public int ChipChance(string source)
+        {
+            switch (source)
+            {
+                case RewardSources.Elite: return ChipChanceElite;
+                case RewardSources.Treasure: return ChipChanceTreasure;
+                default: return 0;
+            }
+        }
+
         // ------------------------------------------------------------------ Module (selten)
 
         /// <summary>Chance in Prozent auf ein Modul als zusätzliche Wahl, je Quelle. Boss-Flucht gibt immer eines.</summary>

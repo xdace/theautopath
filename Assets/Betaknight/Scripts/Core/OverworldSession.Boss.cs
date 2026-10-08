@@ -53,6 +53,11 @@ namespace Betaknight.Core
             if (ExpandBoard(Progression.BoardExpansionsOnBossEscape)) lines.Add(SessionTexts.BoardExpansion(before, BoardSize));
             string module = GrantBossModule();
             if (module != null) lines.Add(module);
+            for (int i = 0; i < Progression.ChipsOnBossEscape; i++)
+            {
+                string chip = GrantChip(RollChipId());
+                if (chip != null) lines.Add(chip);
+            }
             lines.AddRange(EvolveAfterBoss());
             lines.Add(SessionTexts.PortalOpen(Act + 1));
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, result.Escaped ? SessionTexts.EscapedThroughPortal : SessionTexts.BossDefeated, lines));

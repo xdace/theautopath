@@ -18,6 +18,9 @@ namespace Betaknight.Core.Shop
         /// <summary>Teurer Modul-Platz (nicht in jedem Shop).</summary>
         public int Module = 30;
 
+        /// <summary>Logik-Chip (A-20, nicht in jedem Shop).</summary>
+        public int Chip = 15;
+
         /// <summary>Verkauf aus dem Inventar: halber Preis.</summary>
         public int SellItem => Item / 2;
         public int SellRune => Rune / 2;
@@ -40,6 +43,19 @@ namespace Betaknight.Core.Shop
         {
             _modules.Clear();
             _modules.AddRange(moduleIds);
+        }
+
+        private readonly List<string> _chips = new List<string>();
+
+        /// <summary>Logik-Chips im Angebot (A-20).</summary>
+        public IReadOnlyList<string> ChipIds => _chips;
+
+        internal void RemoveChipAt(int index) => _chips.RemoveAt(index);
+
+        internal void ReplaceChips(IEnumerable<string> chipIds)
+        {
+            _chips.Clear();
+            if (chipIds != null) _chips.AddRange(chipIds);
         }
 
         /// <summary>Skills im Angebot (Ids aus dem Skill-Katalog).</summary>

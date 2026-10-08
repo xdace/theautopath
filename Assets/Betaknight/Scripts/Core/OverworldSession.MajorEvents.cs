@@ -119,6 +119,11 @@ namespace Betaknight.Core
             int gold = result.GoldReward + (elite ? Progression.EliteGoldBonus : 0);
             Stats.AddGold(gold);
             lines.Add(SessionTexts.GoldGain(gold));
+            if (elite)
+            {
+                string chip = RollRewardChip(RewardSources.Elite);
+                if (chip != null) lines.Add(chip);
+            }
             Map.MarkResolved(cell.Coord);
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, SessionTexts.FightWon(title), lines));
             OfferRunes(elite ? RewardSources.Elite : RewardSources.Victory);
@@ -167,7 +172,10 @@ namespace Betaknight.Core
             int gold = _random.Next(6, 11);
             Stats.AddGold(gold);
             Map.MarkResolved(cell.Coord);
-            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, SessionTexts.Treasure, new[] { SessionTexts.GoldGain(gold) }));
+            var lines = new List<string> { SessionTexts.GoldGain(gold) };
+            string chip = RollRewardChip(RewardSources.Treasure);
+            if (chip != null) lines.Add(chip);
+            MajorEventResolved?.Invoke(new MajorEventOutcome(cell, SessionTexts.Treasure, lines));
             OfferRunes(RewardSources.Treasure);
         }
 
@@ -201,6 +209,7 @@ namespace Betaknight.Core
             {
                 inventory = new ShopInventory(RuneOffer.Create("Shop", RuneCatalog, Board, _random, isOwned: RuneInventory.Contains).Options,
                     PickItems(ShopItemCount), PickSkills(Progression.ShopSkillCount), RollShopModules());
+                inventory.ReplaceChips(RollShopChips());
                 _shops.Add(cell.Coord, inventory);
             }
 
@@ -271,6 +280,7 @@ namespace Betaknight.Core
             PendingShop.Inventory.ReplaceItems(PickItems(ShopItemCount));
             PendingShop.Inventory.ReplaceSkills(PickSkills(Progression.ShopSkillCount));
             PendingShop.Inventory.ReplaceModules(RollShopModules());
+            PendingShop.Inventory.ReplaceChips(RollShopChips());
             return true;
         }
 
