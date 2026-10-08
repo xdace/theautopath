@@ -67,7 +67,7 @@ namespace Betaknight.Core
         public RuneOffer PendingRuneOffer { get; private set; }
 
         /// <summary>Wartet die Session auf eine Entscheidung des Spielers?</summary>
-        public bool IsBusy => PendingEncounter != null || PendingRuneOffer != null || PendingShop != null;
+        public bool IsBusy => PendingEncounter != null || PendingRuneOffer != null || PendingShop != null || PendingPortal;
 
         /// <summary>Wird nach jedem erfolgreichen Schritt ausgelöst, nachdem kleine Events bereits gewirkt haben.</summary>
         public event Action<StepResult> CellEntered;

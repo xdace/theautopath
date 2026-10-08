@@ -98,7 +98,7 @@ namespace Betaknight.Core
             bool lost = raid?.IsLost == true;
             string title = lost ? "Mine zurückerobert" : "Goldmine verteidigt";
 
-            int tier = cell.Coord.DistanceTo(Map.Center) + MineRaidTierBonus;
+            int tier = TierAt(cell.Coord) + MineRaidTierBonus;
             var context = new BattleContext { OnGoldMine = true, Turn = Turns.CurrentTurn };
             CombatResult result = RunCombat(CellContent.Enemy, tier, context);
 

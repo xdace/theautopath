@@ -103,7 +103,7 @@ namespace Betaknight.Core
 
         private void Fight(HexCell cell)
         {
-            int tier = cell.Coord.DistanceTo(Map.Center);
+            int tier = TierAt(cell.Coord);
             var context = new BattleContext { VsBoss = cell.Content == CellContent.Boss, Turn = Turns.CurrentTurn };
             CombatResult result = RunCombat(cell.Content, tier, context);
 

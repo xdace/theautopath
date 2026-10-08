@@ -54,7 +54,7 @@ namespace Betaknight.Overworld.UI
 
             GUILayout.BeginArea(PanelRect, GUI.skin.box);
             string kit = _session.Kit != null ? $" – {_session.Kit.Name}" : string.Empty;
-            GUILayout.Label($"<b>Betaknight{kit}</b>", _style);
+            GUILayout.Label($"<b>Betaknight{kit}</b>   Akt {_session.Act}", _style);
             int boss = _session.TurnsUntilBoss;
             string bossText = boss <= 3 ? $"<color=#ff7a6b>Boss in {boss} Zügen</color>" : $"Boss in {boss} Zügen";
             GUILayout.Label($"Zug: {_session.Turns.CurrentTurn}   {bossText}", _style);

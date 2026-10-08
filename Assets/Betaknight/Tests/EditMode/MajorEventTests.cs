@@ -246,6 +246,7 @@ namespace Betaknight.Tests.EditMode
                     if (s.PendingEncounter != null) s.ChooseEncounterOption(s.PendingEncounter.Definition.Options.Count - 1);
                     else if (s.PendingRuneOffer != null) { if (!s.TakeRune(0, 0)) s.SkipRuneOffer(); }
                     else if (s.PendingShop != null) s.LeaveShop();
+                    else if (s.CanEnterPortal) s.EnterPortal();
                 }
 
                 var options = s.Map.GetNeighbors(s.Player.Position).Where(c => s.CanStepTo(c.Coord)).ToList();

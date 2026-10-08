@@ -49,6 +49,7 @@ Kämpfe laufen automatisch in festen Ticks (20 pro Sekunde). Jede Rune ist eine 
 - Sets: Fortschritt steht im HUD und im Tafel-Editor. Teile angefangener Sets kommen 3× häufiger in Angebote, Shops verkaufen 2 Teile. Aegis-Firewall (ab 2 Teilen) schaltet die Rune «Ladung voll» frei.
 - **Goldminen-Verteidigung:** Alle 8 Züge wird eine eigene Mine angegriffen (rot, «!G»). 6 Züge Zeit, sonst ist sie verloren, bis sie zurückerobert ist. Der Kampf dort läuft «auf der Goldmine» (Schrott-Ernter, Rune «Auf Goldmine»).
 - **Boss alle 25 Züge:** Er taucht beim Ritter auf und ist unbesiegbar. Wer 15 s überlebt, entkommt durchs Portal (+8 Gold, +2 Splitter). Ausweichen und Betäuben helfen, Phantom-Signal ist dafür gebaut.
+- **Akte:** Das Fluchtportal führt auf eine neue Karte (Akt 2, 3 …). Ritter, Ausrüstung, Tafel, Gold und Splitter kommen mit, eroberte Minen bleiben zurück. Das Portal heilt 50 % der Max-HP, Gegner sind pro Akt 2 Stufen stärker, der Zugzähler und der Boss-Takt laufen weiter.
 
 Konzept: `/mnt/project-files/design/kampfsystem-konzept.md` im Projekt.
 
@@ -103,7 +104,10 @@ Assets/Betaknight/
 │   │   ├── Shop/          Shop-Bestand und Preise
 │   │   ├── OverworldSession.cs              Fassade: Bewegung, kleine/mittlere Events, Runenwahl
 │   │   ├── OverworldSession.MajorEvents.cs  Fassade: Kampf, Truhe, Goldmine, Shop
-│   │   └── OverworldSession.Gear.cs         Fassade: Ausrüstung, Skill-Zuordnung, Tafel umsortieren
+│   │   ├── OverworldSession.Gear.cs         Fassade: Ausrüstung, Skill-Zuordnung, Tafel umsortieren
+│   │   ├── OverworldSession.Mines.cs        Fassade: Goldminen-Raids und Verteidigung
+│   │   ├── OverworldSession.Boss.cs         Fassade: Boss alle 25 Züge, Flucht durchs Portal
+│   │   └── OverworldSession.Acts.cs         Fassade: Portal, Akte, Gegnerstufe pro Akt
 │   └── Overworld/   Betaknight.Overworld  – Unity-Darstellung und Eingabe
 │       ├── Config/        OverworldSettings (ScriptableObject)
 │       ├── Views/         HexGridView, HexCellView, PlayerView, ProceduralSprites
@@ -152,7 +156,7 @@ Falls der Test Runner fehlt, im Package Manager das Paket **Test Framework** ins
 | Neues Set | Teile mit Set-Id + `SetBonusRegistry.Register(id, name, teile => new …Set())` (ein `BattleModifier`) |
 | Neuer Gegner | Eintrag in `EnemyCatalog` mit Stufenbereich und fester Tafel |
 | Inverter-Rune | `NotCondition` / `condition.Not()` existiert bereits |
-| Portal-Felder auf der Karte | Boss-Flucht endet heute an Ort und Stelle (`OverworldSession.Boss.cs`), Ziel des Portals ist noch offen |
+| Akt-spezifische Karten/Gegner | `OverworldSession.CreateNextAct(config, previous)` bekommt die Karten-Konfiguration; `TierAt` und `ActTierBonus` regeln die Stärke pro Akt |
 | Gegneralarme beim Zurückreisen | `StepResult.FirstVisit == false` und `HexCell.VisitCount` |
 | Hindernisse | `HexCell.IsWalkable` (Regeln und Pfadsuche berücksichtigen es bereits) |
 | Neue Events | Eintrag in `EncounterCatalog.CreateDefault()` |

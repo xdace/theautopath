@@ -19,15 +19,8 @@ namespace Betaknight.Core
 
         private bool _bossPending;
 
-        /// <summary>Züge bis zum nächsten Boss (0 = in diesem Zug).</summary>
-        public int TurnsUntilBoss
-        {
-            get
-            {
-                int rest = Turns.CurrentTurn % BossInterval;
-                return rest == 0 ? 0 : BossInterval - rest;
-            }
-        }
+        /// <summary>Züge bis zum nächsten Boss (1 = der nächste Schritt ruft ihn).</summary>
+        public int TurnsUntilBoss => BossInterval - Turns.CurrentTurn % BossInterval;
 
         public event Action<CombatResult> BossEncountered;
 
@@ -43,7 +36,7 @@ namespace Betaknight.Core
             _bossPending = false;
 
             HexCell cell = CurrentCell;
-            int tier = cell.Coord.DistanceTo(Map.Center);
+            int tier = TierAt(cell.Coord);
             var context = new BattleContext { VsBoss = true, Turn = Turns.CurrentTurn };
             CombatResult result = RunCombat(CellContent.Boss, tier, context);
             BossEncountered?.Invoke(result);
@@ -56,8 +49,10 @@ namespace Betaknight.Core
             Stats.AddShards(BossEscapeShards);
             lines.Add($"+{BossEscapeGold} Gold");
             lines.Add($"+{BossEscapeShards} Runensplitter");
+            lines.Add($"Portal zu Akt {Act + 1} offen");
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, result.Escaped ? "Durchs Portal entkommen" : "Boss besiegt", lines));
             CheckShards();
+            OpenPortal();
         }
     }
 }

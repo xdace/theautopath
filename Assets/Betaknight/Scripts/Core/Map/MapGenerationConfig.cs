@@ -102,6 +102,14 @@ namespace Betaknight.Core.Map
         /// <summary>Quelle für kleine und mittlere Events.</summary>
         public EncounterCatalog Encounters = EncounterCatalog.CreateDefault();
 
+        /// <summary>Gleiche Einstellungen mit anderem Seed, z. B. für die Karte des nächsten Akts.</summary>
+        public MapGenerationConfig WithSeed(int seed)
+        {
+            var copy = (MapGenerationConfig)MemberwiseClone();
+            copy.Seed = seed;
+            return copy;
+        }
+
         /// <summary>
         /// Ring 1 nur kleine Events, danach wachsen mittlere und grosse Events.
         /// Truhen und Shops sind anfangs selten (siehe <see cref="DefaultRules"/>).
