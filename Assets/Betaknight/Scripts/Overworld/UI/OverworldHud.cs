@@ -37,13 +37,22 @@ namespace Betaknight.Overworld.UI
             _onNewMap = onNewMap;
         }
 
-        private static readonly Rect PanelRect = new Rect(12, 12, 380, 540);
+        private const float PanelWidth = 380f;
+        private const float ButtonBarHeight = 4 * 30f + 16f;
+
+        /// <summary>Info-Bereich links oben; scrollt, wenn der Inhalt zu lang wird.</summary>
+        private static Rect InfoRect => new Rect(12f, 12f, PanelWidth, Mathf.Max(160f, Screen.height - 32f - ButtonBarHeight));
+
+        /// <summary>Feste Knopfleiste unter dem Info-Bereich, scrollt nie mit.</summary>
+        private static Rect ButtonRect => new Rect(12f, InfoRect.yMax + 8f, PanelWidth, ButtonBarHeight);
+
+        private Vector2 _scroll;
 
         /// <summary>Liegt ein Bildschirmpunkt (Ursprung unten links) über dem HUD? Dann ignoriert die Karte den Klick.</summary>
         public static bool ContainsScreenPoint(Vector2 screen)
         {
             var guiPoint = new Vector2(screen.x, Screen.height - screen.y);
-            return PanelRect.Contains(guiPoint);
+            return InfoRect.Contains(guiPoint) || ButtonRect.Contains(guiPoint);
         }
 
         private void OnGUI()
@@ -56,7 +65,8 @@ namespace Betaknight.Overworld.UI
                 _style = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true, wordWrap = true };
             }
 
-            GUILayout.BeginArea(PanelRect, GUI.skin.box);
+            GUILayout.BeginArea(InfoRect, GUI.skin.box);
+            _scroll = GUILayout.BeginScrollView(_scroll);
             string kit = _session.Kit != null ? $" – {_session.Kit.Name}" : string.Empty;
             GUILayout.Label($"<b>Betaknight{kit}</b>   Akt {_session.Act}", _style);
             int boss = _session.TurnsUntilBoss;
@@ -86,7 +96,10 @@ namespace Betaknight.Overworld.UI
                 GUILayout.Label($"Zeiger: {hovered.Coord} – {info}", _style);
             }
 
-            GUILayout.FlexibleSpace();
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
+
+            GUILayout.BeginArea(ButtonRect, GUI.skin.box);
             if (OnOpenBuild != null && !_session.IsGameOver && GUILayout.Button(new GUIContent("Build (B)", "Logik-Tafel, Skills, Module und Runen")))
             {
                 OnOpenBuild();
