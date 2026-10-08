@@ -18,7 +18,7 @@ namespace Betaknight.Core.Map
         public int Count => _cells.Count;
         public IEnumerable<HexCell> Cells => _cells.Values;
 
-        /// <summary>Wird ausgelöst, wenn sich Inhalt, Sichtbarkeit oder Begehbarkeit eines Feldes ändert.</summary>
+        /// <summary>Wird ausgelöst, wenn sich Inhalt, Event-Status, Sichtbarkeit oder Begehbarkeit eines Feldes ändert.</summary>
         public event Action<HexCell> CellChanged;
 
         public HexMap(HexCoord center, int radius, int seed = 0)
@@ -66,9 +66,36 @@ namespace Betaknight.Core.Map
 
         public void SetContent(HexCoord coord, CellContent content)
         {
+            if (content == CellContent.Encounter)
+                throw new ArgumentException("Für kleine/mittlere Events SetEncounter verwenden.", nameof(content));
+
             HexCell cell = GetCell(coord);
             if (cell.Content == content) return;
             cell.Content = content;
+            cell.EncounterId = null;
+            cell.IsResolved = false;
+            CellChanged?.Invoke(cell);
+        }
+
+        /// <summary>Legt ein kleines oder mittleres Event auf das Feld.</summary>
+        public void SetEncounter(HexCoord coord, string encounterId)
+        {
+            if (string.IsNullOrEmpty(encounterId)) throw new ArgumentException("Event-Id fehlt.", nameof(encounterId));
+
+            HexCell cell = GetCell(coord);
+            if (cell.Content == CellContent.Encounter && cell.EncounterId == encounterId && !cell.IsResolved) return;
+            cell.Content = CellContent.Encounter;
+            cell.EncounterId = encounterId;
+            cell.IsResolved = false;
+            CellChanged?.Invoke(cell);
+        }
+
+        /// <summary>Markiert das Event eines Feldes als erledigt. Inhalt bleibt für die Anzeige erhalten.</summary>
+        public void MarkResolved(HexCoord coord)
+        {
+            HexCell cell = GetCell(coord);
+            if (cell.IsResolved) return;
+            cell.IsResolved = true;
             CellChanged?.Invoke(cell);
         }
 

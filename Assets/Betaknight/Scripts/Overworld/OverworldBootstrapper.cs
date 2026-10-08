@@ -55,7 +55,7 @@ namespace Betaknight.Overworld
             var gridGo = new GameObject("Grid");
             gridGo.transform.SetParent(_root.transform, false);
             HexGridView grid = gridGo.AddComponent<HexGridView>();
-            grid.Initialize(Session.Map, layout, settings);
+            grid.Initialize(Session.Map, layout, settings, config.Encounters);
 
             PlayerView player = PlayerView.Create(_root.transform, grid.ToWorld(Session.Player.Position), settings);
 
@@ -64,7 +64,7 @@ namespace Betaknight.Overworld
             OverworldController controller = _root.AddComponent<OverworldController>();
             controller.Initialize(Session, grid, player, cam);
 
-            _hud.Initialize(Session, controller, BuildWorld);
+            _hud.Initialize(Session, controller, config.Encounters, BuildWorld);
 
             Debug.Log($"[Betaknight] Oberwelt erzeugt: {Session.Map.Count} Felder, Seed {seed}.");
         }

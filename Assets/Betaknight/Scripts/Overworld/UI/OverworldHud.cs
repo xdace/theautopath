@@ -1,5 +1,6 @@
 using System;
 using Betaknight.Core;
+using Betaknight.Core.Encounters;
 using Betaknight.Core.Map;
 using Betaknight.Overworld.Controllers;
 using UnityEngine;
@@ -14,13 +15,15 @@ namespace Betaknight.Overworld.UI
     {
         private OverworldSession _session;
         private OverworldController _controller;
+        private EncounterCatalog _encounters;
         private Action _onNewMap;
         private GUIStyle _style;
 
-        public void Initialize(OverworldSession session, OverworldController controller, Action onNewMap)
+        public void Initialize(OverworldSession session, OverworldController controller, EncounterCatalog encounters, Action onNewMap)
         {
             _session = session;
             _controller = controller;
+            _encounters = encounters;
             _onNewMap = onNewMap;
         }
 
@@ -46,13 +49,13 @@ namespace Betaknight.Overworld.UI
             GUILayout.Label($"<b>Betaknight – Oberwelt</b>", _style);
             GUILayout.Label($"Zug: {_session.Turns.CurrentTurn}", _style);
             GUILayout.Label($"Position: {_session.Player.Position}", _style);
-            GUILayout.Label($"Feld: {Describe(_session.CurrentCell.Content)}", _style);
+            GUILayout.Label($"Feld: {Describe(_session.CurrentCell)}", _style);
             GUILayout.Label($"Seed: {_session.Map.Seed}", _style);
 
             if (_controller != null && _controller.HoveredCoord.HasValue
                 && _session.Map.TryGetCell(_controller.HoveredCoord.Value, out HexCell hovered))
             {
-                string info = hovered.Visibility == CellVisibility.Explored ? Describe(hovered.Content) : "unbekannt";
+                string info = hovered.Visibility == CellVisibility.Explored ? Describe(hovered) : "unbekannt";
                 GUILayout.Label($"Zeiger: {hovered.Coord} – {info}", _style);
             }
 
@@ -64,9 +67,19 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndArea();
         }
 
-        private static string Describe(CellContent content)
+        private string Describe(HexCell cell)
         {
-            switch (content)
+            string text = DescribeContent(cell);
+            return cell.IsResolved ? $"{text} (erledigt)" : text;
+        }
+
+        private string DescribeContent(HexCell cell)
+        {
+            if (cell.Content == CellContent.Encounter && _encounters != null
+                && _encounters.TryGet(cell.EncounterId, out EncounterDefinition encounter))
+                return encounter.Title;
+
+            switch (cell.Content)
             {
                 case CellContent.Enemy: return "Gegner";
                 case CellContent.Boss: return "Boss";
