@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Combat;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
 
@@ -18,6 +19,17 @@ namespace Betaknight.Core
         public Equipment Gear { get; }
         public EquipmentCatalog Items { get; }
         public SetBonusRegistry Sets { get; } = SetBonusRegistry.CreateDefault();
+
+        /// <summary>Skill-Daten für Anzeigen wie den Tafel-Editor.</summary>
+        public SkillCatalog SkillCatalog { get; } = SkillCatalog.CreateDefault();
+
+        /// <summary>Werte des Ritters zu Kampfbeginn (Waffe, Werte, aktive Set-Boni), wie der Kampf sie nutzt.</summary>
+        public SkillUserStats SkillUserStats() =>
+            (_combat as ArenaCombatResolver ?? new ArenaCombatResolver()).PreviewStats(Stats, Runes, Gear);
+
+        /// <summary>Kennzahlen eines Skills mit der aktuellen Ausrüstung. Null bei unbekannter Id.</summary>
+        public SkillInfo DescribeSkill(string skillId, SkillUserStats stats = null) =>
+            SkillCatalog.TryGet(skillId, out SkillDefinition skill) ? SkillInfo.Create(skill, stats ?? SkillUserStats()) : null;
 
         /// <summary>Sets, von denen mindestens ein Teil getragen wird, mit Teilezahl.</summary>
         public List<(SetDefinition set, int pieces)> WornSets()

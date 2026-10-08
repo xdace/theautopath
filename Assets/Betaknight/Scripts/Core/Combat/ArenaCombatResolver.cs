@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using Betaknight.Core.Arena;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Map;
+using Betaknight.Core.Run;
+using Betaknight.Core.Runes;
 
 namespace Betaknight.Core.Combat
 {
@@ -43,6 +45,18 @@ namespace Betaknight.Core.Combat
             int damageTaken = Math.Max(0, request.Stats.Hp - battle.PlayerHp);
             int gold = battle.IsVictory ? random.Next(2, 5) + request.Tier / 2 + battle.BonusGold : 0;
             return new CombatResult(battle.IsSurvived, damageTaken, gold, battle, enemy.Name);
+        }
+
+        /// <summary>
+        /// Werte des Ritters zu Kampfbeginn, genau wie der Simulator ihn baut (Grundwerte, Ausrüstung, aktive Set-Boni).
+        /// Für Kennzahlen im Tafel-Editor; gekämpft wird dabei nicht.
+        /// </summary>
+        public SkillUserStats PreviewStats(PlayerStats stats, RuneLoadout runes, Equipment equipment, BattleContext context = null)
+        {
+            var request = new CombatRequest(CellContent.Enemy, 0, stats, runes, equipment, context);
+            var target = new CombatantSetup { Name = "Ziel", Stats = new CombatStats(1, 0) };
+            var battle = new Battle(CreateSetup(request, new List<CombatantSetup> { target }, 0));
+            return SkillUserStats.From(battle.Player);
         }
 
         public BattleSetup CreateSetup(CombatRequest request, List<CombatantSetup> enemies, int seed)

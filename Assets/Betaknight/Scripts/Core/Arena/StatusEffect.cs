@@ -18,6 +18,9 @@ namespace Betaknight.Core.Arena
             TicksLeft = ticks;
         }
 
+        /// <summary>Kurzer Anzeigetext für Tafel und Tooltips. Standard: der Name aus dem Kampfprotokoll.</summary>
+        public virtual string Summary => BattleLogText.StatusName(Id);
+
         /// <summary>Verhindert Aktionen und bricht laufende ab.</summary>
         public virtual bool Stuns => false;
 

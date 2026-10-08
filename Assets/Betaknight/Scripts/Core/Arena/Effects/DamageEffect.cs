@@ -14,14 +14,21 @@ namespace Betaknight.Core.Arena
             IgnoreArmor = ignoreArmor;
         }
 
+        /// <summary>Schaden pro Ziel vor Abwehr, aus Waffenschaden und Flächenbonus.</summary>
+        public int AmountFor(int weaponDamage, int areaDamageBp)
+        {
+            int amount = BasisPoints.Of(weaponDamage, DamageBp);
+            if (!AllEnemies) return amount;
+            int bonus = System.Math.Max(-BasisPoints.Full, areaDamageBp);
+            return BasisPoints.Of(amount, BasisPoints.Full + bonus);
+        }
+
         public void Apply(in SkillContext context)
         {
-            int amount = BasisPoints.Of(context.User.GetStat(StatKind.Damage), DamageBp);
+            int amount = AmountFor(context.User.GetStat(StatKind.Damage), context.User.GetStat(StatKind.AreaDamage));
 
             if (AllEnemies)
             {
-                int bonus = System.Math.Max(-BasisPoints.Full, context.User.GetStat(StatKind.AreaDamage));
-                amount = BasisPoints.Of(amount, BasisPoints.Full + bonus);
                 foreach (Combatant enemy in context.Battle.OpponentsOf(context.User))
                     context.Battle.ResolveHit(Hit(context, enemy, amount, true));
             }
@@ -29,6 +36,14 @@ namespace Betaknight.Core.Arena
             {
                 context.Battle.ResolveHit(Hit(context, context.Target, amount, false));
             }
+        }
+
+        public void Describe(SkillInfoBuilder info)
+        {
+            int amount = AmountFor(info.Stats.WeaponDamage, info.Stats.AreaDamageBp);
+            string text = $"{SkillInfo.Percent(DamageBp)} Waffenschaden ≈ {amount}{(AllEnemies ? " an allen Gegnern" : string.Empty)}"
+                + (IgnoreArmor ? " (ignoriert Rüstung)" : string.Empty);
+            info.Add(new EffectInfo(EffectInfoKind.Damage, text, DamageBp, amount, allEnemies: AllEnemies));
         }
 
         private HitInfo Hit(in SkillContext context, Combatant target, int amount, bool area) => new HitInfo

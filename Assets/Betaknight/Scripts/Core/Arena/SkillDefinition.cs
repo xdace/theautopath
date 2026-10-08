@@ -31,6 +31,12 @@ namespace Betaknight.Core.Arena
     public interface ISkillEffect
     {
         void Apply(in SkillContext context);
+
+        /// <summary>
+        /// Meldet die Kennzahlen dieser Wirkung (Schaden, Dauer, Chance ...) für die Anzeige.
+        /// Muss dieselben Formeln wie <see cref="Apply"/> nutzen, damit Anzeige und Kampf übereinstimmen.
+        /// </summary>
+        void Describe(SkillInfoBuilder info);
     }
 
     /// <summary>Eine Aktion, das "Was" einer Zeile der Logik-Tafel. Reine Daten plus Wirkungen.</summary>

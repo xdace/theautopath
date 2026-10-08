@@ -224,13 +224,14 @@ namespace Betaknight.Core.Arena
             }
         }
 
-        /// <summary>Startet eine Aktion. Öffentlich für Effekte, die Aktionen auslösen (z. B. Wiederholen).</summary>
-        public void StartAction(Combatant c, SkillDefinition skill, Combatant target, int rowIndex)
+        /// <summary>
+        /// Ausholen und Erholung einer Aktion. Der Basisangriff teilt sein Intervall 2:1 auf, andere Skills nutzen ihre Werte.
+        /// </summary>
+        public static void ActionTiming(SkillDefinition skill, int attackIntervalTicks, out int windup, out int recovery)
         {
-            int windup, recovery;
             if (skill.IsBasicAttack)
             {
-                int interval = c.AttackIntervalTicks;
+                int interval = Math.Max(1, attackIntervalTicks);
                 windup = Math.Max(1, interval * 2 / 3);
                 recovery = Math.Max(0, interval - windup);
             }
@@ -239,6 +240,12 @@ namespace Betaknight.Core.Arena
                 windup = Math.Max(1, skill.WindupTicks);
                 recovery = skill.RecoveryTicks;
             }
+        }
+
+        /// <summary>Startet eine Aktion. Öffentlich für Effekte, die Aktionen auslösen (z. B. Wiederholen).</summary>
+        public void StartAction(Combatant c, SkillDefinition skill, Combatant target, int rowIndex)
+        {
+            ActionTiming(skill, c.AttackIntervalTicks, out int windup, out int recovery);
 
             c.Action = new ActionState
             {

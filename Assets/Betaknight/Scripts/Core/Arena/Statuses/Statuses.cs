@@ -45,6 +45,9 @@ namespace Betaknight.Core.Arena
             DamagePerSecond = System.Math.Max(1, damagePerSecond);
         }
 
+        /// <summary>So oft trifft ein Brennen dieser Dauer: einmal pro voller Sekunde.</summary>
+        public static int TicksOfDamage(int durationTicks) => System.Math.Max(0, durationTicks) / Ticks.PerSecond;
+
         public override void OnTick(Battle battle, Combatant owner)
         {
             _elapsed++;
@@ -58,6 +61,8 @@ namespace Betaknight.Core.Arena
     {
         public AnchorStatus(int ticks) : base(StatusIds.Anchor, ticks) { }
 
+        public override string Summary => "Rüstung ×2, kein Ausweichen";
+
         public override int StatBonus(StatKind kind) => kind == StatKind.ArmorMultiplier ? BasisPoints.Full : 0;
 
         public override void ModifyIncomingHit(Battle battle, Combatant owner, HitInfo hit) => hit.CanBeDodged = false;
@@ -67,6 +72,8 @@ namespace Betaknight.Core.Arena
     public sealed class ThrustersStatus : StatusEffect
     {
         public ThrustersStatus(int ticks) : base(StatusIds.Thrusters, ticks) { }
+
+        public override string Summary => "nächster gegnerischer Treffer verfehlt sicher";
 
         public override void ModifyIncomingHit(Battle battle, Combatant owner, HitInfo hit)
         {

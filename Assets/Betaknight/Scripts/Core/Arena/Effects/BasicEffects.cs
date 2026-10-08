@@ -8,6 +8,12 @@ namespace Betaknight.Core.Arena
 
         public void Apply(in SkillContext c) =>
             c.Battle.Heal(c.User, System.Math.Max(1, BasisPoints.Of(c.User.MaxHp, MaxHpBp)), c.User, c.Skill.Id);
+
+        public void Describe(SkillInfoBuilder info)
+        {
+            int amount = System.Math.Max(1, BasisPoints.Of(info.Stats.MaxHp, MaxHpBp));
+            info.Add(new EffectInfo(EffectInfoKind.Heal, $"heilt {SkillInfo.Percent(MaxHpBp)} Max-HP ≈ {amount}", amount: amount));
+        }
     }
 
     /// <summary>Betäubt das Ziel (oder alle Gegner). Bricht dessen laufende Aktion ab.</summary>
@@ -33,6 +39,9 @@ namespace Betaknight.Core.Arena
                 c.Battle.ApplyStatus(c.Target, new StunStatus(Ticks), c.User);
             }
         }
+
+        public void Describe(SkillInfoBuilder info) => info.Add(new EffectInfo(EffectInfoKind.Stun,
+            $"betäubt {(AllEnemies ? "alle " : string.Empty)}{SkillInfo.Seconds(Ticks)}", durationTicks: Ticks, allEnemies: AllEnemies));
     }
 
     /// <summary>Bricht eine laufende Aufladung des Ziels ab, ohne es zu betäuben.</summary>
@@ -42,6 +51,8 @@ namespace Betaknight.Core.Arena
         {
             if (c.Target != null && c.Target.IsCharging) c.Battle.Interrupt(c.Target);
         }
+
+        public void Describe(SkillInfoBuilder info) => info.Add(new EffectInfo(EffectInfoKind.Interrupt, "bricht Aufladung ab"));
     }
 
     /// <summary>Zeitlicher Wertebonus auf den Anwender oder Malus auf das Ziel.</summary>
@@ -67,6 +78,9 @@ namespace Betaknight.Core.Arena
             Combatant who = OnTarget ? c.Target : c.User;
             if (who != null) c.Battle.ApplyStatus(who, new StatModifierStatus(StatusId, Stat, Amount, Ticks), c.User);
         }
+
+        public void Describe(SkillInfoBuilder info) => info.Add(new EffectInfo(EffectInfoKind.StatChange,
+            $"{(OnTarget ? "Gegner " : string.Empty)}{SkillInfo.StatChange(Stat, Amount)} für {SkillInfo.Seconds(Ticks)}", durationTicks: Ticks));
     }
 
     /// <summary>Setzt das Ziel in Brand: Schaden pro Sekunde in Prozent des eigenen Waffenschadens.</summary>
@@ -84,8 +98,20 @@ namespace Betaknight.Core.Arena
         public void Apply(in SkillContext c)
         {
             if (c.Target == null) return;
-            int dps = System.Math.Max(1, BasisPoints.Of(c.User.GetStat(StatKind.Damage), DamageBpPerSecond));
+            int dps = DamagePerSecondFor(c.User.GetStat(StatKind.Damage));
             c.Battle.ApplyStatus(c.Target, new BurnStatus(Ticks, dps), c.User);
+        }
+
+        /// <summary>Schaden pro Sekunde aus dem Waffenschaden, mindestens 1.</summary>
+        public int DamagePerSecondFor(int weaponDamage) => System.Math.Max(1, BasisPoints.Of(weaponDamage, DamageBpPerSecond));
+
+        public void Describe(SkillInfoBuilder info)
+        {
+            int dps = DamagePerSecondFor(info.Stats.WeaponDamage);
+            int total = dps * BurnStatus.TicksOfDamage(Ticks);
+            info.Add(new EffectInfo(EffectInfoKind.DamageOverTime,
+                $"Brennen {SkillInfo.Percent(DamageBpPerSecond)} Waffenschaden/s ≈ {dps}/s, {total} über {SkillInfo.Seconds(Ticks)}",
+                DamageBpPerSecond, dps, total, Ticks));
         }
     }
 
@@ -106,6 +132,13 @@ namespace Betaknight.Core.Arena
             Combatant who = OnTarget ? c.Target : c.User;
             if (who != null) c.Battle.ApplyStatus(who, _factory(), c.User);
         }
+
+        public void Describe(SkillInfoBuilder info)
+        {
+            StatusEffect sample = _factory();
+            info.Add(new EffectInfo(EffectInfoKind.Status,
+                $"{(OnTarget ? "Gegner: " : string.Empty)}{sample.Summary} ({SkillInfo.Seconds(sample.TicksLeft)})", durationTicks: sample.TicksLeft));
+        }
     }
 
     /// <summary>Wendet eine Wirkung nur mit einer Chance an (z. B. 20 % Betäubung).</summary>
@@ -125,6 +158,13 @@ namespace Betaknight.Core.Arena
             if (ChanceBp <= 0) return;
             if (ChanceBp >= BasisPoints.Full || c.Battle.Random.Next(BasisPoints.Full) < ChanceBp) Inner.Apply(c);
         }
+
+        public void Describe(SkillInfoBuilder info)
+        {
+            SkillInfoBuilder inner = info.Nested();
+            Inner.Describe(inner);
+            foreach (EffectInfo e in inner.Effects) info.Add(ChanceBp >= BasisPoints.Full ? e : e.WithChance(ChanceBp));
+        }
     }
 
     /// <summary>Setzt eine eigene Ressource auf einen festen Wert, z. B. Hitze auf 0.</summary>
@@ -141,6 +181,9 @@ namespace Betaknight.Core.Arena
 
         public void Apply(in SkillContext c) =>
             c.Battle.ChangeResource(c.User, ResourceId, Value - c.User.GetResource(ResourceId), int.MaxValue, int.MinValue);
+
+        public void Describe(SkillInfoBuilder info) =>
+            info.Add(new EffectInfo(EffectInfoKind.Resource, $"{SkillInfo.ResourceName(ResourceId)} auf {Value}"));
     }
 
     /// <summary>
@@ -161,5 +204,8 @@ namespace Betaknight.Core.Arena
                 effect.Apply(repeat);
             }
         }
+
+        public void Describe(SkillInfoBuilder info) =>
+            info.Add(new EffectInfo(EffectInfoKind.Repeat, "wiederholt den letzten eigenen Skill (dessen Schaden zählt dort)"));
     }
 }
