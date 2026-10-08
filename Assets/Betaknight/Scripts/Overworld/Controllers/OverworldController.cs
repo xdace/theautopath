@@ -43,8 +43,8 @@ namespace Betaknight.Overworld.Controllers
             if (_session == null || _camera == null) return;
             if (IsTravelling) return;
 
-            // Ein offenes Event-Fenster hat Vorrang vor der Karte.
-            if (_session.IsBusy)
+            // Ein offenes Fenster (Event, Runenwahl, Shop, Game Over) hat Vorrang vor der Karte.
+            if (_session.IsBusy || _session.IsGameOver)
             {
                 SetHovered(null);
                 return;

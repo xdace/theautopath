@@ -28,6 +28,8 @@ namespace Betaknight.Overworld
         private OverworldHud _hud;
         private EncounterWindow _encounterWindow;
         private RuneOfferWindow _runeWindow;
+        private ShopWindow _shopWindow;
+        private GameOverWindow _gameOverWindow;
         private KitSelectionWindow _kitWindow;
         private KnightKit _kit;
 
@@ -44,6 +46,8 @@ namespace Betaknight.Overworld
             _hud = gameObject.AddComponent<OverworldHud>();
             _encounterWindow = gameObject.AddComponent<EncounterWindow>();
             _runeWindow = gameObject.AddComponent<RuneOfferWindow>();
+            _shopWindow = gameObject.AddComponent<ShopWindow>();
+            _gameOverWindow = gameObject.AddComponent<GameOverWindow>();
             _kitWindow = gameObject.AddComponent<KitSelectionWindow>();
         }
 
@@ -56,8 +60,7 @@ namespace Betaknight.Overworld
             _root = null;
             Session = null;
             _hud.Initialize(null, null, null, null);
-            _encounterWindow.enabled = false;
-            _runeWindow.enabled = false;
+            SetRunWindowsEnabled(false);
 
             _kitWindow.Open(KnightKit.Defaults, RuneCatalog.CreateDefault(), kit =>
             {
@@ -70,8 +73,7 @@ namespace Betaknight.Overworld
         public void BuildWorld()
         {
             if (_root != null) Destroy(_root);
-            _encounterWindow.enabled = true;
-            _runeWindow.enabled = true;
+            SetRunWindowsEnabled(true);
 
             int seed = settings.seed != 0 ? settings.seed : Random.Range(1, int.MaxValue);
             MapGenerationConfig config = settings.ToGenerationConfig(seed);
@@ -95,8 +97,18 @@ namespace Betaknight.Overworld
             _hud.Initialize(Session, controller, config.Encounters, StartNewRun);
             _encounterWindow.Initialize(Session);
             _runeWindow.Initialize(Session);
+            _shopWindow.Initialize(Session);
+            _gameOverWindow.Initialize(Session, StartNewRun);
 
             Debug.Log($"[Betaknight] Oberwelt erzeugt: {Session.Map.Count} Felder, Seed {seed}, Kit {_kit?.Name ?? "keins"}.");
+        }
+
+        private void SetRunWindowsEnabled(bool enabled)
+        {
+            _encounterWindow.enabled = enabled;
+            _runeWindow.enabled = enabled;
+            _shopWindow.enabled = enabled;
+            _gameOverWindow.enabled = enabled;
         }
 
         private Camera SetupCamera(Transform followTarget)

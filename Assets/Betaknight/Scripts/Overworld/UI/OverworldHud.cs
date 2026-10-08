@@ -65,6 +65,10 @@ namespace Betaknight.Overworld.UI
             }
 
             GUILayout.FlexibleSpace();
+            if (_session.CanOpenShop && GUILayout.Button("Shop öffnen"))
+            {
+                _session.OpenShop();
+            }
             if (_onNewMap != null && GUILayout.Button("Neuer Run"))
             {
                 _onNewMap();

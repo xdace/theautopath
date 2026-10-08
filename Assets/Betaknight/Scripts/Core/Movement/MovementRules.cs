@@ -13,6 +13,9 @@ namespace Betaknight.Core.Movement
 
         /// <summary>Ein Event wartet noch auf eine Entscheidung.</summary>
         Busy,
+
+        /// <summary>Der Run ist vorbei, der Ritter ist gefallen.</summary>
+        GameOver,
     }
 
     /// <summary>Zentrale Regeln, welche Felder betreten werden dürfen.</summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Betaknight.Core.Combat;
 using Betaknight.Core.Encounters;
 using Betaknight.Core.Exploration;
 using Betaknight.Core.Hex;
@@ -41,7 +42,7 @@ namespace Betaknight.Core
     /// Komplett Unity-frei und dadurch per Unit-Test prüfbar.
     /// Die Darstellung beobachtet nur Events und ruft <see cref="TryStep"/> auf.
     /// </summary>
-    public sealed class OverworldSession
+    public sealed partial class OverworldSession
     {
         public HexMap Map { get; }
         public PlayerModel Player { get; }
@@ -65,7 +66,7 @@ namespace Betaknight.Core
         public RuneOffer PendingRuneOffer { get; private set; }
 
         /// <summary>Wartet die Session auf eine Entscheidung des Spielers?</summary>
-        public bool IsBusy => PendingEncounter != null || PendingRuneOffer != null;
+        public bool IsBusy => PendingEncounter != null || PendingRuneOffer != null || PendingShop != null;
 
         /// <summary>Wird nach jedem erfolgreichen Schritt ausgelöst, nachdem kleine Events bereits gewirkt haben.</summary>
         public event Action<StepResult> CellEntered;
@@ -86,7 +87,8 @@ namespace Betaknight.Core
         private readonly EncounterResolver _resolver;
 
         public OverworldSession(HexMap map, PlayerModel player, TurnSystem turns, ExplorationService exploration,
-            PlayerStats stats = null, EncounterCatalog encounters = null, RuneLoadout runes = null, RuneCatalog runeCatalog = null)
+            PlayerStats stats = null, EncounterCatalog encounters = null, RuneLoadout runes = null, RuneCatalog runeCatalog = null,
+            ICombatResolver combat = null)
         {
             Map = map ?? throw new ArgumentNullException(nameof(map));
             Player = player ?? throw new ArgumentNullException(nameof(player));
@@ -100,6 +102,8 @@ namespace Betaknight.Core
             // Eigener Zufall für Events und Angebote, abgeleitet vom Karten-Seed: gleicher Seed, gleiche Beute.
             _random = new Random(unchecked(Map.Seed * 31 + 7));
             _resolver = new EncounterResolver(Map, Exploration, Stats, _random);
+            _combat = combat ?? new PlaceholderCombatResolver();
+            Turns.TurnEnded += OnTurnEnded;
 
             if (!Map.TryGetCell(Player.Position, out HexCell startCell))
                 throw new ArgumentException("Der Spieler muss auf einem Feld der Karte starten.");
@@ -136,11 +140,16 @@ namespace Betaknight.Core
 
         public bool CanStepTo(HexCoord target) => CheckStep(target) == MoveFailure.None;
 
-        private MoveFailure CheckStep(HexCoord target) =>
-            IsBusy ? MoveFailure.Busy : MovementRules.CheckStep(Map, Player.Position, target);
+        private MoveFailure CheckStep(HexCoord target)
+        {
+            if (IsGameOver) return MoveFailure.GameOver;
+            if (IsBusy) return MoveFailure.Busy;
+            return MovementRules.CheckStep(Map, Player.Position, target);
+        }
 
         /// <summary>
-        /// Ein Schritt auf ein Nachbarfeld: bewegt den Spieler, deckt auf, beendet den Zug und löst das Feld-Event aus.
+        /// Ein Schritt auf ein Nachbarfeld: bewegt den Spieler, deckt auf, beendet den Zug und löst das Feld-Event aus
+        /// (kleine/mittlere Events hier, grosse in OverworldSession.MajorEvents.cs).
         /// </summary>
         public StepResult TryStep(HexCoord target)
         {
@@ -156,6 +165,7 @@ namespace Betaknight.Core
             Turns.EndTurn();
 
             TriggerEncounter(cell);
+            TriggerMajorEvent(cell, firstVisit);
 
             StepResult result = StepResult.Ok(cell, firstVisit);
             CellEntered?.Invoke(result);

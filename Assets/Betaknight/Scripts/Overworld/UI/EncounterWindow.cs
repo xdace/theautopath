@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Betaknight.Overworld.UI
 {
     /// <summary>
-    /// Zeigt mittlere Events als Fenster mit Optionen und meldet Ergebnisse als kurze Hinweise unten links.
+    /// Zeigt mittlere Events als Fenster mit Optionen und meldet Ergebnisse aller Events als kurze Hinweise unten links.
     /// Platzhalter per IMGUI, bis das echte UI kommt. Spielregeln kennt es nicht, es ruft nur die Session auf.
     /// </summary>
     public sealed class EncounterWindow : MonoBehaviour
@@ -27,6 +27,7 @@ namespace Betaknight.Overworld.UI
             _messages.Clear();
             _session = session;
             _session.EncounterResolved += OnResolved;
+            _session.MajorEventResolved += OnMajorResolved;
         }
 
         /// <summary>Hinweis unten links einblenden, z. B. für andere Systeme.</summary>
@@ -38,6 +39,9 @@ namespace Betaknight.Overworld.UI
 
         private void OnResolved(EncounterOutcome outcome) =>
             Post($"<b>{outcome.Definition.Title}</b>: {outcome.Summary}");
+
+        private void OnMajorResolved(MajorEventOutcome outcome) =>
+            Post($"<b>{outcome.Title}</b>: {outcome.Summary}");
 
         private void OnGUI()
         {
@@ -96,7 +100,9 @@ namespace Betaknight.Overworld.UI
 
         private void Unsubscribe()
         {
-            if (_session != null) _session.EncounterResolved -= OnResolved;
+            if (_session == null) return;
+            _session.EncounterResolved -= OnResolved;
+            _session.MajorEventResolved -= OnMajorResolved;
         }
 
         private void OnDestroy() => Unsubscribe();
