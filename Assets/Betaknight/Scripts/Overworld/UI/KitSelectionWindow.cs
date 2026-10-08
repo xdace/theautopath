@@ -49,15 +49,15 @@ namespace Betaknight.Overworld.UI
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
 
             GUILayout.BeginArea(rect, GUI.skin.box);
-            GUILayout.Label("<b>Wähle deinen Ritter</b>", _titleStyle);
+            GUILayout.Label(UiTexts.Kit.Title, _titleStyle);
             GUILayout.Space(8f);
 
             foreach (KnightKit kit in _kits)
             {
                 string rune = _runes != null && _runes.TryGet(kit.StartRuneId, out RuneDefinition r)
                     ? $"{r.Name}: {r.Description}"
-                    : "keine";
-                string label = $"<b>{kit.Name}</b>  [{kit.Tag.DisplayName()}]   {kit.MaxHp} HP, {kit.Gold} Gold\n{kit.Description}\nStart-Rune {rune}";
+                    : UiTexts.Kit.NoRune;
+                string label = UiTexts.Kit.Label(kit.Name, kit.Tag.DisplayName(), kit.MaxHp, kit.Gold, kit.Description, rune);
 
                 if (GUILayout.Button(label, _kitStyle, GUILayout.Height(88f)))
                 {

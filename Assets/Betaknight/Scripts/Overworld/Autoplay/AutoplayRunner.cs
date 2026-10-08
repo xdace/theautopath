@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using Betaknight.Core;
 using Betaknight.Core.Autoplay;
@@ -67,6 +68,8 @@ namespace Betaknight.Overworld.Autoplay
         private float Now => Time.realtimeSinceStartup;
         private float Speed => _options?.Speed ?? 1f;
 
+        private string SpeedText => Speed.ToString("0.##", CultureInfo.InvariantCulture);
+
         public void Initialize(OverworldBootstrapper boot, AutoplayOptions options)
         {
             _boot = boot;
@@ -76,13 +79,14 @@ namespace Betaknight.Overworld.Autoplay
         /// <summary>Startet den ersten Run (statt des normalen Spielstarts).</summary>
         public void Begin()
         {
-            foreach (string warning in _options.Warnings) Debug.LogWarning($"[Autoplay] {warning}");
+            foreach (string warning in _options.Warnings) Debug.LogWarning(AutoplayTexts.LogPrefix + warning);
             Application.logMessageReceived += OnLog;
             Application.runInBackground = true;
             Time.timeScale = Mathf.Clamp(Speed, 0.1f, 100f);
             _boot.Arena.SpeedFactor = Speed;
-            Debug.Log($"[Autoplay] Start: {_options.Runs} Run(s), Seed {(_options.Seed.HasValue ? _options.Seed.Value.ToString() : "zufällig")}, " +
-                $"Tempo {Speed}×, bis Akt {_options.TargetAct}{(_options.Quit ? ", danach beenden" : string.Empty)}.");
+            Debug.Log(AutoplayTexts.LogPrefix + AutoplayTexts.LogStart(_options.Runs,
+                _options.Seed.HasValue ? _options.Seed.Value.ToString(CultureInfo.InvariantCulture) : AutoplayTexts.RandomSeed,
+                SpeedText, _options.TargetAct, _options.Quit));
             StartRun();
         }
 
@@ -125,10 +129,10 @@ namespace Betaknight.Overworld.Autoplay
             _warmup = WarmupFrames;
             _runStart = Now;
             _phase = Phase.Running;
-            Progress("Run startet");
+            Progress(AutoplayTexts.ProgressRunStarts);
             _nextActionAt = Now + WindowPause / Speed;
 
-            Debug.Log($"[Autoplay] Run {_runIndex + 1}/{_options.Runs}, Seed {_seed}");
+            Debug.Log(AutoplayTexts.LogPrefix + AutoplayTexts.LogRun(_runIndex + 1, _options.Runs, _seed));
             _boot.SeedOverride = _seed;
             _boot.StartNewRun();
         }
@@ -143,7 +147,7 @@ namespace Betaknight.Overworld.Autoplay
             }
             _recorder.Finish(reason);
             _summary.Runs.Add(_report);
-            Debug.Log($"[Autoplay] {_report.Summary()}");
+            Debug.Log(AutoplayTexts.LogPrefix + _report.Summary());
 
             _phase = Phase.BetweenRuns;
             _nextRunAt = Now + BetweenRunsPause / Speed;
@@ -154,8 +158,8 @@ namespace Betaknight.Overworld.Autoplay
         {
             _phase = Phase.Done;
             Application.logMessageReceived -= OnLog;
-            Debug.Log($"[Autoplay] {_summary.Summary()}");
-            Debug.Log($"[Autoplay] {RuneFireStats.Table(_summary.Runs)}");
+            Debug.Log(AutoplayTexts.LogPrefix + _summary.Summary());
+            Debug.Log(AutoplayTexts.LogPrefix + RuneFireStats.Table(_summary.Runs));
 
             _reportPath = string.IsNullOrEmpty(_options.ReportPath)
                 ? Path.Combine(Application.persistentDataPath, "autoplay-report.json")
@@ -165,16 +169,16 @@ namespace Betaknight.Overworld.Autoplay
                 string dir = Path.GetDirectoryName(Path.GetFullPath(_reportPath));
                 if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
                 File.WriteAllText(_reportPath, _summary.ToJson());
-                Debug.Log($"[Autoplay] Bericht: {Path.GetFullPath(_reportPath)}");
+                Debug.Log(AutoplayTexts.LogPrefix + AutoplayTexts.LogReport(Path.GetFullPath(_reportPath)));
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[Autoplay] Bericht konnte nicht geschrieben werden ({_reportPath}): {e.Message}");
+                Debug.LogWarning(AutoplayTexts.LogPrefix + AutoplayTexts.LogReportFailed(_reportPath, e.Message));
             }
 
             if (_options.Quit)
             {
-                Debug.Log($"[Autoplay] Beenden mit Exit-Code {_summary.ExitCode}");
+                Debug.Log(AutoplayTexts.LogPrefix + AutoplayTexts.LogQuit(_summary.ExitCode));
                 Application.Quit(_summary.ExitCode);
             }
         }
@@ -227,10 +231,10 @@ namespace Betaknight.Overworld.Autoplay
             {
                 if (Now < _nextActionAt) return;
                 KnightKit kit = AutoplayBot.ChooseKit(kits.Kits, _seed);
-                _report.Kit = kit?.Name ?? "keins";
-                Debug.Log($"[Autoplay] Kit: {_report.Kit}");
+                _report.Kit = kit?.Name ?? AutoplayTexts.NoKit;
+                Debug.Log(AutoplayTexts.LogPrefix + AutoplayTexts.LogKit(_report.Kit));
                 kits.Choose(kit);
-                Progress($"Kit {_report.Kit}");
+                Progress(AutoplayTexts.ProgressKit(_report.Kit));
                 _nextActionAt = Now + ActionPause / Speed;
                 return;
             }
@@ -242,7 +246,7 @@ namespace Betaknight.Overworld.Autoplay
                 _attached = session;
                 _recorder.Attach(session);
                 _warmup = WarmupFrames;
-                Progress($"Akt {session.Act}");
+                Progress(AutoplayTexts.ProgressAct(session.Act));
             }
             if (session.Turns.CurrentTurn != _lastTurn)
             {
@@ -252,7 +256,7 @@ namespace Betaknight.Overworld.Autoplay
 
             if (session.Act >= _options.TargetAct)
             {
-                EndRun($"Akt {_options.TargetAct} erreicht");
+                EndRun(AutoplayTexts.EndActReached(_options.TargetAct));
                 return;
             }
 
@@ -268,7 +272,7 @@ namespace Betaknight.Overworld.Autoplay
                 if (arena.IsFinished && Now >= _nextActionAt)
                 {
                     arena.Continue();
-                    Progress("Arena: Weiter");
+                    Progress(AutoplayTexts.ProgressArenaContinue);
                     _nextActionAt = Now + ActionPause / Speed;
                 }
                 return;
@@ -276,12 +280,12 @@ namespace Betaknight.Overworld.Autoplay
 
             if (session.IsGameOver)
             {
-                EndRun("Game Over");
+                EndRun(AutoplayTexts.EndGameOver);
                 return;
             }
             if (session.Turns.CurrentTurn >= HeadlessAutoplay.MaxTurns)
             {
-                EndRun("Zuglimit");
+                EndRun(AutoplayTexts.EndTurnLimit);
                 return;
             }
 
@@ -349,18 +353,18 @@ namespace Betaknight.Overworld.Autoplay
             if (Now - _lastProgress <= HangSeconds) return;
 
             OverworldSession s = _boot.Session;
-            string where = s == null ? "ohne Session" : $"Akt {s.Act}, Zug {s.Turns.CurrentTurn}";
-            string text = $"{where}: keine Aktion seit {HangSeconds:0} s, zuletzt «{_lastAction}»";
+            string where = s == null ? AutoplayTexts.NoSessionWhere : AutoplayTexts.WhereActTurn(s.Act, s.Turns.CurrentTurn);
+            string text = AutoplayTexts.NoActionFor(where, HangSeconds, _lastAction);
             _report.AddHang(text);
-            Debug.LogWarning($"[Autoplay] Hänger: {text}");
+            Debug.LogWarning(AutoplayTexts.LogPrefix + AutoplayTexts.LogHang(text));
             _hangsThisRun++;
 
             // Befreiungsversuch: Arena weiterklicken, Fenster schliessen.
             _boot.Arena.Continue();
             _boot.CloseLoadoutWindows();
-            Progress("Befreiungsversuch nach Hänger");
+            Progress(AutoplayTexts.ProgressHangRecovery);
 
-            if (_hangsThisRun >= MaxHangsPerRun) EndRun("Hänger");
+            if (_hangsThisRun >= MaxHangsPerRun) EndRun(AutoplayTexts.EndHang);
         }
 
         // ------------------------------------------------------------------ Anzeige
@@ -373,13 +377,13 @@ namespace Betaknight.Overworld.Autoplay
             switch (_phase)
             {
                 case Phase.Done:
-                    status = $"<b>Testspieler fertig</b>\n{_summary.Summary()}\nBericht: {_reportPath}";
+                    status = AutoplayTexts.StatusDone(_summary.Summary(), _reportPath);
                     break;
                 case Phase.BetweenRuns:
-                    status = $"<b>Testspieler</b>  Run {_runIndex}/{_options.Runs} beendet: {_report?.EndReason}";
+                    status = AutoplayTexts.StatusRunEnded(_runIndex, _options.Runs, _report?.EndReason);
                     break;
                 default:
-                    status = $"<b>Testspieler</b>  Run {_runIndex + 1}/{_options.Runs}, Seed {_seed}, {_report?.Kit}, Tempo {Speed}×\n{_lastAction}";
+                    status = AutoplayTexts.StatusRunning(_runIndex + 1, _options.Runs, _seed, _report?.Kit, SpeedText, _lastAction);
                     break;
             }
             const float width = 420f;

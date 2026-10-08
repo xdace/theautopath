@@ -21,10 +21,10 @@ namespace Betaknight.Overworld
     /// </summary>
     public sealed class OverworldBootstrapper : MonoBehaviour
     {
-        [Tooltip("Optional. Ohne Asset werden die Standardwerte verwendet.")]
+        [Tooltip("Optional. Without an asset the default values are used.")]
         [SerializeField] private OverworldSettings settings;
 
-        [Tooltip("Optional. Ohne Zuweisung wird Camera.main verwendet bzw. eine Kamera erzeugt.")]
+        [Tooltip("Optional. If unassigned, Camera.main is used or a camera is created.")]
         [SerializeField] private Camera targetCamera;
 
         private GameObject _root;
@@ -62,7 +62,7 @@ namespace Betaknight.Overworld
             if (settings == null)
             {
                 settings = ScriptableObject.CreateInstance<OverworldSettings>();
-                settings.name = "OverworldSettings (Standard)";
+                settings.name = "OverworldSettings (Default)";
             }
 
             _hud = gameObject.AddComponent<OverworldHud>();
@@ -204,7 +204,7 @@ namespace Betaknight.Overworld
             Session.UseRecipeStore(_recipeStore);
             Session.ActCompleted += OnActCompleted;
 
-            _root = new GameObject($"Overworld (Akt {Session.Act})");
+            _root = new GameObject($"Overworld (Act {Session.Act})");
             var layout = new HexLayout(settings.hexSize);
 
             var gridGo = new GameObject("Grid");
@@ -232,7 +232,7 @@ namespace Betaknight.Overworld
             _inventoryWindow.Initialize(Session);
             _inventoryFullWindow.Initialize(Session);
 
-            Debug.Log($"[Betaknight] Akt {Session.Act}: {Session.Map.Count} Felder, Seed {Session.Map.Seed}, Kit {_kit?.Name ?? "keins"}.");
+            Debug.Log($"[Betaknight] Act {Session.Act}: {Session.Map.Count} tiles, seed {Session.Map.Seed}, kit {_kit?.Name ?? "none"}.");
         }
 
         private void SetRunWindowsEnabled(bool enabled)

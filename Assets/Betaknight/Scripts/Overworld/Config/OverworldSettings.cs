@@ -21,30 +21,30 @@ namespace Betaknight.Overworld.Config
             public string label;
         }
 
-        [Header("Kartengenerierung")]
+        [Header("Map Generation")]
         [Min(1)] public int mapRadius = 6;
 
-        [Tooltip("0 = bei jedem Start ein neuer Zufalls-Seed.")]
+        [Tooltip("0 = a new random seed on every start.")]
         public int seed = 0;
 
-        [Tooltip("Event-Mischung nach Entfernung vom Start (klein / mittel / gross). Das letzte Band gilt bis zum Kartenrand.")]
+        [Tooltip("Event mix by distance from the start (minor / medium / major). The last band applies up to the map edge.")]
         public List<DistanceBand> distanceBands = MapGenerationConfig.DefaultBands();
 
-        [Tooltip("Frühestens ab welcher Entfernung und höchstens wie oft ein grosser Inhalt vorkommt (MaxCount 0 = unbegrenzt).")]
+        [Tooltip("Minimum distance and maximum count for a major content (MaxCount 0 = unlimited).")]
         public List<ContentRule> contentRules = MapGenerationConfig.DefaultRules();
 
-        [Tooltip("Garantierte grosse Inhalte in einem Entfernungsbereich.")]
+        [Tooltip("Guaranteed major contents within a distance range.")]
         public List<ContentQuota> contentQuotas = MapGenerationConfig.DefaultQuotas();
 
-        [Header("Erkundung")]
+        [Header("Exploration")]
         [Min(0)] public int sightRadius = 1;
 
-        [Header("Darstellung")]
+        [Header("Display")]
         [Min(0.05f)] public float hexSize = 0.6f;
 
         [Range(0f, 0.3f)] public float hexGap = 0.06f;
 
-        [Tooltip("Verborgene Felder dunkel anzeigen, damit die Kartengrenze erkennbar ist.")]
+        [Tooltip("Show hidden tiles dark so the map border is visible.")]
         public bool showHiddenCells = true;
 
         public Color hiddenColor = new Color(0.10f, 0.11f, 0.14f);
@@ -66,16 +66,16 @@ namespace Betaknight.Overworld.Config
             new ContentStyle { content = CellContent.GoldMine, color = new Color(0.85f, 0.72f, 0.20f), label = "G" },
         };
 
-        [Tooltip("Farbe kleiner Events. Das Symbol kommt aus dem Event-Katalog.")]
+        [Tooltip("Color of minor events. The symbol comes from the event catalog.")]
         public Color minorEventColor = new Color(0.45f, 0.55f, 0.45f);
 
-        [Tooltip("Farbe mittlerer Events (Entscheidung).")]
+        [Tooltip("Color of medium events (decision).")]
         public Color mediumEventColor = new Color(0.55f, 0.45f, 0.70f);
 
-        [Tooltip("Erledigte Events werden in Richtung dieser Farbe abgedunkelt.")]
+        [Tooltip("Resolved events are darkened towards this color.")]
         public Color resolvedColor = new Color(0.25f, 0.27f, 0.30f);
 
-        [Header("Bewegung & Kamera")]
+        [Header("Movement & Camera")]
         [Min(0.01f)] public float stepDuration = 0.18f;
         [Min(0.5f)] public float cameraOrthoSize = 5f;
         [Min(0.1f)] public float cameraFollowSpeed = 6f;

@@ -13,9 +13,9 @@ namespace Betaknight.Overworld.UI
         {
             switch (kind)
             {
-                case ModuleKind.Skill: return "Skill-Modul";
-                case ModuleKind.Block: return "Baustein-Modul";
-                case ModuleKind.Trigger: return "Auslöser";
+                case ModuleKind.Skill: return UiTexts.Module.SkillKind;
+                case ModuleKind.Block: return UiTexts.Module.BlockKind;
+                case ModuleKind.Trigger: return UiTexts.Module.TriggerKind;
                 default: return kind.ToString();
             }
         }
@@ -24,9 +24,9 @@ namespace Betaknight.Overworld.UI
         public static string Describe(OverworldSession session, string moduleId, string suffix = "")
         {
             if (!session.ModuleCatalog.TryGet(moduleId, out ModuleDefinition module)) return moduleId;
-            string text = $"<b>Modul: {module.Name}</b>  [{KindName(module.Kind)}]{suffix}\n<size=13>{module.Description}";
+            string text = $"{UiTexts.Module.Title(module.Name, KindName(module.Kind))}{suffix}\n<size=13>{module.Description}";
             string owned = Owned(session, moduleId);
-            if (owned.Length > 0) text += $"\n<color=#9fc7ff>Besitzt: {owned}</color>";
+            if (owned.Length > 0) text += $"\n<color=#9fc7ff>{UiTexts.Owned(owned)}</color>";
             text += RuneText.Eases(session, moduleId);
             text += SkillText.EvolutionHints(session.EvolutionHintsForModule(moduleId));
             return text + "</size>";
@@ -59,10 +59,10 @@ namespace Betaknight.Overworld.UI
             if (target != null)
             {
                 string from = target.NameFrom(session.ModuleCatalog);
-                if (GUILayout.Button(new GUIContent($"▲ Stufe erhöhen ({from} → +{target.Level + 1})", $"{from} ({session.ModuleWhere(target)}) wird stärker"),
+                if (GUILayout.Button(new GUIContent(UiTexts.Module.Upgrade(from, target.Level + 1), UiTexts.Module.UpgradeTip(from, session.ModuleWhere(target))),
                         GUILayout.Height(28f)))
                     take(SkillDuplicateChoice.Upgrade);
-                if (GUILayout.Button(new GUIContent("Weiteres Exemplar", "Ein zweites Modul auf Stufe 0 für einen anderen Platz"), GUILayout.Height(28f)))
+                if (GUILayout.Button(new GUIContent(UiTexts.Module.AnotherCopy, UiTexts.Module.AnotherCopyTip), GUILayout.Height(28f)))
                     take(SkillDuplicateChoice.KeepCopy);
             }
             else if (GUILayout.Button(takeLabel, GUILayout.Height(28f)))

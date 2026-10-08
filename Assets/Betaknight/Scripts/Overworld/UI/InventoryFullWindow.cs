@@ -44,9 +44,9 @@ namespace Betaknight.Overworld.UI
 
         private void DrawItem(EquipmentDefinition incoming)
         {
-            GUILayout.Label("<b>Inventar voll</b>", _title);
-            GUILayout.Label($"Neu: {ItemText.Details(incoming, _session)}", _text);
-            GUILayout.Label("Ein Teil verwerfen, damit das neue hineinpasst:", _text);
+            GUILayout.Label(UiTexts.InventoryFull.ItemTitle, _title);
+            GUILayout.Label(UiTexts.InventoryFull.New(ItemText.Details(incoming, _session)), _text);
+            GUILayout.Label(UiTexts.InventoryFull.ItemHint, _text);
 
             _scroll = GUILayout.BeginScrollView(_scroll);
             // Indizes sind Zellen des Item-Rasters; leere Zellen überspringen.
@@ -54,7 +54,7 @@ namespace Betaknight.Overworld.UI
             {
                 EquipmentDefinition item = _session.Inventory[i];
                 if (item == null) continue;
-                if (GUILayout.Button($"<b>{item.Name}</b> [{item.Slot.DisplayName()}] verwerfen\n<size=13>{ItemText.Describe(item)}</size>", _button))
+                if (GUILayout.Button(UiTexts.InventoryFull.DiscardItem(item.Name, item.Slot.DisplayName(), ItemText.Describe(item)), _button))
                 {
                     _session.DiscardItem(i);
                     break;
@@ -62,20 +62,20 @@ namespace Betaknight.Overworld.UI
             }
             GUILayout.EndScrollView();
 
-            if (GUILayout.Button($"{incoming.Name} ablehnen", GUILayout.Height(32f))) _session.RejectPendingItem();
+            if (GUILayout.Button(UiTexts.InventoryFull.Reject(incoming.Name), GUILayout.Height(32f))) _session.RejectPendingItem();
         }
 
         private void DrawRune(StoredRune incoming)
         {
-            GUILayout.Label("<b>Runen-Inventar voll</b>", _title);
-            GUILayout.Label($"Neu: <b>{incoming.Name}</b>\n{incoming.Description}", _text);
-            GUILayout.Label("Eine Rune verwerfen, damit die neue hineinpasst:", _text);
+            GUILayout.Label(UiTexts.InventoryFull.RuneTitle, _title);
+            GUILayout.Label(UiTexts.InventoryFull.New($"<b>{incoming.Name}</b>\n{incoming.Description}"), _text);
+            GUILayout.Label(UiTexts.InventoryFull.RuneHint, _text);
 
             _scroll = GUILayout.BeginScrollView(_scroll);
             IReadOnlyList<StoredRune> runes = _session.RuneInventory.Runes;
             for (int i = 0; i < runes.Count; i++)
             {
-                if (GUILayout.Button($"<b>{runes[i].Name}</b> verwerfen\n<size=13>{runes[i].Description}</size>", _button))
+                if (GUILayout.Button(UiTexts.InventoryFull.DiscardRune(runes[i].Name, runes[i].Description), _button))
                 {
                     _session.DiscardRune(i);
                     break;
@@ -83,7 +83,7 @@ namespace Betaknight.Overworld.UI
             }
             GUILayout.EndScrollView();
 
-            if (GUILayout.Button($"{incoming.Name} ablehnen", GUILayout.Height(32f))) _session.RejectPendingRune();
+            if (GUILayout.Button(UiTexts.InventoryFull.Reject(incoming.Name), GUILayout.Height(32f))) _session.RejectPendingRune();
         }
 
         private void EnsureStyles()

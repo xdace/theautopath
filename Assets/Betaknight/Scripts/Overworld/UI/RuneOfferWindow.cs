@@ -63,9 +63,9 @@ namespace Betaknight.Overworld.UI
 
         private void DrawOptions(RuneOffer offer)
         {
-            GUILayout.Label($"<b>Runenwahl</b> – {offer.Source}", _titleStyle);
-            GUILayout.Label($"Tafel: {_session.Runes.Runes.Count}/{_session.Runes.Slots}   Inventar: {_session.Inventory.Count}/{_session.Inventory.Capacity} Teile, "
-                + $"{_session.RuneInventory.Count}/{_session.RuneInventory.Capacity} Runen", _textStyle);
+            GUILayout.Label(UiTexts.Offer.Title(offer.Source), _titleStyle);
+            GUILayout.Label(UiTexts.Offer.Status(_session.Runes.Runes.Count, _session.Runes.Slots, _session.Inventory.Count, _session.Inventory.Capacity,
+                _session.RuneInventory.Count, _session.RuneInventory.Capacity), _textStyle);
             GUILayout.Space(6f);
 
             IReadOnlyList<RuneDefinition> options = offer.Options;
@@ -76,7 +76,7 @@ namespace Betaknight.Overworld.UI
                 {
                     // Doppelte Rune: die vorhandene steigt eine Stufe.
                     string hints = SkillText.EvolutionHints(_session.EvolutionHintsForRune(rune.Id));
-                    string upgrade = $"<color=#7ddc6f>▲ Stufe erhöhen</color>  {RuneText.DifficultyBadge(rune)}  <b>{RuneLevelText(rune)}</b>\n{rune.Description}{hints}";
+                    string upgrade = $"<color=#7ddc6f>{UiTexts.Offer.LevelUp}</color>  {RuneText.DifficultyBadge(rune)}  <b>{RuneLevelText(rune)}</b>\n{rune.Description}{hints}";
                     GUI.enabled = _session.CanUpgradeRune(rune);
                     if (GUILayout.Button(upgrade, _nameStyle, GUILayout.Height(RuneHeight(hints)))) _session.TakeRune(i);
                     GUI.enabled = true;
@@ -102,8 +102,8 @@ namespace Betaknight.Overworld.UI
                 if (_session.CanUpgradeItem(item.Id))
                 {
                     // Doppeltes Teil: das vorhandene wird aufgewertet (Werte und passive Effekte).
-                    string where = worn != null && worn.Id == item.Id ? "angelegt" : "im Inventar";
-                    string text = $"<color=#7ddc6f>▲ Aufwerten</color>  <b>{item.BaseName}</b> ({where}) → Stufe +{OwnedLevel(item) + 1}\n{ItemText.Describe(item)}";
+                    string where = worn != null && worn.Id == item.Id ? UiTexts.Offer.Equipped : UiTexts.Offer.InInventory;
+                    string text = $"<color=#7ddc6f>{UiTexts.Offer.Upgrade}</color>  <b>{item.BaseName}</b> ({where}) → {UiTexts.Offer.UpgradeLevel(OwnedLevel(item) + 1)}\n{ItemText.Describe(item)}";
                     if (GUILayout.Button(text, _nameStyle, GUILayout.Height(64f))) _session.TakeItem(i);
                     continue;
                 }
@@ -111,10 +111,10 @@ namespace Betaknight.Overworld.UI
                 GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}{RuneText.Eases(_session, item.Id)}\n<size=13>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>{(setBlock.Length > 0 ? $"\n<size=13>{setBlock}</size>" : string.Empty)}", _plainStyle);
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _session.CanTakeItem(i, ItemPlacement.Equip);
-                string equip = worn != null ? $"Anlegen ({worn.Name} ins Inventar)" : "Anlegen";
+                string equip = worn != null ? UiTexts.Offer.EquipSwap(worn.Name) : UiTexts.Offer.Equip;
                 if (GUILayout.Button(equip, GUILayout.Height(28f))) _session.TakeItem(i, ItemPlacement.Equip);
                 GUI.enabled = _session.CanTakeItem(i, ItemPlacement.Inventory);
-                if (GUILayout.Button("Ins Inventar", GUILayout.Height(28f))) _session.TakeItem(i, ItemPlacement.Inventory);
+                if (GUILayout.Button(UiTexts.Offer.ToInventory, GUILayout.Height(28f))) _session.TakeItem(i, ItemPlacement.Inventory);
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
                 GUILayout.EndVertical();
@@ -125,7 +125,7 @@ namespace Betaknight.Overworld.UI
                 int index = i;
                 GUILayout.BeginVertical(GUI.skin.box);
                 GUILayout.Label(SkillText.Describe(_session, offer.SkillIds[i]), _plainStyle);
-                SkillText.DrawChoice(_session, offer.SkillIds[i], _session.CanTakeSkill(i), "Skill nehmen (frei in die Sammlung)",
+                SkillText.DrawChoice(_session, offer.SkillIds[i], _session.CanTakeSkill(i), UiTexts.Offer.TakeSkill,
                     choice => _session.TakeSkill(index, choice));
                 GUILayout.EndVertical();
             }
@@ -134,8 +134,8 @@ namespace Betaknight.Overworld.UI
             {
                 int index = i;
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label(ModuleText.Describe(_session, offer.ModuleIds[i], "  <color=#ffd75e>selten</color>"), _plainStyle);
-                ModuleText.DrawChoice(_session, offer.ModuleIds[i], _session.CanTakeModule(i), "Modul nehmen (frei in die Sammlung)",
+                GUILayout.Label(ModuleText.Describe(_session, offer.ModuleIds[i], $"  <color=#ffd75e>{UiTexts.Offer.Rare}</color>"), _plainStyle);
+                ModuleText.DrawChoice(_session, offer.ModuleIds[i], _session.CanTakeModule(i), UiTexts.Offer.TakeModule,
                     choice => _session.TakeModule(index, choice));
                 GUILayout.EndVertical();
             }
@@ -143,13 +143,13 @@ namespace Betaknight.Overworld.UI
             if (offer.BoardExpansion)
             {
                 GUI.enabled = _session.CanExpandBoard;
-                string text = $"<color=#7ddc6f>▲ Tafel-Erweiterung: +1 Zeile</color>  ({_session.Runes.Slots} → {_session.Runes.Slots + 1} von {_session.Progression.MaxBoardRows})";
+                string text = UiTexts.Offer.BoardExpansion(_session.Runes.Slots, _session.Runes.Slots + 1, _session.Progression.MaxBoardRows);
                 if (GUILayout.Button(text, _nameStyle, GUILayout.Height(44f))) _session.TakeBoardExpansion();
                 GUI.enabled = true;
             }
 
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button($"Verzichten (+{OverworldSession.SkipRuneGold} Gold)", GUILayout.Height(30f)))
+            if (GUILayout.Button(UiTexts.Offer.Skip(OverworldSession.SkipRuneGold), GUILayout.Height(30f)))
             {
                 _session.SkipRuneOffer();
             }
@@ -162,7 +162,7 @@ namespace Betaknight.Overworld.UI
         {
             int row = _session.Runes.IndexOf(rune);
             int level = row >= 0 ? _session.Runes.Rows[row].Level : _session.RuneInventory[_session.RuneInventory.IndexOf(rune)].Level;
-            return level < rune.MaxLevel ? $"{rune.NameAt(level)} → {rune.NameAt(level + 1)}" : $"{rune.NameAt(level)} (höchste Stufe)";
+            return level < rune.MaxLevel ? $"{rune.NameAt(level)} → {rune.NameAt(level + 1)}" : UiTexts.Offer.MaxLevel(rune.NameAt(level));
         }
 
         private int OwnedLevel(EquipmentDefinition item)
@@ -175,23 +175,23 @@ namespace Betaknight.Overworld.UI
 
         private void DrawReplace(RuneDefinition incoming)
         {
-            GUILayout.Label($"<b>{incoming.Name}</b>: Tafel ist voll", _titleStyle);
+            GUILayout.Label(UiTexts.BoardFull(incoming.Name), _titleStyle);
             GUILayout.Space(6f);
 
-            if (GUILayout.Button("Ins Runen-Inventar legen", GUILayout.Height(32f)))
+            if (GUILayout.Button(UiTexts.Offer.ToRuneInventory, GUILayout.Height(32f)))
             {
                 _session.TakeRune(_choiceAwaitingSlot);
                 _choiceAwaitingSlot = -1;
                 return;
             }
-            GUILayout.Label("… oder eine Zeile tauschen (die alte Rune wandert mit ihrer Stufe ins Inventar, der Skill bleibt):", _plainStyle);
+            GUILayout.Label(UiTexts.SwapRowHint, _plainStyle);
 
             IReadOnlyList<RuneDefinition> equipped = _session.Runes.Runes;
             for (int slot = 0; slot < equipped.Count; slot++)
             {
                 RuneDefinition rune = equipped[slot];
                 RuneSlot row = _session.Runes.Rows[slot];
-                if (GUILayout.Button($"statt <b>{row.Name}</b>  [{rune.Tag.DisplayName()}]\n{row.Description}", _nameStyle, GUILayout.Height(56f)))
+                if (GUILayout.Button($"{UiTexts.Offer.Instead(row.Name)}  [{rune.Tag.DisplayName()}]\n{row.Description}", _nameStyle, GUILayout.Height(56f)))
                 {
                     _session.TakeRune(_choiceAwaitingSlot, slot);
                     _choiceAwaitingSlot = -1;
@@ -199,7 +199,7 @@ namespace Betaknight.Overworld.UI
             }
 
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Zurück", GUILayout.Height(30f))) _choiceAwaitingSlot = -1;
+            if (GUILayout.Button(UiTexts.Back, GUILayout.Height(30f))) _choiceAwaitingSlot = -1;
         }
 
         private void EnsureStyles()

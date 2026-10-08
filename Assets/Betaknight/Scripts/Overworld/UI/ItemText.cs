@@ -14,7 +14,7 @@ namespace Betaknight.Overworld.UI
             foreach (KeyValuePair<StatKind, int> stat in item.Stats)
                 if (stat.Value != 0) parts.Add(Stat(stat.Key, stat.Value));
             if (item.Tags.Count > 0) parts.Add(TagNames(item));
-            if (item.TwoHanded) parts.Add("zweihändig, sperrt Schild");
+            if (item.TwoHanded) parts.Add(UiTexts.Item.TwoHandedLocksShield);
             return parts.Count > 0 ? string.Join(", ", parts) : item.Description;
         }
 
@@ -24,7 +24,7 @@ namespace Betaknight.Overworld.UI
         /// </summary>
         public static string Compare(EquipmentDefinition item, EquipmentDefinition worn)
         {
-            if (worn == item) return "<color=#888888>angelegt</color>";
+            if (worn == item) return $"<color=#888888>{UiTexts.Item.Equipped}</color>";
             var kinds = new List<StatKind>();
             foreach (StatKind k in item.Stats.Keys) if (!kinds.Contains(k)) kinds.Add(k);
             if (worn != null) foreach (StatKind k in worn.Stats.Keys) if (!kinds.Contains(k)) kinds.Add(k);
@@ -38,8 +38,8 @@ namespace Betaknight.Overworld.UI
                 bool better = kind == StatKind.AttackInterval ? diff < 0 : diff > 0;
                 parts.Add($"<color={(better ? "#7ddc6f" : "#ff7a6b")}>{Stat(kind, diff)}</color>");
             }
-            if (parts.Count == 0) return worn != null ? $"gleiche Werte wie {worn.Name}" : "keine Werte";
-            return (worn != null ? $"statt {worn.Name}: " : "Platz frei: ") + string.Join(", ", parts);
+            if (parts.Count == 0) return worn != null ? UiTexts.Item.SameStats(worn.Name) : UiTexts.Item.NoStats;
+            return (worn != null ? UiTexts.Item.Instead(worn.Name) : UiTexts.Item.SlotFree) + string.Join(", ", parts);
         }
 
         /// <summary>
@@ -49,15 +49,15 @@ namespace Betaknight.Overworld.UI
         public static string SetBlock(SetDefinition set, int pieces, bool worn)
         {
             int before = worn ? pieces : pieces - 1;
-            string head = worn ? $"{pieces}/{set.MaxPieces} getragen" : $"mit diesem Teil {pieces}/{set.MaxPieces}";
-            var lines = new List<string> { $"Set <b>{set.Name}</b> ({head})" };
+            string head = worn ? UiTexts.Item.SetWorn(pieces, set.MaxPieces) : UiTexts.Item.SetWith(pieces, set.MaxPieces);
+            var lines = new List<string> { UiTexts.Item.SetHead(set.Name, head) };
             foreach (KeyValuePair<int, string> bonus in set.Bonuses)
             {
                 bool active = SetDefinition.IsActive(bonus.Key, pieces);
                 bool fresh = active && !SetDefinition.IsActive(bonus.Key, before);
-                string line = $"{(active ? "●" : "○")} {bonus.Key} Teile: {bonus.Value}";
+                string line = $"{(active ? "●" : "○")} {UiTexts.Item.Pieces(bonus.Key, bonus.Value)}";
                 string color = fresh ? UiTheme.Hex(UiTheme.Good) : active ? UiTheme.Hex(UiTheme.Accent) : UiTheme.Hex(UiTheme.MutedColor);
-                lines.Add($"<color={color}>{line}{(fresh ? "  (neu)" : string.Empty)}</color>");
+                lines.Add($"<color={color}>{line}{(fresh ? UiTexts.Item.New : string.Empty)}</color>");
             }
             return string.Join("\n", lines);
         }
@@ -68,14 +68,14 @@ namespace Betaknight.Overworld.UI
         /// </summary>
         public static string TagBlock(SynergyTag tag, int count, int before, bool preview)
         {
-            string head = preview ? $"mit diesem Teil {count}" : $"{count} getragen";
-            var lines = new List<string> { $"Tag <b>{tag.Name}</b> ({head}; Stufen ab 2/4/6 Teilen)" };
+            string head = preview ? UiTexts.Item.TagWith(count) : UiTexts.Item.TagWorn(count);
+            var lines = new List<string> { UiTexts.Item.TagHead(tag.Name, head) };
             foreach (KeyValuePair<int, SynergyEffect> tier in tag.Tiers)
             {
                 bool active = count >= tier.Key;
                 bool fresh = active && before < tier.Key;
                 string color = fresh ? UiTheme.Hex(UiTheme.Good) : active ? UiTheme.Hex(UiTheme.Accent) : UiTheme.Hex(UiTheme.MutedColor);
-                lines.Add($"<color={color}>{(active ? "●" : "○")} {tier.Key} Teile: {tier.Value.Text}{(fresh ? "  (neu)" : string.Empty)}</color>");
+                lines.Add($"<color={color}>{(active ? "●" : "○")} {UiTexts.Item.Pieces(tier.Key, tier.Value.Text)}{(fresh ? UiTexts.Item.New : string.Empty)}</color>");
             }
             return string.Join("\n", lines);
         }
@@ -114,16 +114,16 @@ namespace Betaknight.Overworld.UI
         /// <summary>Alle Angaben zu einem Teil; ohne Session stehen die Set-Boni ohne Teilezahl da.</summary>
         public static string Details(EquipmentDefinition item, SetBonusRegistry sets, string setBlock = null)
         {
-            var lines = new List<string> { $"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{(item.TwoHanded ? ", zweihändig" : string.Empty)}" };
+            var lines = new List<string> { $"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{(item.TwoHanded ? UiTexts.Item.TwoHanded : string.Empty)}" };
             var stats = new List<string>();
             foreach (KeyValuePair<StatKind, int> stat in item.Stats)
                 if (stat.Value != 0) stats.Add(Stat(stat.Key, stat.Value));
-            lines.Add(stats.Count > 0 ? "Werte: " + string.Join(", ", stats) : "Werte: keine");
-            foreach (SkillPassive passive in item.Passives) lines.Add($"Passiv: <color=#ffd75e>{passive.Text}</color>");
-            if (item.Tags.Count > 0 && string.IsNullOrEmpty(setBlock)) lines.Add($"Tags: {TagNames(item)}");
+            lines.Add(stats.Count > 0 ? UiTexts.Item.StatsPrefix + string.Join(", ", stats) : UiTexts.Item.StatsNone);
+            foreach (SkillPassive passive in item.Passives) lines.Add(UiTexts.Item.Passive(passive.Text));
+            if (item.Tags.Count > 0 && string.IsNullOrEmpty(setBlock)) lines.Add(UiTexts.Item.Tags(TagNames(item)));
             if (!string.IsNullOrEmpty(setBlock)) lines.Add(setBlock);
             else if (item.SetId != null && sets != null && sets.TryGet(item.SetId, out SetDefinition set)) lines.Add(SetBlock(set, 1, false));
-            else if (item.SetId != null) lines.Add($"Set: {item.SetId}");
+            else if (item.SetId != null) lines.Add(UiTexts.Item.Set(item.SetId));
             if (item.Description.Length > 0) lines.Add($"<i>{item.Description}</i>");
             return string.Join("\n", lines);
         }
@@ -154,14 +154,14 @@ namespace Betaknight.Overworld.UI
             int abs = value < 0 ? -value : value;
             switch (kind)
             {
-                case StatKind.MaxHp: return $"{sign}{abs} Max-HP";
-                case StatKind.Damage: return $"{sign}{abs} Schaden";
-                case StatKind.Armor: return $"{sign}{abs} Rüstung";
+                case StatKind.MaxHp: return UiTexts.Item.MaxHp(sign, abs);
+                case StatKind.Damage: return UiTexts.Item.Damage(sign, abs);
+                case StatKind.Armor: return UiTexts.Item.Armor(sign, abs);
                 // Weniger Ticks zwischen Angriffen = schneller, daher umgekehrtes Vorzeichen.
-                case StatKind.AttackInterval: return value < 0 ? $"schneller ({abs} Ticks)" : $"langsamer ({abs} Ticks)";
-                case StatKind.Dodge: return $"{sign}{abs / 100} % Ausweichen";
-                case StatKind.Block: return $"{sign}{abs / 100} % Block";
-                case StatKind.Crit: return $"{sign}{abs / 100} % Krit";
+                case StatKind.AttackInterval: return value < 0 ? UiTexts.Item.Faster(abs) : UiTexts.Item.Slower(abs);
+                case StatKind.Dodge: return UiTexts.Item.Dodge(sign, abs / 100);
+                case StatKind.Block: return UiTexts.Item.Block(sign, abs / 100);
+                case StatKind.Crit: return UiTexts.Item.Crit(sign, abs / 100);
                 default: return $"{kind} {sign}{abs}";
             }
         }

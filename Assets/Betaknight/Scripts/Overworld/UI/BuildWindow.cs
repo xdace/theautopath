@@ -99,8 +99,7 @@ namespace Betaknight.Overworld.UI
             DrawRightColumn(columns);
             GUILayout.EndHorizontal();
 
-            GUILayout.Label("<color=#9aa4b2>Ziehen: Skill auf Zeile = einsetzen/tauschen, Zeile auf Zeile = umsortieren, Rune auf Zeile = tauschen, "
-                + "Rune auf freien Platz = neue Zeile, Modul auf ◇ = einsetzen, zurück in eine Liste = herausnehmen. Doppel-/Rechtsklick: in Zeile / aus Zeile.</color>",
+            GUILayout.Label($"<color=#9aa4b2>{UiTexts.Build.Hint}</color>",
                 UiTheme.Small);
             GUILayout.EndArea();
 
@@ -114,19 +113,19 @@ namespace Betaknight.Overworld.UI
         private void DrawHeader()
         {
             GUILayout.BeginHorizontal();
-            string rows = $"Tafel {_session.Runes.Rows.Count}/{_session.Runes.Slots} Zeilen (max. {_session.Progression.MaxBoardRows})";
-            GUILayout.Label($"Build  <size={UiTheme.SmallSize}><color=#9aa4b2>{rows} · oberste erfüllte Zeile mit bereitem Skill feuert</color></size>", UiTheme.Title);
+            string rows = UiTexts.Build.Rows(_session.Runes.Rows.Count, _session.Runes.Slots, _session.Progression.MaxBoardRows);
+            GUILayout.Label($"{UiTexts.Build.TitleName}  <size={UiTheme.SmallSize}><color=#9aa4b2>{rows} · {UiTexts.Build.FiresRule}</color></size>", UiTheme.Title);
             GUILayout.FlexibleSpace();
             if (!_session.CanChangeLoadout)
-                GUILayout.Label($"<color={UiTheme.Hex(UiTheme.Bad)}>Nur lesen: Kampf oder offene Entscheidung</color>", UiTheme.Small, GUILayout.ExpandWidth(false));
-            if (GUILayout.Button(new GUIContent("✕", "Schliessen (B oder Esc)"), GUILayout.Width(34f), GUILayout.Height(28f))) Close();
+                GUILayout.Label($"<color={UiTheme.Hex(UiTheme.Bad)}>{UiTexts.ReadOnly}</color>", UiTheme.Small, GUILayout.ExpandWidth(false));
+            if (GUILayout.Button(new GUIContent(UiTexts.Close, UiTexts.Build.CloseTip), GUILayout.Width(34f), GUILayout.Height(28f))) Close();
             GUILayout.EndHorizontal();
         }
 
         private void DrawPreviewLine()
         {
-            string text = _drag.IsDragging ? $"Ziehe: {_drag.Dragging.Value.Label}" : _hover;
-            GUILayout.Label(string.IsNullOrEmpty(text) ? "<color=#666c78>Maus über einen Skill, eine Rune oder ein Modul zeigt hier die Kurzwerte.</color>" : text,
+            string text = _drag.IsDragging ? UiTexts.Build.Dragging(_drag.Dragging.Value.Label) : _hover;
+            GUILayout.Label(string.IsNullOrEmpty(text) ? $"<color=#666c78>{UiTexts.Build.HoverHint}</color>" : text,
                 UiTheme.SmallLine, GUILayout.Height(20f));
         }
 
@@ -141,12 +140,12 @@ namespace Betaknight.Overworld.UI
         {
             GUILayout.BeginVertical(UiTheme.Section, GUILayout.Width(SideWidth), GUILayout.Height(height));
             IReadOnlyList<SkillInstance> all = _session.Skills.All;
-            GUILayout.Label($"<b>Skills</b>  <color=#9aa4b2>{_session.Skills.Free.Count} frei von {all.Count}</color>", UiTheme.Text);
+            GUILayout.Label($"{UiTexts.Build.SkillsTitle}  <color=#9aa4b2>{UiTexts.Build.FreeOf(_session.Skills.Free.Count, all.Count)}</color>", UiTheme.Text);
             _skillScroll = GUILayout.BeginScrollView(_skillScroll);
 
             DrawBasicAttackCard();
             foreach (SkillInstance skill in all.OrderBy(s => s.IsFree ? 0 : 1)) DrawSkillCard(skill);
-            if (all.Count == 0) GUILayout.Label("<color=#888888>noch keine Skills</color>", UiTheme.Small);
+            if (all.Count == 0) GUILayout.Label($"<color=#888888>{UiTexts.Build.NoSkills}</color>", UiTheme.Small);
 
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
@@ -158,12 +157,12 @@ namespace Betaknight.Overworld.UI
 
         private void DrawBasicAttackCard()
         {
-            const string label = "Basisangriff";
-            GUILayout.Box(new GUIContent($"<b>{label}</b>  <color=#9aa4b2>immer verfügbar</color>", "Basisangriff an eine Zeile ziehen. Kein Exemplar nötig."),
+            const string label = UiTexts.BasicAttack;
+            GUILayout.Box(new GUIContent($"<b>{label}</b>  <color=#9aa4b2>{UiTexts.Build.AlwaysAvailable}</color>", UiTexts.Build.BasicAttackTip),
                 UiTheme.Cell, GUILayout.Height(26f));
             Rect r = GUILayoutUtility.GetLastRect();
             _drag.Source(r, new DragItem(DragKind.BasicAttack, 0, label));
-            Hover(r, $"<b>Basisangriff</b>: {ShortStats(_session.DescribeSkill(SkillInstance.BasicAttack(), _skillStats))}");
+            Hover(r, $"<b>{label}</b>: {ShortStats(_session.DescribeSkill(SkillInstance.BasicAttack(), _skillStats))}");
         }
 
         private void DrawSkillCard(SkillInstance skill)
@@ -171,13 +170,13 @@ namespace Betaknight.Overworld.UI
             SkillInfo info = _session.DescribeSkill(skill, _skillStats);
             string name = skill.NameFrom(_session.SkillCatalog);
             int row = skill.Holder is RuneSlot slot ? _session.Runes.IndexOfRow(slot) : -1;
-            string where = row >= 0 ? $"<color=#9aa4b2>Zeile {row + 1}</color>" : $"<color={UiTheme.Hex(UiTheme.Good)}>frei</color>";
+            string where = row >= 0 ? $"<color=#9aa4b2>{UiTexts.Row(row + 1)}</color>" : $"<color={UiTheme.Hex(UiTheme.Good)}>{UiTexts.Free}</color>";
             string modules = skill.Modules.Count > 0 ? $" <color=#ffd75e>◆{skill.Modules.Count}</color>" : string.Empty;
             string text = $"<b>{name}</b>{modules}  {where}\n<color=#ffd75e>{ShortStats(info)}</color>";
             GUILayout.Box(new GUIContent(text, SkillTip(skill, info)), skill.IsFree ? UiTheme.Cell : UiTheme.EmptyCell, GUILayout.Height(42f));
             Rect r = GUILayoutUtility.GetLastRect();
             _drag.Source(r, new DragItem(DragKind.Skill, skill.InstanceId, name), shortcut: () => SkillShortcut(skill));
-            Hover(r, $"<b>{name}</b>: {ShortStats(info)} · {info?.TimingText} <color=#9aa4b2>– Skills ändern die Werte der Leiste nicht</color>");
+            Hover(r, $"<b>{name}</b>: {ShortStats(info)} · {info?.TimingText} <color=#9aa4b2>{UiTexts.Build.SkillsKeepBar}</color>");
         }
 
         /// <summary>Kurzweg: freier Skill in die erste Zeile ohne Skill (sonst die erste mit Basisangriff), eingesetzter heraus.</summary>
@@ -199,8 +198,8 @@ namespace Betaknight.Overworld.UI
         private void DrawBoardColumn(float width, float height)
         {
             GUILayout.BeginVertical(UiTheme.Section, GUILayout.Width(width), GUILayout.Height(height));
-            GUILayout.Label("<b>Logik-Tafel</b>  <color=#9aa4b2>Rune (Wann) → Skill (Was) · ≡ ziehen zum Umsortieren · Maus darüber zeigt Details</color>", UiTheme.Text);
-            Hover(GUILayoutUtility.GetLastRect(), $"<b>Logik-Tafel</b>: Von oben nach unten gilt die erste Zeile, deren Bedingung erfüllt und deren Skill bereit ist. {RowQueueConfig.RuleText}");
+            GUILayout.Label($"{UiTexts.Build.BoardTitle}  <color=#9aa4b2>{UiTexts.Build.BoardLegend}</color>", UiTheme.Text);
+            Hover(GUILayoutUtility.GetLastRect(), UiTexts.Build.BoardRule(RowQueueConfig.RuleText));
             _boardScroll = GUILayout.BeginScrollView(_boardScroll);
 
             IReadOnlyList<RuneSlot> rows = _session.Runes.Rows;
@@ -209,7 +208,7 @@ namespace Betaknight.Overworld.UI
             for (int i = rows.Count; i < _session.Runes.Slots; i++) DrawFreeSlot(i);
             DrawTriggerLinks(links, rows.Count);
 
-            GUILayout.Box($"↓  [Immer] → <b>Basisangriff</b>  <color=#9aa4b2>fest, ganz unten · {ShortStats(_session.DescribeSkill(SkillInstance.BasicAttack(), _skillStats))}</color>",
+            GUILayout.Box($"↓  [{UiTexts.Always}] → <b>{UiTexts.BasicAttack}</b>  <color=#9aa4b2>{UiTexts.Build.FallbackLegend} · {ShortStats(_session.DescribeSkill(SkillInstance.BasicAttack(), _skillStats))}</color>",
                 UiTheme.EmptyCell, GUILayout.Height(RowHeight));
 
             GUILayout.EndScrollView();
@@ -223,7 +222,7 @@ namespace Betaknight.Overworld.UI
             // Griff: ganze Zeile ziehen.
             GUILayout.Label($"<color=#9aa4b2>≡ {index + 1}.</color>", UiTheme.SmallLine, GUILayout.Width(40f), GUILayout.Height(RowHeight - 6f));
             Rect handle = GUILayoutUtility.GetLastRect();
-            _drag.Source(handle, new DragItem(DragKind.Row, index, $"Zeile {index + 1}: {row.Name}"));
+            _drag.Source(handle, new DragItem(DragKind.Row, index, UiTexts.Build.RowLabel(index + 1, row.Name)));
 
             // Rune (Wann) mit Stufen-Abzeichen und Wachstum.
             string growth = row.Growth > 0 ? $" <color=#b5e48c>+{row.Growth}</color>" : string.Empty;
@@ -240,9 +239,9 @@ namespace Betaknight.Overworld.UI
             SkillInstance skill = row.Skill;
             // Werte so, wie sie von dieser Zeile aus wirken: inklusive Schwierigkeits-Bonus des Bausteins.
             SkillInfo info = skill != null ? _session.DescribeRowSkill(row, _skillStats) : null;
-            string skillName = skill == null ? null : skill.IsBasicAttack ? "Basisangriff" : skill.NameFrom(_session.SkillCatalog);
+            string skillName = skill == null ? null : skill.IsBasicAttack ? UiTexts.BasicAttack : skill.NameFrom(_session.SkillCatalog);
             string skillText = skill == null
-                ? "<color=#888888>— leer: Skill hierher ziehen (Zeile pausiert)</color>"
+                ? $"<color=#888888>{UiTexts.Build.EmptyRow}</color>"
                 : $"<b>{skillName}</b>  <color=#ffd75e>{ShortStats(info)}</color>";
             GUILayout.Label(new GUIContent(skillText, skill != null ? SkillTip(skill, info) : null), UiTheme.SmallLine, GUILayout.MinWidth(180f), GUILayout.Height(RowHeight - 6f));
             Rect skillRect = GUILayoutUtility.GetLastRect();
@@ -255,7 +254,7 @@ namespace Betaknight.Overworld.UI
             if (skill != null && !skill.IsBasicAttack) DrawModuleSlots(skill, index);
 
             string marks = _session.IsEvolutionReady(row) ? $" <color=#d29bff>✦</color>" : string.Empty;
-            GUILayout.Label(new GUIContent(marks, marks.Length > 0 ? "Entwickelt sich nach dem nächsten Boss" : null), UiTheme.SmallLine, GUILayout.Width(18f));
+            GUILayout.Label(new GUIContent(marks, marks.Length > 0 ? UiTexts.Build.EvolvesTip : null), UiTheme.SmallLine, GUILayout.Width(18f));
             GUILayout.Space(16f + 9f * linkCount);
             GUILayout.EndHorizontal();
 
@@ -301,7 +300,7 @@ namespace Betaknight.Overworld.UI
 
         private void DrawFreeSlot(int index)
         {
-            GUILayout.Box($"{index + 1}.  + freier Platz – Rune aus dem Runen-Inventar hierher ziehen", UiTheme.EmptyCell, GUILayout.Height(RowHeight));
+            GUILayout.Box(UiTexts.Build.FreeSlot(index + 1), UiTheme.EmptyCell, GUILayout.Height(RowHeight));
             Rect r = GUILayoutUtility.GetLastRect();
             _drag.Target(r, d => d.Kind == DragKind.Rune && !_session.Runes.IsFull, d => _session.EquipRuneFromInventory(d.A, index));
         }
@@ -313,7 +312,7 @@ namespace Betaknight.Overworld.UI
             {
                 GUIContent chip = ModuleText.Chip(_session, m);
                 bool trigger = m.ModuleId == ModuleIds.Trigger;
-                if (trigger) chip.tooltip = $"{chip.tooltip}\nKlick: nächstes Ziel wählen";
+                if (trigger) chip.tooltip = chip.tooltip + UiTexts.Build.TriggerClick;
                 chip.text = $"<color=#ffd75e>◆</color>{Shorten(chip.text, trigger ? 14 : 9)}";
                 GUILayout.Label(chip, UiTheme.SmallLine, GUILayout.Width(trigger ? 112f : 76f), GUILayout.Height(RowHeight - 6f));
                 Rect r = GUILayoutUtility.GetLastRect();
@@ -326,7 +325,7 @@ namespace Betaknight.Overworld.UI
 
             for (int i = holder.Modules.Count; i < holder.ModuleSlots; i++)
             {
-                string tip = holder is RuneSlot ? "Freier Modul-Platz am Baustein: Baustein-Modul hierher ziehen" : "Freier Modul-Platz am Skill: Skill-Modul hierher ziehen";
+                string tip = holder is RuneSlot ? UiTexts.Build.FreeRuneModuleSlot : UiTexts.Build.FreeSkillModuleSlot;
                 GUILayout.Label(new GUIContent("<color=#666c78>◇</color>", tip), UiTheme.SmallLine, GUILayout.Width(20f), GUILayout.Height(RowHeight - 6f));
                 Rect r = GUILayoutUtility.GetLastRect();
                 _drag.Target(r, d => d.Kind == DragKind.Module && _session.CanPlaceModule(_session.Modules.Get(d.A), holder), d => PlaceModule(d.A, holder, row));
@@ -368,8 +367,8 @@ namespace Betaknight.Overworld.UI
         {
             GUILayout.BeginVertical(GUILayout.Width(SideWidth), GUILayout.Height(height));
             GUILayout.BeginHorizontal();
-            if (GUILayout.Toggle(!_showRecipes, "Module und Runen", GUI.skin.button, GUILayout.Height(26f))) _showRecipes = false;
-            if (GUILayout.Toggle(_showRecipes, "Rezeptbuch", GUI.skin.button, GUILayout.Height(26f))) _showRecipes = true;
+            if (GUILayout.Toggle(!_showRecipes, UiTexts.Build.ModulesAndRunes, GUI.skin.button, GUILayout.Height(26f))) _showRecipes = false;
+            if (GUILayout.Toggle(_showRecipes, UiTexts.Build.RecipeBook, GUI.skin.button, GUILayout.Height(26f))) _showRecipes = true;
             GUILayout.EndHorizontal();
 
             if (_showRecipes)
@@ -388,14 +387,14 @@ namespace Betaknight.Overworld.UI
         {
             GUILayout.BeginVertical(UiTheme.Section, GUILayout.Height(height));
             IReadOnlyList<ModuleInstance> all = _session.Modules.All;
-            GUILayout.Label($"<b>Module</b>  <color=#9aa4b2>{_session.Modules.Free.Count} frei von {all.Count}</color>", UiTheme.Text);
+            GUILayout.Label($"{UiTexts.Build.ModulesTitle}  <color=#9aa4b2>{UiTexts.Build.FreeOf(_session.Modules.Free.Count, all.Count)}</color>", UiTheme.Text);
             _moduleScroll = GUILayout.BeginScrollView(_moduleScroll);
-            if (all.Count == 0) GUILayout.Label("<color=#888888>noch keine – selten aus Elite, Truhen, Boss-Flucht und Shop</color>", UiTheme.Small);
+            if (all.Count == 0) GUILayout.Label($"<color=#888888>{UiTexts.Build.NoModules}</color>", UiTheme.Small);
             foreach (ModuleInstance m in all.OrderBy(x => x.IsFree ? 0 : 1))
             {
                 ModuleDefinition d = _session.ModuleDefinitionOf(m);
                 string name = m.NameFrom(_session.ModuleCatalog);
-                string where = m.IsFree ? $"<color={UiTheme.Hex(UiTheme.Good)}>frei</color>" : $"<color=#9aa4b2>{_session.ModuleWhere(m)}</color>";
+                string where = m.IsFree ? $"<color={UiTheme.Hex(UiTheme.Good)}>{UiTexts.Free}</color>" : $"<color=#9aa4b2>{_session.ModuleWhere(m)}</color>";
                 string kind = d != null ? ModuleText.KindName(d.Kind) : "?";
                 GUILayout.Box(new GUIContent($"<b>{name}</b> <color=#9aa4b2>[{kind}]</color>  {where}", d?.DescriptionAt(m.Level)),
                     m.IsFree ? UiTheme.Cell : UiTheme.EmptyCell, GUILayout.Height(26f));
@@ -434,9 +433,9 @@ namespace Betaknight.Overworld.UI
         {
             GUILayout.BeginVertical(UiTheme.Section, GUILayout.Height(height));
             IReadOnlyList<StoredRune> stored = _session.RuneInventory.Runes;
-            GUILayout.Label($"<b>Runen-Inventar</b>  <color=#9aa4b2>{stored.Count}/{_session.RuneInventory.Capacity}</color>", UiTheme.Text);
+            GUILayout.Label($"{UiTexts.Build.RuneInventoryTitle}  <color=#9aa4b2>{stored.Count}/{_session.RuneInventory.Capacity}</color>", UiTheme.Text);
             _runeScroll = GUILayout.BeginScrollView(_runeScroll);
-            if (stored.Count == 0) GUILayout.Label("<color=#888888>leer – Zeile hierher ziehen legt ihre Rune ab</color>", UiTheme.Small);
+            if (stored.Count == 0) GUILayout.Label($"<color=#888888>{UiTexts.Build.RuneInventoryEmpty}</color>", UiTheme.Small);
             for (int i = 0; i < stored.Count; i++)
             {
                 StoredRune rune = stored[i];
@@ -459,12 +458,12 @@ namespace Betaknight.Overworld.UI
         private void DrawRecipeBook(float height)
         {
             GUILayout.BeginVertical(UiTheme.Section, GUILayout.Height(height));
-            GUILayout.Label("<b>Rezeptbuch</b>  <color=#9aa4b2>bleibt über Runs, nur Wissen</color>", UiTheme.Text);
+            GUILayout.Label($"{UiTexts.Build.RecipeBookTitle}  <color=#9aa4b2>{UiTexts.Build.RecipeBookLegend}</color>", UiTheme.Text);
             _recipeScroll = GUILayout.BeginScrollView(_recipeScroll);
             foreach (EvolutionRecipe recipe in _session.EvolutionCatalog.All)
             {
                 bool known = _session.RecipeBook.HasEvolution(recipe.Id);
-                string head = $"<b>Evolution {_session.EvolutionName(recipe)}</b>";
+                string head = UiTexts.Build.Evolution(_session.EvolutionName(recipe));
                 string text = known ? $"{head}: {_session.RecipeText(recipe)}" : $"{head}\n<color=#888888>{recipe.Hint}</color>";
                 GUILayout.Label($"<color=#d29bff>{text}</color>\n<color=#9aa4b2>{_session.EvolutionProgress(recipe)}</color>", UiTheme.Small);
                 GUILayout.Space(4f);
@@ -474,7 +473,7 @@ namespace Betaknight.Overworld.UI
             {
                 bool known = _session.IsDuoDiscovered(duo.Id);
                 bool active = registry.IsDuoActive(duo, _session.Gear);
-                string text = known ? $"<b>Duo {duo.Name}</b>: {duo.Effect.Text}" : $"<b>Duo ???</b>\n<color=#888888>{_session.DuoHint(duo)}</color>";
+                string text = known ? UiTexts.Build.Duo(duo.Name, duo.Effect.Text) : $"{UiTexts.Build.UnknownDuo}\n<color=#888888>{_session.DuoHint(duo)}</color>";
                 GUILayout.Label(active ? $"<color={UiTheme.Hex(UiTheme.Good)}>{text}</color>" : text, UiTheme.Small);
                 GUILayout.Space(4f);
             }
@@ -490,8 +489,8 @@ namespace Betaknight.Overworld.UI
         private static string ShortStats(SkillInfo info)
         {
             if (info == null) return string.Empty;
-            string effect = info.Effects.Count > 0 ? info.Effects[0].Text : "keine Wirkung";
-            string cd = info.Skill.IsBasicAttack ? string.Empty : info.CooldownTicks > 0 ? $" · CD {SkillInfo.Seconds(info.CooldownTicks)}" : " · kein CD";
+            string effect = info.Effects.Count > 0 ? info.Effects[0].Text : UiTexts.Build.NoEffect;
+            string cd = info.Skill.IsBasicAttack ? string.Empty : info.CooldownTicks > 0 ? UiTexts.Build.Cooldown(SkillInfo.Seconds(info.CooldownTicks)) : UiTexts.Build.NoCooldown;
             return effect + cd;
         }
 
@@ -503,9 +502,9 @@ namespace Betaknight.Overworld.UI
             if (rule != null)
             {
                 string effect = _session.GrowthEffectText(rule, skill.Growth);
-                lines.Add($"Wächst: {rule.Text}{(effect.Length > 0 ? $" · jetzt {effect}" : string.Empty)} ({_session.MilestoneText(skill.Growth, true)})");
+                lines.Add(UiTexts.Build.GrowsNow(rule.Text, effect, _session.MilestoneText(skill.Growth, true)));
             }
-            if (!skill.IsBasicAttack) lines.Add($"Modul-Plätze {skill.Modules.Count}/{skill.ModuleSlots}");
+            if (!skill.IsBasicAttack) lines.Add(UiTexts.Build.ModuleSlots(skill.Modules.Count, skill.ModuleSlots));
             foreach (string evolution in _session.EvolutionHintsForSkill(skill.SkillId)) lines.Add(evolution);
             return string.Join("\n", lines);
         }
@@ -519,12 +518,12 @@ namespace Betaknight.Overworld.UI
             if (rule != null)
             {
                 string effect = _session.GrowthEffectText(rule, row.Growth, row);
-                lines.Add($"Wächst: {rule.Text}{(effect.Length > 0 ? $" · {effect}" : string.Empty)} ({_session.MilestoneText(row.Growth, false)})");
+                lines.Add(UiTexts.Build.GrowsRow(rule.Text, effect, _session.MilestoneText(row.Growth, false)));
             }
             lines.Add(RuneText.DifficultyTip(row.Rune, _session.RowDifficulty(row) != row.Rune.Difficulty));
-            lines.Add($"Modul-Plätze {row.Modules.Count}/{row.ModuleSlots}");
+            lines.Add(UiTexts.Build.ModuleSlots(row.Modules.Count, row.ModuleSlots));
             lines.AddRange(_session.EvolutionProgressFor(row));
-            lines.Add("Ziehen: auf das Runen-Inventar = ablegen · Rechtsklick = ablegen");
+            lines.Add(UiTexts.Build.RowDragHint);
             return string.Join("\n", lines);
         }
 

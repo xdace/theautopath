@@ -96,8 +96,7 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndHorizontal();
 
             DrawGrid();
-            GUILayout.Label("<color=#9aa4b2>Ziehen: Teil aus dem Raster auf seinen Platz an der Figur = anlegen (falscher Platz wird rot), zurück ins Raster = ablegen, "
-                + "Zelle auf Zelle = tauschen, auf leere Zelle = verschieben. Doppel-/Rechtsklick: anlegen bzw. ablegen.</color>", UiTheme.Small);
+            GUILayout.Label($"<color=#9aa4b2>{UiTexts.Inventory.Hint}</color>", UiTheme.Small);
             GUILayout.EndArea();
 
             if (Event.current.type == EventType.Repaint) _hover = _hoverNext;
@@ -109,11 +108,11 @@ namespace Betaknight.Overworld.UI
         {
             GUILayout.BeginHorizontal();
             Inventory inventory = _session.Inventory;
-            GUILayout.Label($"Inventar  <size={UiTheme.SmallSize}><color=#9aa4b2>{inventory.Count}/{inventory.Capacity} Zellen belegt · Gold {_session.Stats.Gold}</color></size>", UiTheme.Title);
+            GUILayout.Label($"{UiTexts.Inventory.TitleName}  <size={UiTheme.SmallSize}><color=#9aa4b2>{UiTexts.Inventory.Title(inventory.Count, inventory.Capacity, _session.Stats.Gold)}</color></size>", UiTheme.Title);
             GUILayout.FlexibleSpace();
             if (!_session.CanChangeLoadout)
-                GUILayout.Label($"<color={UiTheme.Hex(UiTheme.Bad)}>Nur lesen: Kampf oder offene Entscheidung</color>", UiTheme.Small, GUILayout.ExpandWidth(false));
-            if (GUILayout.Button(new GUIContent("✕", "Schliessen (I oder Esc)"), GUILayout.Width(34f), GUILayout.Height(28f))) Close();
+                GUILayout.Label($"<color={UiTheme.Hex(UiTheme.Bad)}>{UiTexts.ReadOnly}</color>", UiTheme.Small, GUILayout.ExpandWidth(false));
+            if (GUILayout.Button(new GUIContent(UiTexts.Close, UiTexts.Inventory.CloseTip), GUILayout.Width(34f), GUILayout.Height(28f))) Close();
             GUILayout.EndHorizontal();
         }
 
@@ -126,12 +125,12 @@ namespace Betaknight.Overworld.UI
             if (focus.HasValue && focus.Value.Kind == DragKind.Item && _session.Inventory[focus.Value.A] is EquipmentDefinition item)
             {
                 preview = _session.PreviewEquip(item);
-                title = $"«{item.Name}» anlegen";
+                title = UiTexts.Inventory.PreviewEquip(item.Name);
             }
             else if (focus.HasValue && focus.Value.Kind == DragKind.Equipped && _session.Gear.Get((EquipmentSlot)focus.Value.A) is EquipmentDefinition worn)
             {
                 preview = _session.PreviewUnequip((EquipmentSlot)focus.Value.A);
-                title = $"«{worn.Name}» ablegen";
+                title = UiTexts.Inventory.PreviewUnequip(worn.Name);
             }
             _statBar.Draw(_session, preview, title);
         }
@@ -142,7 +141,7 @@ namespace Betaknight.Overworld.UI
         {
             const float w = 400f, h = 470f;
             GUILayout.BeginVertical(UiTheme.Section, GUILayout.Width(w), GUILayout.Height(h));
-            GUILayout.Label("<b>Ritter</b>", UiTheme.Text);
+            GUILayout.Label(UiTexts.Inventory.Knight, UiTheme.Text);
             Rect figure = GUILayoutUtility.GetRect(w - 20f, h - 50f);
             GUILayout.EndVertical();
 
@@ -179,7 +178,7 @@ namespace Betaknight.Overworld.UI
         {
             EquipmentDefinition item = _session.Gear.Get(slot);
             bool locked = slot == EquipmentSlot.Shield && _session.Gear.IsShieldLocked;
-            string name = item != null ? $"<b>{item.Name}</b>" : locked ? "<color=#888888>gesperrt (Zweihand)</color>" : "<color=#888888>leer</color>";
+            string name = item != null ? $"<b>{item.Name}</b>" : locked ? $"<color=#888888>{UiTexts.Inventory.Locked}</color>" : $"<color=#888888>{UiTexts.Inventory.Empty}</color>";
             string text = $"<color=#9aa4b2>{slot.DisplayName()}</color>\n{name}";
             GUIStyle style = _selectedSlot == slot ? UiTheme.CellSelected : item != null ? UiTheme.Cell : UiTheme.EmptyCell;
             var cell = new GUIStyle(style) { wordWrap = true, alignment = TextAnchor.MiddleCenter };
@@ -208,9 +207,8 @@ namespace Betaknight.Overworld.UI
             EquipmentDefinition item = _selectedSlot.HasValue ? _session.Gear.Get(_selectedSlot.Value) : _session.Inventory[_selectedCell];
             if (item == null)
             {
-                GUILayout.Label("<b>Details</b>", UiTheme.Text);
-                GUILayout.Label("<color=#9aa4b2>Klick auf ein Teil zeigt Werte, passive Effekte, Set und den Vergleich mit dem angelegten Teil. "
-                    + "Maus über einem Teil zeigt oben in der Stat-Leiste, was sich ändern würde.</color>", UiTheme.Small);
+                GUILayout.Label(UiTexts.Inventory.Details, UiTheme.Text);
+                GUILayout.Label($"<color=#9aa4b2>{UiTexts.Inventory.DetailsHint}</color>", UiTheme.Small);
             }
             else
             {
@@ -239,15 +237,15 @@ namespace Betaknight.Overworld.UI
             {
                 EquipmentSlot slot = _selectedSlot.Value;
                 GUI.enabled = _session.CanUnequipToInventory(slot);
-                if (GUILayout.Button("Ablegen (ins Raster)", GUILayout.Height(28f)) && _session.UnequipToInventory(slot)) ClearSelection();
+                if (GUILayout.Button(UiTexts.Inventory.Unequip, GUILayout.Height(28f)) && _session.UnequipToInventory(slot)) ClearSelection();
             }
             else
             {
                 int cell = _selectedCell;
                 GUI.enabled = _session.CanEquipFromInventory(cell);
-                if (GUILayout.Button("Anlegen", GUILayout.Height(28f)) && _session.EquipFromInventory(cell)) ClearSelection();
+                if (GUILayout.Button(UiTexts.Inventory.Equip, GUILayout.Height(28f)) && _session.EquipFromInventory(cell)) ClearSelection();
                 GUI.enabled = _session.CanChangeLoadout;
-                if (GUILayout.Button("Verwerfen", GUILayout.Height(28f)) && _session.DiscardItem(cell)) ClearSelection();
+                if (GUILayout.Button(UiTexts.Inventory.Discard, GUILayout.Height(28f)) && _session.DiscardItem(cell)) ClearSelection();
             }
             GUI.enabled = true;
             GUILayout.EndHorizontal();
@@ -258,7 +256,7 @@ namespace Betaknight.Overworld.UI
         /// <summary>Tag-Zähler und getragene Sets kompakt; das Rezeptbuch steht im Fenster «Build».</summary>
         private void DrawTags()
         {
-            GUILayout.Label("<b>Synergie-Tags und Sets</b>  <color=#9aa4b2>Schwellen 2/4/6 getragene Teile, Duo ab 4 + 4</color>", UiTheme.Text);
+            GUILayout.Label($"{UiTexts.Inventory.TagsTitle}  <color=#9aa4b2>{UiTexts.Inventory.TagsLegend}</color>", UiTheme.Text);
             // Alle Tags mit ihren Stufen, auch ohne getragenes Teil: so ist sichtbar, was Toxin, Schrott, Ladung … bewirken.
             foreach (SynergyTag tag in _session.Synergies.Tags)
             {
@@ -268,8 +266,8 @@ namespace Betaknight.Overworld.UI
             }
             foreach (SynergyDuo duo in _session.ActiveDuos())
             {
-                string text = _session.IsDuoDiscovered(duo.Id) ? duo.Effect.Text : "Wirkung zeigt sich im nächsten Kampf.";
-                GUILayout.Label($"<color={UiTheme.Hex(UiTheme.Good)}><b>Duo {_session.DuoName(duo)}</b> aktiv: {text}</color>", UiTheme.Small);
+                string text = _session.IsDuoDiscovered(duo.Id) ? duo.Effect.Text : UiTexts.Inventory.DuoUnknown;
+                GUILayout.Label($"<color={UiTheme.Hex(UiTheme.Good)}>{UiTexts.Inventory.DuoActive(_session.DuoName(duo), text)}</color>", UiTheme.Small);
             }
 
             // Alle Sets mit ihren Boni, auch ohne getragenes Teil: so ist sichtbar, wofür man sammelt.
@@ -288,7 +286,7 @@ namespace Betaknight.Overworld.UI
         {
             Inventory inventory = _session.Inventory;
             GUILayout.BeginVertical(UiTheme.Section);
-            GUILayout.Label("<b>Gegenstände</b>  <color=#9aa4b2>Ausrüstung und später Verbrauchsgegenstände, deine Reihenfolge bleibt</color>", UiTheme.Text);
+            GUILayout.Label($"{UiTexts.Inventory.GridTitle}  <color=#9aa4b2>{UiTexts.Inventory.GridLegend}</color>", UiTheme.Text);
             int rows = (inventory.Capacity + GridColumns - 1) / GridColumns;
             for (int r = 0; r < rows; r++)
             {

@@ -20,10 +20,10 @@ namespace Betaknight.Overworld.UI
         {
             if (rune == null) return string.Empty;
             int tier = rune.DifficultyFor(inverted);
-            string text = $"Schwierigkeit {DifficultyText.Symbol(tier)} {DifficultyText.Tooltip(tier)}";
+            string text = UiTexts.Rune.Difficulty(DifficultyText.Symbol(tier), DifficultyText.Tooltip(tier));
             if (!inverted && rune.InvertedDifficulty != rune.Difficulty)
-                text += $"\nUmgekehrt: {DifficultyText.Symbol(rune.InvertedDifficulty)} {DifficultyText.Name(rune.InvertedDifficulty)}";
-            text += "\nErleichterer (Ausrüstung, Module, Skills) senken den Bonus nicht.";
+                text += UiTexts.Rune.Inverted(DifficultyText.Symbol(rune.InvertedDifficulty), DifficultyText.Name(rune.InvertedDifficulty));
+            text += UiTexts.Rune.EasersKeepBonus;
             return text;
         }
 

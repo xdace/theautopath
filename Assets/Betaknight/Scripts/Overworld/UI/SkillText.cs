@@ -18,12 +18,12 @@ namespace Betaknight.Overworld.UI
             if (!session.SkillCatalog.TryGet(skillId, out SkillDefinition skill)) return skillId;
             SkillInfo info = session.DescribeSkill(skillId, null, 0);
             string kinds = SkillKinds.Names(skill.Kinds);
-            string text = $"<b>Skill: {skill.Name}</b>{(kinds.Length > 0 ? $"  [{kinds}]" : string.Empty)}{suffix}\n<size=13>{skill.Description}";
+            string text = $"{UiTexts.Skill.Title(skill.Name)}{(kinds.Length > 0 ? $"  [{kinds}]" : string.Empty)}{suffix}\n<size=13>{skill.Description}";
             if (info != null) text += $"\n<color=#ffd75e>{info.Summary}</color>";
             GrowthRule rule = session.GrowthCatalog.ForSkill(skillId);
-            if (rule != null) text += $"\n<color=#b5e48c>Wächst: {rule.Text}</color>";
+            if (rule != null) text += $"\n<color=#b5e48c>{UiTexts.Grows(rule.Text)}</color>";
             string owned = Owned(session, skillId);
-            if (owned.Length > 0) text += $"\n<color=#9fc7ff>Besitzt: {owned}</color>";
+            if (owned.Length > 0) text += $"\n<color=#9fc7ff>{UiTexts.Owned(owned)}</color>";
             text += RuneText.Eases(session, skillId);
             text += EvolutionHints(session.EvolutionHintsForSkill(skillId));
             return text + "</size>";
@@ -47,8 +47,8 @@ namespace Betaknight.Overworld.UI
 
         public static string Where(OverworldSession session, SkillInstance skill)
         {
-            if (skill.Holder is RuneSlot row) return $"Zeile {session.Runes.IndexOfRow(row) + 1}";
-            return skill.Holder != null ? skill.Holder.HolderName : "frei";
+            if (skill.Holder is RuneSlot row) return UiTexts.Row(session.Runes.IndexOfRow(row) + 1);
+            return skill.Holder != null ? skill.Holder.HolderName : UiTexts.Free;
         }
 
         /// <summary>
@@ -64,13 +64,13 @@ namespace Betaknight.Overworld.UI
             {
                 string from = target.NameFrom(session.SkillCatalog);
                 int grown = target.Growth + GrowthStages.DuplicateGrowth;
-                string tip = $"{from} ({Where(session, target)}) wächst um {GrowthStages.DuplicateGrowth}: {session.MilestoneText(grown, true)}";
-                if (GUILayout.Button(new GUIContent($"▲ Wachstum +{GrowthStages.DuplicateGrowth} ({from} → +{grown})", tip), GUILayout.Height(28f)))
+                string tip = UiTexts.Skill.GrowthTip(from, Where(session, target), GrowthStages.DuplicateGrowth, session.MilestoneText(grown, true));
+                if (GUILayout.Button(new GUIContent(UiTexts.Skill.Growth(GrowthStages.DuplicateGrowth, from, grown), tip), GUILayout.Height(28f)))
                     take(SkillDuplicateChoice.Upgrade);
-                if (GUILayout.Button(new GUIContent("Zweites Exemplar", "Ein weiteres Exemplar mit Wachstum 0, z. B. für eine zweite Zeile"), GUILayout.Height(28f)))
+                if (GUILayout.Button(new GUIContent(UiTexts.Skill.SecondCopy, UiTexts.Skill.SecondCopyTip), GUILayout.Height(28f)))
                     take(SkillDuplicateChoice.KeepCopy);
             }
-            else if (GUILayout.Button(session.OwnsSkill(skillId) ? $"{takeLabel} (weiteres Exemplar)" : takeLabel, GUILayout.Height(28f)))
+            else if (GUILayout.Button(session.OwnsSkill(skillId) ? UiTexts.Skill.TakeAnother(takeLabel) : takeLabel, GUILayout.Height(28f)))
             {
                 take(SkillDuplicateChoice.KeepCopy);
             }

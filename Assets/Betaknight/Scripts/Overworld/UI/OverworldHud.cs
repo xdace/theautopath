@@ -68,58 +68,58 @@ namespace Betaknight.Overworld.UI
             GUILayout.BeginArea(InfoRect, GUI.skin.box);
             _scroll = GUILayout.BeginScrollView(_scroll);
             string kit = _session.Kit != null ? $" – {_session.Kit.Name}" : string.Empty;
-            GUILayout.Label($"<b>Betaknight{kit}</b>   Akt {_session.Act}", _style);
+            GUILayout.Label(UiTexts.Hud.Title(kit, _session.Act), _style);
             int boss = _session.TurnsUntilBoss;
-            string bossText = boss <= 3 ? $"<color=#ff7a6b>Boss in {boss} Zügen</color>" : $"Boss in {boss} Zügen";
-            GUILayout.Label($"Zug: {_session.Turns.CurrentTurn}   {bossText}", _style);
-            GUILayout.Label($"HP: {_session.Stats.Hp}/{_session.Stats.MaxHp}   Gold: {_session.Stats.Gold}   Splitter: {_session.Stats.Shards}", _style);
-            GUILayout.Label($"Logik-Tafel: {_session.Runes.Rows.Count} Runen, Zeilen {_session.Runes.Slots}/{_session.Progression.MaxBoardRows}\n{BoardList()}", _style);
+            string bossText = boss <= 3 ? $"<color=#ff7a6b>{UiTexts.Hud.BossIn(boss)}</color>" : UiTexts.Hud.BossIn(boss);
+            GUILayout.Label(UiTexts.Hud.Turn(_session.Turns.CurrentTurn, bossText), _style);
+            GUILayout.Label(UiTexts.Hud.Resources(_session.Stats.Hp, _session.Stats.MaxHp, _session.Stats.Gold, _session.Stats.Shards), _style);
+            GUILayout.Label(UiTexts.Hud.Board(_session.Runes.Rows.Count, _session.Runes.Slots, _session.Progression.MaxBoardRows, BoardList()), _style);
             GUILayout.Label($"<size=13>{BuildSummary()}</size>", _style);
-            GUILayout.Label($"Ausrüstung: {GearList()}", _style);
+            GUILayout.Label(UiTexts.Hud.Gear(GearList()), _style);
             string sets = SetList();
             if (sets.Length > 0)
             {
                 // Maus darüber: was jedes getragene Set bei 2 und 3 Teilen bewirkt.
                 var tip = new List<string>();
                 foreach ((SetDefinition set, int pieces) in _session.WornSets()) tip.Add(set.Describe(pieces));
-                GUILayout.Label(new GUIContent($"Sets: {sets}", string.Join("\n\n", tip)), _style);
+                GUILayout.Label(new GUIContent(UiTexts.Hud.Sets(sets), string.Join("\n\n", tip)), _style);
             }
             string tags = TagList();
-            if (tags.Length > 0) GUILayout.Label(new GUIContent($"Tags: {tags}", TagTooltip()), _style);
+            if (tags.Length > 0) GUILayout.Label(new GUIContent(UiTexts.Hud.Tags(tags), TagTooltip()), _style);
             foreach (MineRaid raid in _session.Raids)
             {
-                string state = raid.IsLost ? "verloren" : $"angegriffen, noch {raid.TurnsLeft(_session.Turns.CurrentTurn)} Züge";
-                GUILayout.Label($"<color=#ff7a6b>Mine {raid.Coord}: {state}</color>", _style);
+                string state = raid.IsLost ? UiTexts.Hud.MineLost : UiTexts.Hud.MineAttacked(raid.TurnsLeft(_session.Turns.CurrentTurn));
+                GUILayout.Label($"<color=#ff7a6b>{UiTexts.Hud.Mine(raid.Coord.ToString(), state)}</color>", _style);
             }
-            GUILayout.Label($"Position: {_session.Player.Position}", _style);
-            GUILayout.Label($"Feld: {Describe(_session.CurrentCell)}", _style);
-            GUILayout.Label($"Seed: {_session.Map.Seed}", _style);
+            GUILayout.Label(UiTexts.Hud.Position(_session.Player.Position.ToString()), _style);
+            GUILayout.Label(UiTexts.Hud.Tile(Describe(_session.CurrentCell)), _style);
+            GUILayout.Label(UiTexts.Hud.Seed(_session.Map.Seed), _style);
 
             if (_controller != null && _controller.HoveredCoord.HasValue
                 && _session.Map.TryGetCell(_controller.HoveredCoord.Value, out HexCell hovered))
             {
-                string info = hovered.IsContentKnown ? Describe(hovered) : "unbekannt";
-                GUILayout.Label($"Zeiger: {hovered.Coord} – {info}", _style);
+                string info = hovered.IsContentKnown ? Describe(hovered) : UiTexts.Hud.Unknown;
+                GUILayout.Label(UiTexts.Hud.Pointer(hovered.Coord.ToString(), info), _style);
             }
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
 
             GUILayout.BeginArea(ButtonRect, GUI.skin.box);
-            if (OnOpenBuild != null && !_session.IsGameOver && GUILayout.Button(new GUIContent("Build (B)", "Logik-Tafel, Skills, Module und Runen")))
+            if (OnOpenBuild != null && !_session.IsGameOver && GUILayout.Button(new GUIContent(UiTexts.Hud.BuildButton, UiTexts.Hud.BuildTip)))
             {
                 OnOpenBuild();
             }
             if (OnOpenInventory != null && !_session.IsGameOver
-                && GUILayout.Button(new GUIContent($"Inventar (I)  {_session.Inventory.Count}/{_session.Inventory.Capacity}", "Ausrüstung und Gegenstände")))
+                && GUILayout.Button(new GUIContent(UiTexts.Hud.InventoryButton(_session.Inventory.Count, _session.Inventory.Capacity), UiTexts.Hud.InventoryTip)))
             {
                 OnOpenInventory();
             }
-            if (_session.CanOpenShop && GUILayout.Button("Shop öffnen"))
+            if (_session.CanOpenShop && GUILayout.Button(UiTexts.Hud.OpenShop))
             {
                 _session.OpenShop();
             }
-            if (_onNewMap != null && GUILayout.Button("Neuer Run"))
+            if (_onNewMap != null && GUILayout.Button(UiTexts.Hud.NewRun))
             {
                 _onNewMap();
             }
@@ -135,7 +135,7 @@ namespace Betaknight.Overworld.UI
             for (int i = 0; i < _session.Runes.Rows.Count; i++)
             {
                 RuneSlot row = _session.Runes.Rows[i];
-                string skill = row.Skill == null ? "<color=#888888>—</color>" : row.Skill.IsBasicAttack ? "Basisangriff" : row.Skill.NameFrom(Skills);
+                string skill = row.Skill == null ? "<color=#888888>—</color>" : row.Skill.IsBasicAttack ? UiTexts.BasicAttack : row.Skill.NameFrom(Skills);
                 int modules = row.Modules.Count + (row.Skill?.Modules.Count ?? 0);
                 string marks = modules > 0 ? $" <color=#ffd75e>◆{modules}</color>" : string.Empty;
                 foreach (OverworldSession.TriggerLink link in _session.TriggerLinks())
@@ -144,7 +144,7 @@ namespace Betaknight.Overworld.UI
                 string block = row.Growth > 0 ? $"{row.Name} +{row.Growth}" : row.Name;
                 lines.Add($"{i + 1}. {RuneText.Difficulty(_session.RowDifficulty(row))}[{block}]{RuneText.LevelBadge(row.Rune, row.Level)} → {skill}{marks}");
             }
-            lines.Add("↓ [Immer] → Basisangriff");
+            lines.Add(UiTexts.FallbackRow);
             return string.Join("\n", lines);
         }
 
@@ -158,7 +158,7 @@ namespace Betaknight.Overworld.UI
             var blocks = new List<string>();
             foreach (SynergyCounter c in _session.TagCounters()) blocks.Add(c.Tag.Describe(c.Count));
             foreach (SynergyDuo duo in _session.ActiveDuos())
-                blocks.Add(_session.IsDuoDiscovered(duo.Id) ? $"Duo {duo.Name}: {duo.Effect.Text}" : "Duo ???: Wirkung zeigt sich im nächsten Kampf.");
+                blocks.Add(_session.IsDuoDiscovered(duo.Id) ? UiTexts.Hud.Duo(duo.Name, duo.Effect.Text) : UiTexts.Hud.UnknownDuo);
             return string.Join("\n\n", blocks);
         }
 
@@ -168,7 +168,7 @@ namespace Betaknight.Overworld.UI
             foreach (SynergyCounter c in _session.TagCounters())
                 parts.Add(c.Reached > 0 ? $"<color=#ffd75e>{c.Text}</color>" : c.Text);
             foreach (SynergyDuo duo in _session.ActiveDuos())
-                parts.Add($"<color=#7ddc6f>Duo {_session.DuoName(duo)}</color>");
+                parts.Add($"<color=#7ddc6f>{UiTexts.Hud.DuoName(_session.DuoName(duo))}</color>");
             return string.Join(", ", parts);
         }
 
@@ -200,13 +200,12 @@ namespace Betaknight.Overworld.UI
                 _weaponFrame = Time.frameCount;
             }
             int weapon = _weapon;
-            return $"Build: Waffenschaden {weapon}, Ausrüstung +{itemLevels}, Runen-Stufen +{runeLevels}, "
-                + $"Inventar {_session.Inventory.Count} Teile / {_session.RuneInventory.Count} Runen";
+            return UiTexts.Hud.BuildSummary(weapon, itemLevels, runeLevels, _session.Inventory.Count, _session.RuneInventory.Count);
         }
 
         private string GearList()
         {
-            if (_session.Gear.Items.Count == 0) return "nichts";
+            if (_session.Gear.Items.Count == 0) return UiTexts.Hud.Nothing;
             var names = new List<string>();
             foreach (EquipmentDefinition item in _session.Gear.Items) names.Add(item.Name);
             return string.Join(", ", names);
@@ -215,7 +214,7 @@ namespace Betaknight.Overworld.UI
         private string Describe(HexCell cell)
         {
             string text = DescribeContent(cell);
-            return cell.IsResolved ? $"{text} (erledigt)" : text;
+            return cell.IsResolved ? UiTexts.Hud.Resolved(text) : text;
         }
 
         private string DescribeContent(HexCell cell)
@@ -226,13 +225,13 @@ namespace Betaknight.Overworld.UI
 
             switch (cell.Content)
             {
-                case CellContent.Enemy: return "Gegner";
-                case CellContent.Boss: return "Boss";
-                case CellContent.Elite: return "Elite-Gegner";
-                case CellContent.Shop: return "Shop";
-                case CellContent.Treasure: return "Schatztruhe";
-                case CellContent.GoldMine: return "Goldmine";
-                default: return "Start";
+                case CellContent.Enemy: return UiTexts.Hud.Enemy;
+                case CellContent.Boss: return UiTexts.Hud.Boss;
+                case CellContent.Elite: return UiTexts.Hud.Elite;
+                case CellContent.Shop: return UiTexts.Hud.Shop;
+                case CellContent.Treasure: return UiTexts.Hud.Treasure;
+                case CellContent.GoldMine: return UiTexts.Hud.GoldMine;
+                default: return UiTexts.Hud.Start;
             }
         }
     }

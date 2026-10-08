@@ -56,20 +56,20 @@ namespace Betaknight.Overworld.UI
             ShopVisit shop = _session.PendingShop;
             ShopPrices prices = _session.ShopPrices;
 
-            GUILayout.Label("<b>Shop</b>", _titleStyle);
-            GUILayout.Label($"Gold: {_session.Stats.Gold}   HP: {_session.Stats.Hp}/{_session.Stats.MaxHp}   Runen: {_session.Runes.Runes.Count}/{_session.Runes.Slots}", _textStyle);
+            GUILayout.Label(UiTexts.Shop.Title, _titleStyle);
+            GUILayout.Label(UiTexts.Shop.Status(_session.Stats.Gold, _session.Stats.Hp, _session.Stats.MaxHp, _session.Runes.Runes.Count, _session.Runes.Slots), _textStyle);
             GUILayout.Space(6f);
             _scroll = GUILayout.BeginScrollView(_scroll);
 
             IReadOnlyList<RuneDefinition> runes = shop.Inventory.Runes;
-            if (runes.Count == 0) GUILayout.Label("Ausverkauft.", _textStyle);
+            if (runes.Count == 0) GUILayout.Label(UiTexts.Shop.SoldOut, _textStyle);
 
             for (int i = 0; i < runes.Count; i++)
             {
                 RuneDefinition rune = runes[i];
                 GUI.enabled = _session.CanBuyShopRune(i);
                 string hints = SkillText.EvolutionHints(_session.EvolutionHintsForRune(rune.Id));
-                string label = $"{RuneText.DifficultyBadge(rune)}  <b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]  – {prices.Rune} Gold\n{rune.Description}{hints}";
+                string label = UiTexts.Shop.RuneLabel(RuneText.DifficultyBadge(rune), rune.Name, rune.Tag.DisplayName(), prices.Rune, rune.Description, hints);
                 if (GUILayout.Button(new GUIContent(label, RuneText.DifficultyTip(rune)), _itemStyle, GUILayout.Height(58f + 18f * (hints.Split('\n').Length - 1))))
                 {
                     if (_session.Runes.IsFull) _runeAwaitingSlot = i;
@@ -85,13 +85,13 @@ namespace Betaknight.Overworld.UI
                 string set = item.SetId != null ? $"  Set: {_session.Sets.NameOf(item.SetId)}" : string.Empty;
                 string setBlock = ItemText.SynergyBlock(_session, item);
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]  – {prices.Item} Gold{set}\n{ItemText.Describe(item)}{RuneText.Eases(_session, item.Id)}\n<size=13>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>{(setBlock.Length > 0 ? $"\n<size=13>{setBlock}</size>" : string.Empty)}", _plainStyle);
+                GUILayout.Label($"{UiTexts.Shop.ItemHead(item.Name, item.Slot.DisplayName(), prices.Item, set)}\n{ItemText.Describe(item)}{RuneText.Eases(_session, item.Id)}\n<size=13>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>{(setBlock.Length > 0 ? $"\n<size=13>{setBlock}</size>" : string.Empty)}", _plainStyle);
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _session.CanBuyShopItem(i, ItemPlacement.Equip);
-                if (GUILayout.Button(worn != null ? $"Kaufen und anlegen ({worn.Name} ins Inventar)" : "Kaufen und anlegen", GUILayout.Height(28f)))
+                if (GUILayout.Button(worn != null ? UiTexts.Shop.BuyAndEquipSwap(worn.Name) : UiTexts.Shop.BuyAndEquip, GUILayout.Height(28f)))
                     _session.BuyShopItem(i, ItemPlacement.Equip);
                 GUI.enabled = _session.CanBuyShopItem(i, ItemPlacement.Inventory);
-                if (GUILayout.Button("Kaufen, ins Inventar", GUILayout.Height(28f))) _session.BuyShopItem(i, ItemPlacement.Inventory);
+                if (GUILayout.Button(UiTexts.Shop.BuyToInventory, GUILayout.Height(28f))) _session.BuyShopItem(i, ItemPlacement.Inventory);
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
                 GUILayout.EndVertical();
@@ -102,8 +102,8 @@ namespace Betaknight.Overworld.UI
             {
                 int index = i;
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label(SkillText.Describe(_session, skills[i], $"  – {prices.Skill} Gold"), _plainStyle);
-                SkillText.DrawChoice(_session, skills[i], _session.CanBuyShopSkill(i), "Skill kaufen", choice => _session.BuyShopSkill(index, choice));
+                GUILayout.Label(SkillText.Describe(_session, skills[i], UiTexts.PriceTag(prices.Skill)), _plainStyle);
+                SkillText.DrawChoice(_session, skills[i], _session.CanBuyShopSkill(i), UiTexts.Shop.BuySkill, choice => _session.BuyShopSkill(index, choice));
                 GUILayout.EndVertical();
             }
 
@@ -112,8 +112,8 @@ namespace Betaknight.Overworld.UI
             {
                 int index = i;
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label(ModuleText.Describe(_session, modules[i], $"  – {prices.Module} Gold"), _plainStyle);
-                ModuleText.DrawChoice(_session, modules[i], _session.CanBuyShopModule(i), "Modul kaufen", choice => _session.BuyShopModule(index, choice));
+                GUILayout.Label(ModuleText.Describe(_session, modules[i], UiTexts.PriceTag(prices.Module)), _plainStyle);
+                ModuleText.DrawChoice(_session, modules[i], _session.CanBuyShopModule(i), UiTexts.Shop.BuyModule, choice => _session.BuyShopModule(index, choice));
                 GUILayout.EndVertical();
             }
 
@@ -121,19 +121,19 @@ namespace Betaknight.Overworld.UI
 
             GUILayout.Space(8f);
             GUI.enabled = _session.CanBuyHeal;
-            if (GUILayout.Button($"Heilen (+{prices.HealAmount} HP) – {prices.Heal} Gold", GUILayout.Height(30f))) _session.BuyHeal();
+            if (GUILayout.Button(UiTexts.Shop.Heal(prices.HealAmount, prices.Heal), GUILayout.Height(30f))) _session.BuyHeal();
 
             GUI.enabled = _session.CanBuyRuneSlot;
-            string slot = _session.CanExpandBoard ? $"Zusätzlicher Runenplatz – {_session.RuneSlotPrice} Gold"
-                : $"Tafel voll ({_session.Progression.MaxBoardRows} Zeilen)";
+            string slot = _session.CanExpandBoard ? UiTexts.Shop.RuneSlot(_session.RuneSlotPrice)
+                : UiTexts.Shop.BoardFull(_session.Progression.MaxBoardRows);
             if (GUILayout.Button(slot, GUILayout.Height(30f))) _session.BuyRuneSlot();
 
             GUI.enabled = _session.CanRerollShop;
-            if (GUILayout.Button($"Angebot neu würfeln – {prices.Reroll} Gold", GUILayout.Height(30f))) _session.RerollShop();
+            if (GUILayout.Button(UiTexts.Shop.Reroll(prices.Reroll), GUILayout.Height(30f))) _session.RerollShop();
 
             GUI.enabled = true;
             GUILayout.EndScrollView();
-            if (GUILayout.Button("Shop verlassen", GUILayout.Height(32f))) _session.LeaveShop();
+            if (GUILayout.Button(UiTexts.Shop.Leave, GUILayout.Height(32f))) _session.LeaveShop();
         }
 
         /// <summary>Verkauf aus dem Inventar für den halben Preis. Angelegtes muss erst abgelegt werden.</summary>
@@ -142,13 +142,13 @@ namespace Betaknight.Overworld.UI
             if (_session.Inventory.Count == 0 && _session.RuneInventory.Count == 0) return;
 
             GUILayout.Space(8f);
-            GUILayout.Label($"<b>Verkaufen</b> (halber Preis: Teil {prices.SellItem} Gold, Rune {prices.SellRune} Gold)", _plainStyle);
+            GUILayout.Label(UiTexts.Shop.SellTitle(prices.SellItem, prices.SellRune), _plainStyle);
             // Indizes sind Zellen des Item-Rasters; leere Zellen überspringen.
             for (int i = 0; i < _session.Inventory.Capacity; i++)
             {
                 EquipmentDefinition item = _session.Inventory[i];
                 if (item == null) continue;
-                if (GUILayout.Button($"{item.Name} [{item.Slot.DisplayName()}] verkaufen  +{prices.SellItem} Gold", GUILayout.Height(26f)))
+                if (GUILayout.Button(UiTexts.Shop.SellItem(item.Name, item.Slot.DisplayName(), prices.SellItem), GUILayout.Height(26f)))
                 {
                     _session.SellItem(i);
                     return;
@@ -157,7 +157,7 @@ namespace Betaknight.Overworld.UI
             IReadOnlyList<StoredRune> runes = _session.RuneInventory.Runes;
             for (int i = 0; i < runes.Count; i++)
             {
-                if (GUILayout.Button($"Rune {runes[i].Name} verkaufen  +{prices.SellRune} Gold", GUILayout.Height(26f)))
+                if (GUILayout.Button(UiTexts.Shop.SellRune(runes[i].Name, prices.SellRune), GUILayout.Height(26f)))
                 {
                     _session.SellRune(i);
                     return;
@@ -174,16 +174,16 @@ namespace Betaknight.Overworld.UI
                 return;
             }
 
-            GUILayout.Label($"<b>{stock[_runeAwaitingSlot].Name}</b>: Tafel ist voll", _titleStyle);
+            GUILayout.Label(UiTexts.BoardFull(stock[_runeAwaitingSlot].Name), _titleStyle);
             GUILayout.Space(6f);
 
-            if (GUILayout.Button("Kaufen, ins Runen-Inventar", GUILayout.Height(32f)))
+            if (GUILayout.Button(UiTexts.Shop.BuyToRuneInventory, GUILayout.Height(32f)))
             {
                 _session.BuyShopRune(_runeAwaitingSlot);
                 _runeAwaitingSlot = -1;
                 return;
             }
-            GUILayout.Label("… oder eine Zeile tauschen (die alte Rune wandert mit ihrer Stufe ins Inventar, der Skill bleibt):", _plainStyle);
+            GUILayout.Label(UiTexts.SwapRowHint, _plainStyle);
 
             IReadOnlyList<RuneDefinition> equipped = _session.Runes.Runes;
             for (int slot = 0; slot < equipped.Count; slot++)
@@ -198,7 +198,7 @@ namespace Betaknight.Overworld.UI
             }
 
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Zurück", GUILayout.Height(30f))) _runeAwaitingSlot = -1;
+            if (GUILayout.Button(UiTexts.Back, GUILayout.Height(30f))) _runeAwaitingSlot = -1;
         }
 
         private void EnsureStyles()

@@ -35,10 +35,10 @@ namespace Betaknight.Overworld.UI
         }
 
         private void OnRaid(MineRaid raid) =>
-            Post($"<color=#ff7a6b><b>Goldmine {raid.Coord} angegriffen!</b></color> {OverworldSession.MineRaidTurns} Züge zum Verteidigen");
+            Post(UiTexts.Messages.MineRaid(raid.Coord.ToString(), OverworldSession.MineRaidTurns));
 
         private void OnMineLost(MineRaid raid) =>
-            Post($"<color=#ff7a6b><b>Goldmine {raid.Coord} verloren.</b></color> Zurückerobern bringt sie wieder");
+            Post(UiTexts.Messages.MineLost(raid.Coord.ToString()));
 
         /// <summary>Hinweis unten links einblenden, z. B. für andere Systeme.</summary>
         public void Post(string text)
@@ -47,7 +47,7 @@ namespace Betaknight.Overworld.UI
             if (_messages.Count > MaxMessages) _messages.RemoveAt(0);
         }
 
-        private void OnImproved(string text) => Post($"<color=#7ddc6f><b>Verbessert:</b> {text}</color>");
+        private void OnImproved(string text) => Post(UiTexts.Messages.Improved(text));
 
         private void OnResolved(EncounterOutcome outcome) =>
             Post($"<b>{outcome.Definition.Title}</b>: {outcome.Summary}");

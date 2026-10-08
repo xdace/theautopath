@@ -196,16 +196,16 @@ namespace Betaknight.Overworld.UI
             var log = new Rect(pad, stage.yMax + pad, Screen.width - pad * 2, Screen.height - stage.yMax - pad * 2 - 44f);
             var controls = new Rect(pad, Screen.height - pad - 36f, Screen.width - pad * 2, 36f);
 
-            string enemy = string.IsNullOrEmpty(_current.EnemyName) ? "Gegner" : _current.EnemyName;
+            string enemy = string.IsNullOrEmpty(_current.EnemyName) ? UiTexts.Arena.Enemy : _current.EnemyName;
             string portal = string.Empty;
             int survive = _playback.Result.SurviveTicks;
             if (survive > 0)
             {
                 int left = Mathf.Max(0, survive - _playback.Tick);
-                portal = left > 0 ? $"   <color=#b18cff>Portal öffnet in {BattleLogText.Time(left)}</color>" : "   <color=#b18cff>Portal offen</color>";
+                portal = left > 0 ? $"   <color=#b18cff>{UiTexts.Arena.PortalOpensIn(BattleLogText.Time(left))}</color>" : $"   <color=#b18cff>{UiTexts.Arena.PortalOpen}</color>";
             }
             GUI.Label(new Rect(pad, 12f, Screen.width - pad * 2, 36f),
-                $"<b>Arena</b> – Ritter gegen {enemy}   <color=#9aa4b2>{BattleLogText.Time(_playback.Tick)}</color>{portal}", _title);
+                UiTexts.Arena.Title(enemy, BattleLogText.Time(_playback.Tick), portal), _title);
 
             if (_playback.IsFinished)
             {
@@ -275,10 +275,10 @@ namespace Betaknight.Overworld.UI
                     Fill(bar, new Color(0.2f, 0.2f, 0.22f));
                     Fill(new Rect(bar.x, bar.y, bar.width * f.WindupProgress(_playback.Tick), bar.height),
                         charging ? new Color(1f, 0.55f, 0.15f) : new Color(0.7f, 0.7f, 0.75f));
-                    string cast = $"Cast {SkillInfo.Seconds(f.ActionWindupTicks)}";
-                    if (f.ActionCause == ActionCause.Trigger) cast += $", <color=#ffae42>↪ von Zeile {f.ActionCauseRow + 1}</color>";
-                    else if (f.ActionCause == ActionCause.Repeat) cast += ", <color=#9fc7ff>↻ Wiederholung</color>";
-                    string label = charging ? $"<color=#ffae42>lädt auf: {BattleLogText.SkillName(f.ActionSkill)} ({cast})</color>"
+                    string cast = UiTexts.Arena.Cast(SkillInfo.Seconds(f.ActionWindupTicks));
+                    if (f.ActionCause == ActionCause.Trigger) cast += $", <color=#ffae42>{UiTexts.Arena.FromRow(f.ActionCauseRow + 1)}</color>";
+                    else if (f.ActionCause == ActionCause.Repeat) cast += $", <color=#9fc7ff>{UiTexts.Arena.Repeat}</color>";
+                    string label = charging ? $"<color=#ffae42>{UiTexts.Arena.Charging(BattleLogText.SkillName(f.ActionSkill), cast)}</color>"
                         : $"{BattleLogText.SkillName(f.ActionSkill)} ({cast})";
                     GUI.Label(new Rect(bar.x - 30f, bar.yMax, bar.width + 60f, 20f), label, _small);
                 }
@@ -318,7 +318,7 @@ namespace Betaknight.Overworld.UI
                 Fill(box, new Color(c.r * 0.35f, c.g * 0.35f, c.b * 0.35f, 0.95f));
                 Fill(new Rect(box.x, box.yMax - 4f, box.width * st.Remaining(_playback.Tick), 4f), c);
                 string stacks = st.Stacks > 1 ? $" ×{st.Stacks}" : string.Empty;
-                string tooltip = $"{BattleLogText.StatusName(st.Id)}: noch {RowStateText.Seconds(st.TicksLeft(_playback.Tick))}{(st.Stacks > 1 ? $", {st.Stacks} Stapel" : string.Empty)}";
+                string tooltip = UiTexts.Arena.StatusTip(BattleLogText.StatusName(st.Id), RowStateText.Seconds(st.TicksLeft(_playback.Tick)), st.Stacks);
                 GUI.Label(box, new GUIContent($"<size=13><b>{StatusShort(st.Id)}</b>{stacks}\n{RowStateText.Seconds(st.TicksLeft(_playback.Tick))}</size>", tooltip), _cell);
             }
         }
@@ -357,7 +357,7 @@ namespace Betaknight.Overworld.UI
         private void DrawBoard(Rect area)
         {
             GUILayout.BeginArea(area, GUI.skin.box);
-            GUILayout.Label(new GUIContent("<b>Logik-Tafel</b>  <size=13><color=#9aa4b2>Zeile hovern für den Grund</color></size>", QueueRule), _text);
+            GUILayout.Label(new GUIContent($"{UiTexts.Arena.BoardTitle}  <size=13><color=#9aa4b2>{UiTexts.Arena.BoardLegend}</color></size>", QueueRule), _text);
             BattleResult r = _playback.Result;
             for (int i = 0; i < r.PlayerRowLabels.Count; i++)
             {
@@ -392,11 +392,12 @@ namespace Betaknight.Overworld.UI
             // A-13: Warteschlange direkt unter der Tafel.
             string queue = _playback.QueueText(Glyph('⏳', "…"));
             GUILayout.Space(4f);
-            GUILayout.Label(new GUIContent(queue.Length > 0 ? $"<size=13><color=#7fd7ff>{queue}</color></size>" : "<size=13><color=#666b75>Wartet: –</color></size>",
+            GUILayout.Label(new GUIContent(queue.Length > 0 ? $"<size=13><color=#7fd7ff>{queue}</color></size>" : $"<size=13><color=#666b75>{UiTexts.Arena.QueueEmpty}</color></size>",
                 QueueRule), _row);
             GUILayout.FlexibleSpace();
-            GUILayout.Label($"<size=13>{StateGlyph(RowDisplay.Ready)} bereit   {StateGlyph(RowDisplay.ConditionFalse)} Bedingung falsch   "
-                + $"{StateGlyph(RowDisplay.Cooldown)} Cooldown   {StateGlyph(RowDisplay.Queued)} eingereiht   {StateGlyph(RowDisplay.Orphaned)} verwaist</size>", _row);
+            GUILayout.Label($"<size=13>{StateGlyph(RowDisplay.Ready)} {UiTexts.Arena.StateReady}   {StateGlyph(RowDisplay.ConditionFalse)} {UiTexts.Arena.StateConditionFalse}   "
+                + $"{StateGlyph(RowDisplay.Cooldown)} {UiTexts.Arena.StateCooldown}   {StateGlyph(RowDisplay.Queued)} {UiTexts.Arena.StateQueued}   "
+                + $"{StateGlyph(RowDisplay.Orphaned)} {UiTexts.Arena.StateOrphaned}</size>", _row);
             GUILayout.EndArea();
         }
 
@@ -408,18 +409,18 @@ namespace Betaknight.Overworld.UI
             string now;
             switch (state)
             {
-                case RowDisplay.Ready: now = "Bedingung erfüllt, Skill bereit"; break;
-                case RowDisplay.ConditionFalse: now = "condition not met"; break;
-                case RowDisplay.Cooldown: now = $"Skill im Cooldown (noch {RowStateText.Seconds(_playback.CooldownLeft(row))})"; break;
-                case RowDisplay.Orphaned: now = "skipped (no skill)"; break;
+                case RowDisplay.Ready: now = UiTexts.Arena.NowReady; break;
+                case RowDisplay.ConditionFalse: now = UiTexts.Arena.NowConditionFalse; break;
+                case RowDisplay.Cooldown: now = UiTexts.Arena.NowCooldown(RowStateText.Seconds(_playback.CooldownLeft(row))); break;
+                case RowDisplay.Orphaned: now = UiTexts.Arena.NowOrphaned; break;
                 case RowDisplay.Queued:
                     int left = _playback.CooldownLeft(row);
-                    now = left > 0 ? $"eingereiht, wartet auf Cooldown (noch {RowStateText.Seconds(left)})" : "eingereiht, wartet (Aktion läuft)";
+                    now = left > 0 ? UiTexts.Arena.NowQueuedCooldown(RowStateText.Seconds(left)) : UiTexts.Arena.NowQueuedWaiting;
                     break;
-                default: now = "noch keine Entscheidung"; break;
+                default: now = UiTexts.Arena.NowUndecided; break;
             }
             string skipped = _playback.LastSkipReason(row);
-            string text = skipped != null ? $"Jetzt: {now}\nLast: {skipped}" : $"Jetzt: {now}";
+            string text = skipped != null ? UiTexts.Arena.NowAndLast(now, skipped) : UiTexts.Arena.Now(now);
             return $"{text}\n{QueueRule}";
         }
 
@@ -429,14 +430,13 @@ namespace Betaknight.Overworld.UI
         {
             GUILayout.BeginArea(area, GUI.skin.box);
             BattleResult r = _playback.Result;
-            GUILayout.Label($"<b>Auswertung</b>   {BattleLogText.OutcomeText(r.Outcome)}, {BattleLogText.Time(r.EndTick)}, "
-                + $"Schaden gesamt {_report.TotalDamage}, Heilung {_report.TotalHealing}", _text);
+            GUILayout.Label(UiTexts.Arena.Report(BattleLogText.OutcomeText(r.Outcome), BattleLogText.Time(r.EndTick), _report.TotalDamage, _report.TotalHealing), _text);
             if (_report.TotalDamage > 0)
             {
                 // A-12: Skills sollen der Hauptschaden sein; der Anteil steht deshalb gross über der Tabelle.
                 string color = _report.BasicAttackShareBp <= BasisPoints.Percent(30) ? "#7ddc6f" : "#ffd75e";
                 GUILayout.Label(new GUIContent($"<size=18><b><color={color}>{_report.DamageSplitText}</color></b></size>",
-                    "Anteil am Schaden: Basisangriff gegen Skills. Ziel mit 3 oder mehr Schadens-Skills: Basisangriff höchstens etwa 30 %."), _text);
+                    UiTexts.Arena.SplitTip), _text);
             }
 
             _reportScroll = GUILayout.BeginScrollView(_reportScroll);
@@ -448,17 +448,17 @@ namespace Betaknight.Overworld.UI
                 : new[] { w * 0.27f, w * 0.09f, w * 0.08f, w * 0.08f, w * 0.07f, w * 0.07f, w * 0.12f, w * 0.12f, w * 0.10f };
             var header = new List<GUIContent>
             {
-                new GUIContent("<b>Row</b>"),
-                new GUIContent("<b>Fired</b>", "How often this row started an action (↪ by a trigger, ↻ repeated)."),
-                new GUIContent("<b>Triggered</b>", "How often this row's condition was met. Hard blocks need easers or a build that makes them happen."),
-                new GUIContent("<b>Damage</b>"),
-                new GUIContent("<b>Healing</b>"),
-                new GUIContent("<b>Share</b>", "Share of total damage."),
-                new GUIContent("<b>Bonus</b>", "Extra damage, healing and saved cooldown from the block's difficulty bonus."),
-                new GUIContent("<b>Queued</b>", "How often this row was queued, and the average wait until it started."),
-                new GUIContent("<b>Missed Trigger</b>", MissedTriggerTip),
+                new GUIContent(UiTexts.Arena.HeaderRow),
+                new GUIContent(UiTexts.Arena.HeaderFired, UiTexts.Arena.HeaderFiredTip),
+                new GUIContent(UiTexts.Arena.HeaderTriggered, UiTexts.Arena.HeaderTriggeredTip),
+                new GUIContent(UiTexts.Arena.HeaderDamage),
+                new GUIContent(UiTexts.Arena.HeaderHealing),
+                new GUIContent(UiTexts.Arena.HeaderShare, UiTexts.Arena.HeaderShareTip),
+                new GUIContent(UiTexts.Arena.HeaderBonus, UiTexts.Arena.HeaderBonusTip),
+                new GUIContent(UiTexts.Arena.HeaderQueued, UiTexts.Arena.HeaderQueuedTip),
+                new GUIContent(UiTexts.Arena.HeaderMissed, MissedTriggerTip),
             };
-            if (reasons) header.Add(new GUIContent("<b>Other reason</b>", "Most common reason besides a missed trigger, e.g. no skill (orphaned) or another action running."));
+            if (reasons) header.Add(new GUIContent(UiTexts.Arena.HeaderOther, UiTexts.Arena.HeaderOtherTip));
             ReportRow(cols, Color.clear, header.ToArray());
             foreach (RowReport row in _report.Rows)
             {
@@ -473,7 +473,7 @@ namespace Betaknight.Overworld.UI
                 ReportRow(cols, RowColorFor(row.Index), cells.ToArray());
             }
             if (_report.OtherDamage > 0)
-                ReportRow(cols, Color.clear, "<color=#9aa4b2>ohne Zeile (Set-Boni, Rückschlag)</color>", "", "", _report.OtherDamage.ToString());
+                ReportRow(cols, Color.clear, $"<color=#9aa4b2>{UiTexts.Arena.NoRowDamage}</color>", "", "", _report.OtherDamage.ToString());
 
             GUILayout.Space(8f);
             foreach (string hint in _report.Hints) GUILayout.Label($"• {hint}", _row);
@@ -496,7 +496,7 @@ namespace Betaknight.Overworld.UI
         private static string QueueCell(RowReport row)
         {
             if (row.Queued == 0) return "–";
-            string text = row.StartedFromQueue > 0 ? $"{row.Queued}× · Ø {SkillInfo.Seconds(row.AverageWaitTicks)}" : $"{row.Queued}×";
+            string text = row.StartedFromQueue > 0 ? UiTexts.Arena.QueueAverage(row.Queued, SkillInfo.Seconds(row.AverageWaitTicks)) : $"{row.Queued}×";
             return $"<color=#7fd7ff>{text}</color>";
         }
 
@@ -510,7 +510,7 @@ namespace Betaknight.Overworld.UI
         }
 
         /// <summary>H-04: Erklärung der Spalte «Missed Trigger» (Kopf der Auswertung).</summary>
-        private const string MissedTriggerTip = "How often this row's condition was not met while a lower row or the basic attack fired.";
+        private const string MissedTriggerTip = UiTexts.Arena.HeaderMissedTip;
 
         private void ReportRow(float[] cols, Color color, params string[] cells)
         {
@@ -537,10 +537,10 @@ namespace Betaknight.Overworld.UI
         {
             GUILayout.BeginArea(area, GUI.skin.box);
             GUILayout.BeginHorizontal();
-            GUILayout.Label("<b>Protokoll</b>", _text, GUILayout.Width(110f));
-            FilterButton(LogFilter.All, "Alles");
-            FilterButton(LogFilter.Mine, "Meine Aktionen");
-            FilterButton(LogFilter.Damage, "Nur Schaden");
+            GUILayout.Label(UiTexts.Arena.LogTitle, _text, GUILayout.Width(110f));
+            FilterButton(LogFilter.All, UiTexts.Arena.FilterAll);
+            FilterButton(LogFilter.Mine, UiTexts.Arena.FilterMine);
+            FilterButton(LogFilter.Damage, UiTexts.Arena.FilterDamage);
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
 
@@ -582,13 +582,13 @@ namespace Betaknight.Overworld.UI
                 BattleResult r = _playback.Result;
                 GUILayout.Label($"<b>{BattleLogText.OutcomeText(r.Outcome)}</b>   −{_current.DamageTaken} HP   +{_current.GoldReward} Gold", _text);
                 GUILayout.FlexibleSpace();
-                if (OnEditBoard != null && r.IsSurvived && GUILayout.Button("Build öffnen (B)", GUILayout.Width(160f), GUILayout.Height(32f)))
+                if (OnEditBoard != null && r.IsSurvived && GUILayout.Button(UiTexts.Arena.OpenBuild, GUILayout.Width(160f), GUILayout.Height(32f)))
                 {
                     _queue.Clear();
                     OpenNext();
                     OnEditBoard();
                 }
-                if (GUILayout.Button("Weiter", GUILayout.Width(140f), GUILayout.Height(32f))) OpenNext();
+                if (GUILayout.Button(UiTexts.Arena.Continue, GUILayout.Width(140f), GUILayout.Height(32f))) OpenNext();
             }
             else
             {
@@ -597,9 +597,9 @@ namespace Betaknight.Overworld.UI
                     string label = i == _speedIndex ? $"<b>[{Speeds[i]}×]</b>" : $"{Speeds[i]}×";
                     if (GUILayout.Button(label, _row, GUILayout.Width(60f), GUILayout.Height(32f))) _speedIndex = i;
                 }
-                if (GUILayout.Button(_paused ? "Weiter" : "Pause", GUILayout.Width(90f), GUILayout.Height(32f))) _paused = !_paused;
+                if (GUILayout.Button(_paused ? UiTexts.Arena.Continue : UiTexts.Arena.Pause, GUILayout.Width(90f), GUILayout.Height(32f))) _paused = !_paused;
                 GUILayout.FlexibleSpace();
-                if (GUILayout.Button("Überspringen", GUILayout.Width(140f), GUILayout.Height(32f)))
+                if (GUILayout.Button(UiTexts.Arena.Skip, GUILayout.Width(140f), GUILayout.Height(32f)))
                 {
                     _playback.SkipToEnd();
                     _playback.TakePopups();
@@ -681,13 +681,13 @@ namespace Betaknight.Overworld.UI
         {
             switch (id)
             {
-                case StatusIds.Burn: return "Brand";
-                case StatusIds.Stun: return "Betäubt";
-                case StatusIds.ArmorBreak: return "R.-Bruch";
-                case StatusIds.ShieldWall: return "Schild";
-                case StatusIds.Blinded: return "Blind";
-                case StatusIds.Anchor: return "Anker";
-                case StatusIds.Thrusters: return "Düsen";
+                case StatusIds.Burn: return UiTexts.Arena.StatusBurn;
+                case StatusIds.Stun: return UiTexts.Arena.StatusStun;
+                case StatusIds.ArmorBreak: return UiTexts.Arena.StatusArmorBreak;
+                case StatusIds.ShieldWall: return UiTexts.Arena.StatusShieldWall;
+                case StatusIds.Blinded: return UiTexts.Arena.StatusBlind;
+                case StatusIds.Anchor: return UiTexts.Arena.StatusAnchor;
+                case StatusIds.Thrusters: return UiTexts.Arena.StatusThrusters;
                 default: return id;
             }
         }

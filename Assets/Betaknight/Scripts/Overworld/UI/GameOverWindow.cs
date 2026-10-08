@@ -37,10 +37,10 @@ namespace Betaknight.Overworld.UI
             const float height = 200f;
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUILayout.BeginArea(rect, GUI.skin.box);
-            GUILayout.Label("<b>Der Ritter ist gefallen</b>", _titleStyle);
-            GUILayout.Label($"Akt {_session.Act}, Zug {_session.Turns.CurrentTurn}, {_session.Runes.Runes.Count} Runen, {_session.Stats.Gold} Gold", _textStyle);
+            GUILayout.Label(UiTexts.GameOver.Title, _titleStyle);
+            GUILayout.Label(UiTexts.GameOver.Summary(_session.Act, _session.Turns.CurrentTurn, _session.Runes.Runes.Count, _session.Stats.Gold), _textStyle);
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Neuer Run", GUILayout.Height(36f))) _onNewRun?.Invoke();
+            if (GUILayout.Button(UiTexts.GameOver.NewRun, GUILayout.Height(36f))) _onNewRun?.Invoke();
             GUILayout.EndArea();
         }
     }

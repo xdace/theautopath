@@ -31,11 +31,10 @@ namespace Betaknight.Overworld.UI
             const float height = 210f;
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUILayout.BeginArea(rect, GUI.skin.box);
-            GUILayout.Label("<b>Das Fluchtportal ist offen</b>", _titleStyle);
-            GUILayout.Label($"Es führt in Akt {_session.Act + 1}: eine neue Karte mit stärkeren Gegnern. "
-                + "Ritter, Ausrüstung, Tafel, Gold und Splitter kommen mit, eroberte Minen bleiben zurück.", _textStyle);
+            GUILayout.Label(UiTexts.Portal.Title, _titleStyle);
+            GUILayout.Label(UiTexts.Portal.Text(_session.Act + 1), _textStyle);
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button($"Durchs Portal → Akt {_session.Act + 1}", GUILayout.Height(36f))) _session.EnterPortal();
+            if (GUILayout.Button(UiTexts.Portal.Button(_session.Act + 1), GUILayout.Height(36f))) _session.EnterPortal();
             GUILayout.EndArea();
         }
     }
