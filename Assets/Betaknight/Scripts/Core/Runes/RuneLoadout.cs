@@ -55,12 +55,42 @@ namespace Betaknight.Core.Runes
 
         public bool HasTag(RuneTag tag) => _rows.Any(r => r.Rune.Tag == tag);
 
-        public bool TryAdd(RuneDefinition rune, string skillId = null)
+        public bool TryAdd(RuneDefinition rune, string skillId = null, int level = 0)
         {
             if (rune == null || IsFull || Contains(rune)) return false;
-            _rows.Add(new RuneSlot(rune, skillId));
+            _rows.Add(new RuneSlot(rune, skillId) { Level = Math.Max(0, Math.Min(level, rune.MaxLevel)) });
             Changed?.Invoke();
             return true;
+        }
+
+        /// <summary>
+        /// Tauscht die Rune einer Zeile gegen eine andere mit deren Stufe. Der zugeordnete Skill bleibt an der Zeile.
+        /// Die bisherige Rune kommt mit ihrer Stufe zurück, z. B. fürs Runen-Inventar.
+        /// </summary>
+        public bool SwapRune(int index, RuneDefinition rune, int level, out RuneDefinition oldRune, out int oldLevel)
+        {
+            oldRune = null;
+            oldLevel = 0;
+            if (rune == null || !IsValid(index)) return false;
+            for (int i = 0; i < _rows.Count; i++)
+                if (i != index && _rows[i].Rune.Id == rune.Id) return false;
+
+            oldRune = _rows[index].Rune;
+            oldLevel = _rows[index].Level;
+            _rows[index].Rune = rune;
+            _rows[index].Level = Math.Max(0, Math.Min(level, rune.MaxLevel));
+            Changed?.Invoke();
+            return true;
+        }
+
+        /// <summary>Entfernt eine Zeile und gibt sie zurück (Rune, Stufe, Skill). Null bei ungültigem Index.</summary>
+        public RuneSlot RemoveAt(int index)
+        {
+            if (!IsValid(index)) return null;
+            RuneSlot row = _rows[index];
+            _rows.RemoveAt(index);
+            Changed?.Invoke();
+            return row;
         }
 
         /// <summary>Ersetzt die Rune einer Zeile. Der zugeordnete Skill bleibt, die Stufe beginnt neu.</summary>

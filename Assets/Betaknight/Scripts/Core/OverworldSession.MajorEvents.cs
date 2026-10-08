@@ -123,7 +123,16 @@ namespace Betaknight.Core
 
         private CombatResult RunCombat(CellContent enemy, int tier, BattleContext context)
         {
-            CombatResult result = _combat.Resolve(new CombatRequest(enemy, tier, Stats, Runes, Gear, context), _random);
+            CombatResult result;
+            IsInCombat = true;
+            try
+            {
+                result = _combat.Resolve(new CombatRequest(enemy, tier, Stats, Runes, Gear, context), _random);
+            }
+            finally
+            {
+                IsInCombat = false;
+            }
             LastCombat = result;
             CombatFinished?.Invoke(result);
             return result;
@@ -182,7 +191,8 @@ namespace Betaknight.Core
             HexCell cell = CurrentCell;
             if (!_shops.TryGetValue(cell.Coord, out ShopInventory inventory))
             {
-                inventory = new ShopInventory(RuneOffer.Create("Shop", RuneCatalog, Runes, _random).Options, PickItems(ShopItemCount));
+                inventory = new ShopInventory(RuneOffer.Create("Shop", RuneCatalog, Runes, _random, isOwned: RuneInventory.Contains).Options,
+                    PickItems(ShopItemCount));
                 _shops.Add(cell.Coord, inventory);
             }
 
@@ -193,16 +203,19 @@ namespace Betaknight.Core
 
         public bool CanBuyShopRune(int index) =>
             PendingShop != null && index >= 0 && index < PendingShop.Inventory.Runes.Count
-            && Stats.Gold >= ShopPrices.Rune && !Runes.Contains(PendingShop.Inventory.Runes[index]);
+            && Stats.Gold >= ShopPrices.Rune && !Runes.Contains(PendingShop.Inventory.Runes[index])
+            && !RuneInventory.Contains(PendingShop.Inventory.Runes[index]);
 
-        /// <summary>Kauft eine Rune. Bei vollen Plätzen muss <paramref name="replaceSlot"/> angegeben werden.</summary>
+        /// <summary>
+        /// Kauft eine Rune: auf eine freie Zeile, sonst ins Runen-Inventar. Mit <paramref name="replaceSlot"/> in diese Zeile,
+        /// die bisherige Rune wandert ins Inventar.
+        /// </summary>
         public bool BuyShopRune(int index, int replaceSlot = -1)
         {
             if (!CanBuyShopRune(index)) return false;
 
             RuneDefinition rune = PendingShop.Inventory.Runes[index];
-            bool ok = Runes.IsFull ? Runes.TryReplace(replaceSlot, rune) : Runes.TryAdd(rune, DefaultSkillForNewRow());
-            if (!ok) return false;
+            if (!PlaceNewRune(rune, replaceSlot)) return false;
 
             Stats.TrySpendGold(ShopPrices.Rune);
             PendingShop.Inventory.Remove(rune);
@@ -238,7 +251,7 @@ namespace Betaknight.Core
         {
             if (!CanRerollShop) return false;
             Stats.TrySpendGold(ShopPrices.Reroll);
-            PendingShop.Inventory.Replace(RuneOffer.Create("Shop", RuneCatalog, Runes, _random).Options);
+            PendingShop.Inventory.Replace(RuneOffer.Create("Shop", RuneCatalog, Runes, _random, isOwned: RuneInventory.Contains).Options);
             PendingShop.Inventory.ReplaceItems(PickItems(ShopItemCount));
             return true;
         }

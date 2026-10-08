@@ -67,7 +67,8 @@ namespace Betaknight.Core
         public RuneOffer PendingRuneOffer { get; private set; }
 
         /// <summary>Wartet die Session auf eine Entscheidung des Spielers?</summary>
-        public bool IsBusy => PendingEncounter != null || PendingRuneOffer != null || PendingShop != null || PendingPortal;
+        public bool IsBusy => PendingEncounter != null || PendingRuneOffer != null || PendingShop != null || PendingPortal
+            || PendingItem != null || PendingRune != null;
 
         /// <summary>Wird nach jedem erfolgreichen Schritt ausgelöst, nachdem kleine Events bereits gewirkt haben.</summary>
         public event Action<StepResult> CellEntered;
@@ -89,8 +90,11 @@ namespace Betaknight.Core
 
         public OverworldSession(HexMap map, PlayerModel player, TurnSystem turns, ExplorationService exploration,
             PlayerStats stats = null, EncounterCatalog encounters = null, RuneLoadout runes = null, RuneCatalog runeCatalog = null,
-            ICombatResolver combat = null, Equipment equipment = null, EquipmentCatalog items = null)
+            ICombatResolver combat = null, Equipment equipment = null, EquipmentCatalog items = null,
+            Inventory inventory = null, RuneInventory runeInventory = null)
         {
+            Inventory = inventory ?? new Inventory();
+            RuneInventory = runeInventory ?? new RuneInventory();
             Gear = equipment ?? new Equipment();
             Items = items ?? EquipmentCatalog.CreateDefault();
             Map = map ?? throw new ArgumentNullException(nameof(map));
@@ -215,7 +219,7 @@ namespace Betaknight.Core
         public RuneOffer OfferRunes(string source)
         {
             if (IsBusy) return null;
-            RuneOffer offer = RuneOffer.Create(source, RuneCatalog, Runes, _random, isUnlocked: IsRuneUnlocked);
+            RuneOffer offer = RuneOffer.Create(source, RuneCatalog, Runes, _random, isUnlocked: IsRuneUnlocked, isOwned: RuneInventory.Contains);
             offer = offer.WithItems(RollRewardItems(source));
             if (offer.Count == 0) return null;
 
@@ -225,8 +229,9 @@ namespace Betaknight.Core
         }
 
         /// <summary>
-        /// Nimmt eine Rune aus dem wartenden Angebot. Sind alle Plätze belegt, muss <paramref name="replaceSlot"/>
-        /// die Rune angeben, die ersetzt wird. Gibt false zurück, wenn die Wahl ungültig ist.
+        /// Nimmt eine Rune aus dem wartenden Angebot. Mit freier Zeile kommt sie auf die Tafel, sonst ins Runen-Inventar.
+        /// Mit <paramref name="replaceSlot"/> kommt sie in diese Zeile und die bisherige Rune samt Stufe ins Inventar
+        /// (der Skill bleibt an der Zeile). Gibt false zurück, wenn die Wahl ungültig ist.
         /// </summary>
         public bool TakeRune(int optionIndex, int replaceSlot = -1)
         {
@@ -234,10 +239,13 @@ namespace Betaknight.Core
             if (offer == null || optionIndex < 0 || optionIndex >= offer.Options.Count) return false;
 
             RuneDefinition rune = offer.Options[optionIndex];
-            bool ok = Runes.IsFull ? Runes.TryReplace(replaceSlot, rune) : Runes.TryAdd(rune, DefaultSkillForNewRow());
-            if (!ok) return false;
-
             PendingRuneOffer = null;
+            if (!PlaceNewRune(rune, replaceSlot))
+            {
+                PendingRuneOffer = offer;
+                return false;
+            }
+
             RuneTaken?.Invoke(rune);
             CheckShards();
             return true;

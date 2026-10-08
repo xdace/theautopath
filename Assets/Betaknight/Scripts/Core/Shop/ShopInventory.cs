@@ -13,6 +13,10 @@ namespace Betaknight.Core.Shop
         public int Slot = 20;
         public int Reroll = 3;
         public int Item = 12;
+
+        /// <summary>Verkauf aus dem Inventar: halber Preis.</summary>
+        public int SellItem => Item / 2;
+        public int SellRune => Rune / 2;
     }
 
     /// <summary>Warenbestand eines Shops. Bleibt pro Shop-Feld erhalten, Gekauftes verschwindet.</summary>

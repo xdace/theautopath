@@ -36,19 +36,21 @@ namespace Betaknight.Core.Runes
         /// mindestens eine Rune mit einem Tag, den der Spieler bereits hat. Passende Tags sind doppelt gewichtet.
         /// </summary>
         /// <param name="isUnlocked">Freigeschaltete exklusive Runen (z. B. durch ein Set). Sie kommen garantiert ins Angebot.</param>
+        /// <param name="isOwned">Runen, die der Spieler sonst noch besitzt (z. B. im Runen-Inventar); sie werden nicht angeboten.</param>
         public static RuneOffer Create(string source, RuneCatalog catalog, RuneLoadout loadout, Random random, int count = 3,
-            Func<RuneDefinition, bool> isUnlocked = null)
+            Func<RuneDefinition, bool> isUnlocked = null, Func<RuneDefinition, bool> isOwned = null)
         {
             if (catalog == null) throw new ArgumentNullException(nameof(catalog));
             if (loadout == null) throw new ArgumentNullException(nameof(loadout));
             if (random == null) throw new ArgumentNullException(nameof(random));
 
-            List<RuneDefinition> pool = catalog.All.Where(r => r.Weight > 0 && !r.IsExclusive && !loadout.Contains(r)).ToList();
+            bool Owned(RuneDefinition r) => loadout.Contains(r) || (isOwned != null && isOwned(r));
+            List<RuneDefinition> pool = catalog.All.Where(r => r.Weight > 0 && !r.IsExclusive && !Owned(r)).ToList();
             var picked = new List<RuneDefinition>();
 
             if (isUnlocked != null)
             {
-                foreach (RuneDefinition unlocked in catalog.All.Where(r => r.IsExclusive && isUnlocked(r) && !loadout.Contains(r)))
+                foreach (RuneDefinition unlocked in catalog.All.Where(r => r.IsExclusive && isUnlocked(r) && !Owned(r)))
                 {
                     if (picked.Count >= count) break;
                     picked.Add(unlocked);

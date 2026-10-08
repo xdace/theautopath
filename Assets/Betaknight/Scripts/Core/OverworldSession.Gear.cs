@@ -47,31 +47,31 @@ namespace Betaknight.Core
         public bool IsRuneUnlocked(RuneDefinition rune) =>
             rune != null && rune.UnlockSetId != null && Gear.SetPieces(rune.UnlockSetId) >= SetDefinition.FirstBonusPieces;
 
-        /// <summary>Ein Teil wurde aus einem Angebot angelegt; abgelegte Teile gehen verloren.</summary>
+        /// <summary>
+        /// Ein Teil wurde genommen. Zweiter Wert: Teile, die dabei abgelegt wurden (sie liegen jetzt im Inventar).
+        /// Ist das Teil selbst ins Inventar gegangen, ist es nicht angelegt.
+        /// </summary>
         public event Action<EquipmentDefinition, IReadOnlyList<EquipmentDefinition>> ItemTaken;
 
         /// <summary>
-        /// Nimmt ein Ausrüstungsteil aus dem wartenden Angebot und legt es an. Verwaiste Zeilen bekommen
-        /// den ersten neuen Skill. False, wenn das Teil nicht angelegt werden kann (z. B. Schild bei Zweihand).
+        /// Nimmt ein Ausrüstungsteil aus dem wartenden Angebot. <see cref="ItemPlacement.Auto"/> legt es an, wenn
+        /// sein Platz frei ist, sonst kommt es ins Inventar. Abgelegte Teile wandern ins Inventar.
         /// </summary>
-        public bool TakeItem(int itemIndex)
+        public bool TakeItem(int itemIndex, ItemPlacement placement = ItemPlacement.Auto)
         {
-            RuneOffer offer = PendingRuneOffer;
-            if (offer == null || itemIndex < 0 || itemIndex >= offer.ItemIds.Count) return false;
-            if (!Items.TryGet(offer.ItemIds[itemIndex], out EquipmentDefinition item)) return false;
-
-            List<EquipmentDefinition> removed = EquipItem(item);
-            if (removed == null) return false;
+            if (!CanTakeItem(itemIndex, placement)) return false;
+            EquipmentDefinition item = Items.Get(PendingRuneOffer.ItemIds[itemIndex]);
 
             PendingRuneOffer = null;
-            ItemTaken?.Invoke(item, removed);
+            PlaceNewItem(item, placement);
             CheckShards();
             return true;
         }
 
-        public bool CanTakeItem(int itemIndex) =>
+        public bool CanTakeItem(int itemIndex, ItemPlacement placement = ItemPlacement.Auto) =>
             PendingRuneOffer != null && itemIndex >= 0 && itemIndex < PendingRuneOffer.ItemIds.Count
-            && Items.TryGet(PendingRuneOffer.ItemIds[itemIndex], out EquipmentDefinition item) && Gear.CanEquip(item, out _);
+            && Items.TryGet(PendingRuneOffer.ItemIds[itemIndex], out EquipmentDefinition item)
+            && (placement != ItemPlacement.Equip || Gear.CanEquip(item, out _));
 
         /// <summary>Ordnet einer Zeile einen Skill zu. Erlaubt sind getragene Skills, der Basisangriff oder null (leer).</summary>
         public bool AssignSkill(int row, string skillId)
@@ -109,26 +109,25 @@ namespace Betaknight.Core
         /// <summary>So viele Ausrüstungsteile liegen in jedem Shop.</summary>
         public const int ShopItemCount = 2;
 
-        public bool CanBuyShopItem(int index) =>
+        public bool CanBuyShopItem(int index, ItemPlacement placement = ItemPlacement.Auto) =>
             PendingShop != null && index >= 0 && index < PendingShop.Inventory.ItemIds.Count
             && Stats.Gold >= ShopPrices.Item
-            && Items.TryGet(PendingShop.Inventory.ItemIds[index], out EquipmentDefinition item) && Gear.CanEquip(item, out _);
+            && Items.TryGet(PendingShop.Inventory.ItemIds[index], out EquipmentDefinition item)
+            && (placement != ItemPlacement.Equip || Gear.CanEquip(item, out _));
 
-        /// <summary>Kauft ein Ausrüstungsteil und legt es sofort an. Abgelegte Teile gehen verloren.</summary>
-        public bool BuyShopItem(int index)
+        /// <summary>Kauft ein Ausrüstungsteil: anlegen oder ins Inventar wie bei <see cref="TakeItem"/>.</summary>
+        public bool BuyShopItem(int index, ItemPlacement placement = ItemPlacement.Auto)
         {
-            if (!CanBuyShopItem(index)) return false;
+            if (!CanBuyShopItem(index, placement)) return false;
             EquipmentDefinition item = Items.Get(PendingShop.Inventory.ItemIds[index]);
-            List<EquipmentDefinition> removed = EquipItem(item);
-            if (removed == null) return false;
 
             Stats.TrySpendGold(ShopPrices.Item);
             PendingShop.Inventory.RemoveItemAt(index);
-            ItemTaken?.Invoke(item, removed);
+            PlaceNewItem(item, placement);
             return true;
         }
 
-        /// <summary>Legt an und gibt verwaisten Zeilen den ersten neuen Skill.</summary>
+        /// <summary>Legt an und gibt verwaisten Zeilen den ersten neuen Skill. Abgelegte Teile kommen zurück.</summary>
         private List<EquipmentDefinition> EquipItem(EquipmentDefinition item)
         {
             List<EquipmentDefinition> removed = Gear.Equip(item);
@@ -155,7 +154,8 @@ namespace Betaknight.Core
             int total = 0;
             foreach (EquipmentDefinition item in Items.All)
             {
-                if (item.Weight <= 0 || Gear.Get(item.Slot) == item || !Gear.CanEquip(item, out _)) continue;
+                // Schon getragene oder gelagerte Teile nicht noch einmal; Schilde trotz Zweihand gehen ins Inventar.
+                if (item.Weight <= 0 || Gear.Get(item.Slot) == item || Inventory.Contains(item.Id)) continue;
                 pool.Add(item);
                 total += OfferWeight(item);
             }

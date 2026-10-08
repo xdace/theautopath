@@ -9,7 +9,7 @@ namespace Betaknight.Core
 {
     /// <summary>
     /// Akte: Nach dem Boss öffnet sich ein Fluchtportal. Es führt auf eine neue, härtere Karte;
-    /// Ritter, Ausrüstung, Runen-Tafel, Gold und Splitter kommen mit. Minen und Raids bleiben zurück.
+    /// Ritter, Ausrüstung, Inventar, Runen-Tafel, Gold und Splitter kommen mit. Minen und Raids bleiben zurück.
     /// </summary>
     public sealed partial class OverworldSession
     {
@@ -75,7 +75,9 @@ namespace Betaknight.Core
                 previous.RuneCatalog,
                 previous._combat,
                 previous.Gear,
-                previous.Items);
+                previous.Items,
+                previous.Inventory,
+                previous.RuneInventory);
             session.Kit = previous.Kit;
             session.Act = act;
             return session;

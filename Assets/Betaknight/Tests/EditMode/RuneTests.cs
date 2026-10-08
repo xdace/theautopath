@@ -92,18 +92,30 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void FullLoadoutNeedsAReplaceSlot()
+        public void FullBoardSendsNewRunesToTheInventory()
         {
             var runes = new RuneLoadout(slots: 1);
             runes.TryAdd(Catalog.Get("on_hit"));
             OverworldSession s = Session(runes: runes);
             RuneOffer offer = s.OfferRunes("Test");
 
-            Assert.IsFalse(s.TakeRune(0));
-            Assert.IsTrue(s.IsBusy);
+            Assert.IsTrue(s.TakeRune(0));
+            Assert.AreEqual("on_hit", s.Runes.Runes.Single().Id, "Die Tafel bleibt unverändert.");
+            Assert.AreSame(offer.Options[0], s.RuneInventory.Runes.Single().Rune);
+            Assert.IsFalse(s.IsBusy);
+        }
+
+        [Test]
+        public void ReplacingARowMovesTheOldRuneToTheInventory()
+        {
+            var runes = new RuneLoadout(slots: 1);
+            runes.TryAdd(Catalog.Get("on_hit"));
+            OverworldSession s = Session(runes: runes);
+            RuneOffer offer = s.OfferRunes("Test");
 
             Assert.IsTrue(s.TakeRune(0, replaceSlot: 0));
             Assert.AreSame(offer.Options[0], s.Runes.Runes[0]);
+            Assert.AreEqual("on_hit", s.RuneInventory.Runes.Single().Rune.Id);
         }
 
         [Test]
