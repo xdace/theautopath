@@ -57,6 +57,7 @@ Travel stops by itself on hostile tiles (enemy, boss), on newly discovered tiles
 | Skill | Sieg (35 %), Elite (60 %), Truhe (50 %), Mine (35 %), Runensplitter (30 %), Shop (1 Skill, 14 Gold) | Neues Exemplar frei in die Sammlung. Schon vorhanden: «Wachstum +5» für das vorhandene Exemplar (siehe Wachsen und Evolution) oder «Zweites Exemplar» für eine weitere Komponente |
 | Platinen-Erweiterung: nächste Grösse | Garantiert bei jeder Boss-Flucht und beim Akt-Wechsel, als Wahl bei Elite-Siegen (50 %) und seltenen Truhen (10 %), Shop-Platz (20, 35, 50 … Gold pro Run, einer pro Shop) | 4×3 → 4×4 → 5×4 → 5×5 → 6×5 → 6×6 |
 | Modul (selten) | Elite (35 %), Truhe (15 %), garantiert bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 30 Gold) | Neues Exemplar frei in die Sammlung; schon vorhanden: «Stufe erhöhen» (+1, wo das Modul Stufen hat) oder «Weiteres Exemplar» |
+| Chip (selten) | Elite (35 %), Truhe (15 %), garantiert 1 bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 15 Gold) | Leiterbahn, Diode, Gatter, Kondensator oder Sicherung ins Chip-Inventar (siehe «Pins, Traces and Logic Chips») |
 | Gold, Splitter | Kämpfe, Events, Minen, Boss-Flucht | Elite-Siege geben +4 Gold |
 
 Kampfbelohnungen bieten bevorzugt Verbesserungen an: Stufe für einen eigenen Skill, Stufe für ein getragenes Teil, ein fehlendes Set-Teil, Stufe für eine vorhandene Rune oder eine Rune zu einem vorhandenen Tag. Mindestens eine Option ist immer eine Verbesserung. Skill-Angebote bevorzugen Skills, deren Art zum Build passt (×3 Gewicht): Arten eigener Skills, Ziele der passiven Effekte der Ausrüstung und die Runen (Klinge → Angriff, Schild → Schild, Funke → Schock, Glut → Feuer und Heilung, Phantom → Bewegung). Gegner skalieren weiter über Ring und Akt, die Schutzregeln (eine Aktion pro Tick, Überhitzung ab 90 s) bleiben. Alle Werte stehen in `Core/Run/ProgressionConfig.cs`.
@@ -115,6 +116,63 @@ Modules sit on relays and components. Blood Toll now costs HP per cast and gives
 
 - **Build:** The board with drag & drop and right-click rotation; skill, chip and module inventories next to it. Every component shows its size, cast time, effect, the relay powering it and "not powered (too large)" when it does not fit.
 - **Arena:** Relays light up when they trigger, the queue is shown in reading order, the firing component is highlighted, frozen and unpowered components are marked. The report after the fight lists every component: fired, triggered, queued with average wait, missed with the main reason, damage and share.
+
+### Pins, Traces and Logic Chips (A-20)
+
+Components now talk to each other. When a component fires, it sends **pulses** along its connections; logic chips combine relays.
+
+- **Pins** sit on component edges and are data per skill (`Core/Circuit/Pins.cs`, `PinCatalog.CreateDefault`). Two components are **connected** when two pins touch: neighbouring cells, pins facing each other. Pins turn with the component (90° clockwise).
+- **Typed pins** ("Shock pin", "Fire pin" …) ask for a skill kind. With a matching neighbour on that pin the component gets **+15 % effect** per matched pin (`PinConfig`). Shown as a coloured notch, lit when matched.
+- **Traces** connect distant pins: Straight, Corner, T and Cross (1×1 chips, right click rotates). A **Diode** lets pulses pass one way only (in → out, arrow on the chip).
+- **Pulses** travel **one connection per tick** (every trace piece and the final pin each count as one). When a pulse arrives, the target component is queued and casts normally with its cast time. It counts as **powered by the original relay**: that relay's size limit and bonus tier apply, bonuses never stack. Too large for the original relay → missed (too large). Circles are allowed; they are limited by cast times only. If several paths lead to the same target, the shortest one counts.
+- **Gates** are 1×1 chips that read the relays they touch (reading order) and **power the components they touch** like a relay:
+
+| Chip | Triggers when | Difficulty |
+|---|---|---|
+| AND | both touching relays are on (rising edge) | the higher of the two **+1** (max. 3) |
+| OR | either touching relay triggers | the lower of the two |
+| NOT | the touching relay turns off | the relay's own inverted value (rune data, `invertedDifficulty`) |
+| Fuse | its touching relay triggers, **once per fight** | always 3 (Very hard) |
+
+  A state relay is "on" while its condition holds; an event relay counts as on for 0.5 s after it triggered (`ChipConfig.GateHoldTicks`). A relay used by a gate still powers its own neighbours as usual.
+- **Capacitor:** stores up to **3 pulses** (more are lost) and releases them all when a relay touching it triggers, or **3 s** after the first stored pulse at the latest. Released pulses keep their original relay. It is a node: pulses end there and start again from all its open sides.
+- **Chips are rare rewards:** Elite wins (35 %), chests (15 %), every boss escape (1 chip, guaranteed) and the shop (a chip slot in 50 % of shops, 15 gold). They go straight into the chip inventory, which travels through the acts. All values are data in `ChipConfig`, `ChipCatalog.CreateDefault` and `ProgressionConfig`.
+- **Arena:** Pulses move along their path, gates and relays show open/closed, a blown fuse is marked, capacitors show their charge (e.g. 2/3). The log and the component tooltip say why something fired: "pulsed by Shock Stab (via 2 connections), powered by Battle Start".
+- **Data model:** `LogicGraph` holds relays, components, chips, pins and connections (edge kinds Power, Input, Pulse, PinOf). Fights stay deterministic: same seed, same pulses.
+
+#### Example circuits
+
+Coordinates are (column, row) from the top left, starting at 0. `>` is a diode pointing right. All three are checked by tests in `CircuitPulseTests` (`ReadmeExample…`).
+
+**1. Opening combo (pulse chain)**
+
+```
+      0              1             2        3
+0  [Battle Start] [Shock Stab]  [ > ]  [Thrusters]
+```
+
+Battle Start powers Shock Stab. After Shock Stab hits, its right pin sends a pulse through the diode; two ticks later Thrusters are queued, powered by Battle Start (Easy, 1 cell). The diode stops the pulse from bouncing back, so this fires once. Place Thrusters directly next to Shock Stab instead and their pins touch both ways: the two loop for the whole fight. Swap Battle Start for **HP Full** (Medium) and a 2×1 Cryo Grenade fits at the end of the chain.
+
+**2. Hard opener (AND gate)**
+
+```
+        0          1             2              3
+0                                          [HP Full]
+1                [ Core ]  [Shock Stab]    [ AND ]
+2                                          [Battle Start]
+```
+
+The AND gate touches both relays and powers the Shock Stab next to it. HP Full is Medium, Battle Start is Easy, so the gate is **Hard** (higher +1): Shock Stab casts with +30 % effect and −20 % cast time (plus +10 % from the Core), once at the start of the fight while your HP is full. Fits the starting 4×3 board.
+
+**3. Saved counter (capacitor)**
+
+```
+      0          1          2        3          4          5
+0  [Clock]  [Shock Stab]  [ > ]  [Capacitor]  [Trace]  [Lightning Lance]
+1                                [When Hit]
+```
+
+Every Clock tick fires Shock Stab, whose pulse is stored in the capacitor (the diode blocks the way back). When you get hit, When Hit touches the capacitor and releases it: the pulse runs along the trace and Lightning Lance strikes, powered by Clock. Without a hit, the capacitor releases on its own after 3 s. Needs a board 6 columns wide.
 
 ### Kampf: Skills, Ausrüstung und Werte
 
@@ -199,7 +257,7 @@ Module sind wie Skills eigene Exemplare (`Core/Modules/`: `ModuleInstance`, `Mod
 
 **Auslöser** zielen per stabiler Id auf ein Skill-Exemplar (Komponente), nicht auf eine Position: Verschieben oder Drehen nimmt das Ziel mit. Ein Ziel, das gerade nicht auf der Platine liegt, löst nichts aus. Das ausgelöste Ziel castet ganz normal mit Cast-Zeit und wird eingereiht; steht es schon in der Warteschlange, zählt der Auslöser als verpasst. **Kreise sind erlaubt**, das sind die Loops; begrenzt werden sie nur durch Cast-Zeiten.
 
-Datenmodell: Die Platine im Kampf ist ein Graph (`Arena/Graph/LogicGraph.cs`): Knoten sind Relais und Komponenten, Kanten sind Auslöser (`GraphEdgeKind.Trigger`; UND/ODER können später als weitere Kantenarten dazukommen). Der Kampf bleibt deterministisch: gleiche Seeds ergeben dieselben Kämpfe, auch mit Kreisen.
+Datenmodell: Die Platine im Kampf ist ein Graph (`Arena/Graph/LogicGraph.cs`): Knoten sind Relais und Komponenten, Kanten sind Auslöser (`GraphEdgeKind.Trigger`). Seit A-20 auch Chips und Pins als Knoten sowie Versorgung, Gatter-Eingänge und Pulsverbindungen als Kanten (siehe «Pins, Traces and Logic Chips»). Der Kampf bleibt deterministisch: gleiche Seeds ergeben dieselben Kämpfe, auch mit Kreisen.
 
 Build-Fenster: In jeder Zeile stehen die Modul-Plätze von Baustein und Skill (◆ besetzt, ◇ frei). Ein Modul wird auf einen freien Platz gezogen und zurück in die Modul-Liste abgenommen. Ein Klick auf einen Auslöser wählt das nächste Ziel (alle Zeilen, dann «kein Ziel»). Rechts an den Zeilen sind Auslöser als Linien gezeichnet (orange vom Skill, türkis vom Baustein, Pfeil am Ziel), jede Verbindung auf eigener Spur, sodass Kreise sichtbar bleiben. Das HUD zeigt pro Zeile ◆ (Module) und ↪ (Auslöser-Ziel), die Modul-Liste im Build alle Module mit Ort.
 
@@ -328,6 +386,14 @@ Shops frühestens ab Ring 3 und höchstens 2, Truhen höchstens 6, Goldminen hö
 | Triggered | How often a relay triggered a component |
 | Missed Trigger | A trigger that could not queue the component (already queued, too large, frozen) |
 | Trigger | Module that starts another component after this one fires (↪) |
+| Pin | Contact on a component edge. Touching pins connect two components |
+| Typed Pin | Pin that asks for a skill kind; a matching neighbour gives +15 % effect |
+| Trace | Chip that connects distant pins (Straight, Corner, T, Cross) |
+| Pulse | Signal a firing component sends along its connections, one connection per tick |
+| Diode | One-way connection |
+| AND / OR / NOT Gate | Chips that combine the relays they touch and power touching components |
+| Capacitor | Stores up to 3 pulses and releases them together |
+| Fuse | Once per fight, a Very hard relay |
 | Repeat | An action that runs a second time (↻), e.g. from Multicast or Echo |
 | Module | Rare add-on for a skill or rune (Multicast, Area, Chain, Invert, Threshold, Trigger …) |
 | Difficulty | Easy, Medium, Hard, Very Hard: harder relays power bigger components and give a bigger bonus (◆) |
@@ -361,8 +427,8 @@ Assets/Betaknight/
 │   │   ├── Encounters/    Kleine und mittlere Events: Katalog, Optionen, Wirkungen, Resolver
 │   │   ├── Run/           PlayerStats (HP, Gold, Splitter), KnightKit, ProgressionConfig
 │   │   ├── Runes/         Runen (Bedingungen der Relais), Runenwahl, RuneInventory
-│   │   ├── Circuit/       CircuitBoard (Raster, Kern, Relais, Komponenten), CircuitConfig, Formen und Zellen
-│   │   ├── Arena/         Kampfsimulator: Battle (Tick-Schleife), Combatant, LogicBoard, Conditions/ (Runen-Bedingungen + ConditionRegistry),
+│   │   ├── Circuit/       CircuitBoard (Raster, Kern, Relais, Komponenten, Chips), CircuitConfig, Formen und Zellen, Pins (PinCatalog), Chips (ChipCatalog)
+│   │   ├── Arena/         Kampfsimulator: Battle (Tick-Schleife, Pulse, Gatter, Kondensatoren), Combatant, LogicBoard, Wiring (Pulsverbindungen), Conditions/ (Runen-Bedingungen + ConditionRegistry),
 │   │   │                  Effects/ (ISkillEffect), Statuses/, Skills/ (SkillCatalog), BattleModifier, Playback/ (Wiedergabe + Protokolltext),
 │   │   │                  Insight/ (BattleReport: Auswertung pro Komponente nach dem Kampf)
 │   │   ├── Gear/          Ausrüstung: EquipmentCatalog, Equipment, Inventory (Item-Raster mit fester Reihenfolge, IInventoryItem), BuildStats, BoardFactory (Platine → Kampf-Tafel), Sets/ (SetBonusRegistry),
@@ -441,8 +507,8 @@ letzte Aktion. Im Editor geht es ohne Build nicht über die Kommandozeile; dafü
 **Strategie «einfach, aber vollständig»:** Kit nach Seed; unbekannte Felder zuerst (Gegner bei unter 40 % HP meiden);
 Angebote nach Wertung Verbesserung > neue Karte > Gold, der erste Auslöser hat Vorrang; bessere Teile anlegen (Wertung
 aus der Stat-Leiste); freie Skills als Komponenten neben ein Relais, das sie versorgen kann (bevorzugt am Kern), Runen als Relais auf freie Felder,
-Module an den ersten passenden Ort, Auslöser bekommen ein Ziel; Lagerfeuer: ruhen unter 60 % HP, sonst Rune verstärken;
-Shop: heilen, Modul, Skill, besseres Teil, Platinen-Erweiterung, Rune, dann verlassen; Minen erobern und verteidigen; nach dem
+Module an den ersten passenden Ort, Chips dorthin, wo sie am meisten verbinden (Pulsverbindungen, Gatter mit Eingängen), Auslöser bekommen ein Ziel; Lagerfeuer: ruhen unter 60 % HP, sonst Rune verstärken;
+Shop: heilen, Modul, Skill, besseres Teil, Platinen-Erweiterung, Rune, Chip, dann verlassen; Minen erobern und verteidigen; nach dem
 Boss durchs Portal; bis Game Over oder Akt 3.
 
 **Bericht** (`total` mit Summen, `runs` mit einem Eintrag pro Run; zusätzlich eine Zeile pro Run im Log mit `[Autoplay]`):
@@ -511,6 +577,8 @@ Seit A-18 sind alle Spieltexte Englisch. Texte stehen pro Bereich an einem Ort: 
 |---|---|
 | Platine, Relais, Komponente, Kern | Circuit Board, Relay, Component, Core |
 | nicht versorgt (zu gross) | not powered (too large) |
+| Pin, typisierter Pin, Leiterbahn, Puls | Pin, Typed Pin, Trace, Pulse |
+| UND-/ODER-/NICHT-Gatter, Kondensator, Sicherung, Diode | AND/OR/NOT Gate, Capacitor, Fuse, Diode |
 | Rune / Logikbaustein / Baustein | Rune (in Hinweisen zur Schwierigkeit auch "block") |
 | Bedingung, Basisangriff | Condition, Basic Attack |
 | Auslöser, ausgelöst, Wiederholung | Trigger, triggered, Repeat |

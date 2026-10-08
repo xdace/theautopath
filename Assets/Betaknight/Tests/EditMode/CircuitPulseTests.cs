@@ -374,6 +374,61 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(playback.Entries.Any(e => e.Text.Contains("pulse")));
         }
 
+        // ------------------------------------------------------------------ Beispiele aus der README
+
+        /// <summary>Wie im Spiel: Kern bei (1, 1) mit +10 %.</summary>
+        private static CircuitSpec WithCore(CircuitSpec spec)
+        {
+            spec.Core = new Cell(1, 1);
+            spec.CoreBonusPercent = 10;
+            return spec;
+        }
+
+        [Test]
+        public void ReadmeExampleOpeningComboChainsByPulse()
+        {
+            // Battle Start → Shock Stab → Diode → Thrusters: die Schubdüsen feuern 2 Ticks nach dem Stich, versorgt vom Kampfbeginn.
+            BattleResult r = Fight(Compile(WithCore(Spec(new[] { Relay("battle_start", 0, 0) },
+                new[] { Part(SkillIds.ShockStab, 1, 0), Part(SkillIds.Thrusters, 3, 0) }, new[] { Chip(ChipIds.Diode, 2, 0) }))));
+            BattleEvent stab = Own(r).First(e => e.Kind == BattleEventKind.ActionExecuted && e.Detail == SkillIds.ShockStab);
+            BattleEvent queued = Own(r).First(e => e.Kind == BattleEventKind.RowQueued && e.RowIndex == 1);
+            Assert.AreEqual(stab.Tick + 2, queued.Tick);
+            Assert.AreEqual(0, queued.Relay);
+            Assert.AreEqual(1, Starts(r, SkillIds.ShockStab).Count, "die Diode verhindert den Kreis");
+        }
+
+        [Test]
+        public void ReadmeExampleAndGateMakesAHarderOpener()
+        {
+            // HP Full (◆) UND Battle Start (◇) → ◆◆: der Schockstich neben dem Gatter (und am Kern) läuft mit Stufe 2.
+            LogicBoard board = Compile(WithCore(Spec(new[] { Relay("hp_full", 3, 0), Relay("battle_start", 3, 2) }, new[] { Part(SkillIds.ShockStab, 2, 1) },
+                new[] { Chip(ChipIds.And, 3, 1) })));
+            Assert.IsTrue(board.Rows[0].TouchesCore);
+            BattleEvent start = Starts(Fight(board), SkillIds.ShockStab).First();
+            Assert.AreEqual(2, start.Tier);
+            Assert.AreEqual(Gate(board).Index, start.Relay);
+        }
+
+        [Test]
+        public void ReadmeExampleCapacitorSavesPulsesForACounter()
+        {
+            // Clock → Shock Stab → Diode → Capacitor → Trace → Lightning Lance; When Hit berührt den Kondensator.
+            LogicBoard board = Compile(WithCore(Spec(new[] { Relay("clock", 0, 0), Relay("when_hit", 3, 1) },
+                new[] { Part(SkillIds.ShockStab, 1, 0), Part(SkillIds.LightningLance, 5, 0) },
+                new[] { Chip(ChipIds.Diode, 2, 0), Chip(ChipIds.Capacitor, 3, 0), Chip(ChipIds.Trace, 4, 0) })));
+            Assert.IsFalse(board.Rows[1].IsPowered, "die Lanze berührt kein Relais");
+            Assert.AreEqual(2, board.Links.Single(l => l.From.Equals(PulseNode.Component(0))).Delay);
+            Assert.IsFalse(board.Links.Any(l => l.From.IsCapacitor && l.To.Equals(PulseNode.Component(0))), "die Diode sperrt den Rückweg");
+            CollectionAssert.AreEqual(new[] { 1 }, board.Chips.Single(c => c.Kind == ChipKind.Capacitor).ReleaseRelays);
+
+            BattleResult r = Fight(board, enemyInterval: 70);
+            Assert.IsTrue(Own(r).Any(e => e.Kind == BattleEventKind.CapacitorStored));
+            Assert.IsTrue(Own(r).Any(e => e.Kind == BattleEventKind.CapacitorReleased));
+            BattleEvent lance = Starts(r, SkillIds.LightningLance).First();
+            Assert.IsTrue(lance.IsPulse);
+            Assert.AreEqual(0, lance.Relay, "versorgt von der Clock");
+        }
+
         [Test]
         public void TheSessionPlacesTurnsMovesAndRemovesChips()
         {
