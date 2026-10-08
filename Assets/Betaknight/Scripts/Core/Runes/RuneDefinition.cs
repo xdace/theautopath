@@ -113,6 +113,14 @@ namespace Betaknight.Core.Runes
         public string NameAt(int level) => string.Format(NameTemplate, ParameterAt(level));
         public string DescriptionAt(int level) => string.Format(DescriptionTemplate, ParameterAt(level));
 
+        /// <summary>Stufe als kurzer Text, z. B. "Stufe 1/2" oder "Stufe 2/2 max". Leer, wenn die Rune keine Stufen hat.</summary>
+        public string LevelText(int level)
+        {
+            if (MaxLevel == 0) return string.Empty;
+            int clamped = Math.Max(0, Math.Min(level, MaxLevel));
+            return clamped >= MaxLevel ? $"Stufe {clamped}/{MaxLevel} max" : $"Stufe {clamped}/{MaxLevel}";
+        }
+
         /// <summary>Name auf Stufe 0.</summary>
         public string Name => NameAt(0);
         public string Description => DescriptionAt(0);

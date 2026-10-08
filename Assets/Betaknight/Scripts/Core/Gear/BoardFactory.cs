@@ -61,7 +61,7 @@ namespace Betaknight.Core.Gear
                 return new LogicRow(AlwaysCondition.Instance, null, spec.RuneId ?? "?");
             }
 
-            string label = rune.NameAt(spec.Level);
+            string label = spec.Level > 0 ? $"{rune.NameAt(spec.Level)} ▲{spec.Level}" : rune.NameAt(spec.Level);
 
             // Set-exklusive Runen wirken nur, solange das Set getragen wird.
             if (rune.UnlockSetId != null && (equipment == null || equipment.SetPieces(rune.UnlockSetId) < SetDefinition.FirstBonusPieces))

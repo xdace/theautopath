@@ -98,7 +98,7 @@ namespace Betaknight.Overworld.UI
             GUI.enabled = true;
             GUILayout.EndVertical();
 
-            GUILayout.Label($"{index + 1}. <b>{row.Name}</b>\n<size=12>{row.Description}</size>", _text, GUILayout.Width(330f));
+            GUILayout.Label($"{index + 1}. <b>{row.Name}</b>{RuneText.LevelBadge(row.Rune, row.Level)}\n<size=12>{row.Description}</size>", _text, GUILayout.Width(330f));
 
             List<SkillInstance> options = SkillOptions(row);
             int current = row.Skill == null ? -1 : options.FindIndex(o => o == row.Skill || (o.IsBasicAttack && row.Skill.IsBasicAttack));

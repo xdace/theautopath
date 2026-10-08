@@ -115,7 +115,7 @@ namespace Betaknight.Overworld.UI
             {
                 RuneSlot row = _session.Runes.Rows[i];
                 string skill = row.Skill == null ? "<color=#888888>—</color>" : row.Skill.IsBasicAttack ? "Basisangriff" : row.Skill.NameFrom(Skills);
-                lines.Add($"{i + 1}. [{row.Name}] → {skill}");
+                lines.Add($"{i + 1}. [{row.Name}]{RuneText.LevelBadge(row.Rune, row.Level)} → {skill}");
             }
             lines.Add("↓ [Immer] → Basisangriff");
             return string.Join("\n", lines);
