@@ -48,7 +48,7 @@ namespace Betaknight.Core.Gear
     /// nicht mehr, die sind eigene Exemplare in der Skill-Sammlung. Die Waffe bestimmt Waffenschaden und Basisangriff.
     /// Reine Daten; neue Teile sind neue Katalog-Einträge.
     /// </summary>
-    public sealed class EquipmentDefinition
+    public sealed class EquipmentDefinition : IInventoryItem
     {
         private readonly Dictionary<StatKind, int> _stats;
         private readonly Dictionary<StatKind, int> _baseStats;
@@ -63,6 +63,8 @@ namespace Betaknight.Core.Gear
 
         /// <summary>Stufe 0 bis +3. Ein doppeltes Teil wertet das vorhandene auf.</summary>
         public int Level { get; private set; }
+
+        public InventoryItemKind ItemKind => InventoryItemKind.Equipment;
         public EquipmentSlot Slot { get; }
         public string Description { get; }
         /// <summary>Passive Effekte auf Skills bestimmter Arten, z. B. «Schock-Skills +20 % Wirkung».</summary>

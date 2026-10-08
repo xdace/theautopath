@@ -48,29 +48,53 @@ namespace Betaknight.Core
 
         // ------------------------------------------------------------------ Ausrüstung
 
-        /// <summary>Legt ein Teil aus dem Inventar an. Das bisherige Teil (bei Zweihand auch der Schild) kommt ins Inventar.</summary>
-        public bool EquipFromInventory(int index)
+        /// <summary>
+        /// Legt das Teil einer Raster-Zelle an. Das bisherige Teil kommt in dieselbe Zelle, ein weiteres verdrängtes
+        /// (Schild bei Zweihand) in die erste freie.
+        /// </summary>
+        public bool EquipFromInventory(int cell)
         {
-            if (!CanEquipFromInventory(index)) return false;
-            EquipmentDefinition item = Inventory.RemoveAt(index);
+            if (!CanEquipFromInventory(cell)) return false;
+            EquipmentDefinition item = Inventory.RemoveAt(cell);
             List<EquipmentDefinition> removed = EquipItem(item);
-            foreach (EquipmentDefinition old in removed) StoreItem(old);
+            for (int i = 0; i < removed.Count; i++)
+                if (i > 0 || !Inventory.TryPlace(removed[i], cell)) StoreItem(removed[i]);
             ItemTaken?.Invoke(item, removed);
             return true;
         }
 
-        public bool CanEquipFromInventory(int index) =>
-            CanChangeLoadout && Inventory.IsValid(index) && Gear.CanEquip(Inventory[index], out _);
+        public bool CanEquipFromInventory(int cell) =>
+            CanChangeLoadout && Inventory[cell] != null && Gear.CanEquip(Inventory[cell], out _);
 
-        /// <summary>Legt das Teil eines Platzes ab und ins Inventar. Braucht einen freien Inventarplatz.</summary>
-        public bool UnequipToInventory(EquipmentSlot slot)
+        /// <summary>Ziehen auf einen bestimmten Platz an der Figur: nur der passende Platz nimmt das Teil an.</summary>
+        public bool EquipFromInventoryTo(int cell, EquipmentSlot slot) => CanEquipTo(cell, slot) && EquipFromInventory(cell);
+
+        /// <summary>Passt das Teil dieser Zelle auf diesen Platz (und darf es jetzt angelegt werden)?</summary>
+        public bool CanEquipTo(int cell, EquipmentSlot slot) => CanEquipFromInventory(cell) && Inventory[cell].Slot == slot;
+
+        /// <summary>
+        /// Legt das Teil eines Platzes ab und ins Raster: ohne <paramref name="cell"/> in die erste freie Zelle, sonst in
+        /// diese Zelle. Liegt dort ein Teil für denselben Platz, wird getauscht (es wird angelegt).
+        /// </summary>
+        public bool UnequipToInventory(EquipmentSlot slot, int cell = -1)
         {
-            if (!CanUnequipToInventory(slot)) return false;
-            Inventory.TryAdd(Gear.Unequip(slot));
-            return true;
+            if (!CanUnequipToInventory(slot, cell)) return false;
+            if (cell >= 0 && Inventory.IsValid(cell)) return EquipFromInventory(cell);
+            EquipmentDefinition item = Gear.Unequip(slot);
+            return cell >= 0 ? Inventory.TryPlace(item, cell) : Inventory.TryAdd(item);
         }
 
-        public bool CanUnequipToInventory(EquipmentSlot slot) => CanChangeLoadout && Gear.Get(slot) != null && !Inventory.IsFull;
+        public bool CanUnequipToInventory(EquipmentSlot slot, int cell = -1)
+        {
+            if (!CanChangeLoadout || Gear.Get(slot) == null) return false;
+            if (cell < 0) return !Inventory.IsFull;
+            if (!Inventory.IsCell(cell)) return false;
+            if (!Inventory.IsValid(cell)) return true;
+            return Inventory[cell]?.Slot == slot && CanEquipFromInventory(cell);
+        }
+
+        /// <summary>Sortieren im Raster: auf eine leere Zelle verschieben, auf eine volle tauschen.</summary>
+        public bool MoveInventoryItem(int from, int to) => CanChangeLoadout && Inventory.Move(from, to);
 
         /// <summary>
         /// Verwirft ein Teil aus dem Inventar. Wartet ein Teil auf Platz, rückt es nach. Sonst nur ausserhalb von Kampf und Fenstern.
@@ -160,12 +184,18 @@ namespace Betaknight.Core
             return true;
         }
 
-        /// <summary>Setzt eine Rune aus dem Inventar als neue Zeile ein (braucht eine freie Zeile).</summary>
-        public bool EquipRuneFromInventory(int inventoryIndex)
+        /// <summary>
+        /// Setzt eine Rune aus dem Inventar als neue Zeile ein (braucht eine freie Zeile). Mit <paramref name="atRow"/>
+        /// landet die neue Zeile an dieser Stelle, sonst unten.
+        /// </summary>
+        public bool EquipRuneFromInventory(int inventoryIndex, int atRow = -1)
         {
             if (!CanChangeLoadout || !RuneInventory.IsValid(inventoryIndex) || Runes.IsFull) return false;
             StoredRune stored = RuneInventory.RemoveAt(inventoryIndex);
-            return Runes.TryAdd(stored.Rune, SkillForNewRow(), stored.Level, stored.Growth);
+            if (!Runes.TryAdd(stored.Rune, SkillForNewRow(), stored.Level, stored.Growth)) return false;
+            int last = Runes.Rows.Count - 1;
+            if (atRow >= 0 && atRow < last) Runes.Move(last, atRow);
+            return true;
         }
 
         /// <summary>Nimmt eine Zeile von der Tafel; die Rune kommt mit Stufe ins Inventar.</summary>

@@ -72,10 +72,16 @@ namespace Betaknight.Core.Combat
         public SkillUserStats PreviewStats(PlayerStats stats, RuneLoadout runes, Equipment equipment, BattleContext context = null,
             SkillLevelRules skillLevels = null)
         {
+            return SkillUserStats.From(PreviewCombatant(stats, runes, equipment, context, skillLevels));
+        }
+
+        /// <summary>Der Ritter zu Kampfbeginn, gebaut wie im Kampf (für Stat-Leiste und Vorschau). Gekämpft wird nicht.</summary>
+        public Combatant PreviewCombatant(PlayerStats stats, RuneLoadout runes, Equipment equipment, BattleContext context = null,
+            SkillLevelRules skillLevels = null)
+        {
             var request = new CombatRequest(CellContent.Enemy, 0, stats, runes, equipment, context, skillLevels);
             var target = new CombatantSetup { Name = "Ziel", Stats = new CombatStats(1, 0) };
-            var battle = new Battle(CreateSetup(request, new List<CombatantSetup> { target }, 0));
-            return SkillUserStats.From(battle.Player);
+            return new Battle(CreateSetup(request, new List<CombatantSetup> { target }, 0)).Player;
         }
 
         public BattleSetup CreateSetup(CombatRequest request, List<CombatantSetup> enemies, int seed)
