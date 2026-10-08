@@ -76,7 +76,7 @@ namespace Betaknight.Overworld.UI
                 {
                     // Doppelte Rune: die vorhandene steigt eine Stufe.
                     string hints = SkillText.EvolutionHints(_session.EvolutionHintsForRune(rune.Id));
-                    string upgrade = $"<color=#7ddc6f>▲ Stufe erhöhen</color>  <b>{RuneLevelText(rune)}</b>\n{rune.Description}{hints}";
+                    string upgrade = $"<color=#7ddc6f>▲ Stufe erhöhen</color>  {RuneText.DifficultyBadge(rune)}  <b>{RuneLevelText(rune)}</b>\n{rune.Description}{hints}";
                     GUI.enabled = _session.CanUpgradeRune(rune);
                     if (GUILayout.Button(upgrade, _nameStyle, GUILayout.Height(RuneHeight(hints)))) _session.TakeRune(i);
                     GUI.enabled = true;
@@ -85,8 +85,8 @@ namespace Betaknight.Overworld.UI
 
                 bool synergy = _session.Runes.HasTag(rune.Tag);
                 string runeHints = SkillText.EvolutionHints(_session.EvolutionHintsForRune(rune.Id));
-                string label = $"<b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]{(synergy ? "  ★" : string.Empty)}\n{rune.Description}{runeHints}";
-                if (GUILayout.Button(label, _nameStyle, GUILayout.Height(RuneHeight(runeHints))))
+                string label = $"{RuneText.DifficultyBadge(rune)}  <b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]{(synergy ? "  ★" : string.Empty)}\n{rune.Description}{runeHints}";
+                if (GUILayout.Button(new GUIContent(label, RuneText.DifficultyTip(rune)), _nameStyle, GUILayout.Height(RuneHeight(runeHints))))
                 {
                     if (_session.Runes.IsFull) _choiceAwaitingSlot = i;
                     else _session.TakeRune(i);
@@ -107,7 +107,7 @@ namespace Betaknight.Overworld.UI
                     continue;
                 }
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}\n<size=13>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>", _plainStyle);
+                GUILayout.Label($"<b>{item.Name}</b>  [{item.Slot.DisplayName()}]{set}\n{ItemText.Describe(item)}{RuneText.Eases(_session, item.Id)}\n<size=13>{ItemText.Compare(item, worn)}  {ItemText.TagPreview(_session, item)}{SkillText.EvolutionHints(_session.EvolutionHintsForItem(item))}</size>", _plainStyle);
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _session.CanTakeItem(i, ItemPlacement.Equip);
                 string equip = worn != null ? $"Anlegen ({worn.Name} ins Inventar)" : "Anlegen";

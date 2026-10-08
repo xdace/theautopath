@@ -224,7 +224,7 @@ namespace Betaknight.Overworld.UI
 
         private void DrawSelection(EquipmentDefinition item)
         {
-            GUILayout.Label(ItemText.Details(item, _session.Sets), UiTheme.Text);
+            GUILayout.Label(ItemText.Details(item, _session.Sets) + RuneText.Eases(_session, item.Id), UiTheme.Text);
             if (item.SetId != null) GUILayout.Label($"Set getragen: {_session.Gear.SetPieces(item.SetId)}/3 Teile", UiTheme.Small);
             GUILayout.Label(ItemText.Compare(item, _session.Gear.Get(item.Slot)), UiTheme.Small);
             if (!_selectedSlot.HasValue)

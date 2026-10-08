@@ -24,6 +24,7 @@ namespace Betaknight.Overworld.UI
             if (rule != null) text += $"\n<color=#b5e48c>Wächst: {rule.Text}</color>";
             string owned = Owned(session, skillId);
             if (owned.Length > 0) text += $"\n<color=#9fc7ff>Besitzt: {owned}</color>";
+            text += RuneText.Eases(session, skillId);
             text += EvolutionHints(session.EvolutionHintsForSkill(skillId));
             return text + "</size>";
         }

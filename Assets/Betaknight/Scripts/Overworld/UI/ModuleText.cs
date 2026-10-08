@@ -27,6 +27,7 @@ namespace Betaknight.Overworld.UI
             string text = $"<b>Modul: {module.Name}</b>  [{KindName(module.Kind)}]{suffix}\n<size=13>{module.Description}";
             string owned = Owned(session, moduleId);
             if (owned.Length > 0) text += $"\n<color=#9fc7ff>Besitzt: {owned}</color>";
+            text += RuneText.Eases(session, moduleId);
             text += SkillText.EvolutionHints(session.EvolutionHintsForModule(moduleId));
             return text + "</size>";
         }
@@ -44,7 +45,7 @@ namespace Betaknight.Overworld.UI
         {
             ModuleDefinition d = session.ModuleDefinitionOf(module);
             string name = module.NameFrom(session.ModuleCatalog);
-            string tip = d != null ? d.DescriptionAt(module.Level) : string.Empty;
+            string tip = (d != null ? d.DescriptionAt(module.Level) : string.Empty) + RuneText.Eases(session, module.ModuleId);
             if (module.ModuleId == ModuleIds.Trigger) return new GUIContent($"↪ {session.DescribeTrigger(module)}", tip);
             return new GUIContent(name, tip);
         }

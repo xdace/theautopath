@@ -420,22 +420,35 @@ namespace Betaknight.Overworld.UI
 
             _reportScroll = GUILayout.BeginScrollView(_reportScroll);
             float w = area.width - 40f;
-            float[] cols = { w * 0.34f, w * 0.09f, w * 0.10f, w * 0.09f, w * 0.09f, w * 0.10f, w * 0.19f };
-            ReportRow(cols, Color.clear, "<b>Zeile</b>", "<b>gefeuert</b>", "<b>Schaden</b>", "<b>Heilung</b>", "<b>Anteil</b>", "<b>übersprungen</b>", "<b>häufigster Grund</b>");
+            float[] cols = { w * 0.28f, w * 0.08f, w * 0.07f, w * 0.08f, w * 0.07f, w * 0.07f, w * 0.13f, w * 0.08f, w * 0.14f };
+            ReportRow(cols, Color.clear, "<b>Zeile</b>", "<b>gefeuert</b>", "<b>erfüllt</b>", "<b>Schaden</b>", "<b>Heilung</b>", "<b>Anteil</b>",
+                "<b>Bonus</b>", "<b>übersprungen</b>", "<b>häufigster Grund</b>");
             foreach (RowReport row in _report.Rows)
             {
-                string prefix = row.IsFallback ? "↓" : $"{row.Index + 1}.";
+                string prefix = row.IsFallback ? "↓" : $"{row.Index + 1}. {RuneText.Difficulty(row.Difficulty)}";
                 string reason = row.MainReason.HasValue ? RowStateText.Reason(row.MainReason.Value) : "–";
-                ReportRow(cols, RowColorFor(row.Index), $"{prefix} [{row.Label}] → {row.Skill}", FiredText(row), row.Damage.ToString(),
-                    row.Healing.ToString(), SkillInfo.Percent(row.DamageShareBp), row.Skipped > 0 ? $"{row.Skipped}×" : "–", reason);
+                string met = row.IsFallback || row.ConditionMet < 0 ? "–" : $"{row.ConditionMet}×";
+                ReportRow(cols, RowColorFor(row.Index), $"{prefix} [{row.Label}] → {row.Skill}", FiredText(row), met, row.Damage.ToString(),
+                    row.Healing.ToString(), SkillInfo.Percent(row.DamageShareBp), BonusText(row), row.Skipped > 0 ? $"{row.Skipped}×" : "–", reason);
             }
             if (_report.OtherDamage > 0)
-                ReportRow(cols, Color.clear, "<color=#9aa4b2>ohne Zeile (Set-Boni, Rückschlag)</color>", "", _report.OtherDamage.ToString(), "", "", "", "");
+                ReportRow(cols, Color.clear, "<color=#9aa4b2>ohne Zeile (Set-Boni, Rückschlag)</color>", "", "", _report.OtherDamage.ToString(), "", "", "", "", "");
 
             GUILayout.Space(8f);
             foreach (string hint in _report.Hints) GUILayout.Label($"• {hint}", _row);
             GUILayout.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        /// <summary>Was der Schwierigkeits-Bonus ausgemacht hat: «+140 · −6 s CD», «–» ohne Bonus.</summary>
+        private static string BonusText(RowReport row)
+        {
+            if (row.BonusExecutions == 0) return "–";
+            var parts = new List<string>();
+            if (row.BonusDamage > 0) parts.Add($"+{row.BonusDamage}");
+            if (row.BonusHealing > 0) parts.Add($"+{row.BonusHealing} HP");
+            if (row.CooldownSavedTicks > 0) parts.Add($"−{SkillInfo.Seconds(row.CooldownSavedTicks)} CD");
+            return $"<color=#ffae42>{(parts.Count > 0 ? string.Join(" · ", parts) : $"{row.BonusExecutions}×")}</color>";
         }
 
         /// <summary>«5×», mit Anteil ausgelöster (↪) und wiederholter (↻) Starts.</summary>

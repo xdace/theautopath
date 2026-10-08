@@ -226,18 +226,19 @@ namespace Betaknight.Overworld.UI
 
             // Rune (Wann) mit Stufen-Abzeichen und Wachstum.
             string growth = row.Growth > 0 ? $" <color=#b5e48c>+{row.Growth}</color>" : string.Empty;
-            string rune = $"<b>{row.Name}</b>{RuneText.LevelBadge(row.Rune, row.Level)}{growth}";
+            string rune = $"{RuneText.Difficulty(_session.RowDifficulty(row))} <b>{row.Name}</b>{RuneText.LevelBadge(row.Rune, row.Level)}{growth}";
             GUILayout.Label(new GUIContent(rune, RowTip(row)), UiTheme.SmallLine, GUILayout.Width(250f), GUILayout.Height(RowHeight - 6f));
             Rect runeRect = GUILayoutUtility.GetLastRect();
             _drag.Source(runeRect, new DragItem(DragKind.RowRune, index, row.Name), shortcut: () => _session.UnequipRune(index));
-            Hover(runeRect, $"<b>{row.Name}</b>: {row.Description} {row.Rune.LevelText(row.Level)}");
+            Hover(runeRect, $"<b>{row.Name}</b>: {row.Description} {row.Rune.LevelText(row.Level)} · {DifficultyText.Tooltip(_session.RowDifficulty(row))}");
 
             DrawModuleSlots(row, index);
             GUILayout.Label("→", UiTheme.SmallLine, GUILayout.Width(16f));
 
             // Skill (Was) mit Kurzwerten.
             SkillInstance skill = row.Skill;
-            SkillInfo info = skill != null ? _session.DescribeSkill(skill, _skillStats) : null;
+            // Werte so, wie sie von dieser Zeile aus wirken: inklusive Schwierigkeits-Bonus des Bausteins.
+            SkillInfo info = skill != null ? _session.DescribeRowSkill(row, _skillStats) : null;
             string skillName = skill == null ? null : skill.IsBasicAttack ? "Basisangriff" : skill.NameFrom(_session.SkillCatalog);
             string skillText = skill == null
                 ? "<color=#888888>— leer: Skill hierher ziehen (Zeile pausiert)</color>"
@@ -439,11 +440,12 @@ namespace Betaknight.Overworld.UI
             {
                 StoredRune rune = stored[i];
                 string growth = rune.Growth > 0 ? $" <color=#b5e48c>+{rune.Growth}</color>" : string.Empty;
-                GUILayout.Box(new GUIContent($"<b>{rune.Name}</b>{RuneText.LevelBadge(rune.Rune, rune.Level)}{growth}", rune.Description), UiTheme.Cell, GUILayout.Height(26f));
+                GUILayout.Box(new GUIContent($"{RuneText.Difficulty(rune.Rune.Difficulty)} <b>{rune.Name}</b>{RuneText.LevelBadge(rune.Rune, rune.Level)}{growth}",
+                    $"{rune.Description}\n{RuneText.DifficultyTip(rune.Rune)}"), UiTheme.Cell, GUILayout.Height(26f));
                 Rect r = GUILayoutUtility.GetLastRect();
                 int index = i;
                 _drag.Source(r, new DragItem(DragKind.Rune, index, rune.Name), shortcut: () => _session.EquipRuneFromInventory(index));
-                Hover(r, $"<b>{rune.Name}</b>: {rune.Description} {rune.Rune.LevelText(rune.Level)}");
+                Hover(r, $"<b>{rune.Name}</b>: {rune.Description} {rune.Rune.LevelText(rune.Level)} · {DifficultyText.Tooltip(rune.Rune.Difficulty)}");
             }
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
@@ -518,6 +520,7 @@ namespace Betaknight.Overworld.UI
                 string effect = _session.GrowthEffectText(rule, row.Growth, row);
                 lines.Add($"Wächst: {rule.Text}{(effect.Length > 0 ? $" · {effect}" : string.Empty)} ({_session.MilestoneText(row.Growth, false)})");
             }
+            lines.Add(RuneText.DifficultyTip(row.Rune, _session.RowDifficulty(row) != row.Rune.Difficulty));
             lines.Add($"Modul-Plätze {row.Modules.Count}/{row.ModuleSlots}");
             lines.AddRange(_session.EvolutionProgressFor(row));
             lines.Add("Ziehen: auf das Runen-Inventar = ablegen · Rechtsklick = ablegen");
