@@ -18,6 +18,15 @@ namespace Betaknight.Core.Map
         /// <summary>True, sobald das Event des Feldes ausgelöst wurde. Jedes Event wirkt nur einmal.</summary>
         public bool IsResolved { get; internal set; }
 
+        /// <summary>
+        /// Inhalt ist bekannt, obwohl das Feld noch nicht betreten wurde (z. B. durch einen Wegweiser).
+        /// Wirkt sich nur auf die Anzeige aus, nicht auf Routen.
+        /// </summary>
+        public bool IsScouted { get; internal set; }
+
+        /// <summary>Darf die Darstellung den Inhalt zeigen?</summary>
+        public bool IsContentKnown => Visibility == CellVisibility.Explored || IsScouted;
+
         /// <summary>Hat das Feld noch ein offenes Event?</summary>
         public bool HasPendingEvent => Content != CellContent.Empty && !IsResolved;
 

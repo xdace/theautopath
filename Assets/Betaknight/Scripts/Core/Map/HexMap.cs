@@ -90,6 +90,15 @@ namespace Betaknight.Core.Map
             CellChanged?.Invoke(cell);
         }
 
+        /// <summary>Macht den Inhalt eines Feldes bekannt (siehe <see cref="HexCell.IsScouted"/>).</summary>
+        public void SetScouted(HexCoord coord)
+        {
+            HexCell cell = GetCell(coord);
+            if (cell.IsScouted) return;
+            cell.IsScouted = true;
+            CellChanged?.Invoke(cell);
+        }
+
         /// <summary>Markiert das Event eines Feldes als erledigt. Inhalt bleibt für die Anzeige erhalten.</summary>
         public void MarkResolved(HexCoord coord)
         {

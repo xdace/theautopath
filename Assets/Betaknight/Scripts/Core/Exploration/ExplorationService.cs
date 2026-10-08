@@ -51,5 +51,30 @@ namespace Betaknight.Core.Exploration
 
             return changed;
         }
+
+        /// <summary>
+        /// Kundschaftet ein Feld aus: Verborgene Felder werden als "?" sichtbar und ihr Inhalt wird angezeigt.
+        /// Erforschte Felder bleiben unverändert. Gibt true zurück, wenn sich etwas geändert hat.
+        /// </summary>
+        public bool Scout(HexCoord coord)
+        {
+            if (!_map.TryGetCell(coord, out HexCell cell)) return false;
+            if (cell.Visibility == CellVisibility.Explored || cell.IsScouted) return false;
+
+            if (cell.Visibility == CellVisibility.Hidden) _map.SetVisibility(coord, CellVisibility.Unexplored);
+            _map.SetScouted(coord);
+            return true;
+        }
+
+        /// <summary>Kundschaftet alle Felder im Umkreis aus. Gibt die Anzahl neu bekannter Felder zurück.</summary>
+        public int ScoutAround(HexCoord center, int radius)
+        {
+            int count = 0;
+            foreach (HexCoord coord in HexCoord.Spiral(center, radius))
+            {
+                if (Scout(coord)) count++;
+            }
+            return count;
+        }
     }
 }

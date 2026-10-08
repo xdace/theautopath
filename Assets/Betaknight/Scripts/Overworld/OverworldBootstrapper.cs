@@ -24,6 +24,7 @@ namespace Betaknight.Overworld
 
         private GameObject _root;
         private OverworldHud _hud;
+        private EncounterWindow _encounterWindow;
 
         public OverworldSession Session { get; private set; }
 
@@ -36,6 +37,7 @@ namespace Betaknight.Overworld
             }
 
             _hud = gameObject.AddComponent<OverworldHud>();
+            _encounterWindow = gameObject.AddComponent<EncounterWindow>();
         }
 
         private void Start() => BuildWorld();
@@ -65,6 +67,7 @@ namespace Betaknight.Overworld
             controller.Initialize(Session, grid, player, cam);
 
             _hud.Initialize(Session, controller, config.Encounters, BuildWorld);
+            _encounterWindow.Initialize(Session);
 
             Debug.Log($"[Betaknight] Oberwelt erzeugt: {Session.Map.Count} Felder, Seed {seed}.");
         }

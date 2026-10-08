@@ -27,7 +27,7 @@ namespace Betaknight.Overworld.UI
             _onNewMap = onNewMap;
         }
 
-        private static readonly Rect PanelRect = new Rect(12, 12, 340, 230);
+        private static readonly Rect PanelRect = new Rect(12, 12, 340, 290);
 
         /// <summary>Liegt ein Bildschirmpunkt (Ursprung unten links) über dem HUD? Dann ignoriert die Karte den Klick.</summary>
         public static bool ContainsScreenPoint(Vector2 screen)
@@ -48,6 +48,7 @@ namespace Betaknight.Overworld.UI
             GUILayout.BeginArea(PanelRect, GUI.skin.box);
             GUILayout.Label($"<b>Betaknight – Oberwelt</b>", _style);
             GUILayout.Label($"Zug: {_session.Turns.CurrentTurn}", _style);
+            GUILayout.Label($"HP: {_session.Stats.Hp}/{_session.Stats.MaxHp}   Gold: {_session.Stats.Gold}   Splitter: {_session.Stats.Shards}", _style);
             GUILayout.Label($"Position: {_session.Player.Position}", _style);
             GUILayout.Label($"Feld: {Describe(_session.CurrentCell)}", _style);
             GUILayout.Label($"Seed: {_session.Map.Seed}", _style);
@@ -55,7 +56,7 @@ namespace Betaknight.Overworld.UI
             if (_controller != null && _controller.HoveredCoord.HasValue
                 && _session.Map.TryGetCell(_controller.HoveredCoord.Value, out HexCell hovered))
             {
-                string info = hovered.Visibility == CellVisibility.Explored ? Describe(hovered) : "unbekannt";
+                string info = hovered.IsContentKnown ? Describe(hovered) : "unbekannt";
                 GUILayout.Label($"Zeiger: {hovered.Coord} – {info}", _style);
             }
 
@@ -86,7 +87,7 @@ namespace Betaknight.Overworld.UI
                 case CellContent.Shop: return "Shop";
                 case CellContent.Treasure: return "Schatztruhe";
                 case CellContent.GoldMine: return "Goldmine";
-                default: return "leer";
+                default: return "Start";
             }
         }
     }

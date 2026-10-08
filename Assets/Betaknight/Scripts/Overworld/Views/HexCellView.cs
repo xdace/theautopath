@@ -104,6 +104,13 @@ namespace Betaknight.Overworld.Views
                     color = _settings.unexploredColor;
                     text = "?";
                     textColor = _settings.unexploredLabelColor;
+                    if (_cell.IsScouted)
+                    {
+                        // Ausgekundschaftet: Inhalt ist bekannt, das Feld aber noch nicht betreten.
+                        ResolveContentLook(out Color contentColor, out string contentText);
+                        color = Color.Lerp(_settings.unexploredColor, contentColor, 0.5f);
+                        if (!string.IsNullOrEmpty(contentText)) text = contentText;
+                    }
                     break;
 
                 default:

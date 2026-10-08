@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Betaknight.Core.Map;
+using E = Betaknight.Core.Encounters.EncounterEffect;
 
 namespace Betaknight.Core.Encounters
 {
@@ -34,23 +36,39 @@ namespace Betaknight.Core.Encounters
             return d;
         }
 
+        private static EncounterDefinition Minor(string id, string title, string symbol, int weight, int minDistance, string text, params E[] effects) =>
+            new EncounterDefinition(id, title, symbol, EncounterSize.Minor, weight, minDistance, text, new EncounterOption("Weiter", effects));
+
+        private static EncounterDefinition Medium(string id, string title, string symbol, int weight, int minDistance, string text, params EncounterOption[] options) =>
+            new EncounterDefinition(id, title, symbol, EncounterSize.Medium, weight, minDistance, text, options);
+
         /// <summary>Standard-Events des Spiels.</summary>
         public static EncounterCatalog CreateDefault() => new EncounterCatalog(new[]
         {
             // Kleine Events: wirken sofort.
-            new EncounterDefinition("coins", "Verstreute Münzen", "c", EncounterSize.Minor, 30),
-            new EncounterDefinition("herbs", "Heilkräuter", "h", EncounterSize.Minor, 20),
-            new EncounterDefinition("shard", "Runensplitter", "s", EncounterSize.Minor, 20),
-            new EncounterDefinition("signpost", "Wegweiser", "w", EncounterSize.Minor, 12),
-            new EncounterDefinition("tracks", "Händlerspuren", "t", EncounterSize.Minor, 8, minDistance: 2),
-            new EncounterDefinition("thorns", "Dornengestrüpp", "x", EncounterSize.Minor, 10, minDistance: 2),
+            Minor("coins", "Verstreute Münzen", "c", 30, 0, "Ein paar Münzen glänzen im Gras.", E.Gold(2, 4)),
+            Minor("herbs", "Heilkräuter", "h", 20, 0, "Du kaust bittere Kräuter. Die Wunden schliessen sich ein wenig.", E.Heal(2, 4)),
+            Minor("shard", "Runensplitter", "s", 20, 0, "Ein glimmender Runensplitter steckt im Boden.", E.Shards(1)),
+            Minor("signpost", "Wegweiser", "w", 12, 0, "Ein alter Wegweiser verrät, was in der Nähe liegt.", E.ScoutAround(2)),
+            Minor("tracks", "Händlerspuren", "t", 8, 2, "Wagenspuren führen zu einem Händler.", E.ScoutNearest(CellContent.Shop)),
+            Minor("thorns", "Dornengestrüpp", "x", 10, 2, "Dornen kratzen an der Rüstung.", E.Damage(1, 2)),
 
             // Mittlere Events: eine Entscheidung.
-            new EncounterDefinition("campfire", "Lagerfeuer", "F", EncounterSize.Medium, 20),
-            new EncounterDefinition("wanderer", "Wanderer", "W", EncounterSize.Medium, 20),
-            new EncounterDefinition("shrine", "Blutschrein", "S", EncounterSize.Medium, 15),
-            new EncounterDefinition("mercenary", "Verletzter Söldner", "M", EncounterSize.Medium, 12, minDistance: 3),
-            new EncounterDefinition("cache", "Verschütteter Vorrat", "V", EncounterSize.Medium, 15),
+            Medium("campfire", "Lagerfeuer", "F", 20, 0, "Ein verlassenes Lagerfeuer glimmt noch.",
+                new EncounterOption("Ausruhen (+10 HP)", E.Heal(10)),
+                new EncounterOption("Rüstung flicken (+3 Max-HP)", E.MaxHp(3))),
+            Medium("wanderer", "Wanderer", "W", 20, 0, "Ein Wanderer bietet dir einen Handel an.",
+                new EncounterOption("Runensplitter kaufen (5 Gold)", 5, E.Shards(1)),
+                new EncounterOption("Nach dem Weg fragen", E.ScoutAround(3))),
+            Medium("shrine", "Blutschrein", "S", 15, 0, "Ein Schrein verlangt ein Opfer.",
+                new EncounterOption("Blut opfern (-5 HP, +2 Splitter)", E.Damage(5), E.Shards(2)),
+                new EncounterOption("Weitergehen")),
+            Medium("mercenary", "Verletzter Söldner", "M", 12, 3, "Ein verwundeter Söldner lehnt an einem Baum.",
+                new EncounterOption("Wunden versorgen (6 Gold)", 6, E.Shards(1), E.ScoutNearest(CellContent.Treasure)),
+                new EncounterOption("Seine Börse nehmen (+6 Gold, -3 HP)", E.Gold(6), E.Damage(3))),
+            Medium("cache", "Verschütteter Vorrat", "V", 15, 0, "Unter Geröll liegt etwas begraben.",
+                new EncounterOption("Ausgraben (-2 HP, +6–9 Gold)", E.Damage(2), E.Gold(6, 9)),
+                new EncounterOption("Vorsichtig suchen (+2–3 Gold)", E.Gold(2, 3))),
         });
     }
 }

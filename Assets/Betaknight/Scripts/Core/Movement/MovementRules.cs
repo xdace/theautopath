@@ -10,6 +10,9 @@ namespace Betaknight.Core.Movement
         NotAdjacent,
         Hidden,
         Blocked,
+
+        /// <summary>Ein Event wartet noch auf eine Entscheidung.</summary>
+        Busy,
     }
 
     /// <summary>Zentrale Regeln, welche Felder betreten werden dürfen.</summary>
