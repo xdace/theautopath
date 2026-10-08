@@ -23,8 +23,8 @@ namespace Betaknight.Overworld.UI
         private Action _onNewMap;
         private GUIStyle _style;
 
-        /// <summary>Öffnet den Tafel-Editor. Ohne Zuweisung gibt es keinen Knopf.</summary>
-        public Action OnEditBoard;
+        /// <summary>Öffnet das Fenster «Build». Ohne Zuweisung gibt es keinen Knopf.</summary>
+        public Action OnOpenBuild;
 
         /// <summary>Öffnet das Inventar. Ohne Zuweisung gibt es keinen Knopf.</summary>
         public Action OnOpenInventory;
@@ -48,11 +48,12 @@ namespace Betaknight.Overworld.UI
 
         private void OnGUI()
         {
+            UiTheme.Apply();
             if (_session == null) return;
 
             if (_style == null)
             {
-                _style = new GUIStyle(GUI.skin.label) { fontSize = 16, richText = true, wordWrap = true };
+                _style = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true, wordWrap = true };
             }
 
             GUILayout.BeginArea(PanelRect, GUI.skin.box);
@@ -86,12 +87,12 @@ namespace Betaknight.Overworld.UI
             }
 
             GUILayout.FlexibleSpace();
-            if (OnEditBoard != null && !_session.IsBusy && !_session.IsGameOver && GUILayout.Button("Tafel bearbeiten"))
+            if (OnOpenBuild != null && !_session.IsGameOver && GUILayout.Button(new GUIContent("Build (B)", "Logik-Tafel, Skills, Module und Runen")))
             {
-                OnEditBoard();
+                OnOpenBuild();
             }
             if (OnOpenInventory != null && !_session.IsGameOver
-                && GUILayout.Button($"Inventar ({_session.Inventory.Count}/{_session.Inventory.Capacity})"))
+                && GUILayout.Button(new GUIContent($"Inventar (I)  {_session.Inventory.Count}/{_session.Inventory.Capacity}", "Ausrüstung und Gegenstände")))
             {
                 OnOpenInventory();
             }
@@ -104,6 +105,7 @@ namespace Betaknight.Overworld.UI
                 _onNewMap();
             }
             GUILayout.EndArea();
+            UiTheme.DrawTooltip();
         }
 
         private static readonly SkillCatalog Skills = SkillCatalog.CreateDefault();

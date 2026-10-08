@@ -33,7 +33,7 @@ namespace Betaknight.Overworld
         private GameOverWindow _gameOverWindow;
         private KitSelectionWindow _kitWindow;
         private ArenaWindow _arenaWindow;
-        private BoardEditorWindow _boardWindow;
+        private BuildWindow _buildWindow;
         private PortalWindow _portalWindow;
         private InventoryWindow _inventoryWindow;
         private InventoryFullWindow _inventoryFullWindow;
@@ -58,7 +58,7 @@ namespace Betaknight.Overworld
             _gameOverWindow = gameObject.AddComponent<GameOverWindow>();
             _kitWindow = gameObject.AddComponent<KitSelectionWindow>();
             _arenaWindow = gameObject.AddComponent<ArenaWindow>();
-            _boardWindow = gameObject.AddComponent<BoardEditorWindow>();
+            _buildWindow = gameObject.AddComponent<BuildWindow>();
             _portalWindow = gameObject.AddComponent<PortalWindow>();
             _inventoryWindow = gameObject.AddComponent<InventoryWindow>();
             _inventoryFullWindow = gameObject.AddComponent<InventoryFullWindow>();
@@ -71,12 +71,46 @@ namespace Betaknight.Overworld
             _gameOverWindow.Hidden = arenaOpen;
             _portalWindow.Hidden = arenaOpen;
             _inventoryFullWindow.Hidden = arenaOpen;
-            _hud.OnEditBoard = () => _boardWindow.Toggle();
-            _arenaWindow.OnEditBoard = () => _boardWindow.Open();
-            _hud.OnOpenInventory = () => _inventoryWindow.Toggle();
+            // «Build» und «Inventar» sind nie gleichzeitig offen: das eine schliesst das andere.
+            _hud.OnOpenBuild = ToggleBuild;
+            _arenaWindow.OnEditBoard = () =>
+            {
+                _inventoryWindow.Close();
+                _buildWindow.Open();
+            };
+            _hud.OnOpenInventory = ToggleInventory;
         }
 
         private void Start() => StartNewRun();
+
+        private void ToggleBuild()
+        {
+            _inventoryWindow.Close();
+            _buildWindow.Toggle();
+        }
+
+        private void ToggleInventory()
+        {
+            _buildWindow.Close();
+            _inventoryWindow.Toggle();
+        }
+
+        /// <summary>Tasten B (Build) und I (Inventar); nicht während die Arena läuft.</summary>
+        private void OnGUI()
+        {
+            Event e = Event.current;
+            if (Session == null || _arenaWindow.IsOpen || e.type != EventType.KeyDown) return;
+            if (e.keyCode == KeyCode.B)
+            {
+                ToggleBuild();
+                e.Use();
+            }
+            else if (e.keyCode == KeyCode.I)
+            {
+                ToggleInventory();
+                e.Use();
+            }
+        }
 
         /// <summary>Neuer Run: Welt abbauen und das Ritter-Kit wählen lassen. Danach wird die Karte erzeugt.</summary>
         public void StartNewRun()
@@ -86,7 +120,7 @@ namespace Betaknight.Overworld
             Session = null;
             _hud.Initialize(null, null, null, null);
             _arenaWindow.Initialize(null);
-            _boardWindow.Initialize(null);
+            _buildWindow.Initialize(null);
             _portalWindow.Initialize(null);
             _inventoryWindow.Initialize(null);
             _inventoryFullWindow.Initialize(null);
@@ -138,7 +172,7 @@ namespace Betaknight.Overworld
 
             OverworldController controller = _root.AddComponent<OverworldController>();
             controller.Initialize(Session, grid, player, cam);
-            controller.InputBlocked = () => _arenaWindow.IsOpen || _boardWindow.IsOpen || _inventoryWindow.IsOpen;
+            controller.InputBlocked = () => _arenaWindow.IsOpen || _buildWindow.IsOpen || _inventoryWindow.IsOpen;
 
             _hud.Initialize(Session, controller, _config.Encounters, StartNewRun);
             _encounterWindow.Initialize(Session, keepMessages: Session.Act > 1);
@@ -146,7 +180,7 @@ namespace Betaknight.Overworld
             _shopWindow.Initialize(Session);
             _gameOverWindow.Initialize(Session, StartNewRun);
             _arenaWindow.Initialize(Session);
-            _boardWindow.Initialize(Session);
+            _buildWindow.Initialize(Session);
             _portalWindow.Initialize(Session);
             _inventoryWindow.Initialize(Session);
             _inventoryFullWindow.Initialize(Session);

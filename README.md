@@ -23,9 +23,14 @@ Es sind keine Prefabs, Sprites oder Fonts nötig. Hexfelder, Spielfigur und Labe
 | Klick auf ein entferntes, erforschtes Feld | Reise über bekannte Routen, Schritt für Schritt, jeder Schritt kostet einen Zug |
 | Fenster bei mittleren Events | Eine der Optionen wählen (ausgegraute sind nicht bezahlbar) |
 | Runenwahl | Eine Rune oder ein Ausrüstungsteil nehmen (★ = passt zu einem vorhandenen Tag) oder für 3 Gold verzichten. Teile: «Anlegen» oder «Ins Inventar»; Runen bei voller Tafel: «Ins Runen-Inventar» oder eine Zeile tauschen |
-| Button «Tafel bearbeiten» | Zeilen der Logik-Tafel umsortieren (▲▼). Rune und Skill pro Zeile getrennt wählen: den Skill mit ◀▶ aus den freien Skills der Sammlung (oder Basisangriff), mit × herausnehmen; die Rune aus dem Runen-Inventar einsetzen oder tauschen (↔) und ablegen («ab»). Darunter die Skill-Sammlung: freie Skills an eine Zeile setzen (→n), eingesetzte mit einer anderen Zeile tauschen |
-| Button «Inventar» | Links die 7 Ausrüstungsplätze, rechts das Inventar, darunter Runentafel, Runen-Inventar und «Skills» (jedes Exemplar mit Stufe, Arten und Ort). Klick auf ein Teil zeigt Werte, passive Effekte, Set und den Vergleich mit dem angelegten Teil (grün besser, rot schlechter) |
-| Arena nach jedem Kampf | Spielt den Kampf ab: Tempo 1×/2×/4×, Pause, «Überspringen». Tafel live mit Zustand pro Zeile, Zustände, Ressourcen und schwebende Zahlen. Danach Auswertung pro Zeile, Protokoll mit Filter, «Tafel bearbeiten» oder «Weiter» (siehe «Die Arena lesen») |
+| Taste **B** / Button «Build (B)» | Fenster «Build» (ersetzt den Tafel-Editor): Mitte die Logik-Tafel, eine Zeile pro Rune + Skill (Rune mit Stufen-Abzeichen und Wachstum, Skill mit Kurzwerten, Details im Tooltip). Links das Skill-Inventar, rechts Module und Runen-Inventar oder das Rezeptbuch, oben die Stat-Leiste |
+| Ziehen im Build | Skill auf eine Zeile = einsetzen (besetzte Zeile: tauschen), Skill aus der Zeile ins Skill-Inventar = herausnehmen. Zeile am Griff ≡ auf eine andere Zeile = umsortieren. Rune aus dem Runen-Inventar auf eine Zeile = tauschen, auf einen freien Platz = neue Zeile; Rune einer Zeile ins Runen-Inventar = ablegen. Modul auf einen freien Platz ◇ an Baustein oder Skill = einsetzen, zurück in die Modul-Liste = abnehmen; Klick auf einen Auslöser wählt sein Ziel |
+| Taste **I** / Button «Inventar (I)» | Fenster «Inventar» wie im Rollenspiel: Figur des Ritters mit den 7 Plätzen (Helm, Handschuhe, Brust, Beinschienen, Stiefel, Waffe, Schild), daneben Details zum gewählten Teil, Tags und Sets, darunter das Item-Raster (12 Zellen) für Ausrüstung und später Verbrauchsgegenstände. Runen und Skills stehen nur im Build |
+| Ziehen im Inventar | Teil aus dem Raster auf seinen Platz an der Figur = anlegen (das alte Teil kommt in dieselbe Zelle; ein falscher Platz wird rot und verweigert), Teil von der Figur ins Raster = ablegen (auf ein passendes Teil: tauschen). Zelle auf Zelle = tauschen, auf eine leere Zelle = verschieben; die Reihenfolge bleibt erhalten, auch über Akte |
+| Doppel- oder Rechtsklick | Kurzweg: Skill, Rune oder Modul in die erste passende Zeile bzw. heraus; Teil anlegen bzw. ablegen. Einfacher Klick auf ein Teil zeigt die Details (Anlegen, Ablegen, Verwerfen) |
+| Stat-Leiste | In beiden Fenstern: HP, Waffenschaden, Angriffe/s, Rüstung, Ausweichen, Block, Krit, Präzision, Flächenschaden und aktive Set-Boni, Tag-Stufen und Duos. Maus über ein Teil oder Ziehen eines Teils zeigt die Änderung («Rüstung 6 → 9», grün besser, rot schlechter); bei Skills, Runen und Modulen stehen die Kurzwerte darunter |
+| Während Kampf und offenen Entscheidungen | Beide Fenster bleiben lesbar, Ziehen ist gesperrt. «B» und «I» schliessen sich gegenseitig, Esc schliesst |
+| Arena nach jedem Kampf | Spielt den Kampf ab: Tempo 1×/2×/4×, Pause, «Überspringen». Tafel live mit Zustand pro Zeile, Zustände, Ressourcen und schwebende Zahlen. Danach Auswertung pro Zeile, Protokoll mit Filter, «Build öffnen» oder «Weiter» (siehe «Die Arena lesen») |
 | Button «Shop öffnen» | Erscheint auf einem bereits besuchten Shop-Feld |
 | Button «Neuer Run» | Zurück zur Kit-Auswahl, neue Karte |
 
@@ -91,13 +96,13 @@ Jedes Teil trägt 1–2 Tags (vorläufig, als Daten in `SynergyRegistry.CreateDe
 
 Anzeige: Das HUD zeigt die Zähler («Ladung 3/4», erreichte Schwellen gelb) und aktive Duos. Das Inventar listet alle Tags mit ihren Stufen und das Rezeptbuch. Angebote, Shop und das Inventar zeigen, was ein Teil bewirken würde («→ Ladung 4/6: Schwelle!», «→ Duo frei: ???»).
 
-- **Skill-Kennzahlen im Tafel-Editor:** Unter jedem Skill (auch beim Durchblättern mit ◀▶ und beim festen Basisangriff) steht eine Infozeile: Wirkung, Schaden, CD, Cast-Zeit und Erholung. Schaden steht doppelt, als Prozent vom Waffenschaden und als Wert mit der aktuellen Ausrüstung samt aktiver Set-Boni, gegen ein Ziel ohne Rüstung, ohne Block und Krit (z. B. «120 % Waffenschaden ≈ 10 an allen Gegnern», «Brennen 50 % Waffenschaden/s ≈ 3/s, 15 über 5 s», «20 % Chance: betäubt 1 s»). Skills ohne Schaden zeigen «kein Schaden». Mit der Maus über der Zeile erscheinen alle Details als Tooltip, bei vielen Zeilen scrollt das Fenster.
+- **Skill-Kennzahlen im Build:** Jede Zeile und jeder Skill im Skill-Inventar zeigt Kurzwerte (erste Wirkung und Cooldown), der Tooltip alles: Wirkung, Schaden, CD, Cast-Zeit und Erholung. Schaden steht doppelt, als Prozent vom Waffenschaden und als Wert mit der aktuellen Ausrüstung samt aktiver Set-Boni, gegen ein Ziel ohne Rüstung, ohne Block und Krit (z. B. «120 % Waffenschaden ≈ 10 an allen Gegnern», «Brennen 50 % Waffenschaden/s ≈ 3/s, 15 über 5 s», «20 % Chance: betäubt 1 s»). Skills ohne Schaden zeigen «kein Schaden». Bei kleinen Auflösungen scrollt jeder Bereich für sich.
   Die Werte stehen nicht in der UI, sondern kommen aus den Effekten: Jede `ISkillEffect` meldet über `Describe(SkillInfoBuilder)` ihre Kennzahlen mit denselben Formeln wie `Apply`. `SkillInfo.Create(skill, stats)` fasst sie zusammen, `OverworldSession.SkillUserStats()` liefert die Werte des Ritters zu Kampfbeginn. Neue Effekte müssen `Describe` umsetzen und erscheinen dann automatisch richtig.
 - 7 Ausrüstungsplätze (Helm, Handschuhe, Brust, Beinschienen, Waffe, Schild, Stiefel). Zweihandwaffen sperren den Schild.
 - 4 Sets mit Boni ab 2 und 3 Teilen: Überlast-Protokoll, Aegis-Firewall, Schrott-Ernter, Phantom-Signal.
 - Schutzregeln statt Balance-Bremsen: höchstens eine Aktion pro Tick, Reaktionen erst im nächsten Tick, ab 90 s Überhitzung. Kaputte Builds sind erlaubt, die Engine bleibt stabil.
 - Lagerfeuer kann eine Rune eine Stufe verstärken (z. B. «HP unter 30 %» → «HP unter 40 %»).
-- Sets: Fortschritt steht im HUD und im Tafel-Editor. Teile angefangener Sets kommen 3× häufiger in Angebote, Shops verkaufen 2 Teile. Aegis-Firewall (ab 2 Teilen) schaltet die Rune «Ladung voll» frei.
+- Sets: Fortschritt steht im HUD, in der Stat-Leiste und im Inventar. Teile angefangener Sets kommen 3× häufiger in Angebote, Shops verkaufen 2 Teile. Aegis-Firewall (ab 2 Teilen) schaltet die Rune «Ladung voll» frei.
 - **Goldminen-Verteidigung:** Alle 8 Züge wird eine eigene Mine angegriffen (rot, «!G»). 6 Züge Zeit, sonst ist sie verloren, bis sie zurückerobert ist. Der Kampf dort läuft «auf der Goldmine» (Schrott-Ernter, Rune «Auf Goldmine»).
 - **Boss alle 25 Züge:** Er taucht beim Ritter auf und ist unbesiegbar. Wer 15 s überlebt, entkommt durchs Portal (+8 Gold, +2 Splitter). Ausweichen und Betäuben helfen, Phantom-Signal ist dafür gebaut.
 - **Akte:** Das Fluchtportal führt auf eine neue Karte (Akt 2, 3 …). Ritter, Ausrüstung, Tafel, Gold und Splitter kommen mit, eroberte Minen bleiben zurück. Das Portal heilt 50 % der Max-HP, Gegner sind pro Akt 2 Stufen stärker, der Zugzähler und der Boss-Takt laufen weiter.
@@ -124,7 +129,7 @@ Module sind wie Skills eigene Exemplare (`Core/Modules/`: `ModuleInstance`, `Mod
 
 Datenmodell: Die Tafel im Kampf ist ein Graph (`Arena/Graph/LogicGraph.cs`): Knoten sind Baustein und Skill jeder Zeile, Kanten sind Auslöser (`GraphEdgeKind.Trigger`; UND/ODER können später als weitere Kantenarten dazukommen). Der Kampf bleibt deterministisch: gleiche Seeds ergeben dieselben Kämpfe, auch mit Kreisen.
 
-Tafel-Editor: Unter jeder Zeile stehen die Modul-Plätze von Baustein und Skill. «+ Name» setzt ein freies passendes Modul ein, «×» nimmt es ab. Ein Klick auf einen Auslöser wählt das nächste Ziel (alle Zeilen, dann «kein Ziel»). Rechts an den Zeilen sind Auslöser als Linien gezeichnet (orange vom Skill, türkis vom Baustein, Pfeil am Ziel), jede Verbindung auf eigener Spur, sodass Kreise sichtbar bleiben. Das HUD zeigt pro Zeile ◆ (Module) und ↪ (Auslöser-Ziel), das Inventar alle Module mit Ort und Ziel.
+Build-Fenster: In jeder Zeile stehen die Modul-Plätze von Baustein und Skill (◆ besetzt, ◇ frei). Ein Modul wird auf einen freien Platz gezogen und zurück in die Modul-Liste abgenommen. Ein Klick auf einen Auslöser wählt das nächste Ziel (alle Zeilen, dann «kein Ziel»). Rechts an den Zeilen sind Auslöser als Linien gezeichnet (orange vom Skill, türkis vom Baustein, Pfeil am Ziel), jede Verbindung auf eigener Spur, sodass Kreise sichtbar bleiben. Das HUD zeigt pro Zeile ◆ (Module) und ↪ (Auslöser-Ziel), die Modul-Liste im Build alle Module mit Ort.
 
 #### Wachsen und Evolution
 
@@ -140,7 +145,7 @@ Tafel-Editor: Unter jeder Zeile stehen die Modul-Plätze von Baustein und Skill.
 | Pro gewonnenem Kampf | +1 Prozentpunkt Schwelle (max. 50 %) | Bausteine «HP unter … %» (beide), «Gegner unter … %», «HP unter … % oder ausgewichen» |
 | Pro gewonnenem Kampf | nur Zähler | alle anderen Bausteine |
 
-**Meilensteine:** Wachstum 5 / 15 / 30 ergibt Skill-Stufe 1 / 2 / 3 (Höchststufe). Wachstum 10 und 25 öffnet je einen weiteren Modul-Platz, für Skills und Bausteine (also bis 3 Plätze). Die Karte zeigt das Wachstum am Namen («Bohrstoß +7», «[HP unter 30 % +4] → Bohrstoß +7»), der Tafel-Editor unter jeder Zeile die Regel, die aktuelle Wirkung und den nächsten Meilenstein.
+**Meilensteine:** Wachstum 5 / 15 / 30 ergibt Skill-Stufe 1 / 2 / 3 (Höchststufe). Wachstum 10 und 25 öffnet je einen weiteren Modul-Platz, für Skills und Bausteine (also bis 3 Plätze). Die Karte zeigt das Wachstum am Namen («Bohrstoß +7», «[HP unter 30 % +4] → Bohrstoß +7»), das Build-Fenster im Tooltip jeder Zeile die Regel, die aktuelle Wirkung und den nächsten Meilenstein.
 
 **Zusammenführung mit den Stufen +1…+3 (A-03).** Früher gab ein doppelter Skill eine Stufe, und jede Stufe hatte eigene Werte (+15 % Waffenschaden usw.). Jetzt gibt es **nur noch eine Zahl pro Exemplar, das Wachstum**: Die Stufe ist ein Meilenstein daraus und bringt selbst keine Werte mehr; ein doppelter Skill aus einer Belohnung gibt **+5 Wachstum** (genau eine Stufe, wenn man auf einer Schwelle steht). Die ganze Kraft kommt aus der Wachstums-Regel des Skills. Grund: Hätten Stufe und Wachstum beide Werte, zählte jeder Punkt doppelt (der Stufensprung durch Wachstum und das Wachstum selbst), und ein Duplikat wäre gegenüber Kämpfen unvergleichbar. So bleibt sichtbar, woher ein Wert kommt, Duplikate und Kämpfe zahlen auf dasselbe Konto ein, und Stufe 3 bleibt das Tor für Evolutionen. Lagerfeuer-Stufen von Runen bleiben unverändert (sie verschieben die Schwelle in festen Schritten); das Schwellen-Wachstum legt Prozentpunkte darauf, nie über 50 % und nie unter den Grundwert.
 
@@ -155,7 +160,7 @@ Tafel-Editor: Unter jeder Zeile stehen die Modul-Plätze von Baustein und Skill.
 | Toxin | Bohrstoß | Baustein «Gegner unter … %» in derselben Zeile | Säurebohrer: 120 % an alle Gegner, doppeltes Gift |
 | Schrott | Schildschlag | Tag Schrott 4 | Schrottramme: 120 % durch Rüstung, unterbricht, 2 s Betäubung |
 
-Evolutionsformen werden nie angeboten, man erreicht sie nur über ein Rezept. Angebote, Shop und Inventar zeigen den Fortschritt («Evolution ???: fehlt Modul Fläche», «→ Ladung 3/4 für Evolution von Schockstich»), der Tafel-Editor pro Zeile, das HUD ein ✦ an Zeilen, die nach dem nächsten Boss evolvieren.
+Evolutionsformen werden nie angeboten, man erreicht sie nur über ein Rezept. Angebote, Shop, Inventar und das Rezeptbuch im Build zeigen den Fortschritt («Evolution ???: fehlt Modul Fläche», «→ Ladung 3/4 für Evolution von Schockstich»), das Build-Fenster pro Zeile (Tooltip und ✦), das HUD ein ✦ an Zeilen, die nach dem nächsten Boss evolvieren.
 
 **Rezeptbuch:** Unentdeckte Evolutionen und Duos stehen als Silhouette «???» mit einem Hinweis im Inventar, entdeckte mit ihrem Rezept. Das Buch wird über Runs gespeichert (in Unity in den PlayerPrefs, `Overworld/Persistence/PlayerPrefsRecipeBookStore`, im Core hinter `IRecipeBookStore`). Es ist reines Wissen: Gespeichert werden nur Einträge wie «evo:evo_inferno», nie Werte oder Boni.
 
@@ -167,7 +172,7 @@ Die Arena zeigt nicht nur, *welche* Zeile feuert, sondern auch *warum* die ander
 - **Gründe fürs Überspringen:** «Bedingung nicht erfüllt», «Skill im Cooldown (noch x,y s)», «verwaist (kein Skill)» und «Bedingung erfüllt, aber Aktion läuft» (eine höhere Zeile war bereit, während eine Aktion lief, die sich nicht abbrechen lässt; nur das Ausholen eines Basisangriffs darf noch unterbrochen werden).
 - **Kämpfer:** Unter dem Lebensbalken stehen Ressourcen als Balken (Hitze, Ladung, Tempo-Stapel …) und aktive Zustände als kleine Kästchen (Brand, Betäubt, R.-Bruch, Schild …) mit Restdauer, Restzeit-Balken und Stapeln (×2). Tooltip mit vollem Namen.
 - **Schwebende Zahlen am Ziel:** Schaden weiss, Krit gelb und grösser, Heilung grün, «Block» und «Ausgewichen» als Wort. Kommt die Wirkung von einer Tafel-Zeile, liegt die Zahl auf einem Feld in der Farbe dieser Zeile. Auch Brennen zählt zur Zeile, die es gesetzt hat.
-- **Auswertung nach dem Kampf** (vor «Weiter»): Tabelle pro Zeile mit «gefeuert», Schaden und Heilung gesamt, Anteil am Gesamtschaden, wie oft übersprungen und häufigster Grund. Dazu Hinweise wie «Zeile 3 hat nie gefeuert: Bedingung nie erfüllt» oder «Zeile 2 (Bohrstoß) macht 64 % des Schadens». «Tafel bearbeiten» öffnet direkt den Tafel-Editor.
+- **Auswertung nach dem Kampf** (vor «Weiter»): Tabelle pro Zeile mit «gefeuert», Schaden und Heilung gesamt, Anteil am Gesamtschaden, wie oft übersprungen und häufigster Grund. Dazu Hinweise wie «Zeile 3 hat nie gefeuert: Bedingung nie erfüllt» oder «Zeile 2 (Bohrstoß) macht 64 % des Schadens». «Build öffnen» öffnet direkt das Fenster «Build».
 - **Auslöser und Wiederholungen:** Der Cast-Balken zeigt «↪ von Zeile 1» bei ausgelösten und «↻ Wiederholung» bei wiederholten Aktionen. Im Protokoll steht beim Start «↪ ausgelöst von Zeile n» und verfallene Auslöser als «Auslöser von Zeile 1 verfällt, Zeile 2 (Bohrstoß) nicht bereit», so lässt sich jede Kette verfolgen. Die Auswertung zählt in «gefeuert» ausgelöste (↪) und wiederholte (↻) Starts mit und gibt Hinweise wie «Zeile 2 (Bohrstoß) wurde 4× ausgelöst, von Zeile 1 ×4» oder «3 Auslöser auf Zeile 2 verfielen».
 - **Protokoll-Filter:** «Alles», «Meine Aktionen» oder «Nur Schaden». Einträge einer Zeile tragen deren Farbstreifen.
 - **Bei 4×:** Hervorhebungen (feuernde Zeile, Treffer-Blitz) bleiben mindestens 0,35 s Echtzeit sichtbar, schwebende Zahlen gut 1 s.
@@ -222,7 +227,7 @@ Assets/Betaknight/
 │   │   ├── Arena/         Kampfsimulator: Battle (Tick-Schleife), Combatant, LogicBoard, Conditions/ (Runen-Bedingungen + ConditionRegistry),
 │   │   │                  Effects/ (ISkillEffect), Statuses/, Skills/ (SkillCatalog), BattleModifier, Playback/ (Wiedergabe + Protokolltext),
 │   │   │                  Insight/ (BattleDecision: Gründe je Zeile, BattleReport: Auswertung nach dem Kampf)
-│   │   ├── Gear/          Ausrüstung: EquipmentCatalog, Equipment, Inventory, BoardFactory (Runen-Zeilen → Tafel), Sets/ (SetBonusRegistry),
+│   │   ├── Gear/          Ausrüstung: EquipmentCatalog, Equipment, Inventory (Item-Raster mit fester Reihenfolge, IInventoryItem), BuildStats, BoardFactory (Runen-Zeilen → Tafel), Sets/ (SetBonusRegistry),
 │   │   │                  Synergies/ (SynergyRegistry: Tags, Schwellen, Duos als Daten; Wirkungen als BattleModifier)
 │   │   ├── Combat/        ICombatResolver, ArenaCombatResolver, EnemyCatalog (Platzhalter-Resolver nur noch für Tests)
 │   │   ├── Shop/          Shop-Bestand und Preise
@@ -236,6 +241,7 @@ Assets/Betaknight/
 │   │   ├── OverworldSession.Synergies.cs    Fassade: Tag-Zähler, aktive Duos, Rezeptbuch, Vorschau für Angebote
 │   │   ├── OverworldSession.Skills.cs       Fassade: Skill-Sammlung, Einsetzen/Tauschen, Erhalt, Stufe oder zweites Exemplar, Angebote
 │   │   ├── OverworldSession.Modules.cs      Fassade: Modul-Sammlung, Einsetzen/Abnehmen, Auslöser-Ziele, seltener Erhalt
+│   │   ├── OverworldSession.Build.cs        Fassade: Stat-Leiste (BuildStats) und Vorschau «vorher → nachher» für Teile
 │   │   ├── OverworldSession.Growth.cs       Fassade: Wachstum nach Kämpfen, Meilensteine, Evolution nach dem Boss, Fortschritt für Angebote
 │   │   ├── OverworldSession.Inventory.cs    Fassade: Inventar, anlegen/ablegen/tauschen, verwerfen, verkaufen
 │   │   ├── OverworldSession.Progression.cs  Fassade: Tafel-Erweiterung, Stufen, Angebote mit Verbesserung
@@ -248,7 +254,8 @@ Assets/Betaknight/
 │       ├── Controllers/   OverworldController, CameraFollow2D
 │       ├── Input/         PointerInput (neues Input System und alter Input Manager)
 │       ├── Persistence/   PlayerPrefsRecipeBookStore (Rezeptbuch über Runs)
-│       ├── UI/            OverworldHud, Kit-Auswahl, Event-, Runen-, Shop-, Game-Over-Fenster, ArenaWindow, BoardEditorWindow, InventoryWindow, InventoryFullWindow (IMGUI-Platzhalter)
+│       ├── UI/            OverworldHud, Kit-Auswahl, Event-, Runen-, Shop-, Game-Over-Fenster, ArenaWindow, BuildWindow, InventoryWindow (Figur + Item-Raster), InventoryFullWindow;
+│       │                  UiTheme (deckender Stil, Schriftgrössen 18/15/13), DragDrop (Ziehen und Ablegen), StatBar (Stat-Leiste mit Vorschau)
 │       └── OverworldBootstrapper.cs
 └── Tests/EditMode/  Unit-Tests für die Core-Logik
 ```
@@ -286,7 +293,7 @@ Falls der Test Runner fehlt, im Package Manager das Paket **Test Framework** ins
 | Konzept-Feature | Andockpunkt |
 |---|---|
 | Neue Rune | Eintrag in `RuneCatalog` + `ConditionRegistry.Register(id, parameter => new …Condition())` |
-| Neuer Skill | Eintrag in `SkillCatalog` aus `ISkillEffect`-Bausteinen mit mindestens einer Skill-Art (`kinds:`); neue Wirkung = neue `ISkillEffect`-Klasse mit `Apply` und `Describe` (Kennzahlen für den Tafel-Editor) |
+| Neuer Skill | Eintrag in `SkillCatalog` aus `ISkillEffect`-Bausteinen mit mindestens einer Skill-Art (`kinds:`); neue Wirkung = neue `ISkillEffect`-Klasse mit `Apply` und `Describe` (Kennzahlen für das Build-Fenster) |
 | Neues Ausrüstungsteil | Eintrag in `EquipmentCatalog` |
 | Neues Set | Teile mit Set-Id + `SetBonusRegistry.Register(id, name, teile => new …Set())` (ein `BattleModifier`) |
 | Neuer Synergie-Tag oder Duo | Eintrag in `SynergyRegistry.CreateDefault` (Text, passive Effekte, `BattleModifier`-Fabrik je Schwelle); Teile bekommen die Tag-Id über `tags:` |
