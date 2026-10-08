@@ -75,6 +75,8 @@ namespace Betaknight.Tests.EditMode
         private static BattleResult Fight(CombatantSetup player, CombatantSetup enemy = null, BattleContext context = null, int seed = 7)
         {
             BattleSetup setup = Duel(player, enemy ?? Golem(), seed);
+            // Thermal Throttling (A-21) erst spät: die Set-Tests vergleichen Cast-Zeiten und Schaden ohne Aufheizen.
+            setup.TimeLimitTicks = Ticks.FromSeconds(90);
             if (context != null) setup.Context = context;
             BattleResult r = CombatSimulation.Run(setup);
             TestContext.WriteLine($"{r.Outcome} nach {r.EndTick} Ticks, HP {r.PlayerHp}/{r.PlayerMaxHp}");

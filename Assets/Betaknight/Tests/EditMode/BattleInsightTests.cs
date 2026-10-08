@@ -213,13 +213,14 @@ namespace Betaknight.Tests.EditMode
         /// Mit A-19 erneut: Platine statt Tafel, keine Cooldowns, Relais lösen bei Ereignissen bzw. steigender Flanke aus,
         /// Skills nach Grösse neu eingestellt, Gegner mit Takt-Relais.
         /// Mit A-20 erneut: Relais und Gatter melden «an/aus» (neue Ereignisse), Pins verbinden berührende Komponenten mit Pulsen.
+        /// Mit A-21 erneut: Thermal Throttling ab 30 s statt Überhitzungsschaden, Gegner mit Hacks.
         /// </summary>
-        [TestCase("blade", 5, "3 Kämpfe, 279 Ereignisse, D614982A797F1C50")]
-        [TestCase("blade", 21, "3 Kämpfe, 200 Ereignisse, 6AA6D61B866A2137")]
-        [TestCase("shield", 5, "6 Kämpfe, 698 Ereignisse, 20429A318F3B1822")]
-        [TestCase("shield", 21, "2 Kämpfe, 256 Ereignisse, 34999B421D745B99")]
-        [TestCase("spark", 5, "3 Kämpfe, 329 Ereignisse, 916715A88FC2B019")]
-        [TestCase("spark", 21, "2 Kämpfe, 176 Ereignisse, 06219AA6E9CF142E")]
+        [TestCase("blade", 5, "3 Kämpfe, 306 Ereignisse, AB5E5A1398A44BE2")]
+        [TestCase("blade", 21, "3 Kämpfe, 207 Ereignisse, 5B02DB70EEB31508")]
+        [TestCase("shield", 5, "6 Kämpfe, 711 Ereignisse, C05EE9A169128EE5")]
+        [TestCase("shield", 21, "2 Kämpfe, 265 Ereignisse, B5F90485BB801208")]
+        [TestCase("spark", 5, "3 Kämpfe, 329 Ereignisse, 846367016FB33416")]
+        [TestCase("spark", 21, "2 Kämpfe, 176 Ereignisse, 566503A6F4A0A100")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {
             Assert.AreEqual(fingerprint, Fingerprint(BotBattles(KnightKit.Defaults.Single(k => k.Id == kit), seed)));

@@ -31,8 +31,10 @@ namespace Betaknight.Tests.EditMode
 
         private static BattleResult LongDuel(CombatantSetup a, CombatantSetup b, int seconds = 80, int seed = 3)
         {
+            // Endet beim Zeitlimit, bevor Thermal Throttling (A-21) den Schaden erhöht.
             BattleSetup setup = Duel(a, b, seed);
             setup.TimeLimitTicks = Ticks.FromSeconds(seconds);
+            setup.MaxTicks = setup.TimeLimitTicks - 1;
             return CombatSimulation.Run(setup);
         }
 

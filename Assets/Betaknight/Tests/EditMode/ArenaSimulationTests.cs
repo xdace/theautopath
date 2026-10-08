@@ -80,11 +80,12 @@ namespace Betaknight.Tests.EditMode
         {
             BattleResult r = CombatSimulation.Run(Duel(Fighter("A", 5000, 1, armor: 1000), Fighter("B", 5000, 1, armor: 1000)));
 
+            // Thermal Throttling (A-21): ab 30 s Stufen mit mehr Schaden, bis einer fällt.
             Assert.AreNotEqual(BattleOutcome.Timeout, r.Outcome);
-            Assert.Greater(r.EndTick, Ticks.FromSeconds(90));
+            Assert.Greater(r.EndTick, Ticks.FromSeconds(30));
             Assert.Less(r.EndTick, 10000);
             Assert.IsTrue(r.Events.Any(e => e.Kind == BattleEventKind.Overheat));
-            Assert.IsFalse(r.Events.Any(e => e.Kind == BattleEventKind.Overheat && e.Tick <= Ticks.FromSeconds(90)));
+            Assert.IsFalse(r.Events.Any(e => e.Kind == BattleEventKind.Overheat && e.Tick < Ticks.FromSeconds(30)));
         }
 
         [Test]
@@ -105,10 +106,12 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void DeathFromOverheatOnBothSidesIsADefeat()
+        public void ThermalThrottlingNeverDealsDamageOnItsOwn()
         {
+            // Früher tötete die Überhitzung beide Seiten; Thermal Throttling (A-21) macht nur vorhandenen Schaden grösser.
             BattleResult r = CombatSimulation.Run(Duel(Fighter("A", 100, 0), Fighter("B", 100, 0)));
-            Assert.AreEqual(BattleOutcome.Defeat, r.Outcome);
+            Assert.AreEqual(BattleOutcome.Timeout, r.Outcome);
+            Assert.AreEqual(100, r.PlayerHp);
         }
 
         [Test]

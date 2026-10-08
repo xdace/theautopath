@@ -37,8 +37,9 @@ namespace Betaknight.Tests.EditMode
 
         private static BattleResult Run(BattleSetup setup, int seconds = 20)
         {
-            setup.TimeLimitTicks = Ticks.FromSeconds(seconds);
+            // Ohne Thermal Throttling (A-21): die Tests messen reine Cast-Zeiten.
             setup.MaxTicks = Ticks.FromSeconds(seconds + 5);
+            setup.TimeLimitTicks = setup.MaxTicks + 1;
             return CombatSimulation.Run(setup);
         }
 

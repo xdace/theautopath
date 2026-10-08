@@ -9,6 +9,7 @@ using Betaknight.Core.Map;
 using Betaknight.Core.Movement;
 using Betaknight.Core.Run;
 using Betaknight.Core.Runes;
+using Betaknight.Core.Shop;
 using Betaknight.Core.Turns;
 using NUnit.Framework;
 
@@ -195,6 +196,78 @@ namespace Betaknight.Tests.EditMode
 
             Assert.IsTrue(s.RerollShop());
             Assert.AreEqual(3, s.PendingShop.Inventory.Runes.Count);
+        }
+
+        [Test]
+        public void RerollGetsDearerWithinOneVisit()
+        {
+            OverworldSession s = Session(new PlayerStats(gold: 100));
+            s.Map.SetContent(East, CellContent.Shop);
+            s.TryStep(East);
+
+            ShopPrices prices = s.ShopPrices;
+            var paid = new System.Collections.Generic.List<int>();
+            for (int i = 0; i < 3; i++)
+            {
+                int before = s.Stats.Gold;
+                Assert.IsTrue(s.RerollShop());
+                paid.Add(before - s.Stats.Gold);
+            }
+            CollectionAssert.AreEqual(new[] { prices.Reroll, prices.Reroll + prices.RerollStep, prices.Reroll + 2 * prices.RerollStep }, paid);
+
+            s.LeaveShop();
+            Assert.IsTrue(s.OpenShop());
+            Assert.AreEqual(prices.Reroll, s.ShopRerollPrice, "beim nächsten Besuch wieder der Grundpreis");
+        }
+
+        [Test]
+        public void ALockedOfferSurvivesRerollsAndAppearsInTheNextShop()
+        {
+            var west = new HexCoord(-1, 0);
+            OverworldSession s = Session(new PlayerStats(gold: 200));
+            s.Map.SetContent(East, CellContent.Shop);
+            s.Map.SetContent(west, CellContent.Shop);
+            s.TryStep(East);
+
+            RuneDefinition locked = s.PendingShop.Inventory.Runes[1];
+            int count = s.PendingShop.Inventory.Runes.Count;
+            Assert.IsTrue(s.ToggleLock(ShopOfferKind.Rune, 1));
+            Assert.IsTrue(s.IsLockedAt(ShopOfferKind.Rune, 1));
+            for (int i = 0; i < 4; i++)
+            {
+                Assert.IsTrue(s.RerollShop());
+                Assert.Contains(locked, s.PendingShop.Inventory.Runes.ToList());
+                Assert.AreEqual(count, s.PendingShop.Inventory.Runes.Count, "das gesperrte Angebot verdrängt ein neues");
+            }
+
+            s.LeaveShop();
+            s.TryStep(HexCoord.Zero);
+            s.TryStep(west);
+            Assert.IsNotNull(s.PendingShop);
+            Assert.AreEqual(locked, s.PendingShop.Inventory.Runes[0], "auch im nächsten Shop, vorne");
+            Assert.IsTrue(s.IsLockedAt(ShopOfferKind.Rune, 0));
+
+            Assert.IsTrue(s.BuyShopRune(0));
+            Assert.IsEmpty(s.LockedOffers, "kaufen löst die Sperre");
+        }
+
+        [Test]
+        public void OnlyTwoOffersCanBeLockedAndUnlockingFreesASlot()
+        {
+            OverworldSession s = Session(new PlayerStats(gold: 50));
+            s.Map.SetContent(East, CellContent.Shop);
+            s.TryStep(East);
+
+            Assert.AreEqual(2, s.ShopPrices.LockSlots);
+            Assert.IsTrue(s.ToggleLock(ShopOfferKind.Rune, 0));
+            Assert.IsTrue(s.ToggleLock(ShopOfferKind.Rune, 1));
+            Assert.IsFalse(s.CanLock(ShopOfferKind.Rune, 2));
+            Assert.IsFalse(s.ToggleLock(ShopOfferKind.Rune, 2));
+            Assert.IsFalse(s.IsLockedAt(ShopOfferKind.Rune, 2));
+
+            Assert.IsFalse(s.ToggleLock(ShopOfferKind.Rune, 0), "zweites Antippen entsperrt");
+            Assert.IsTrue(s.ToggleLock(ShopOfferKind.Rune, 2));
+            Assert.AreEqual(2, s.LockedOffers.Count);
         }
 
         [Test]
