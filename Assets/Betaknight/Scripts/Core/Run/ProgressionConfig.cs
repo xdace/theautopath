@@ -76,6 +76,25 @@ namespace Betaknight.Core.Run
         public int SkillOfferWeight = 10;
         public int SkillKindMatchFactor = 3;
 
+        // ------------------------------------------------------------------ Module (selten)
+
+        /// <summary>Chance in Prozent auf ein Modul als zusätzliche Wahl, je Quelle. Boss-Flucht gibt immer eines.</summary>
+        public int ModuleOfferChanceElite = 35;
+        public int ModuleOfferChanceTreasure = 15;
+
+        /// <summary>Chance, dass ein Shop einen (teuren) Modul-Platz hat.</summary>
+        public int ShopModuleChance = 50;
+
+        public int ModuleOfferChance(string source)
+        {
+            switch (source)
+            {
+                case RewardSources.Elite: return ModuleOfferChanceElite;
+                case RewardSources.Treasure: return ModuleOfferChanceTreasure;
+                default: return 0;
+            }
+        }
+
         public int SkillOfferChance(string source)
         {
             switch (source)

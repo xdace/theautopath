@@ -20,11 +20,15 @@ namespace Betaknight.Core.Runes
         /// <summary>Skills als eigener Belohnungstyp (Ids aus dem Skill-Katalog).</summary>
         public IReadOnlyList<string> SkillIds { get; }
 
-        public int Count => Options.Count + ItemIds.Count + SkillIds.Count + (BoardExpansion ? 1 : 0);
+        /// <summary>Module als seltene zusätzliche Wahl (Ids aus dem Modul-Katalog).</summary>
+        public IReadOnlyList<string> ModuleIds { get; }
+
+        public int Count => Options.Count + ItemIds.Count + SkillIds.Count + ModuleIds.Count + (BoardExpansion ? 1 : 0);
 
         public RuneOffer(string source, IReadOnlyList<RuneDefinition> options, IReadOnlyList<string> itemIds = null, bool boardExpansion = false,
-            IReadOnlyList<string> skillIds = null)
+            IReadOnlyList<string> skillIds = null, IReadOnlyList<string> moduleIds = null)
         {
+            ModuleIds = moduleIds ?? Array.Empty<string>();
             Source = source ?? string.Empty;
             Options = options ?? throw new ArgumentNullException(nameof(options));
             ItemIds = itemIds ?? Array.Empty<string>();
@@ -37,7 +41,7 @@ namespace Betaknight.Core.Runes
         {
             if (itemIds == null || itemIds.Count == 0) return this;
             int keep = Math.Max(1, Options.Count - itemIds.Count);
-            return new RuneOffer(Source, Options.Take(keep).ToList(), itemIds, BoardExpansion, SkillIds);
+            return new RuneOffer(Source, Options.Take(keep).ToList(), itemIds, BoardExpansion, SkillIds, ModuleIds);
         }
 
         /// <summary>Dasselbe Angebot mit Skills anstelle der letzten Runen (mindestens eine Rune bleibt).</summary>
@@ -45,15 +49,22 @@ namespace Betaknight.Core.Runes
         {
             if (skillIds == null || skillIds.Count == 0) return this;
             int keep = Math.Max(1, Options.Count - skillIds.Count);
-            return new RuneOffer(Source, Options.Take(keep).ToList(), ItemIds, BoardExpansion, skillIds);
+            return new RuneOffer(Source, Options.Take(keep).ToList(), ItemIds, BoardExpansion, skillIds, ModuleIds);
+        }
+
+        /// <summary>Dasselbe Angebot mit Modulen als zusätzlicher Wahl (Runen bleiben).</summary>
+        public RuneOffer WithModules(IReadOnlyList<string> moduleIds)
+        {
+            if (moduleIds == null || moduleIds.Count == 0) return this;
+            return new RuneOffer(Source, Options, ItemIds, BoardExpansion, SkillIds, moduleIds);
         }
 
         /// <summary>Dasselbe Angebot mit der Tafel-Erweiterung als zusätzlicher Wahl.</summary>
-        public RuneOffer WithBoardExpansion() => new RuneOffer(Source, Options, ItemIds, true, SkillIds);
+        public RuneOffer WithBoardExpansion() => new RuneOffer(Source, Options, ItemIds, true, SkillIds, ModuleIds);
 
         /// <summary>Dasselbe Angebot mit anderen Runen, Teilen und Skills (null = Skills unverändert).</summary>
         public RuneOffer With(IReadOnlyList<RuneDefinition> options, IReadOnlyList<string> itemIds, IReadOnlyList<string> skillIds = null) =>
-            new RuneOffer(Source, options, itemIds, BoardExpansion, skillIds ?? SkillIds);
+            new RuneOffer(Source, options, itemIds, BoardExpansion, skillIds ?? SkillIds, ModuleIds);
 
         /// <summary>
         /// Stellt ein Angebot zusammen: keine Doppelten, nichts schon Ausgerüstetes, und wenn möglich

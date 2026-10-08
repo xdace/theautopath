@@ -199,7 +199,7 @@ namespace Betaknight.Core
             if (!_shops.TryGetValue(cell.Coord, out ShopInventory inventory))
             {
                 inventory = new ShopInventory(RuneOffer.Create("Shop", RuneCatalog, Runes, _random, isOwned: RuneInventory.Contains).Options,
-                    PickItems(ShopItemCount), PickSkills(Progression.ShopSkillCount));
+                    PickItems(ShopItemCount), PickSkills(Progression.ShopSkillCount), RollShopModules());
                 _shops.Add(cell.Coord, inventory);
             }
 
@@ -269,6 +269,7 @@ namespace Betaknight.Core
             PendingShop.Inventory.Replace(RuneOffer.Create("Shop", RuneCatalog, Runes, _random, isOwned: RuneInventory.Contains).Options);
             PendingShop.Inventory.ReplaceItems(PickItems(ShopItemCount));
             PendingShop.Inventory.ReplaceSkills(PickSkills(Progression.ShopSkillCount));
+            PendingShop.Inventory.ReplaceModules(RollShopModules());
             return true;
         }
 

@@ -112,6 +112,8 @@ namespace Betaknight.Core
             // Exemplare, die beim Aufbau schon an Zeilen sitzen, gehören zur Sammlung; ebenso später direkt gesetzte.
             AdoptRowSkills();
             Runes.Changed += AdoptRowSkills;
+            Runes.Changed += ReleaseOrphanModules;
+            Skills.Changed += ReleaseOrphanModules;
 
             // Eigener Zufall für Events und Angebote, abgeleitet vom Karten-Seed: gleicher Seed, gleiche Beute.
             _random = new Random(unchecked(Map.Seed * 31 + 7));
@@ -233,7 +235,8 @@ namespace Betaknight.Core
         {
             if (IsBusy) return null;
             RuneOffer offer = RuneOffer.Create(source, RuneCatalog, Runes, _random, isUnlocked: IsRuneUnlocked, isOwned: RuneInventory.Contains);
-            offer = ShapeOffer(offer.WithItems(RollRewardItems(source)).WithSkills(RollRewardSkills(source)));
+            offer = ShapeOffer(offer.WithItems(RollRewardItems(source)).WithSkills(RollRewardSkills(source)))
+                .WithModules(RollRewardModules(source));
             if (offer.Count == 0) return null;
 
             PendingRuneOffer = offer;

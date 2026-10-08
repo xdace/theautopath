@@ -15,6 +15,9 @@ namespace Betaknight.Core.Shop
         public int Item = 12;
         public int Skill = 14;
 
+        /// <summary>Teurer Modul-Platz (nicht in jedem Shop).</summary>
+        public int Module = 30;
+
         /// <summary>Verkauf aus dem Inventar: halber Preis.</summary>
         public int SellItem => Item / 2;
         public int SellRune => Rune / 2;
@@ -26,6 +29,18 @@ namespace Betaknight.Core.Shop
         private readonly List<RuneDefinition> _runes;
         private readonly List<string> _items = new List<string>();
         private readonly List<string> _skills = new List<string>();
+        private readonly List<string> _modules = new List<string>();
+
+        /// <summary>Module im Angebot (selten, teurer Platz).</summary>
+        public IReadOnlyList<string> ModuleIds => _modules;
+
+        internal void RemoveModuleAt(int index) => _modules.RemoveAt(index);
+
+        internal void ReplaceModules(IEnumerable<string> moduleIds)
+        {
+            _modules.Clear();
+            _modules.AddRange(moduleIds);
+        }
 
         /// <summary>Skills im Angebot (Ids aus dem Skill-Katalog).</summary>
         public IReadOnlyList<string> SkillIds => _skills;
@@ -38,8 +53,10 @@ namespace Betaknight.Core.Shop
         /// <summary>Der zusätzliche Runenplatz ist pro Shop nur einmal käuflich.</summary>
         public bool SlotSold { get; internal set; }
 
-        public ShopInventory(IEnumerable<RuneDefinition> runes, IEnumerable<string> itemIds = null, IEnumerable<string> skillIds = null)
+        public ShopInventory(IEnumerable<RuneDefinition> runes, IEnumerable<string> itemIds = null, IEnumerable<string> skillIds = null,
+            IEnumerable<string> moduleIds = null)
         {
+            if (moduleIds != null) _modules.AddRange(moduleIds);
             _runes = new List<RuneDefinition>(runes ?? throw new ArgumentNullException(nameof(runes)));
             if (itemIds != null) _items.AddRange(itemIds);
             if (skillIds != null) _skills.AddRange(skillIds);

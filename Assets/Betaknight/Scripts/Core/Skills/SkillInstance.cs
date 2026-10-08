@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using Betaknight.Core.Modules;
 using Betaknight.Core.Arena;
 
 namespace Betaknight.Core.Skills
@@ -24,8 +26,19 @@ namespace Betaknight.Core.Skills
     /// einzusetzen braucht zwei Exemplare. Der Basisangriff ist kein Exemplar: er kommt von der Waffe und darf
     /// an beliebig vielen Zeilen stehen (<see cref="IsBasicAttack"/>).
     /// </summary>
-    public sealed class SkillInstance
+    public sealed class SkillInstance : IModuleHolder
     {
+        private readonly ModuleSlotList _modules = new ModuleSlotList();
+
+        /// <summary>Modul-Plätze des Exemplars (Start 1, der Basisangriff hat keine).</summary>
+        public int ModuleSlots { get; internal set; }
+
+        public IReadOnlyList<ModuleInstance> Modules => _modules.Modules;
+        string IModuleHolder.ModuleHolderName => SkillId;
+        bool IModuleHolder.IsSkillHolder => true;
+        void IModuleHolder.AttachModule(ModuleInstance module) => _modules.Attach(module);
+        void IModuleHolder.DetachModule(ModuleInstance module) => _modules.Detach(module);
+
         /// <summary>Eindeutig innerhalb der Sammlung eines Runs, 0 solange das Exemplar noch keiner Sammlung gehört.</summary>
         public int InstanceId { get; internal set; }
         public string SkillId { get; }
@@ -42,6 +55,7 @@ namespace Betaknight.Core.Skills
             if (string.IsNullOrEmpty(skillId)) throw new ArgumentException("Skill-Id fehlt.", nameof(skillId));
             SkillId = skillId;
             Level = Math.Max(0, level);
+            ModuleSlots = IsBasicAttack ? 0 : 1;
         }
 
         /// <summary>Ein neuer Basisangriff für eine Zeile (gehört zu keiner Sammlung).</summary>

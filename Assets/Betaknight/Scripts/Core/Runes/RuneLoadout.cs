@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Betaknight.Core.Modules;
 using Betaknight.Core.Skills;
 
 namespace Betaknight.Core.Runes
@@ -10,9 +11,22 @@ namespace Betaknight.Core.Runes
     /// Ohne Skill ist die Zeile verwaist und wird im Kampf übersprungen. Als <see cref="ISkillHolder"/> ist sie ein Ort
     /// für genau ein Exemplar; belegt wird sie über die <see cref="SkillCollection"/> der Session.
     /// </summary>
-    public sealed class RuneSlot : ISkillHolder
+    public sealed class RuneSlot : ISkillHolder, IModuleHolder
     {
         private readonly RuneLoadout _owner;
+        private readonly ModuleSlotList _modules = new ModuleSlotList();
+
+        /// <summary>Stabile Id der Zeile (bleibt beim Umsortieren gleich). Ziel für Auslöser.</summary>
+        public int RowId { get; }
+
+        /// <summary>Modul-Plätze des Logikbausteins (Start 1).</summary>
+        public int ModuleSlots { get; internal set; } = 1;
+
+        public IReadOnlyList<ModuleInstance> Modules => _modules.Modules;
+        string IModuleHolder.ModuleHolderName => HolderName;
+        bool IModuleHolder.IsSkillHolder => false;
+        void IModuleHolder.AttachModule(ModuleInstance module) => _modules.Attach(module);
+        void IModuleHolder.DetachModule(ModuleInstance module) => _modules.Detach(module);
 
         public RuneDefinition Rune { get; internal set; }
         public int Level { get; internal set; }
@@ -26,9 +40,10 @@ namespace Betaknight.Core.Runes
         /// <summary>Stufe des Skill-Exemplars (0 ohne Skill).</summary>
         public int SkillLevel => Skill?.Level ?? 0;
 
-        internal RuneSlot(RuneLoadout owner, RuneDefinition rune, SkillInstance skill)
+        internal RuneSlot(RuneLoadout owner, RuneDefinition rune, SkillInstance skill, int rowId)
         {
             _owner = owner;
+            RowId = rowId;
             Rune = rune;
             Skill = skill;
         }
@@ -53,6 +68,7 @@ namespace Betaknight.Core.Runes
     public sealed class RuneLoadout
     {
         private readonly List<RuneSlot> _rows = new List<RuneSlot>();
+        private int _nextRowId = 1;
 
         public int Slots { get; private set; }
 
@@ -90,7 +106,7 @@ namespace Betaknight.Core.Runes
         {
             if (rune == null || IsFull || Contains(rune)) return false;
             if (skill != null && !skill.IsBasicAttack && skill.Holder != null) return false;
-            var row = new RuneSlot(this, rune, skill) { Level = Math.Max(0, Math.Min(level, rune.MaxLevel)) };
+            var row = new RuneSlot(this, rune, skill, _nextRowId++) { Level = Math.Max(0, Math.Min(level, rune.MaxLevel)) };
             if (skill != null && !skill.IsBasicAttack) skill.Holder = row;
             _rows.Add(row);
             Changed?.Invoke();

@@ -136,15 +136,66 @@ namespace Betaknight.Core.Arena
                 CooldownBonusTicks + cooldownTicks, CastBonusPercent + castPercent);
         }
 
-        private SkillDefinition Copy(List<ISkillEffect> effects, int cooldown, int level, int power, int cooldownBonus, int castBonus) =>
-            new SkillDefinition(Id, Name, WindupTicks, RecoveryTicks, cooldown, effects, Description, CountsAsAttack,
-                CanBeRepeated, IsBasicAttack, Kinds)
+        private SkillDefinition Copy(List<ISkillEffect> effects, int cooldown, int level, int power, int cooldownBonus, int castBonus)
+        {
+            SkillDefinition copy = Clone(effects, cooldown);
+            copy.Level = level;
+            copy.PowerBonusPercent = power;
+            copy.CooldownBonusTicks = cooldownBonus;
+            copy.CastBonusPercent = castBonus;
+            return copy;
+        }
+
+        /// <summary>Kopie mit allen Zusatzwerten (Stufe, Boni, Module); Wirkungen und Cooldown optional neu.</summary>
+        private SkillDefinition Clone(List<ISkillEffect> effects = null, int? cooldown = null) =>
+            new SkillDefinition(Id, Name, WindupTicks, RecoveryTicks, cooldown ?? CooldownTicks, effects ?? new List<ISkillEffect>(Effects),
+                Description, CountsAsAttack, CanBeRepeated, IsBasicAttack, Kinds)
             {
-                Level = level,
-                PowerBonusPercent = power,
-                CooldownBonusTicks = cooldownBonus,
-                CastBonusPercent = castBonus,
+                Level = Level,
+                PowerBonusPercent = PowerBonusPercent,
+                CooldownBonusTicks = CooldownBonusTicks,
+                CastBonusPercent = CastBonusPercent,
+                ExtraCasts = ExtraCasts,
+                ExtraTargets = ExtraTargets,
+                HpCostBp = HpCostBp,
+                _modules = new List<string>(_modules),
             };
+
+        // ------------------------------------------------------------------ Module (A-07)
+
+        private List<string> _modules = new List<string>();
+
+        /// <summary>Namen der eingesetzten Skill-Module, z. B. «Fläche», für Anzeige und Protokoll.</summary>
+        public IReadOnlyList<string> Modules => _modules;
+
+        /// <summary>«Mehrfach»: so oft wird die Wirkung danach wiederholt, jedes Mal mit voller Cast-Zeit.</summary>
+        public int ExtraCasts { get; private set; }
+
+        /// <summary>«Kette»: so viele weitere Gegner treffen die zielgerichteten Wirkungen.</summary>
+        public int ExtraTargets { get; private set; }
+
+        /// <summary>«Kostet HP statt Cooldown»: Selbstschaden in Basispunkten der Max-HP bei jedem Start, kein Cooldown.</summary>
+        public int HpCostBp { get; private set; }
+
+        /// <summary>Kopie mit einem Skill-Modul. <paramref name="change"/> setzt die neuen Werte auf der Kopie.</summary>
+        public SkillDefinition WithModule(string moduleName, Func<ISkillEffect, ISkillEffect> mapEffect = null, int extraCasts = 0,
+            int extraTargets = 0, int hpCostBp = 0, int? cooldownTicks = null, int castPercent = 0)
+        {
+            if (IsBasicAttack) return this;
+            List<ISkillEffect> effects = null;
+            if (mapEffect != null)
+            {
+                effects = new List<ISkillEffect>();
+                foreach (ISkillEffect e in Effects) effects.Add(mapEffect(e) ?? e);
+            }
+            SkillDefinition copy = Clone(effects, hpCostBp > 0 ? 0 : cooldownTicks);
+            copy.ExtraCasts += Math.Max(0, extraCasts);
+            copy.ExtraTargets += Math.Max(0, extraTargets);
+            copy.HpCostBp = Math.Max(copy.HpCostBp, hpCostBp);
+            copy.CastBonusPercent += castPercent;
+            if (!string.IsNullOrEmpty(moduleName)) copy._modules.Add(moduleName);
+            return copy;
+        }
 
         public override string ToString() => Name;
     }

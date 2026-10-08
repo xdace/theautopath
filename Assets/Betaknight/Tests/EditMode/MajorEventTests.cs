@@ -238,7 +238,7 @@ namespace Betaknight.Tests.EditMode
             int fights = 0;
             s.MajorEventResolved += o => { if (o.Title.StartsWith("Kampf")) fights++; };
 
-            // Zufälliger Spieler: wählt immer die letzte Option, nimmt die erste Rune, verlässt Shops.
+            // Zufälliger Spieler: wählt immer die letzte Option, nimmt die erste Rune, verlässt Shops, lässt Überzähliges liegen.
             for (int step = 0; step < 60 && !s.IsGameOver; step++)
             {
                 while (s.IsBusy)
@@ -247,6 +247,8 @@ namespace Betaknight.Tests.EditMode
                     else if (s.PendingRuneOffer != null) { if (!s.TakeRune(0, 0)) s.SkipRuneOffer(); }
                     else if (s.PendingShop != null) s.LeaveShop();
                     else if (s.CanEnterPortal) s.EnterPortal();
+                    else if (s.PendingRune != null) s.RejectPendingRune();
+                    else if (s.PendingItem != null) s.RejectPendingItem();
                 }
 
                 var options = s.Map.GetNeighbors(s.Player.Position).Where(c => s.CanStepTo(c.Coord)).ToList();

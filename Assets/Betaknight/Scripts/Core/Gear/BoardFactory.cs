@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Modules;
 using Betaknight.Core.Runes;
 
 namespace Betaknight.Core.Gear
@@ -12,12 +14,21 @@ namespace Betaknight.Core.Gear
         public readonly string SkillId;
         public readonly int SkillLevel;
 
-        public BoardRowSpec(string runeId, string skillId, int level = 0, int skillLevel = 0)
+        /// <summary>Module am Skill-Exemplar der Zeile (Skill-Module, Auslöser «nach Ausführung»).</summary>
+        public readonly IReadOnlyList<ModuleSpec> SkillModules;
+
+        /// <summary>Module am Logikbaustein der Zeile (Baustein-Module, Auslöser «wenn erfüllt»).</summary>
+        public readonly IReadOnlyList<ModuleSpec> BlockModules;
+
+        public BoardRowSpec(string runeId, string skillId, int level = 0, int skillLevel = 0,
+            IReadOnlyList<ModuleSpec> skillModules = null, IReadOnlyList<ModuleSpec> blockModules = null)
         {
             RuneId = runeId;
             SkillId = skillId;
             Level = level;
             SkillLevel = skillLevel;
+            SkillModules = skillModules ?? Array.Empty<ModuleSpec>();
+            BlockModules = blockModules ?? Array.Empty<ModuleSpec>();
         }
     }
 
@@ -31,9 +42,11 @@ namespace Betaknight.Core.Gear
         private readonly RuneCatalog _runes;
         private readonly ConditionRegistry _conditions;
         private readonly SkillCatalog _skills;
+        private readonly ModuleCatalog _modules;
 
-        public BoardFactory(RuneCatalog runes, ConditionRegistry conditions, SkillCatalog skills)
+        public BoardFactory(RuneCatalog runes, ConditionRegistry conditions, SkillCatalog skills, ModuleCatalog modules = null)
         {
+            _modules = modules ?? ModuleCatalog.CreateDefault();
             _runes = runes ?? RuneCatalog.CreateDefault();
             _conditions = conditions ?? ConditionRegistry.CreateDefault();
             _skills = skills ?? SkillCatalog.CreateDefault();
@@ -47,27 +60,54 @@ namespace Betaknight.Core.Gear
             IReadOnlyList<SkillPassive> extraPassives = null)
         {
             var result = new List<LogicRow>();
+            var edges = new List<GraphEdge>();
             if (rows != null)
-                foreach (BoardRowSpec spec in rows) result.Add(CreateRow(spec, equipment, skillLevels, extraPassives));
-            return new LogicBoard(result);
+            {
+                foreach (BoardRowSpec spec in rows)
+                {
+                    int index = result.Count;
+                    result.Add(CreateRow(spec, equipment, skillLevels, extraPassives));
+                    AddTriggers(edges, spec.SkillModules, GraphNode.Skill(index));
+                    AddTriggers(edges, spec.BlockModules, GraphNode.Block(index));
+                }
+            }
+            edges.RemoveAll(e => e.To.Row >= result.Count);
+            return new LogicBoard(result, null, edges.Count > 0 ? new LogicGraph(edges) : null);
+        }
+
+        /// <summary>Auslöser werden zu Kanten im Graph: vom Skill bzw. Baustein der Zeile zum Skill der Zielzeile.</summary>
+        private static void AddTriggers(List<GraphEdge> edges, IReadOnlyList<ModuleSpec> modules, GraphNode from)
+        {
+            foreach (ModuleSpec m in modules)
+                if (m.ModuleId == ModuleIds.Trigger && m.TargetRow >= 0) edges.Add(new GraphEdge(from, GraphNode.Skill(m.TargetRow)));
         }
 
         public LogicRow CreateRow(BoardRowSpec spec, Equipment equipment, SkillLevelRules skillLevels = null,
             IReadOnlyList<SkillPassive> extraPassives = null)
         {
             if (!_runes.TryGet(spec.RuneId, out RuneDefinition rune) ||
-                !_conditions.TryCreate(spec.RuneId, rune.ParameterAt(spec.Level), out ICondition condition))
+                !_conditions.TryCreate(spec.RuneId, ModuleRules.ApplyToParameter(rune, rune.ParameterAt(spec.Level), spec.BlockModules),
+                    out ICondition condition))
             {
                 return new LogicRow(AlwaysCondition.Instance, null, spec.RuneId ?? "?");
             }
 
-            string label = rune.NameAt(spec.Level);
+            int parameter = ModuleRules.ApplyToParameter(rune, rune.ParameterAt(spec.Level), spec.BlockModules);
+            string label = string.Format(rune.NameTemplate, parameter);
+            foreach (ModuleSpec m in spec.BlockModules)
+            {
+                condition = ModuleRules.ApplyToCondition(condition, m);
+                if (m.ModuleId == ModuleIds.Invert) label = $"NICHT {label}";
+                else if (m.ModuleId == ModuleIds.Extend) label = $"{label} (+{SkillInfo.Seconds(ModuleRules.ExtendTicks + ModuleRules.ExtendTicksPerLevel * m.Level)})";
+            }
 
             // Set-exklusive Runen wirken nur, solange das Set getragen wird.
             if (rune.UnlockSetId != null && (equipment == null || equipment.SetPieces(rune.UnlockSetId) < SetDefinition.FirstBonusPieces))
                 return new LogicRow(condition, null, label);
 
             SkillDefinition skill = _skills.TryGet(spec.SkillId, out SkillDefinition s) ? s.AtLevel(spec.SkillLevel, skillLevels) : null;
+            foreach (ModuleSpec m in spec.SkillModules)
+                skill = ModuleRules.ApplyToSkill(skill, m, _modules.TryGet(m.ModuleId, out ModuleDefinition d) ? d.Name : m.ModuleId);
             if (skill != null && equipment != null) skill = equipment.Boost(skill, extraPassives);
             else if (skill != null && extraPassives != null) skill = SkillPassive.Apply(skill, extraPassives);
             return new LogicRow(condition, skill, label);

@@ -85,6 +85,7 @@ namespace Betaknight.Core
             session.Progression = previous.Progression;
             session.RuneSlotsBought = previous.RuneSlotsBought;
             session.CarryRecipeBook(previous);
+            session.CarryModules(previous);
             return session;
         }
     }

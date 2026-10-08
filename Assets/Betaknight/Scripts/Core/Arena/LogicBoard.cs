@@ -36,13 +36,33 @@ namespace Betaknight.Core.Arena
         /// <summary>Index, mit dem die Fallback-Zeile im Protokoll erscheint.</summary>
         public int FallbackIndex => Rows.Count;
 
-        public LogicBoard(IEnumerable<LogicRow> rows, SkillDefinition fallbackSkill = null)
+        /// <summary>Auslöser zwischen Bausteinen und Skills der Zeilen (Kreise erlaubt).</summary>
+        public LogicGraph Graph { get; }
+
+        public LogicBoard(IEnumerable<LogicRow> rows, SkillDefinition fallbackSkill = null, LogicGraph graph = null)
         {
             Rows = new List<LogicRow>(rows ?? Array.Empty<LogicRow>());
+            Graph = graph ?? LogicGraph.Empty;
             Fallback = new LogicRow(AlwaysCondition.Instance, fallbackSkill ?? SkillDefinition.BasicAttack, "Immer");
         }
 
         public static LogicBoard FallbackOnly { get; } = new LogicBoard(null);
+
+        /// <summary>Gibt es Bedingungen mit Gedächtnis oder Baustein-Auslöser? Nur dann beobachtet der Kampf jeden Tick.</summary>
+        public bool NeedsObservation
+        {
+            get
+            {
+                if (_needsObservation.HasValue) return _needsObservation.Value;
+                bool needed = false;
+                for (int i = 0; i < Rows.Count && !needed; i++)
+                    needed = Rows[i].Condition is IObservingCondition || Graph.HasEdgesFrom(GraphNode.Block(i));
+                _needsObservation = needed;
+                return needed;
+            }
+        }
+
+        private bool? _needsObservation;
 
         /// <summary>Zeile nach Index inklusive Fallback.</summary>
         public LogicRow RowAt(int index) => index == FallbackIndex ? Fallback : Rows[index];

@@ -97,7 +97,7 @@ namespace Betaknight.Tests.EditMode
 
             RuneOffer offer = s.PendingRuneOffer;
             Assert.AreEqual(1, offer.ItemIds.Count);
-            Assert.AreEqual(3, offer.Count);
+            Assert.AreEqual(3, offer.Count - offer.ModuleIds.Count, "Ein seltenes Modul darf dazukommen (A-07).");
 
             EquipmentDefinition item = s.Items.Get(offer.ItemIds[0]);
             Assert.IsTrue(s.TakeItem(0));

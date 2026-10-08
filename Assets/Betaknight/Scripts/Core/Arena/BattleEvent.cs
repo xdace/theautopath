@@ -35,6 +35,9 @@ namespace Betaknight.Core.Arena
         /// <summary>Zeitlimit überschritten, Überhitzung beginnt bzw. steigt.</summary>
         Overheat,
         BattleEnd,
+
+        /// <summary>Ein Auslöser verfällt, weil die Zielzeile nicht bereit ist. RowIndex = Ziel, Amount = auslösende Zeile.</summary>
+        TriggerExpired,
     }
 
     /// <summary>Ein Eintrag im Kampfprotokoll. Bedingungen und Set-Boni lesen dieselben Einträge.</summary>
@@ -55,8 +58,17 @@ namespace Betaknight.Core.Arena
         /// </summary>
         public int RowIndex { get; internal set; }
 
-        /// <summary>Bei Aktionen: Wiederholung (Echo) statt Entscheidung der Tafel. Hat eigene Cast-Zeit, keinen Cooldown.</summary>
-        public bool IsRepeat { get; internal set; }
+        /// <summary>Bei Aktionen: Entscheidung der Tafel, Wiederholung (Echo, Mehrfach) oder Auslöser.</summary>
+        public ActionCause Cause { get; internal set; }
+
+        /// <summary>Bei Auslösern: Zeile, die ausgelöst hat, sonst -1.</summary>
+        public int CauseRow { get; internal set; } = -1;
+
+        /// <summary>Wiederholung (Echo, Mehrfach): eigene Cast-Zeit, kein Cooldown.</summary>
+        public bool IsRepeat => Cause == ActionCause.Repeat;
+
+        /// <summary>Durch ein Auslöser-Modul gestartet.</summary>
+        public bool IsTriggered => Cause == ActionCause.Trigger;
 
         /// <summary>Zusatzwert nur für die Anzeige: Stapel bei Zuständen, Obergrenze bei Ressourcen (0 = offen).</summary>
         public int Extra { get; internal set; }

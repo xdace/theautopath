@@ -9,6 +9,12 @@ namespace Betaknight.Core.Arena
         public int LastFiredTick { get; internal set; }
         public int FireCount { get; internal set; }
 
+        /// <summary>Letzter Tick, in dem die Bedingung erfüllt war (nur für beobachtete Bedingungen wie «Verlängern»).</summary>
+        public int LastMetTick { get; internal set; } = int.MinValue / 2;
+
+        /// <summary>War die Bedingung im letzten beobachteten Tick erfüllt? Für Auslöser «wenn erfüllt».</summary>
+        public bool WasMet { get; internal set; }
+
         public RowRuntime(int index) => Index = index;
     }
 
@@ -43,6 +49,15 @@ namespace Betaknight.Core.Arena
         bool IsMet(in ConditionContext context, out Combatant target);
     }
 
+    /// <summary>
+    /// Bedingung mit Gedächtnis über <see cref="RowRuntime"/>: wird jeden Tick vor den Entscheidungen beobachtet,
+    /// damit <see cref="ICondition.IsMet"/> selbst rein bleibt und Protokoll oder Anzeige nichts verändern.
+    /// </summary>
+    public interface IObservingCondition : ICondition
+    {
+        void Observe(in ConditionContext context);
+    }
+
     /// <summary>[Immer]</summary>
     public sealed class AlwaysCondition : ICondition
     {
@@ -59,17 +74,48 @@ namespace Betaknight.Core.Arena
 namespace Betaknight.Core.Arena
 {
     /// <summary>Kehrt eine Bedingung um (Grundlage für eine spätere Inverter-Rune). Ziel ist der Standardgegner.</summary>
-    public sealed class NotCondition : ICondition
+    public sealed class NotCondition : IObservingCondition
     {
         public ICondition Inner { get; }
 
         public NotCondition(ICondition inner) => Inner = inner ?? throw new System.ArgumentNullException(nameof(inner));
+
+        public void Observe(in ConditionContext context)
+        {
+            if (Inner is IObservingCondition observing) observing.Observe(context);
+        }
 
         public bool IsMet(in ConditionContext context, out Combatant target)
         {
             bool met = Inner.IsMet(context, out _);
             target = null;
             return !met;
+        }
+    }
+
+    /// <summary>Modul «Verlängern»: die Bedingung gilt nach dem letzten Erfülltsein noch eine Weile weiter.</summary>
+    public sealed class ExtendedCondition : IObservingCondition
+    {
+        public ICondition Inner { get; }
+        public int Ticks { get; }
+
+        public ExtendedCondition(ICondition inner, int ticks)
+        {
+            Inner = inner ?? throw new System.ArgumentNullException(nameof(inner));
+            Ticks = System.Math.Max(0, ticks);
+        }
+
+        public void Observe(in ConditionContext context)
+        {
+            if (Inner is IObservingCondition observing) observing.Observe(context);
+            if (Inner.IsMet(context, out _)) context.Row.LastMetTick = context.Tick;
+        }
+
+        public bool IsMet(in ConditionContext context, out Combatant target)
+        {
+            if (Inner.IsMet(context, out target)) return true;
+            target = null;
+            return context.Row != null && context.Tick - context.Row.LastMetTick <= Ticks;
         }
     }
 

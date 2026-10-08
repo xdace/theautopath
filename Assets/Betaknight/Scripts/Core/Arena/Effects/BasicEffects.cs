@@ -218,3 +218,28 @@ namespace Betaknight.Core.Arena
             info.Add(new EffectInfo(EffectInfoKind.Repeat, "wiederholt den letzten eigenen Skill mit dessen Cast-Zeit, ohne Cooldown"));
     }
 }
+
+namespace Betaknight.Core.Arena
+{
+    public static class SkillEffects
+    {
+        /// <summary>
+        /// Trifft die Wirkung das Ziel (Schaden, Betäubung, Brennen, Debuffs)? Solche Wirkungen gehen beim Modul «Kette»
+        /// auf weitere Gegner über; Wirkungen auf sich selbst (Heilung, Buffs) nicht.
+        /// </summary>
+        public static bool HitsTarget(ISkillEffect effect)
+        {
+            switch (effect)
+            {
+                case DamageEffect d: return !d.AllEnemies;
+                case StunEffect s: return !s.AllEnemies;
+                case BurnEffect _: return true;
+                case InterruptChargeEffect _: return true;
+                case StatModifierEffect m: return m.OnTarget;
+                case ApplyStatusEffect a: return a.OnTarget;
+                case ChanceEffect c: return HitsTarget(c.Inner);
+                default: return false;
+            }
+        }
+    }
+}

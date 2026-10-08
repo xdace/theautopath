@@ -17,6 +17,8 @@ namespace Betaknight.Core.Arena
                 case "overheat": return "Überhitzung";
                 case "heat": return "Hitze";
                 case "discharge": return "Entladung";
+                case "hp_cost": return "HP-Kosten";
+                case StatusIds.Poison: return "Gift";
                 default: return id;
             }
         }
@@ -47,6 +49,11 @@ namespace Betaknight.Core.Arena
                 case BattleEventKind.ActionStarted:
                     string row = RowLabel(e, result);
                     text = row != null ? $"{who}: [{row}] → {SkillName(e.Detail)}" : $"{who}: {SkillName(e.Detail)}";
+                    if (e.IsTriggered) text += $"  ↪ ausgelöst von Zeile {e.CauseRow + 1}";
+                    else if (e.IsRepeat) text += "  ↻ Wiederholung";
+                    break;
+                case BattleEventKind.TriggerExpired:
+                    text = $"{who}: Auslöser von Zeile {e.Amount + 1} verfällt, Zeile {e.RowIndex + 1} ({SkillName(e.Detail)}) nicht bereit";
                     break;
                 case BattleEventKind.ActionInterrupted: text = $"{who}: {SkillName(e.Detail)} abgebrochen"; break;
                 case BattleEventKind.Healed: text = $"{whom} heilt {e.Amount}"; break;

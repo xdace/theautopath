@@ -37,13 +37,42 @@ namespace Betaknight.Core.Arena
         public int RecoveryLeft { get; internal set; }
         public bool EffectApplied { get; internal set; }
 
-        /// <summary>Wiederholung (Echo): kein Cooldown, startet keine neue Zeile.</summary>
-        public bool IsRepeat { get; internal set; }
+        /// <summary>Warum die Aktion läuft: Entscheidung der Tafel, Wiederholung oder Auslöser.</summary>
+        public ActionCause Cause { get; internal set; }
 
-        /// <summary>Vorgemerkte Wiederholung, startet nach dieser Aktion mit eigener Cast-Zeit.</summary>
-        public SkillDefinition FollowUp { get; internal set; }
+        /// <summary>Bei Auslösern: die Zeile, deren Skill oder Baustein ausgelöst hat, sonst -1.</summary>
+        public int CauseRow { get; internal set; } = -1;
+
+        /// <summary>Noch ausstehende Wiederholungen aus «Mehrfach».</summary>
+        public int RepeatsLeft { get; internal set; }
+
+        public bool IsRepeat => Cause == ActionCause.Repeat;
 
         public bool InWindup => !EffectApplied;
+    }
+
+    /// <summary>Warum eine Aktion gestartet wurde.</summary>
+    public enum ActionCause
+    {
+        /// <summary>Entscheidung der Tafel (oberste erfüllte, bereite Zeile).</summary>
+        Board,
+
+        /// <summary>Wiederholung (Echo, Mehrfach): eigene Cast-Zeit, kein Cooldown.</summary>
+        Repeat,
+
+        /// <summary>Auslöser-Modul: normaler Cast mit Cooldown, ohne Bedingung der Zielzeile.</summary>
+        Trigger,
+    }
+
+    /// <summary>Vorgemerkte Aktion, die nach der laufenden startet (Wiederholung oder Auslöser).</summary>
+    public sealed class PendingAction
+    {
+        public SkillDefinition Skill;
+        public Combatant Target;
+        public int Row;
+        public ActionCause Cause;
+        public int CauseRow = -1;
+        public int RepeatsLeft;
     }
 
     /// <summary>Ein Kämpfer im laufenden Kampf: Werte, Leben, Aktion, Cooldowns, Zustände, Ressourcen.</summary>
@@ -57,6 +86,10 @@ namespace Betaknight.Core.Arena
         internal readonly List<BattleModifier> ModifierList = new List<BattleModifier>();
 
         internal Battle Battle;
+
+        /// <summary>Vorgemerkte Aktionen, die nacheinander nach der laufenden starten. Betäubung leert die Liste.</summary>
+        internal readonly List<PendingAction> Pending = new List<PendingAction>();
+        public IReadOnlyList<PendingAction> PendingActions => Pending;
 
         public string Name { get; }
         public Side Side { get; }

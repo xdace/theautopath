@@ -87,6 +87,7 @@ namespace Betaknight.Core.Arena
             {
                 UpdateTime();
                 AdvanceActions();
+                ObserveRows();
                 Decide();
                 outcome = CheckEnd();
                 if (outcome.HasValue) break;
@@ -173,6 +174,7 @@ namespace Betaknight.Core.Arena
                     Execute(c, a);
                     if (c.Action != a) continue; // durch Tod oder Betäubung abgebrochen
                     a.EffectApplied = true;
+                    AfterExecution(c, a);
                     if (a.RecoveryLeft <= 0) Finish(c, a);
                 }
                 else
@@ -186,7 +188,8 @@ namespace Betaknight.Core.Arena
         private void Execute(Combatant c, ActionState a)
         {
             Combatant target = a.Target != null && a.Target.IsAlive ? a.Target : DefaultTarget(c);
-            Emit(new BattleEvent(Tick, BattleEventKind.ActionExecuted, c, target, a.Skill.CountsAsAttack ? 1 : 0, a.Skill.Id, a.RowIndex) { IsRepeat = a.IsRepeat });
+            Emit(new BattleEvent(Tick, BattleEventKind.ActionExecuted, c, target, a.Skill.CountsAsAttack ? 1 : 0, a.Skill.Id, a.RowIndex)
+                { Cause = a.Cause, CauseRow = a.CauseRow });
 
             if (!a.Skill.IsBasicAttack && a.Skill.CanBeRepeated) c.LastRepeatableSkill = a.Skill;
 
@@ -197,7 +200,36 @@ namespace Betaknight.Core.Arena
                 if (!c.IsAlive) break;
                 effect.Apply(context);
             }
+
+            // Modul «Kette»: zielgerichtete Wirkungen treffen weitere Gegner.
+            if (a.Skill.ExtraTargets > 0 && target != null)
+            {
+                int extra = 0;
+                foreach (Combatant other in OpponentsOf(c))
+                {
+                    if (extra >= a.Skill.ExtraTargets || !c.IsAlive) break;
+                    if (other == target) continue;
+                    extra++;
+                    var chained = new SkillContext(this, c, other, a.Skill, a.RowIndex);
+                    foreach (ISkillEffect effect in a.Skill.Effects)
+                        if (c.IsAlive && SkillEffects.HitsTarget(effect)) effect.Apply(chained);
+                }
+            }
             EndActor();
+        }
+
+        /// <summary>Nach der Wirkung: Wiederholungen aus «Mehrfach» vormerken, dann Auslöser des Skills feuern.</summary>
+        private void AfterExecution(Combatant c, ActionState a)
+        {
+            if (!c.IsAlive) return;
+            if (a.RepeatsLeft > 0)
+            {
+                c.Pending.Insert(0, new PendingAction
+                {
+                    Skill = a.Skill, Target = a.Target, Row = a.RowIndex, Cause = ActionCause.Repeat, RepeatsLeft = a.RepeatsLeft - 1,
+                });
+            }
+            if (!a.IsRepeat && a.RowIndex >= 0 && a.RowIndex < c.Board.Rows.Count) FireEdges(c, GraphNode.Skill(a.RowIndex));
         }
 
         private void BeginActor(Combatant c, int row)
@@ -217,20 +249,97 @@ namespace Betaknight.Core.Arena
             c.Action = null;
             c.LastActionRow = a.RowIndex;
             c.LastActionEndTick = Tick;
+            StartPending(c);
+        }
 
-            // Wiederholung (Echo): eigene Ausführung mit eigener Cast-Zeit, direkt im Anschluss.
-            if (a.FollowUp != null && c.IsAlive && !c.IsStunned && OpponentsOf(c).Count > 0)
-                StartAction(c, a.FollowUp, a.Target, a.RowIndex, repeat: true);
+        /// <summary>Höchstens so viele Aktionen warten hinter der laufenden; weitere Auslöser verfallen.</summary>
+        public const int MaxPendingActions = 4;
+
+        /// <summary>Startet die nächste vorgemerkte Aktion. Ausgelöste, deren Skill nicht mehr bereit ist, verfallen.</summary>
+        private void StartPending(Combatant c)
+        {
+            while (c.Pending.Count > 0 && c.Action == null)
+            {
+                PendingAction p = c.Pending[0];
+                c.Pending.RemoveAt(0);
+                if (!c.IsAlive || c.IsStunned || OpponentsOf(c).Count == 0)
+                {
+                    c.Pending.Clear();
+                    return;
+                }
+                if (p.Cause == ActionCause.Trigger && !c.IsReady(p.Skill))
+                {
+                    Emit(new BattleEvent(Tick, BattleEventKind.TriggerExpired, c, null, p.CauseRow, p.Skill.Id, p.Row));
+                    continue;
+                }
+                StartAction(c, p.Skill, p.Target, p.Row, p.Cause, p.CauseRow, p.RepeatsLeft);
+            }
         }
 
         /// <summary>
-        /// Merkt eine Wiederholung für die laufende Aktion vor. Sie startet nach deren Erholung als eigene Ausführung
+        /// Merkt eine Wiederholung für die laufende Aktion vor (Echo). Sie startet nach deren Erholung als eigene Ausführung
         /// mit voller Cast-Zeit (ohne Cooldown). Keine Ausführung ohne Cast.
         /// </summary>
         public void QueueRepeat(Combatant c, SkillDefinition skill)
         {
-            if (c?.Action == null || skill == null) return;
-            c.Action.FollowUp = skill;
+            if (c?.Action == null || skill == null || c.Pending.Count >= MaxPendingActions) return;
+            c.Pending.Add(new PendingAction { Skill = skill, Target = c.Action.Target, Row = c.Action.RowIndex, Cause = ActionCause.Repeat });
+        }
+
+        // ------------------------------------------------------------------ Auslöser (Graph der Tafel)
+
+        /// <summary>Feuert alle Auslöser-Kanten eines Knotens.</summary>
+        private void FireEdges(Combatant c, GraphNode from)
+        {
+            foreach (GraphEdge edge in c.Board.Graph.From(from))
+                if (edge.Kind == GraphEdgeKind.Trigger) Trigger(c, edge.To.Row, from.Row);
+        }
+
+        /// <summary>
+        /// Löst den Skill einer Zeile aus: ohne deren Bedingung, mit voller Cast-Zeit und Cooldown. Ist er nicht bereit
+        /// (Cooldown, verwaist) oder der Kämpfer betäubt, verfällt der Auslöser. Läuft gerade eine Aktion, wartet er dahinter.
+        /// </summary>
+        private void Trigger(Combatant c, int row, int sourceRow)
+        {
+            LogicRow target = row >= 0 && row < c.Board.Rows.Count ? c.Board.Rows[row] : null;
+            if (target == null || target.IsOrphaned || !c.IsReady(target.Skill) || !c.IsAlive || c.IsStunned
+                || OpponentsOf(c).Count == 0 || (c.Action != null && c.Pending.Count >= MaxPendingActions))
+            {
+                Emit(new BattleEvent(Tick, BattleEventKind.TriggerExpired, c, null, sourceRow, target?.Skill?.Id, row));
+                return;
+            }
+
+            if (c.Action == null)
+            {
+                StartAction(c, target.Skill, null, row, ActionCause.Trigger, sourceRow);
+                return;
+            }
+            c.Pending.Add(new PendingAction { Skill = target.Skill, Row = row, Cause = ActionCause.Trigger, CauseRow = sourceRow });
+        }
+
+        /// <summary>
+        /// Jeden Tick vor den Entscheidungen: Bedingungen mit Gedächtnis beobachten und Bausteine mit Auslösern prüfen.
+        /// Ein Baustein-Auslöser feuert beim Wechsel von nicht erfüllt zu erfüllt.
+        /// </summary>
+        private void ObserveRows()
+        {
+            foreach (Combatant c in _all)
+            {
+                if (!c.IsAlive || !c.Board.NeedsObservation) continue;
+                RowRuntime[] states = _rows[c];
+                for (int i = 0; i < c.Board.Rows.Count; i++)
+                {
+                    LogicRow row = c.Board.Rows[i];
+                    var context = new ConditionContext(this, c, states[i]);
+                    if (row.Condition is IObservingCondition observing) observing.Observe(context);
+                    if (!c.Board.Graph.HasEdgesFrom(GraphNode.Block(i))) continue;
+
+                    bool met = row.Condition.IsMet(context, out _);
+                    bool rising = met && !states[i].WasMet;
+                    states[i].WasMet = met;
+                    if (rising) FireEdges(c, GraphNode.Block(i));
+                }
+            }
         }
 
         private void Decide()
@@ -371,10 +480,13 @@ namespace Betaknight.Core.Arena
 
         /// <summary>
         /// Startet eine Aktion mit voller Cast-Zeit. Öffentlich für Effekte, die Aktionen auslösen.
-        /// <paramref name="repeat"/>: Wiederholung (Echo), setzt keinen Cooldown und zählt nicht als Feuern der Zeile.
+        /// <paramref name="cause"/>: Wiederholungen (Echo, Mehrfach) setzen keinen Cooldown; nur Entscheidungen der Tafel
+        /// zählen als Feuern der Zeile. Ohne <paramref name="repeatsLeft"/> gelten die «Mehrfach»-Wiederholungen des Skills.
         /// </summary>
-        public void StartAction(Combatant c, SkillDefinition skill, Combatant target, int rowIndex, bool repeat = false)
+        public void StartAction(Combatant c, SkillDefinition skill, Combatant target, int rowIndex,
+            ActionCause cause = ActionCause.Board, int causeRow = -1, int? repeatsLeft = null)
         {
+            bool repeat = cause == ActionCause.Repeat;
             ActionTiming(skill, c.AttackIntervalTicks, out int windup, out int recovery, _setup.MinCastTicks);
 
             c.Action = new ActionState
@@ -385,19 +497,26 @@ namespace Betaknight.Core.Arena
                 StartTick = Tick,
                 WindupLeft = windup,
                 RecoveryLeft = recovery,
-                IsRepeat = repeat,
+                Cause = cause,
+                CauseRow = causeRow,
+                RepeatsLeft = repeatsLeft ?? (repeat ? 0 : skill.ExtraCasts),
             };
             if (!repeat) c.SetCooldown(skill.Id, skill.CooldownTicks);
 
-            if (!repeat && rowIndex >= 0 && rowIndex < _rows[c].Length)
+            if (cause == ActionCause.Board && rowIndex >= 0 && rowIndex < _rows[c].Length)
             {
                 RowRuntime state = _rows[c][rowIndex];
                 state.LastFiredTick = Tick;
                 state.FireCount++;
             }
 
-            Emit(new BattleEvent(Tick, BattleEventKind.ActionStarted, c, c.Action.Target, windup, skill.Id, rowIndex) { IsRepeat = repeat });
+            Emit(new BattleEvent(Tick, BattleEventKind.ActionStarted, c, c.Action.Target, windup, skill.Id, rowIndex)
+                { Cause = cause, CauseRow = causeRow });
             foreach (BattleModifier m in c.ModifierList.ToArray()) m.OnActionStarted(this, c, skill, rowIndex);
+
+            // Modul «kostet HP statt Cooldown».
+            if (!repeat && skill.HpCostBp > 0)
+                ResolveHit(HitInfo.SelfDamage(c, Math.Max(1, BasisPoints.Of(c.MaxHp, skill.HpCostBp)), "hp_cost"));
         }
 
         private BattleOutcome? CheckEnd()
@@ -531,7 +650,11 @@ namespace Betaknight.Core.Arena
             foreach (StatusEffect s in target.StatusList) if (s.Id == status.Id) stacks++;
             Emit(new BattleEvent(Tick, BattleEventKind.StatusApplied, source, target, status.TicksLeft, status.Id) { Extra = stacks });
 
-            if (status.Stuns) Interrupt(target);
+            if (status.Stuns)
+            {
+                Interrupt(target);
+                target.Pending.Clear();
+            }
         }
 
         /// <summary>Ändert einen Ressourcen-Zähler innerhalb von [min, max]. Gibt den neuen Wert zurück.</summary>

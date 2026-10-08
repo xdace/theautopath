@@ -152,13 +152,14 @@ namespace Betaknight.Tests.EditMode
         /// Fingerabdrücke aller Kämpfe aus Bot-Runs. Das Protokoll darf keinen Kampf verändern: gleiche Seeds ergeben
         /// dieselben Ereignisse und damit dieselben Entscheidungen. Neu aufgenommen mit A-06, weil sich Kämpfe dort bewusst
         /// ändern (neue Cast-Zeiten, Echo mit eigener Cast-Zeit, Synergie-Tags) und Angebote anders würfeln (Skills seit A-05).
+        /// Mit A-07 erneut aufgenommen: Belohnungen und Shops würfeln zusätzlich seltene Module, die Kämpfe selbst sind unverändert.
         /// </summary>
         [TestCase("blade", 5, "2 Kämpfe, 155 Ereignisse, 585C43CE50272DD0")]
-        [TestCase("blade", 21, "3 Kämpfe, 135 Ereignisse, 9B9FFBB272E89AE4")]
-        [TestCase("shield", 5, "6 Kämpfe, 599 Ereignisse, 62651E896AD5E72E")]
-        [TestCase("shield", 21, "4 Kämpfe, 244 Ereignisse, 6F01525699ADB9A7")]
+        [TestCase("blade", 21, "2 Kämpfe, 133 Ereignisse, C030CD4FF820E8E2")]
+        [TestCase("shield", 5, "6 Kämpfe, 585 Ereignisse, 4612994949C13B3F")]
+        [TestCase("shield", 21, "3 Kämpfe, 191 Ereignisse, F023E0D011A540B7")]
         [TestCase("spark", 5, "2 Kämpfe, 134 Ereignisse, 4052D2913055051E")]
-        [TestCase("spark", 21, "3 Kämpfe, 133 Ereignisse, CC9411FD625A4ED1")]
+        [TestCase("spark", 21, "2 Kämpfe, 146 Ereignisse, 9AEBB76742137BCB")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {
             Assert.AreEqual(fingerprint, Fingerprint(BotBattles(KnightKit.Defaults.Single(k => k.Id == kit), seed)));
