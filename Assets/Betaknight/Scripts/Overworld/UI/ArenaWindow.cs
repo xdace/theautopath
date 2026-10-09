@@ -23,7 +23,13 @@ namespace Betaknight.Overworld.UI
     /// </summary>
     public sealed class ArenaWindow : MonoBehaviour
     {
-        private static readonly int[] Speeds = { 1, 2, 4 };
+        /// <summary>Tempo-Stufen; 1× sind <see cref="BaseTicksPerSecond"/> Ticks pro Sekunde (halbe Spielzeit, besser zu verfolgen).</summary>
+        private static readonly float[] Speeds = { 0.5f, 1f, 2f, 4f };
+        private const float BaseTicksPerSecond = Ticks.PerSecond * 0.5f;
+        private const string SpeedPref = "betaknight.arena.speed";
+
+        /// <summary>So lange bleibt die Bühne nach Kampfende mit «VICTORY»/«DEFEAT» stehen, bevor der Bericht kommt.</summary>
+        private const float EndHoldSeconds = 1.5f;
 
         /// <summary>Hervorhebungen bleiben mindestens so lange sichtbar (Echtzeit), auch bei 4×.</summary>
         private const float MinHighlightSeconds = 0.35f;
@@ -90,7 +96,8 @@ namespace Betaknight.Overworld.UI
         private int _mergedA = -1;
         private int _mergedB = -1;
         private CombatResult _current;
-        private int _speedIndex;
+        private int _speedIndex = 1;
+        private float _finishedAt = -1f;
         private bool _paused;
         private float _tickBuffer;
         private Vector2 _logScroll;
@@ -118,6 +125,7 @@ namespace Betaknight.Overworld.UI
         private GUIStyle _logLine;
         private GUIStyle _tooltip;
         private GUIStyle _title;
+        private GUIStyle _centerTitle;
         private GUIStyle _text;
         private GUIStyle _small;
         private GUIStyle _row;
@@ -187,6 +195,8 @@ namespace Betaknight.Overworld.UI
             _report = null;
             _paused = false;
             _tickBuffer = 0f;
+            _finishedAt = -1f;
+            _speedIndex = Mathf.Clamp(PlayerPrefs.GetInt(SpeedPref, 1), 0, Speeds.Length - 1);
             _logScroll = Vector2.zero;
             _reportScroll = Vector2.zero;
             _popups.Clear();
@@ -217,8 +227,13 @@ namespace Betaknight.Overworld.UI
             _popups.RemoveAll(p => Time.unscaledTime - p.Start > PopupSeconds);
             _pulses.RemoveAll(p => Time.unscaledTime - p.Start > p.Duration);
             _effectFlashes.RemoveAll(f => Time.unscaledTime - f.Start > FlashSeconds);
-            if (_paused || _playback.IsFinished) return;
-            _tickBuffer += Time.unscaledDeltaTime * Ticks.PerSecond * Speeds[_speedIndex] * Mathf.Max(0.01f, SpeedFactor);
+            if (_playback.IsFinished)
+            {
+                if (_finishedAt < 0f) _finishedAt = Time.unscaledTime;
+                return;
+            }
+            if (_paused) return;
+            _tickBuffer += Time.unscaledDeltaTime * BaseTicksPerSecond * Speeds[_speedIndex] * Mathf.Max(0.01f, SpeedFactor);
             int ticks = Mathf.FloorToInt(_tickBuffer);
             if (ticks <= 0) return;
             _tickBuffer -= ticks;
@@ -237,7 +252,7 @@ namespace Betaknight.Overworld.UI
                 _seenOverheat = _fx.OverheatLevel;
                 _overheatFlashUntil = now + ThermalFlashSeconds;
             }
-            float gameSeconds = BattlePlayback.RowHighlightTicks / (float)Ticks.PerSecond / (Speeds[_speedIndex] * Mathf.Max(0.01f, SpeedFactor));
+            float gameSeconds = BattlePlayback.RowHighlightTicks / BaseTicksPerSecond / (Speeds[_speedIndex] * Mathf.Max(0.01f, SpeedFactor));
             if (_playback.LastPlayerRowTick != _seenRowTick)
             {
                 _seenRowTick = _playback.LastPlayerRowTick;
@@ -257,7 +272,7 @@ namespace Betaknight.Overworld.UI
             foreach (PulseView p in _playback.Pulses)
             {
                 if (!_seenPulses.Add((p.Link, p.StartTick))) continue;
-                float seconds = (p.ArriveTick - p.StartTick) / (float)Ticks.PerSecond / speed;
+                float seconds = (p.ArriveTick - p.StartTick) / BaseTicksPerSecond / speed;
                 _pulses.Add(new ActivePulse { Link = p.Link, Fighter = PlayerFighter, Start = now, Duration = Mathf.Max(MinPulseSeconds, seconds), Power = _fx.PulsePower(p.Link, p.StartTick) });
             }
             TrackEnemyBoards(now, gameSeconds, speed);
@@ -298,12 +313,54 @@ namespace Betaknight.Overworld.UI
         private bool IsRowLit(int row) =>
             row == _playback.LastPlayerRow && (Time.unscaledTime < _rowHighlightUntil || _playback.IsRowHighlighted(row));
 
+        private void SetSpeed(int index)
+        {
+            _speedIndex = Mathf.Clamp(index, 0, Speeds.Length - 1);
+            PlayerPrefs.SetInt(SpeedPref, _speedIndex);
+        }
+
+        /// <summary>Spult bis zur nächsten eigenen Aktion (Start einer Komponente) und hält dort an.</summary>
+        private void StepToNextAction()
+        {
+            if (_playback == null || _playback.IsFinished) return;
+            int next = _playback.NextTickWhere(e => e.Kind == BattleEventKind.ActionStarted && e.Source != null
+                && e.Source.Side == Side.Player && e.Detail != SkillDefinition.BasicAttackId);
+            _playback.Advance(next > _playback.Tick ? next - _playback.Tick : 1);
+            _tickBuffer = 0f;
+            _paused = true;
+            TrackHighlights();
+        }
+
+        /// <summary>Tasten: Space Pause, 1–4 Tempo, N nächste Aktion, Punkt ein Tick weiter.</summary>
+        private void HandleKeys()
+        {
+            Event e = Event.current;
+            if (e.type != EventType.KeyDown || _playback == null || _playback.IsFinished) return;
+            switch (e.keyCode)
+            {
+                case KeyCode.Space: _paused = !_paused; break;
+                case KeyCode.Alpha1: case KeyCode.Keypad1: SetSpeed(0); break;
+                case KeyCode.Alpha2: case KeyCode.Keypad2: SetSpeed(1); break;
+                case KeyCode.Alpha3: case KeyCode.Keypad3: SetSpeed(2); break;
+                case KeyCode.Alpha4: case KeyCode.Keypad4: SetSpeed(3); break;
+                case KeyCode.N: StepToNextAction(); break;
+                case KeyCode.Period:
+                    _playback.Advance(1);
+                    _paused = true;
+                    TrackHighlights();
+                    break;
+                default: return;
+            }
+            e.Use();
+        }
+
         private void OnGUI()
         {
             UiTheme.Apply();
             if (_playback == null) return;
             EnsureStyles();
             GUI.depth = -10;
+            HandleKeys();
 
             var screen = new Rect(0, 0, Screen.width, Screen.height);
             Fill(screen, new Color(0.04f, 0.05f, 0.07f, 1f));
@@ -327,10 +384,21 @@ namespace Betaknight.Overworld.UI
                 UiTexts.Arena.Title(enemy, BattleLogText.Time(_playback.Tick), portal), _title);
             DrawThermal(new Rect(pad, 34f, Screen.width - boardWidth - pad * 3, 22f));
 
-            if (_playback.IsFinished)
+            bool holding = _playback.IsFinished && (_finishedAt < 0f || Time.unscaledTime - _finishedAt < EndHoldSeconds);
+            if (_playback.IsFinished && !holding)
             {
                 if (_report == null) _report = BattleReport.Create(_playback.Result);
                 DrawReport(stage);
+            }
+            else if (holding)
+            {
+                DrawStage(stage);
+                DrawPopups();
+                BattleResult res = _playback.Result;
+                Color banner = res.IsVictory ? UiTheme.Good : res.IsSurvived ? UiTheme.Accent : UiTheme.Bad;
+                var bannerRect = new Rect(stage.x, stage.y + stage.height * 0.35f, stage.width, 64f);
+                Fill(bannerRect, new Color(0f, 0f, 0f, 0.6f));
+                GUI.Label(bannerRect, $"<size=40><b><color={UiTheme.Hex(banner)}>{BattleLogText.OutcomeText(res.Outcome).ToUpperInvariant()}</color></b></size>", _centerTitle);
             }
             else
             {
@@ -1271,10 +1339,13 @@ namespace Betaknight.Overworld.UI
             {
                 for (int i = 0; i < Speeds.Length; i++)
                 {
-                    string label = i == _speedIndex ? $"<b>[{Speeds[i]}×]</b>" : $"{Speeds[i]}×";
-                    if (GUILayout.Button(label, _row, GUILayout.Width(60f), GUILayout.Height(32f))) _speedIndex = i;
+                    string speedText = $"{Speeds[i]:0.#}×";
+                    string label = i == _speedIndex ? $"<b>[{speedText}]</b>" : speedText;
+                    if (GUILayout.Button(new GUIContent(label, UiTexts.Arena.SpeedKeyTip(i + 1)), _row, GUILayout.Width(64f), GUILayout.Height(32f))) SetSpeed(i);
                 }
-                if (GUILayout.Button(_paused ? UiTexts.Arena.Continue : UiTexts.Arena.Pause, GUILayout.Width(90f), GUILayout.Height(32f))) _paused = !_paused;
+                if (GUILayout.Button(new GUIContent(_paused ? UiTexts.Arena.Continue : UiTexts.Arena.Pause, UiTexts.Arena.PauseKeyTip), GUILayout.Width(90f), GUILayout.Height(32f))) _paused = !_paused;
+                if (GUILayout.Button(new GUIContent(UiTexts.Arena.NextAction, UiTexts.Arena.NextActionTip), GUILayout.Width(120f), GUILayout.Height(32f))) StepToNextAction();
+                GUILayout.Label($"<color=#9aa4b2>{UiTexts.Arena.KeysHint}</color>", _row, GUILayout.ExpandWidth(false));
                 GUILayout.FlexibleSpace();
                 if (GUILayout.Button(UiTexts.Arena.Skip, GUILayout.Width(140f), GUILayout.Height(32f)))
                 {
@@ -1436,6 +1507,7 @@ namespace Betaknight.Overworld.UI
             if (_white == null) _white = Texture2D.whiteTexture;
             if (_title != null) return;
             _title = new GUIStyle(GUI.skin.label) { fontSize = 18, richText = true };
+            _centerTitle = new GUIStyle(_title) { alignment = TextAnchor.MiddleCenter };
             _text = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true };
             _small = new GUIStyle(GUI.skin.label) { fontSize = 13, richText = true, alignment = TextAnchor.UpperCenter, wordWrap = true };
             _row = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true, wordWrap = true };

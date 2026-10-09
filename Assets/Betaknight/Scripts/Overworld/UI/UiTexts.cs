@@ -587,6 +587,11 @@ namespace Betaknight.Overworld.UI
             public const string OpenBuild = "Open Build (B)";
             public const string Continue = "Continue";
             public const string Pause = "Pause";
+            public const string PauseKeyTip = "Pause / continue (Space)";
+            public const string NextAction = "Next action ▸";
+            public const string NextActionTip = "Jump to the next skill you cast and pause there (N). «.» steps one tick.";
+            public const string KeysHint = "Space pause · 1–4 speed · N next · . step";
+            public static string SpeedKeyTip(int key) => $"Playback speed (key {key}); 1× is half the game speed, remembered";
             public const string Skip = "Skip";
 
             public const string StatusBurn = "Burn";

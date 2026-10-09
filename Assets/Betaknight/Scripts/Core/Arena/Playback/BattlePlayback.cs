@@ -421,6 +421,14 @@ namespace Betaknight.Core.Arena
 
         public void SkipToEnd() => Advance(int.MaxValue / 2);
 
+        /// <summary>Tick des nächsten noch nicht abgespielten Ereignisses, auf das <paramref name="match"/> passt, sonst das Kampfende.</summary>
+        public int NextTickWhere(Func<BattleEvent, bool> match)
+        {
+            for (int i = _next; i < _result.Events.Count; i++)
+                if (match == null || match(_result.Events[i])) return _result.Events[i].Tick;
+            return _result.EndTick;
+        }
+
         private void Log(BattleEvent e, LogCategory category, bool classic = true)
         {
             string text = BattleLogText.Describe(e, _result);
@@ -540,11 +548,21 @@ namespace Betaknight.Core.Arena
                     // Nur die Warteschlange des Spielers wird gezeigt; Gegner haben auch eine, das Protokoll bliebe sonst unlesbar.
                     if (source == null || source.Info.Side != Side.Player) break;
                     string name = e.RowIndex >= 0 && e.RowIndex < _result.PlayerRowSkills.Count ? _result.PlayerRowSkills[e.RowIndex] : BattleLogText.SkillName(e.Detail);
-                    var entry = new QueueView(e.RowIndex, name, e.Tick, e.IsTriggered, e.Relay);
-                    int index = _queue.FindIndex(q => q.Row > e.RowIndex);
-                    if (index < 0) _queue.Add(entry);
-                    else _queue.Insert(index, entry);
+                    // Warteschlange in Auslöse-Reihenfolge (wer zuerst kommt, läuft zuerst); Interrupt springt vor.
+                    _queue.Add(new QueueView(e.RowIndex, name, e.Tick, e.IsTriggered, e.Relay));
                     Log(e, LogCategory.None, classic: false);
+                    break;
+
+                case BattleEventKind.QueueJump:
+                    // Interrupt: die Komponente springt in der Anzeige an die Spitze der Warteschlange.
+                    if (source == null || source.Info.Side != Side.Player) break;
+                    int jump = _queue.FindLastIndex(q => q.Row == e.RowIndex);
+                    if (jump > 0)
+                    {
+                        QueueView moved = _queue[jump];
+                        _queue.RemoveAt(jump);
+                        _queue.Insert(0, moved);
+                    }
                     break;
 
                 case BattleEventKind.ActionInterrupted:
