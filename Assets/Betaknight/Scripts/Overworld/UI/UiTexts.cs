@@ -44,6 +44,27 @@ namespace Betaknight.Overworld.UI
             public const string InventoryTip = "Gear and items";
             public const string OpenShop = "Open Shop";
             public const string NewRun = "New Run";
+            public const string NewRunTip = "Abandon this run and pick a new kit (asks first)";
+            public const string NewRunQuestion = "Start a new run?";
+            public const string NewRunWarning = "The current run is lost: board, gear, gold and progress.";
+            public const string NewRunConfirm = "Yes, new run";
+            public const string Cancel = "Cancel (Esc)";
+            public const string GoldWord = "Gold";
+            public const string ShardsWord = "Shards";
+            public static string ShardsTip(int have, int need) => $"Rune Shards {have}/{need}: every {need} shards give a rune reward.";
+            public const string HpTip = "Your HP. It carries over between fights; heal at events, shops and with skills.";
+            public static string ActTurn(int act, int turn) => $"Act {act} · Turn {turn}";
+            public const string BossTip = "Every 25 turns the boss comes to YOU, wherever you stand. Survive until the portal opens. "
+                + "The farther you stand from the centre, the stronger he is.";
+            public static string DangerHere(int tier) => $"Danger here: {tier}";
+            public const string DangerTip = "Enemy tier on this spot. It grows with the distance from the map centre and with each act. "
+                + "The boss uses the tier of the spot where he finds you.";
+            public static string Goal(int turns) => turns <= 1
+                ? "<b>Goal:</b> <color=#ff7a6b>the boss arrives with your next step.</color> Survive until the portal opens."
+                : $"<b>Goal:</b> get stronger. The boss finds you in <b>{turns}</b> turns, survive him.";
+            public static string GoalTier(int here, int centre) => $"Boss strength = danger where you stand: here {here}, centre {centre}";
+            public const string GoalTip = "Each step is a turn. Fight, loot and build up, then stand somewhere safe (near the centre) when the boss is due.";
+            public const string DebugTitle = "Debug (F3)";
             public const string UnknownDuo = "Duo ???: its effect shows in the next fight.";
 
             public static string Title(string kit, int act) => $"<b>Betaknight{kit}</b>   Act {act}";
@@ -113,6 +134,27 @@ namespace Betaknight.Overworld.UI
         {
             public const string Title = "<b>The knight has fallen</b>";
             public const string NewRun = "New Run";
+            public const string NewRunTip = "Abandon this run and pick a new kit (asks first)";
+            public const string NewRunQuestion = "Start a new run?";
+            public const string NewRunWarning = "The current run is lost: board, gear, gold and progress.";
+            public const string NewRunConfirm = "Yes, new run";
+            public const string Cancel = "Cancel (Esc)";
+            public const string GoldWord = "Gold";
+            public const string ShardsWord = "Shards";
+            public static string ShardsTip(int have, int need) => $"Rune Shards {have}/{need}: every {need} shards give a rune reward.";
+            public const string HpTip = "Your HP. It carries over between fights; heal at events, shops and with skills.";
+            public static string ActTurn(int act, int turn) => $"Act {act} · Turn {turn}";
+            public const string BossTip = "Every 25 turns the boss comes to YOU, wherever you stand. Survive until the portal opens. "
+                + "The farther you stand from the centre, the stronger he is.";
+            public static string DangerHere(int tier) => $"Danger here: {tier}";
+            public const string DangerTip = "Enemy tier on this spot. It grows with the distance from the map centre and with each act. "
+                + "The boss uses the tier of the spot where he finds you.";
+            public static string Goal(int turns) => turns <= 1
+                ? "<b>Goal:</b> <color=#ff7a6b>the boss arrives with your next step.</color> Survive until the portal opens."
+                : $"<b>Goal:</b> get stronger. The boss finds you in <b>{turns}</b> turns, survive him.";
+            public static string GoalTier(int here, int centre) => $"Boss strength = danger where you stand: here {here}, centre {centre}";
+            public const string GoalTip = "Each step is a turn. Fight, loot and build up, then stand somewhere safe (near the centre) when the boss is due.";
+            public const string DebugTitle = "Debug (F3)";
 
             public static string Summary(int act, int turn, string boardSize, int relays, int gold) =>
                 $"Act {act}, Turn {turn}, board {boardSize} with {relays} relays, {gold} Gold";

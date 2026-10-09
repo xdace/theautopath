@@ -82,9 +82,9 @@ namespace Betaknight.Overworld.UI
             _drag.Enabled = _session.CanChangeLoadout;
             if (Event.current.type == EventType.Repaint) _hoverNext = null;
 
-            float width = Mathf.Min(Screen.width - 24f, 1180f);
-            float height = Mathf.Min(Screen.height - 24f, 880f);
-            var area = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+            Rect area = OverworldHud.BelowTopBar(1180f, 880f);
+            float width = area.width;
+            float height = area.height;
             GUILayout.BeginArea(area, GUI.skin.box);
 
             DrawHeader();
