@@ -304,12 +304,14 @@ namespace Betaknight.Overworld.UI
         private static RowDisplay StateOf(LogicRow row, int index, Live live)
         {
             if (row.IsOrphaned) return RowDisplay.Orphaned;
-            if (!row.IsPowered) return row.TooLargeFor.Count > 0 ? RowDisplay.TooLarge : RowDisplay.Unpowered;
-            if (live == null) return RowDisplay.Idle;
+            if (!row.IsPowered && row.TooLargeFor.Count == 0) return RowDisplay.Unpowered;
+            // Zu gross: lädt auf, läuft aber wie jede Komponente, sobald die Ladung reicht.
+            RowDisplay rest = row.IsPowered ? RowDisplay.Idle : RowDisplay.TooLarge;
+            if (live == null) return rest;
             if (live.View != null && live.View.Alive && live.View.ActionSkill != null && live.View.ActionRow == index) return RowDisplay.Firing;
             if (live.Watch.FrozenLeft(index) > 0) return RowDisplay.Frozen;
             if (live.Watch.IsQueued(index)) return RowDisplay.Queued;
-            return RowDisplay.Idle;
+            return rest;
         }
 
         /// <summary>Gehört die Beute zu diesem Teil? Skill nach Id, Modul nach Namen am Skill.</summary>

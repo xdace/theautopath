@@ -213,14 +213,14 @@ namespace Betaknight.Core.Arena
         public const string QueueRule = "Triggered components wait their turn in reading order (top left first). The Basic Attack fills the gaps.";
         public const string FallbackLabel = "fills the gaps";
         public const string NotPowered = "not powered";
-        public const string NotPoweredTooLarge = "not powered (too large)";
+        public const string NotPoweredTooLarge = "charging (too large)";
         public const string CoreName = "Core";
         public static string CoreBonus(int percent) => $"Touching components +{percent} % effect";
         public static string ComponentName(int index, string skill) => $"#{index + 1} {skill}";
         public static string RelayName(int index, string label) => $"Relay {index + 1} ({label})";
 
         public const string MissAlreadyQueued = "already queued";
-        public const string MissTooLarge = "too large for the relay";
+        public const string MissTooLarge = "charging (too large for the relay)";
         public const string MissFrozen = "frozen";
         public const string MissOrphaned = "no skill";
 

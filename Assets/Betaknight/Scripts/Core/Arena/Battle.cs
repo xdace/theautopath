@@ -495,7 +495,8 @@ namespace Betaknight.Core.Arena
             Emit(new BattleEvent(Tick, BattleEventKind.RelayTriggered, c, target, i, relay.Label) { Extra = relay.Powered.Count, Relay = i });
             if (relay.OncePerFight) Emit(new BattleEvent(Tick, BattleEventKind.FuseBlown, c, null, i, relay.Label) { Extra = relay.ChipIndex, Relay = i });
             foreach (int row in relay.Powered) Enqueue(c, row, i, ActionCause.Board, -1, relay.Difficulty, relay.MaxCells, target);
-            foreach (int row in relay.TooLarge) Missed(c, row, i, MissReason.TooLarge);
+            // Zu grosse Komponenten laden auf und laufen, sobald die Ladung ihre Grösse erreicht (siehe Enqueue).
+            foreach (int row in relay.TooLarge) Enqueue(c, row, i, ActionCause.Board, -1, relay.Difficulty, relay.MaxCells, target);
             FireEdges(c, GraphNode.Block(i), relay.Difficulty, i, relay.MaxCells);
             foreach (LogicChip chip in c.Board.Chips)
                 if (chip.Kind == ChipKind.Capacitor && chip.ReleaseList.Contains(i)) ReleaseCapacitor(c, chip.Index);
@@ -660,6 +661,9 @@ namespace Betaknight.Core.Arena
             public readonly int[] FlippedUntil;
             public readonly int[] JamLeft;
             public readonly Dictionary<int, Combatant> Hijacked = new Dictionary<int, Combatant>();
+
+            // Ladung zu grosser Komponenten je (Komponente, Relais): jedes Auslösen bringt die Feld-Grenze des Relais.
+            public readonly Dictionary<(int Row, int Relay), int> Charge = new Dictionary<(int Row, int Relay), int>();
             public int Firewall;
             public int LastComponentTick;
 
@@ -748,7 +752,7 @@ namespace Betaknight.Core.Arena
                 Missed(c, row, relay, MissReason.Orphaned);
                 return;
             }
-            if (r.Cells > maxCells)
+            if (r.Cells > maxCells && !ChargeUp(c, row, relay, maxCells))
             {
                 Missed(c, row, relay, MissReason.TooLarge);
                 return;
@@ -807,6 +811,24 @@ namespace Betaknight.Core.Arena
                 { Cause = cause, CauseRow = causeRow, Tier = tier, Relay = relay, Power = power, Depth = depth });
             if (r.Has(CircuitEffectIds.Interrupt) && c.QueueList.Count > 1)
                 Emit(new BattleEvent(Tick, BattleEventKind.QueueJump, c, null, c.QueueList.Count - 1, r.Skill.Id, row) { Relay = relay });
+        }
+
+        /// <summary>
+        /// Zu grosse Komponente: jedes Auslösen lädt sie um die Feld-Grenze des Relais auf. Erreicht die Ladung ihre Grösse,
+        /// läuft sie (true) und die Grösse wird abgezogen; der Rest bleibt für das nächste Auslösen. Jeder Kampf startet bei 0.
+        /// Beispiel: Grenze 2, Grösse 4 → läuft bei jedem 2. Auslösen.
+        /// </summary>
+        private bool ChargeUp(Combatant c, int row, int relay, int maxCells)
+        {
+            if (maxCells <= 0) return false;
+            Dictionary<(int Row, int Relay), int> charge = _fx[c].Charge;
+            charge.TryGetValue((row, relay), out int stored);
+            stored = (int)Math.Min(int.MaxValue, (long)stored + maxCells);
+            int cells = c.Board.Rows[row].Cells;
+            bool ready = stored >= cells;
+            if (ready) stored -= cells;
+            charge[(row, relay)] = stored;
+            return ready;
         }
 
         /// <summary>Overflow (A-21): Schock an alle Gegner, Schaden nach Grösse der Komponente (Grössen-Wucht × Anteil).</summary>

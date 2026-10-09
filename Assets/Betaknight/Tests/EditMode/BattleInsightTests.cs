@@ -50,15 +50,17 @@ namespace Betaknight.Tests.EditMode
             Assert.Greater(stab.Fired, 0);
             Assert.AreEqual(stab.Queued, stab.Triggered, "der Schockstich verpasst nichts");
 
-            // Der Rüstungsbrecher berührt das Relais, ist aber zu gross: jedes Auslösen ist ein «Missed Trigger».
+            // Der Rüstungsbrecher (4 Zellen) berührt das Relais (Grenze 2), ist aber zu gross: jedes Auslösen lädt ihn um 2 auf,
+            // jedes 2. lässt ihn laufen. Die übrigen sind «Missed Trigger» mit dem Grund «charging».
             Assert.IsFalse(breaker.IsPowered);
             Assert.IsTrue(breaker.IsTooLargeSomewhere);
-            Assert.AreEqual(0, breaker.Fired);
-            Assert.AreEqual(report.RelayTriggers, breaker.MissCount(MissReason.TooLarge));
-            Assert.AreEqual(MissReason.TooLarge, breaker.MainMissReason);
+            Assert.AreEqual(2, board.Relays[0].MaxCells);
+            Assert.GreaterOrEqual(report.RelayTriggers, 2);
+            Assert.Greater(breaker.Fired, 0);
+            Assert.AreEqual(report.RelayTriggers - report.RelayTriggers / 2, breaker.MissCount(MissReason.TooLarge));
             Assert.IsTrue(report.HasMissedTriggers);
-            Assert.AreEqual("too large for the relay", RowStateText.Reason(MissReason.TooLarge));
-            CollectionAssert.Contains(report.Hints, "#2 Armor Break never fired: too large for every touching relay.");
+            Assert.AreEqual("charging (too large for the relay)", RowStateText.Reason(MissReason.TooLarge));
+            CollectionAssert.DoesNotContain(report.Hints, "#2 Armor Break never fired: too large for every touching relay.");
 
             // Die Schubdüsen berührt kein Relais: nie ausgelöst, kein Missed Trigger.
             Assert.IsFalse(thrusters.IsPowered);
@@ -215,13 +217,14 @@ namespace Betaknight.Tests.EditMode
         /// Mit A-20 erneut: Relais und Gatter melden «an/aus» (neue Ereignisse), Pins verbinden berührende Komponenten mit Pulsen.
         /// Mit A-21 erneut: Thermal Throttling ab 30 s statt Überhitzungsschaden, Gegner mit Hacks.
         /// Mit Gegner-Platinen erneut: Gegner tragen Skills, Module und Chips (fest je Feld), nach dem Sieg wird geborgen (ersetzt Zufalls-Skills, -Module und -Chips aus Kämpfen).
+        /// Zu grosse Komponenten laden auf und laufen, sobald die Ladung ihre Grösse erreicht: Seed 21 des Funkenritters erneut aufgenommen.
         /// </summary>
         [TestCase("blade", 5, "4 Kämpfe, 425 Ereignisse, 791A1C878E6E19BF")]
         [TestCase("blade", 21, "2 Kämpfe, 220 Ereignisse, 05E7CAB027B90EED")]
         [TestCase("shield", 5, "4 Kämpfe, 549 Ereignisse, 5EF1F902E41D3BA8")]
         [TestCase("shield", 21, "2 Kämpfe, 304 Ereignisse, 7BD2D0BED604DF0A")]
         [TestCase("spark", 5, "3 Kämpfe, 375 Ereignisse, 88CB409ED14CA2F6")]
-        [TestCase("spark", 21, "2 Kämpfe, 283 Ereignisse, 8258D2EDF7A6B0E6")]
+        [TestCase("spark", 21, "2 Kämpfe, 257 Ereignisse, A00BEEDCC87FA9AF")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {
             Assert.AreEqual(fingerprint, Fingerprint(BotBattles(KnightKit.Defaults.Single(k => k.Id == kit), seed)));
@@ -320,7 +323,7 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(p.IsRelayLit(0));
             Assert.AreEqual(1, p.RelayCount(0));
             Assert.AreEqual(RowDisplay.Firing, p.RowStateAt(0), "der Schockstich startet im selben Tick");
-            StringAssert.Contains("too large for the relay", p.LastSkipReason(1));
+            StringAssert.Contains("charging (too large for the relay)", p.LastSkipReason(1));
             Assert.IsNull(p.LastSkipReason(0), "der Schockstich hat nichts verpasst");
             Assert.IsNull(p.LastSkipReason(3), "der Basisangriff wird nie ausgelöst");
 

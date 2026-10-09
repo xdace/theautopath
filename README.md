@@ -79,7 +79,7 @@ Combat is programmed on a **circuit board**, a grid instead of a list of rows. F
 
 #### Size limit by difficulty
 
-The harder a relay's condition is to meet, the larger the components it can power and the stronger they get. A component larger than the limit of every relay touching it is **not powered (too large)** and never fires. Values are data in `Arena/Difficulty.cs` (`DifficultyBonusConfig.Default`).
+The harder a relay's condition is to meet, the larger the components it can power and the stronger they get. A component larger than the limit of a touching relay is **charging (too large)**: each trigger of that relay adds the relay's limit as charge, and the component runs once the charge reaches its size; the rest carries over. Example: a relay with limit 2 cells and a 4-cell component runs it on every 2nd trigger. Charge starts at 0 in every fight (`Battle.ChargeUp`). Values are data in `Arena/Difficulty.cs` (`DifficultyBonusConfig.Default`).
 
 | Difficulty | Symbol | Example relays | Max component size | Bonus on powered components |
 |---|---|---|---|---|
@@ -115,7 +115,7 @@ Modules sit on relays and components. Blood Toll now costs HP per cast and gives
 
 #### Build window and arena
 
-- **Build:** The board with drag & drop and right-click rotation; skill, chip and module inventories next to it. Every component shows its size, cast time, effect, the relay powering it and "not powered (too large)" when it does not fit.
+- **Build:** The board with drag & drop and right-click rotation; skill, chip and module inventories next to it. Every component shows its size, cast time, effect, the relay powering it and "charging (too large)" when it is larger than the relay's limit.
 - **Arena:** Relays light up when they trigger, the queue is shown in reading order, the firing component is highlighted, frozen and unpowered components are marked. The report after the fight lists every component: fired, triggered, queued with average wait, missed with the main reason, damage and share.
 
 ### Pins, Traces and Logic Chips (A-20)
@@ -125,7 +125,7 @@ Components now talk to each other. When a component fires, it sends **pulses** a
 - **Pins** sit on component edges and are data per skill (`Core/Circuit/Pins.cs`, `PinCatalog.CreateDefault`). Two components are **connected** when two pins touch: neighbouring cells, pins facing each other. Pins turn with the component (90° clockwise).
 - **Typed pins** ("Shock pin", "Fire pin" …) ask for a skill kind. With a matching neighbour on that pin the component gets **+15 % effect** per matched pin (`PinConfig`). Shown as a coloured notch, lit when matched.
 - **Traces** connect distant pins: Straight, Corner, T and Cross (1×1 chips, right click rotates). A **Diode** lets pulses pass one way only (in → out, arrow on the chip).
-- **Pulses** travel **one connection per tick** (every trace piece and the final pin each count as one). When a pulse arrives, the target component is queued and casts normally with its cast time. It counts as **powered by the original relay**: that relay's size limit and bonus tier apply, bonuses never stack. Too large for the original relay → missed (too large). Circles are allowed; they are limited by cast times only. If several paths lead to the same target, the shortest one counts.
+- **Pulses** travel **one connection per tick** (every trace piece and the final pin each count as one). When a pulse arrives, the target component is queued and casts normally with its cast time. It counts as **powered by the original relay**: that relay's size limit and bonus tier apply, bonuses never stack. Too large for the original relay → it charges up like a direct trigger and runs once the charge reaches its size. Circles are allowed; they are limited by cast times only. If several paths lead to the same target, the shortest one counts.
 - **Gates** are 1×1 chips that read the relays they touch (reading order) and **power the components they touch** like a relay:
 
 | Chip | Triggers when | Difficulty |
@@ -377,7 +377,7 @@ Module wirken, solange sie an irgendeinem Baustein sitzen. Eine «Barriere» gib
 
 Die Arena zeigt die eigene Platine live und erklärt, *warum* eine Komponente feuert oder wartet.
 
-- **Platine live:** Relais leuchten auf, wenn sie auslösen, und zählen mit, wie oft. Komponenten tragen ihren Farbstreifen und einen Zustand: feuert (hervorgehoben), eingereiht, eingefroren (mit Restzeit), «not powered (too large)», «not powered», ohne Skill. Der Tooltip nennt die versorgenden Relais und den letzten verpassten Auslöser.
+- **Platine live:** Relais leuchten auf, wenn sie auslösen, und zählen mit, wie oft. Komponenten tragen ihren Farbstreifen und einen Zustand: feuert (hervorgehoben), eingereiht, eingefroren (mit Restzeit), «charging (too large)», «not powered», ohne Skill. Der Tooltip nennt die versorgenden Relais und den letzten verpassten Auslöser.
 - **Warteschlange:** Unter der Platine steht, was wartet, in Lesereihenfolge (#n), mit der Regel als Tooltip (`QueueConfig.RuleText`). Darunter eine Legende der Zustände und die Basisangriff-Zeile («fills the gaps»).
 - **Gegner-Platine:** Maus über dem Gegner zeigt seine Platine (`EnemyBoard.Lines`), ebenso auf der Karte über Gegner-, Elite- und Bossfeldern (mögliche Gegner des Feldes).
 - **Missed Trigger:** Ein Auslösen, das die Komponente nicht einreihen konnte, steht im Protokoll mit Grund: schon eingereiht, zu gross, eingefroren, ohne Skill.
@@ -430,7 +430,7 @@ Shops frühestens ab Ring 3 und höchstens 2, Truhen höchstens 6, Goldminen hö
 | Basic Attack | Weapon attack that fills every gap |
 | Cast Time | Wind-up before a skill hits. Floor 0.1 s |
 | Recovery | Short pause after a skill |
-| Not powered (too large) | The component is bigger than the size limit of every relay touching it |
+| Charging (too large) | The component is bigger than the size limit of a touching relay. Each trigger charges it by that limit; it runs once the charge reaches its size |
 | Haste / Slow | Lower / higher Cast Time for a while. The Haste tag also lowers Cast Time, Haste stacks raise attack speed |
 | Freeze | Stops the target's largest powered component for a few seconds |
 | Queue / Queued | Triggered components wait in the queue in reading order, at most once each |
@@ -630,7 +630,7 @@ Seit A-18 sind alle Spieltexte Englisch. Texte stehen pro Bereich an einem Ort: 
 | Deutsch | Englisch |
 |---|---|
 | Platine, Relais, Komponente, Kern | Circuit Board, Relay, Component, Core |
-| nicht versorgt (zu gross) | not powered (too large) |
+| lädt auf (zu gross) | charging (too large) |
 | Pin, typisierter Pin, Leiterbahn, Puls | Pin, Typed Pin, Trace, Pulse |
 | UND-/ODER-/NICHT-Gatter, Kondensator, Sicherung, Diode | AND/OR/NOT Gate, Capacitor, Fuse, Diode |
 | Rune / Logikbaustein / Baustein | Rune (in Hinweisen zur Schwierigkeit auch "block") |

@@ -356,17 +356,20 @@ namespace Betaknight.Core.Arena
         public RowDisplay RowStateAt(int row)
         {
             LogicBoard board = _result.PlayerBoard;
+            bool charging = false;
             if (board != null && row >= 0 && row < board.Rows.Count)
             {
                 LogicRow r = board.Rows[row];
                 if (r.IsOrphaned) return RowDisplay.Orphaned;
-                if (!r.IsPowered) return r.TooLargeFor.Count > 0 ? RowDisplay.TooLarge : RowDisplay.Unpowered;
+                if (!r.IsPowered && r.TooLargeFor.Count == 0) return RowDisplay.Unpowered;
+                // Zu gross: lädt auf, läuft aber wie jede Komponente, sobald die Ladung reicht.
+                charging = !r.IsPowered;
             }
             FighterView player = Player;
             if (player != null && player.ActionSkill != null && player.ActionRow == row) return RowDisplay.Firing;
             if (FrozenLeft(row) > 0) return RowDisplay.Frozen;
             if (IsRowQueued(row)) return RowDisplay.Queued;
-            return RowDisplay.Idle;
+            return charging ? RowDisplay.TooLarge : RowDisplay.Idle;
         }
 
         /// <summary>Restdauer eines Freeze auf einer Komponente des Spielers in Ticks.</summary>

@@ -186,16 +186,39 @@ namespace Betaknight.Tests.EditMode
             Assert.Greater(Starts(r, SkillIds.BasicAttack).Count, 0, "der Basisangriff füllt die Lücken");
         }
 
-        [Test]
-        public void ATooLargeComponentNeverFiresAndCountsAsMissed()
+        [TestCase(SkillIds.ArmorBreak, 4)]
+        [TestCase(SkillIds.RailCannon, 6)]
+        public void ATooLargeComponentChargesUpAndRunsOnceTheChargeReachesItsSize(string skillId, int cells)
         {
-            // «Battle Start» ist ohne Raute: Grenze 1 Zelle, der 2×2 ist zu gross.
+            // «Clock 2 s» ist ohne Raute: Grenze 1 Zelle. Jedes Auslösen lädt die zu grosse Komponente um 1 auf,
+            // beim 4. (2×2) bzw. 6. Auslösen (2×3) läuft sie, danach beginnt die Ladung neu.
+            LogicBoard board = Compile(Spec(new[] { Relay("clock", 0, 0) }, new[] { Part(skillId, 1, 0) }));
+            Assert.AreEqual(1, board.Relays[0].MaxCells);
+            Assert.AreEqual(cells, board.Rows[0].Cells);
+            CollectionAssert.Contains(board.Rows[0].TooLargeFor, board.Relays[0]);
+
+            BattleResult r = Fight(board, seconds: 30);
+            int triggers = RelayTriggers(r);
+            Assert.GreaterOrEqual(triggers, 2 * cells);
+            List<BattleEvent> own = Own(r).Where(e => e.RowIndex == 0 && e.Relay == 0).ToList();
+            int queued = own.Count(e => e.Kind == BattleEventKind.RowQueued);
+            int charging = own.Count(e => e.Kind == BattleEventKind.TriggerMissed && e.Amount == (int)MissReason.TooLarge);
+            int busy = own.Count(e => e.Kind == BattleEventKind.TriggerMissed && e.Amount == (int)MissReason.AlreadyQueued);
+            Assert.AreEqual(triggers / cells, queued + busy, "jedes {0}. Auslösen läuft", cells);
+            Assert.AreEqual(triggers - triggers / cells, charging, "die anderen laden nur auf");
+            Assert.IsNotEmpty(Starts(r, skillId));
+        }
+
+        [Test]
+        public void ATooLargeComponentThatCannotChargeUpNeverFiresAndCountsAsMissed()
+        {
+            // «Battle Start» ist ohne Raute: Grenze 1 Zelle, der 2×2 ist zu gross. Es löst nur einmal aus: 1 von 4 Ladung.
             LogicBoard board = Compile(Spec(new[] { Relay("battle_start", 0, 0) }, new[] { Part(SkillIds.ArmorBreak, 1, 0) }));
             BattleResult r = Fight(board);
             Assert.IsEmpty(Starts(r, SkillIds.ArmorBreak));
             BattleEvent missed = Own(r).Single(e => e.Kind == BattleEventKind.TriggerMissed);
             Assert.AreEqual((int)MissReason.TooLarge, missed.Amount);
-            Assert.AreEqual(ArenaTexts.NotPoweredTooLarge, "not powered (too large)");
+            Assert.AreEqual(ArenaTexts.NotPoweredTooLarge, "charging (too large)");
         }
 
         [Test]

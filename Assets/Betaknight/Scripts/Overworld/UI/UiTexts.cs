@@ -17,7 +17,7 @@ namespace Betaknight.Overworld.UI
         public const string FallbackLine = BasicAttack + " fills the gaps when nothing is queued";
         public const string SwapRelayHint = "… or swap the rune of a relay (the old rune goes to the inventory with its level; position and modules stay):";
         public const string NotPowered = "not powered";
-        public const string NotPoweredTooLarge = "not powered (too large)";
+        public const string NotPoweredTooLarge = "charging (too large)";
         public const string Powered = "powered";
 
         public static string OnBoard(int number) => $"#{number} on board";
@@ -382,7 +382,7 @@ namespace Betaknight.Overworld.UI
             public static string CoreBonus(int percent) => $"Core +{percent} %";
             public static string PoweredBy(string relays) => $"powered by {relays}";
             public static string TooLargeTip(int cells, int limit) =>
-                $"{Cells(cells)}, but the touching relays power only up to {Cells(limit)}. Use a harder relay (◆ 2 cells, ◆◆ 4, ◆◆◆ 6) or a smaller skill.";
+                $"{Cells(cells)}, but the touching relays power only up to {Cells(limit)}. Each trigger charges it by the relay's limit; it runs once the charge reaches its size. A harder relay (◆ 2 cells, ◆◆ 4, ◆◆◆ 6) runs it every time.";
             public static string Powers(string components) => $"powers {components}";
             public static string TooLargeHere(string components) => $"too large here: {components}";
             public static string RelayLimit(int cells) => $"powers up to {Cells(cells)}";
@@ -529,14 +529,14 @@ namespace Betaknight.Overworld.UI
             public const string StateFiring = "firing";
             public const string StateFrozen = "frozen";
             public const string StateUnpowered = "not powered";
-            public const string StateTooLarge = "too large";
+            public const string StateTooLarge = "charging";
             public const string StateOrphaned = "no skill";
 
             public const string NowIdle = "waiting for its relay to trigger";
             public const string NowQueued = "queued, waiting for its turn (reading order)";
             public const string NowFiring = "firing";
             public const string NowUnpowered = "not powered: no relay touches it, it never fires";
-            public const string NowTooLarge = "not powered (too large): every touching relay is too easy for its size";
+            public const string NowTooLarge = "charging (too large): each trigger adds the relay's limit, it runs once the charge reaches its size";
             public const string NowOrphaned = "no skill";
 
             public const string ReportTitle = "<b>Report</b>";
