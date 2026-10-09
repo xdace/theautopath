@@ -143,11 +143,15 @@ namespace Betaknight.Core
             /// <summary>Vom Relais («wenn ausgelöst») statt vom Skill («nach Ausführung»).</summary>
             public readonly bool FromBlock;
 
-            public TriggerLink(int from, int to, bool fromBlock)
+            /// <summary>Charge Link (lädt das Ziel auf) statt Trigger (reiht es ein).</summary>
+            public readonly bool Charges;
+
+            public TriggerLink(int from, int to, bool fromBlock, bool charges = false)
             {
                 From = from;
                 To = to;
                 FromBlock = fromBlock;
+                Charges = charges;
             }
         }
 
@@ -169,7 +173,7 @@ namespace Betaknight.Core
         {
             if (!ModuleRules.IsTargeted(m.ModuleId)) return;
             int to = CircuitBoardSpec.TargetComponent(Board, m.Target);
-            if (to >= 0) links.Add(new TriggerLink(from, to, fromBlock));
+            if (to >= 0) links.Add(new TriggerLink(from, to, fromBlock, m.ModuleId == ModuleIds.ChargeLink));
         }
 
         // ------------------------------------------------------------------ Erhalt

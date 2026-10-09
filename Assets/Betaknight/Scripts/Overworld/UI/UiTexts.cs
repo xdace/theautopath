@@ -347,7 +347,10 @@ namespace Betaknight.Overworld.UI
             public const string PowersNothing = "powers nothing yet – place a component next to it (edge, not corner)";
             public const string NotPoweredTip = "No relay touches this component at an edge, so it never fires. Put a relay next to it.";
             public const string EvolvesTip = "Evolves after the next boss";
-            public const string TriggerClick = "\nClick: choose next target";
+            public const string TriggerClick = "\nClick, then click a component on the board: link it as the target (Esc cancels)";
+            public const string LinkClick = "click, then click a component on the board to link it";
+            public static string LinkingHint(string module, string where) =>
+                $"Linking {module} ({where}): click the component it should trigger or charge · Esc cancels";
             public const string FreeRuneModuleSlot = "Free module slot on the relay: drag a relay module here";
             public const string FreeSkillModuleSlot = "Free module slot on the component: drag a skill module here";
             public const string ModulesAndRunes = "Modules and Chips";
@@ -389,6 +392,7 @@ namespace Betaknight.Overworld.UI
             public static string RelayLimit(int cells) => $"powers up to {Cells(cells)}";
             public static string MaxCells(int cells) => $"≤{cells}";
             public static string TriggersTo(int number) => $"↪#{number}";
+            public static string ChargesTo(int number) => $"⚡#{number}";
             public static string Evolution(string name) => $"<b>Evolution {name}</b>";
             public static string Duo(string name, string effect) => $"<b>Duo {name}</b>: {effect}";
             public static string GrowsNow(string rule, string effect, string milestone) =>

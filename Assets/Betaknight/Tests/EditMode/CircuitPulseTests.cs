@@ -253,7 +253,9 @@ namespace Betaknight.Tests.EditMode
 
             BattleResult r = Fight(board);
             LogicRelay clock = board.Relays.Single(x => x.RuneId == "clock");
-            Assert.AreEqual(1 + Fires(r, clock), Fires(r, or), "einmal «HP Full», dann jeder Takt");
+            LogicRelay full = board.Relays.Single(x => x.RuneId == "hp_full");
+            Assert.Greater(Fires(r, or), Fires(r, clock), "«HP Full» und jeder Takt");
+            Assert.LessOrEqual(Fires(r, or), Fires(r, clock) + Fires(r, full));
         }
 
         [Test]

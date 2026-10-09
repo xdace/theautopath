@@ -263,13 +263,16 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void AStateRelayTriggersOnlyOnTheRisingEdge()
+        public void AStateRelayTriggersWhenItTurnsOnAndThenEveryTwoSeconds()
         {
-            // «HP Full» bleibt den ganzen Kampf wahr (der Gegner trifft nie): genau ein Auslösen.
+            // «HP Full» bleibt den ganzen Kampf wahr (der Gegner trifft nie): Auslösen zu Beginn, danach alle 2 s erneut.
             LogicBoard board = Compile(Spec(new[] { Relay("hp_full", 0, 0) }, new[] { Part(SkillIds.ShockStab, 1, 0) }));
-            BattleResult r = Fight(board);
-            Assert.AreEqual(1, RelayTriggers(r));
-            Assert.AreEqual(1, Starts(r, SkillIds.ShockStab).Count);
+            Assert.AreEqual(Ticks.FromSeconds(Betaknight.Core.Runes.RuneDefinition.DefaultStatePulseSeconds), board.Relays[0].PulseTicks);
+            BattleResult r = Fight(board, seconds: 7);
+            List<int> ticks = Own(r).Where(e => e.Kind == BattleEventKind.RelayTriggered).Select(e => e.Tick).ToList();
+            Assert.GreaterOrEqual(ticks.Count, 3);
+            for (int i = 1; i < ticks.Count; i++) Assert.AreEqual(Ticks.FromSeconds(2), ticks[i] - ticks[i - 1]);
+            Assert.AreEqual(ticks.Count, Starts(r, SkillIds.ShockStab).Count);
         }
 
         [Test]
@@ -278,7 +281,7 @@ namespace Betaknight.Tests.EditMode
             LogicBoard board = Compile(Spec(new[] { Relay("hp_full", 0, 0, new ModuleSpec(ModuleIds.RepeatWhileTrue)) },
                 new[] { Part(SkillIds.ShockStab, 1, 0) }));
             BattleResult r = Fight(board, seconds: 5);
-            Assert.AreEqual(1, RelayTriggers(r), "das Relais löst nur einmal aus");
+            Assert.Greater(Starts(r, SkillIds.ShockStab).Count, 2 * RelayTriggers(r), "deutlich öfter als das Relais pulst (alle 2 s)");
             Assert.Greater(Starts(r, SkillIds.ShockStab).Count, 5, "die Komponente läuft weiter, solange die Bedingung gilt");
         }
 
@@ -311,7 +314,7 @@ namespace Betaknight.Tests.EditMode
                 new[] { Part(SkillIds.Thrusters, 0, 1), Part(SkillIds.ShockStab, 1, 0) }));
             BattleResult r = Fight(board, seconds: 3);
             List<string> started = Own(r).Where(e => e.Kind == BattleEventKind.ActionStarted && e.Detail != SkillIds.BasicAttack)
-                .Select(e => e.Detail).ToList();
+                .Select(e => e.Detail).Take(2).ToList();
             CollectionAssert.AreEqual(new[] { SkillIds.ShockStab, SkillIds.Thrusters }, started);
             Assert.AreEqual(0, board.Rows.Single(x => x.Skill.Id == SkillIds.ShockStab).Index);
         }

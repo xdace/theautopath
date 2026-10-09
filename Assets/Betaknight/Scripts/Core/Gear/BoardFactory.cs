@@ -184,7 +184,7 @@ namespace Betaknight.Core.Gear
             return new LogicRelay(condition, label, difficulty, Bonus.MaxCells(difficulty), rect, repeat, rune.Id,
                 rune.DifficultyFor(!IsInverted(spec.Modules)))
             {
-                PulseTicks = Ticks.FromSeconds(rune.PulseSeconds),
+                PulseTicks = Ticks.FromSeconds(rune.EffectivePulseSeconds),
             };
         }
 

@@ -75,10 +75,11 @@ namespace Betaknight.Tests.EditMode
         {
             // «HP Full» (◆, 2 Ladung): der Schockstich braucht 1 und läuft, der Rüstungsbrecher (4) bekommt den Rest 1 und lädt.
             LogicBoard board = Board(Relay("hp_full", 1, 0), Part(SkillIds.ShockStab, 0, 0), Part(SkillIds.ArmorBreak, 2, 0));
-            BattleResult r = Fight(board);
-            Assert.AreEqual(1, Queued(r, Row(board, SkillIds.ShockStab)).Count);
-            Assert.IsEmpty(Queued(r, Row(board, SkillIds.ArmorBreak)));
-            Assert.AreEqual(1, Charging(r, Row(board, SkillIds.ArmorBreak)));
+            BattleResult r = Fight(board, seconds: 1);
+            // Nur das erste Auslösen (Tick 1) zählt, danach pulst «HP Full» alle 2 s.
+            Assert.AreEqual(1, Queued(r, Row(board, SkillIds.ShockStab)).Count(e => e.Tick == 1));
+            Assert.IsFalse(Queued(r, Row(board, SkillIds.ArmorBreak)).Any(e => e.Tick == 1));
+            Assert.AreEqual(1, Charging(r, Row(board, SkillIds.ArmorBreak)) - Charging(r, Row(board, SkillIds.ArmorBreak), after: 1));
         }
 
         [Test]
@@ -109,8 +110,9 @@ namespace Betaknight.Tests.EditMode
         {
             // «HP Full» (2 Ladung), zwei Ignite (je 2 Zellen): genau einer läuft, der andere lädt nicht (kein Rest).
             LogicBoard board = Board(Relay("hp_full", 1, 0), Part(SkillIds.Ignite, 0, 0), Part(SkillIds.Ignite, 2, 0));
-            BattleResult r = Fight(board);
-            int a = Queued(r, Row(board, SkillIds.Ignite)).Count, b = Queued(r, Row(board, SkillIds.Ignite, 1)).Count;
+            BattleResult r = Fight(board, seconds: 1);
+            // Nur das erste Auslösen zählt (danach pulst «HP Full» alle 2 s).
+            int a = Queued(r, Row(board, SkillIds.Ignite)).Count(e => e.Tick == 1), b = Queued(r, Row(board, SkillIds.Ignite, 1)).Count(e => e.Tick == 1);
             Assert.AreEqual(1, a + b);
         }
 

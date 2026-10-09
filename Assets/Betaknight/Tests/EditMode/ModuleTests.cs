@@ -240,6 +240,7 @@ namespace Betaknight.Tests.EditMode
             Assert.IsFalse(factory.CreateRelay(new RelaySpec("hp_full", new Cell(0, 0)), null).RepeatWhileTrue);
 
             // «HP Full» gilt, bis der Gegner trifft (nach 3 s): solange läuft die Komponente immer wieder, danach nicht mehr.
+            // Ohne Modul pulst das Relais alle 2 s (zu Beginn und bei 2 s), mit Modul läuft sie dazwischen ständig weiter.
             int Stabs(bool withModule, out int firstHit)
             {
                 LogicBoard board = factory.Create(Circuit(new[] { new RelaySpec("hp_full", new Cell(0, 0), modules: withModule ? modules : null) },
@@ -247,13 +248,14 @@ namespace Betaknight.Tests.EditMode
                 BattleResult r = Run(Duel(Fighter("A", 1000, 0, 20, board: board), Fighter("B", 100000, 1, Ticks.FromSeconds(3))), 8);
                 firstHit = r.Events.First(e => e.Kind == BattleEventKind.Damage && e.Target?.Name == "A").Tick;
                 int hit = firstHit;
-                Assert.AreEqual(1, r.Events.Count(e => e.Kind == BattleEventKind.RelayTriggered && e.Source?.Name == "A"), "das Relais löst einmal aus");
+                Assert.That(r.Events.Count(e => e.Kind == BattleEventKind.RelayTriggered && e.Source?.Name == "A"), Is.InRange(1, 2), "zu Beginn (und nach 2 s)");
                 Assert.IsFalse(r.Events.Any(e => e.Kind == BattleEventKind.RowQueued && e.Source?.Name == "A" && e.Tick > hit),
                     "nach dem Ende des Zustands keine Wiederholung mehr");
                 return Starts(r, SkillIds.ShockStab).Count;
             }
-            Assert.AreEqual(1, Stabs(false, out _));
-            Assert.Greater(Stabs(true, out int until), 1);
+            int plain = Stabs(false, out _);
+            Assert.That(plain, Is.InRange(1, 2));
+            Assert.Greater(Stabs(true, out int until), plain);
             Assert.Greater(until, Ticks.FromSeconds(2));
         }
 

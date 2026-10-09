@@ -107,6 +107,12 @@ namespace Betaknight.Core.Runes
         /// </summary>
         public int PulseSeconds { get; }
 
+        /// <summary>Zustands-Runen ohne eigenen Takt lösen alle so viele Sekunden erneut aus, solange der Zustand gilt.</summary>
+        public const int DefaultStatePulseSeconds = 2;
+
+        /// <summary>Tatsächlicher Takt: eigener Wert, sonst bei Zustands-Runen <see cref="DefaultStatePulseSeconds"/>, sonst 0.</summary>
+        public int EffectivePulseSeconds => PulseSeconds > 0 ? PulseSeconds : Kind == ConditionKind.State ? DefaultStatePulseSeconds : 0;
+
         /// <summary>Schwierigkeit mit oder ohne «Umkehren».</summary>
         public int DifficultyFor(bool inverted) => inverted ? InvertedDifficulty : Difficulty;
 

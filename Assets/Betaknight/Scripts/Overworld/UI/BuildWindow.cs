@@ -51,6 +51,9 @@ namespace Betaknight.Overworld.UI
         // Ausgewähltes Teil (Komponente oder Relais), hervorgehoben in Raster und Liste.
         private object _selected;
 
+        // Verknüpfen: Id des Trigger- bzw. Charge-Link-Moduls, dessen Ziel als Nächstes auf der Platine gewählt wird (-1 = aus).
+        private int _linking = -1;
+
         // Ziehen auf der Platine: welche Zelle der Komponente gepackt wurde, und ob beim Ziehen gedreht wird (Taste R).
         private int _grabX, _grabY;
         private bool _dragRotated;
@@ -97,6 +100,12 @@ namespace Betaknight.Overworld.UI
             UiTheme.Apply();
             GUI.depth = -5;
             Event e = Event.current;
+            if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape && _linking >= 0)
+            {
+                _linking = -1;
+                e.Use();
+                return;
+            }
             if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape)
             {
                 Close();
@@ -179,6 +188,9 @@ namespace Betaknight.Overworld.UI
         private void DrawPreviewLine()
         {
             string text = _hover;
+            ModuleInstance linking = _linking >= 0 ? _session.Modules.Get(_linking) : null;
+            if (linking == null || linking.IsFree) _linking = -1;
+            else text = $"<color=#ffd75e>{UiTexts.Build.LinkingHint(linking.NameFrom(_session.ModuleCatalog), _session.ModuleWhere(linking))}</color>";
             if (_drag.IsDragging)
             {
                 string label = _drag.Dragging.Value.Label;
@@ -399,7 +411,7 @@ namespace Betaknight.Overworld.UI
             if (Board.TouchesCore(c)) marks.Add($"<color=#b18cff>+{Board.Config.CoreBonusPercent} %</color>");
             if (c.Skill.Modules.Count > 0) marks.Add($"<color=#ffd75e>◆{c.Skill.Modules.Count}</color>");
             foreach (OverworldSession.TriggerLink link in links)
-                if (!link.FromBlock && link.From == index) marks.Add($"<color=#ffae42>{UiTexts.Build.TriggersTo(link.To + 1)}</color>");
+                if (!link.FromBlock && link.From == index) marks.Add($"<color=#ffae42>{(link.Charges ? UiTexts.Build.ChargesTo(link.To + 1) : UiTexts.Build.TriggersTo(link.To + 1))}</color>");
             if (_session.IsEvolutionReady(c.Skill)) marks.Add("<color=#d29bff>✦</color>");
 
             string cast = info != null ? SkillInfo.Seconds(info.WindupTicks) : "?";
@@ -418,8 +430,9 @@ namespace Betaknight.Overworld.UI
                 _grabX = grabbed.X - c.Origin.X;
                 _grabY = grabbed.Y - c.Origin.Y;
             }
+            if (_linking >= 0) UiTheme.Outline(rect, new Color(1f, 0.84f, 0.37f, 0.9f), 2f);
             _drag.Source(rect, new DragItem(DragKind.Component, index, $"#{index + 1} {name}"),
-                click: () => _selected = c, shortcut: () => _session.RotateComponent(Board.IndexOf(c)));
+                click: () => ClickComponent(c), shortcut: () => _session.RotateComponent(Board.IndexOf(c)));
             Hover(rect, $"<b>#{index + 1} {name}</b>: {ShortStats(info)} · <color={StateHex(c)}>{StateLong(c)}</color>", c);
         }
 
@@ -435,7 +448,7 @@ namespace Betaknight.Overworld.UI
             var marks = new List<string>();
             if (relay.Modules.Count > 0) marks.Add($"<color=#ffd75e>◆{relay.Modules.Count}</color>");
             foreach (OverworldSession.TriggerLink link in links)
-                if (link.FromBlock && link.From == index) marks.Add($"<color=#45e6f2>{UiTexts.Build.TriggersTo(link.To + 1)}</color>");
+                if (link.FromBlock && link.From == index) marks.Add($"<color=#45e6f2>{(link.Charges ? UiTexts.Build.ChargesTo(link.To + 1) : UiTexts.Build.TriggersTo(link.To + 1))}</color>");
             if (_session.IsEvolutionReady(relay)) marks.Add("<color=#d29bff>✦</color>");
             if (marks.Count > 0) text += " " + string.Join(" ", marks);
 
@@ -700,7 +713,7 @@ namespace Betaknight.Overworld.UI
                 Rect r = GUILayoutUtility.GetLastRect();
                 int id = m.InstanceId;
                 _drag.Source(r, new DragItem(DragKind.Module, id, m.NameFrom(_session.ModuleCatalog)),
-                    click: trigger ? () => _session.CycleTriggerTarget(id) : (System.Action)null,
+                    click: trigger ? () => _linking = id : (System.Action)null,
                     shortcut: () => _session.TakeOffModule(id));
                 Hover(r, $"<b>{m.NameFrom(_session.ModuleCatalog)}</b>: {chip.tooltip}");
             }
@@ -756,8 +769,11 @@ namespace Betaknight.Overworld.UI
                     m.IsFree ? UiTheme.Cell : UiTheme.EmptyCell, GUILayout.Height(26f));
                 Rect r = GUILayoutUtility.GetLastRect();
                 int id = m.InstanceId;
-                _drag.Source(r, new DragItem(DragKind.Module, id, name), shortcut: () => ModuleShortcut(id));
-                Hover(r, $"<b>{name}</b> [{kind}]: {d?.DescriptionAt(m.Level)}");
+                bool linkable = !m.IsFree && ModuleRules.IsTargeted(m.ModuleId);
+                _drag.Source(r, new DragItem(DragKind.Module, id, name), click: linkable ? () => _linking = id : (System.Action)null,
+                    shortcut: () => ModuleShortcut(id));
+                Hover(r, $"<b>{name}</b> [{kind}]: {d?.DescriptionAt(m.Level)}"
+                    + (linkable ? $" · {_session.DescribeTrigger(m)} <color=#9aa4b2>{UiTexts.Build.LinkClick}</color>" : string.Empty));
             }
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
@@ -1091,7 +1107,7 @@ namespace Betaknight.Overworld.UI
                 string effect = _session.GrowthEffectText(rule, skill.Growth);
                 lines.Add(UiTexts.Build.GrowsNow(rule.Text, effect, _session.MilestoneText(skill.Growth, true)));
             }
-            if (!skill.IsBasicAttack) lines.Add(UiTexts.Build.ModuleSlots(skill.Modules.Count, skill.ModuleSlots));
+            if (!skill.IsBasicAttack) lines.AddRange(ModuleLines(skill));
             foreach (string evolution in _session.EvolutionHintsForSkill(skill.SkillId)) lines.Add(evolution);
             return string.Join("\n", lines);
         }
@@ -1121,7 +1137,7 @@ namespace Betaknight.Overworld.UI
                 string effect = _session.GrowthEffectText(rule, c.Skill.Growth);
                 lines.Add(UiTexts.Build.GrowsNow(rule.Text, effect, _session.MilestoneText(c.Skill.Growth, true)));
             }
-            lines.Add(UiTexts.Build.ModuleSlots(c.Skill.Modules.Count, c.Skill.ModuleSlots));
+            lines.AddRange(ModuleLines(c.Skill));
             lines.AddRange(_session.EvolutionProgressFor(c.Skill));
             lines.Add(UiTexts.Build.ComponentDragHint);
             return string.Join("\n", lines);
@@ -1141,10 +1157,36 @@ namespace Betaknight.Overworld.UI
             lines.Add(RuneText.DifficultyTip(relay.Rune, _session.RelayDifficulty(relay) != relay.Rune.Difficulty));
             lines.Add(UiTexts.Build.RelayLimit(_session.RelayMaxCells(relay)));
             lines.Add(PowersText(relay));
-            lines.Add(UiTexts.Build.ModuleSlots(relay.Modules.Count, relay.ModuleSlots));
+            lines.AddRange(ModuleLines(relay));
             lines.AddRange(_session.EvolutionProgressFor(relay));
             lines.Add(UiTexts.Build.RelayDragHint);
             return string.Join("\n", lines);
+        }
+
+        /// <summary>Klick auf eine Komponente: im Verknüpfen-Modus wird sie das Ziel, sonst ausgewählt.</summary>
+        private void ClickComponent(ComponentSlot c)
+        {
+            if (_linking >= 0)
+            {
+                if (c.Skill != null) _session.SetTriggerTarget(_linking, ModuleTarget.Skill(c.Skill.InstanceId));
+                _linking = -1;
+                return;
+            }
+            _selected = c;
+        }
+
+        /// <summary>«Module slots 1/2» und darunter jedes Modul mit seiner Wirkung (Trigger/Charge Link mit Ziel).</summary>
+        private List<string> ModuleLines(IModuleHolder holder)
+        {
+            var lines = new List<string> { UiTexts.Build.ModuleSlots(holder.Modules.Count, holder.ModuleSlots) };
+            foreach (ModuleInstance m in holder.Modules)
+            {
+                ModuleDefinition d = _session.ModuleDefinitionOf(m);
+                string name = m.NameFrom(_session.ModuleCatalog);
+                string effect = ModuleRules.IsTargeted(m.ModuleId) ? _session.DescribeTrigger(m) : d?.DescriptionAt(m.Level) ?? string.Empty;
+                lines.Add($"<color=#ffd75e>◆ {name}</color>: {effect}");
+            }
+            return lines;
         }
 
         private static string Shorten(string text, int max) => text.Length <= max ? text : text.Substring(0, max - 1) + "…";
