@@ -62,8 +62,8 @@ namespace Betaknight.Core.Gear
                     "Heat damage is at most 1 while a powered healing component is on the board."),
                 p => p >= 2 ? new OverloadSet(p >= 3) : null);
             r.Register(Def(SetIds.Aegis, "Aegis Firewall",
-                    "Every Block: +1 Charge (max. 5), at 5 Charge Armor ×2. Unlocks the rune \"Charge Full\".",
-                    "Components powered by \"Charge Full\" discharge: Charge to 0, Damage = 5 × Armor."),
+                    "Every Block: +1 Static (max. 5), at 5 Static Armor ×2. Unlocks the rune \"Static Full\".",
+                    "Components powered by \"Static Full\" discharge: Static to 0, Damage = 5 × Armor."),
                 p => p >= 2 ? new AegisSet(p >= 3) : null);
             r.Register(Def(SetIds.Scrap, "Scrap Harvester",
                     "+2 Gold per defeated enemy.",

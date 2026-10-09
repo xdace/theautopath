@@ -139,7 +139,7 @@ namespace Betaknight.Core.Gear
             new EquipmentDefinition(ReliefCarrierIds.AfterimageVisor, "Afterimage Visor", EquipmentSlot.Helmet, S((StatKind.MaxHp, 2)), weight: 5,
                 description: "Enemy still counts as stunned for 0.5 s after a stun.", tags: T(SynergyTagIds.Phantom)),
             new EquipmentDefinition(ReliefCarrierIds.PrechargedCell, "Precharged Cell", EquipmentSlot.Chest, S((StatKind.MaxHp, 3)), weight: 5,
-                description: "Charge starts at 3.", tags: T(SynergyTagIds.Charge)),
+                description: "Static starts at 3.", tags: T(SynergyTagIds.Charge)),
             new EquipmentDefinition(ReliefCarrierIds.PhantomStep, "Phantom Step Boots", EquipmentSlot.Boots, S((StatKind.Dodge, BasisPoints.Percent(4))), weight: 5,
                 description: "Dodge streak only breaks on the 2nd hit.", tags: T(SynergyTagIds.Phantom)),
             new EquipmentDefinition(ReliefCarrierIds.CounterShield, "Counter Shield", EquipmentSlot.Shield, S((StatKind.Armor, 1), (StatKind.Block, BasisPoints.Percent(10))),

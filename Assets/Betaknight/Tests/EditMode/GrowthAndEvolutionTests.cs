@@ -323,7 +323,7 @@ namespace Betaknight.Tests.EditMode
             SkillInstance stab = AddLeft(s, "clock", SkillIds.ShockStab);
             s.Skills.Grow(stab, 30);
             EvolutionRecipe lance = s.EvolutionCatalog.Get("evo_lance");
-            CollectionAssert.AreEqual(new[] { "Tag Charge 0/4" }, s.EvolutionMissing(lance, stab));
+            CollectionAssert.AreEqual(new[] { "Tag Static 0/4" }, s.EvolutionMissing(lance, stab));
 
             // Bohrstoß neben «HP Full»: die verlangte Rune berührt ihn nicht.
             SkillInstance drill = AddRight(s, "hp_full", SkillIds.Drill);

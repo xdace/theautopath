@@ -9,6 +9,8 @@ namespace Betaknight.Core
     /// </summary>
     public static class CatalogTexts
     {
+        public static string ChargeNeighbours(int amount) => $"+{amount} charge to touching components";
+
         // ------------------------------------------------------------------ Skill-Arten
 
         public const string KindAttack = "Attack";

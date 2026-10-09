@@ -146,15 +146,15 @@ namespace Betaknight.Core.Arena
         {
             // Passive an Ausrüstungsteilen (Ids aus dem EquipmentCatalog).
             new ReliefDefinition(ReliefCarrierIds.NumbingGloves, ReliefKind.Passive, ReliefIds.StunLonger, Ticks.PerSecond,
-                "Own stuns last +1 s", "Charge", "enemy_stunned"),
+                "Own stuns last +1 s", "Static", "enemy_stunned"),
             new ReliefDefinition(ReliefCarrierIds.AfterimageVisor, ReliefKind.Passive, ReliefIds.StunAfterglow, Ticks.FromTenths(5),
                 "Enemy still counts as stunned for 0.5 s after a stun", "Phantom", "enemy_stunned"),
             new ReliefDefinition(ReliefCarrierIds.PrechargedCell, ReliefKind.Passive, ReliefIds.ChargeStart, 3,
-                "Charge starts at 3", "Charge", "charge_full"),
+                "Static starts at 3", "Static", "charge_full"),
             new ReliefDefinition(ReliefCarrierIds.PhantomStep, ReliefKind.Passive, ReliefIds.DodgeTolerance, 1,
                 "Dodge streak only breaks on the 2nd hit", "Phantom", "dodge_streak"),
             new ReliefDefinition(ReliefCarrierIds.CounterShield, ReliefKind.Passive, ReliefIds.CritAfterBlock, BasisPoints.Percent(15),
-                "Crit chance +15 % for 2 s after a Block", "Charge", "on_crit"),
+                "Crit chance +15 % for 2 s after a Block", "Static", "on_crit"),
             new ReliefDefinition(ReliefCarrierIds.VenomTorch, ReliefKind.Passive, ReliefIds.BurnCountsPoison, 1,
                 "\"Enemy Burning\" also counts Poison", "Toxin", "enemy_burning"),
             new ReliefDefinition(ReliefCarrierIds.PainConductor, ReliefKind.Passive, ReliefIds.HpThresholdUp, 5,
@@ -167,7 +167,6 @@ namespace Betaknight.Core.Arena
                 "\"Enemy Below x %\" triggers 10 percentage points earlier", "Module", "enemy_low"),
 
             // Skills, deren Wirkung die Bedingung herbeiführt (Ids aus dem SkillCatalog).
-            new ReliefDefinition(SkillIds.ChargeCoil, ReliefKind.Skill, null, 0, "+3 Charge", CatalogTexts.KindShield, "charge_full"),
             new ReliefDefinition(SkillIds.NumbingMist, ReliefKind.Skill, null, 0, "briefly stuns all enemies", CatalogTexts.KindShock, "enemy_stunned"),
         });
 

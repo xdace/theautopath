@@ -472,16 +472,6 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void ReliefSkill_ChargeCoilFillsCharge()
-        {
-            var skills = SkillCatalog.CreateDefault();
-            LogicBoard Board(SkillDefinition filler) =>
-                new LogicBoard(new[] { Row("charge_full", Ping(), parameter: SkillCatalog.ChargeMax), Clock(filler) });
-            Assert.AreEqual(0, Starts(Solo(Board(Ping("idle")), 20), "ping").Count);
-            Assert.Greater(Starts(Solo(Board(skills.Get(SkillIds.ChargeCoil)), 20), "ping").Count, 0);
-        }
-
-        [Test]
         public void ReliefSkill_NumbingMistStunsEveryone()
         {
             var skills = SkillCatalog.CreateDefault();

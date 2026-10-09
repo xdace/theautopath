@@ -152,7 +152,7 @@ namespace Betaknight.Tests.EditMode
             Equipment gear = Wearing(T(SynergyTagIds.Charge), T(SynergyTagIds.Charge, SynergyTagIds.Heat), T(SynergyTagIds.Charge));
             Assert.AreEqual(3, gear.TagCount(SynergyTagIds.Charge));
             Assert.AreEqual(1, gear.TagCount(SynergyTagIds.Heat));
-            Assert.AreEqual("Charge 3/4", Synergies.Counters(gear).Single(c => c.Tag.Id == SynergyTagIds.Charge).Text);
+            Assert.AreEqual("Static 3/4", Synergies.Counters(gear).Single(c => c.Tag.Id == SynergyTagIds.Charge).Text);
 
             gear.Unequip(EquipmentSlot.Gloves);
             Assert.AreEqual(2, gear.TagCount(SynergyTagIds.Charge), "Abgelegte Teile zählen nicht");
@@ -230,10 +230,10 @@ namespace Betaknight.Tests.EditMode
         {
             Equipment gear = Wearing(T(SynergyTagIds.Charge), T(SynergyTagIds.Charge), T(SynergyTagIds.Charge));
             var item = new EquipmentDefinition("x", "X", EquipmentSlot.Boots, tags: T(SynergyTagIds.Charge));
-            CollectionAssert.AreEqual(new[] { "→ Charge 4/6: Tier reached!" }, Synergies.Preview(gear, item));
+            CollectionAssert.AreEqual(new[] { "→ Static 4/6: Tier reached!" }, Synergies.Preview(gear, item));
 
             var sameSlot = new EquipmentDefinition("y", "Y", EquipmentSlot.Helmet, tags: T(SynergyTagIds.Charge));
-            CollectionAssert.AreEqual(new[] { "→ Charge 3/4" }, Synergies.Preview(gear, sameSlot), "Verdrängtes Teil zählt nicht mehr");
+            CollectionAssert.AreEqual(new[] { "→ Static 3/4" }, Synergies.Preview(gear, sameSlot), "Verdrängtes Teil zählt nicht mehr");
 
             Equipment almost = Wearing(T(SynergyTagIds.Heat, SynergyTagIds.Tempo), T(SynergyTagIds.Heat, SynergyTagIds.Tempo),
                 T(SynergyTagIds.Heat, SynergyTagIds.Tempo));

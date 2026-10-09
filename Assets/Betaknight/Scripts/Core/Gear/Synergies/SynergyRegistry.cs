@@ -196,7 +196,7 @@ namespace Betaknight.Core.Gear
                 E("Fire Skills −20 % Cast Time.", null, SkillPassive.Cast(SkillKind.Fire, -20)),
                 E("+25 % Damage against burning enemies.", () => new SynergyBonusVsStatus(StatusIds.Burn, 25)),
                 E("Basic Attacks apply Burn (3 s, 25 % Weapon Damage per second).", () => new SynergyBurnOnBasic())));
-            r.Register(Tag(SynergyTagIds.Charge, "Charge",
+            r.Register(Tag(SynergyTagIds.Charge, "Static",
                 E("+10 % Block.", () => new SynergyStatBonus(StatKind.Block, BasisPoints.Percent(10))),
                 E("Shock Skills −25 % Cast Time.", null, SkillPassive.Cast(SkillKind.Shock, -25)),
                 E("Every Block hastes you: −20 % Cast Time for 2 s.", () => new SynergyHasteOnDefense(BattleEventKind.Blocked, 20, Ticks.FromSeconds(2)))));

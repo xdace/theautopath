@@ -75,7 +75,7 @@ namespace Betaknight.Core.Runes
             new RuneDefinition("after_block", "After Block", RuneTag.Shield, ConditionKind.Event, "Shortly after a hit was blocked.", difficulty: 2, invertedDifficulty: 0),
             new RuneDefinition("enemy_charging", "Enemy Charging", RuneTag.Shield, ConditionKind.State, "While an enemy is charging an attack.", difficulty: 2, invertedDifficulty: 0),
             new RuneDefinition("hp_full", "HP Full", RuneTag.Shield, ConditionKind.State, "While your HP is full.", difficulty: 1, invertedDifficulty: 0),
-            new RuneDefinition("charge_full", "Charge Full", RuneTag.Shield, ConditionKind.Resource, "At {0} Charge (Aegis Firewall).", new[] { 5 }, 0, exclusive: true, unlockSetId: "aegis", difficulty: 3, invertedDifficulty: 0),
+            new RuneDefinition("charge_full", "Static Full", RuneTag.Shield, ConditionKind.Resource, "At {0} Static (Aegis Firewall).", new[] { 5 }, 0, exclusive: true, unlockSetId: "aegis", difficulty: 3, invertedDifficulty: 0),
 
             // Risiko und Notfall
             new RuneDefinition("hp_low", "HP Below {0} %", RuneTag.Ember, ConditionKind.State, "Every second while your HP is below {0} %.", new[] { 20, 25 }, difficulty: 1, invertedDifficulty: 0, pulseSeconds: 1),

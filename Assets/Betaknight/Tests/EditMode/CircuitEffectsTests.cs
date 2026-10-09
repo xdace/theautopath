@@ -114,9 +114,9 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void OverclockHalvesCastTimeAndHeatsNeighboursUntilTheySkip()
         {
-            // Schockstich mit Overclock neben der Ladungsspule (keine Pins zueinander), beide an einer eigenen Clock.
+            // Schockstich mit Overclock neben den Schubdüsen (keine Pins zueinander), beide an einer eigenen Clock.
             CircuitSpec Board(bool overclock) => Spec(new[] { Relay("clock", 0, 1), Relay("clock", 1, 1) },
-                new[] { overclock ? Part(SkillIds.ShockStab, 0, 0, CircuitEffectIds.Overclock) : Part(SkillIds.ShockStab, 0, 0), Part(SkillIds.ChargeCoil, 1, 0) });
+                new[] { overclock ? Part(SkillIds.ShockStab, 0, 0, CircuitEffectIds.Overclock) : Part(SkillIds.ShockStab, 0, 0), Part(SkillIds.Thrusters, 1, 0) });
             BattleResult plain = Fight(Compile(Board(false)), seconds: 15);
             BattleResult hot = Fight(Compile(Board(true)), seconds: 15);
             Assert.AreEqual(Starts(plain, SkillIds.ShockStab)[0].Amount * (100 + Fx.OverclockCastPercent) / 100, Starts(hot, SkillIds.ShockStab)[0].Amount);
@@ -126,7 +126,7 @@ namespace Betaknight.Tests.EditMode
             BattleEvent skip = Own(hot).Single(e => e.Kind == BattleEventKind.HeatSkip);
             Assert.AreEqual(1, skip.RowIndex);
             Assert.AreEqual(Fx.HeatSkipAt, skip.Amount);
-            Assert.AreEqual(Starts(plain, SkillIds.ChargeCoil).Count - 1, Starts(hot, SkillIds.ChargeCoil).Count, "genau eine Ausführung fällt aus");
+            Assert.AreEqual(Starts(plain, SkillIds.Thrusters).Count - 1, Starts(hot, SkillIds.Thrusters).Count, "genau eine Ausführung fällt aus");
             Assert.IsFalse(Own(hot).Any(e => e.Kind == BattleEventKind.HeatChanged && e.RowIndex == 0), "Overclock heizt nur die Nachbarn");
         }
 

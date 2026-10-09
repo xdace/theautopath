@@ -72,6 +72,9 @@ namespace Betaknight.Core.Arena
         /// <summary>Obergrenze der Ladung (wie beim Aegis-Set).</summary>
         public const int ChargeMax = 5;
 
+        /// <summary>Charge Coil: so viel Komponenten-Ladung bekommt jeder Nachbar pro Ausführung.</summary>
+        public const int ChargeCoilCharge = 2;
+
         // Formen (A-19): mehr Zellen = mehr Wirkung pro Ausführung, aber nur schwere Relais versorgen grosse Komponenten.
         private static readonly Shape S1x1 = new Shape(1, 1);
         private static readonly Shape S1x2 = new Shape(1, 2);
@@ -102,11 +105,12 @@ namespace Betaknight.Core.Arena
                 new ApplyStatusEffect(() => new ThrustersStatus(Ticks.FromSeconds(7))),
             }, "The next enemy hit is sure to miss.", kinds: SkillKind.Movement, shape: S1x1));
 
-            // Erleichterer: Ladung für «Charge Full», Betäubung und Verlangsamung für «Enemy Stunned».
+            // Hilfs-Komponente: lädt ihre Nachbarn auf (Komponenten-Ladung), z. B. eine grosse Kanone ohne starkes Relais.
             c.Register(new SkillDefinition(SkillIds.ChargeCoil, "Charge Coil", CastTime.Fast, 2, new ISkillEffect[]
             {
-                new ChangeResourceEffect(ResourceIds.Charge, 3, ChargeMax),
-            }, "+3 Charge (max. 5). Eases \"Charge Full\".", kinds: SkillKind.Shield, shape: S1x1));
+                new ChargeNeighboursEffect(ChargeCoilCharge),
+            }, $"Gives +{ChargeCoilCharge} charge to every touching component; each runs once its charge reaches its size.",
+                kinds: SkillKind.Shock, shape: S1x1));
 
             c.Register(new SkillDefinition(SkillIds.Ignite, "Ignite", CastTime.Fast, 4, new ISkillEffect[]
             {

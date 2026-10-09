@@ -158,6 +158,29 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
+        public void ChargeCoilChargesEveryTouchingComponent()
+        {
+            // «Clock 2 s» lässt die Charge Coil laufen; sie gibt Schockstich (1 Zelle) und Rüstungsbruch (4 Zellen, kein Relais)
+            // je +2: der Schockstich (1 Zelle) läuft damit zweimal (die zweite Ladung reiht ihn nach dem Cast erneut ein), der
+            // Rüstungsbruch jedes 2. Mal.
+            var spec = new CircuitSpec { Width = 6, Height = 6 };
+            spec.Relays.Add(new RelaySpec("clock", new Cell(0, 0)));
+            spec.Components.Add(Part(SkillIds.ChargeCoil, 1, 0));
+            spec.Components.Add(Part(SkillIds.ShockStab, 1, 1));
+            spec.Components.Add(Part(SkillIds.ArmorBreak, 2, 0));
+            LogicBoard board = Factory.Create(spec, null);
+            int coil = Row(board, SkillIds.ChargeCoil), stab = Row(board, SkillIds.ShockStab), breaker = Row(board, SkillIds.ArmorBreak);
+            Assert.IsFalse(board.Rows[stab].IsPowered);
+            Assert.IsFalse(board.Rows[breaker].IsPowered);
+
+            BattleResult r = Fight(board, seconds: 12);
+            int coils = r.Events.Count(e => e.Source?.Name == "A" && e.Kind == BattleEventKind.ActionExecuted && e.RowIndex == coil);
+            Assert.GreaterOrEqual(coils, 4);
+            Assert.That(Queued(r, stab).Count, Is.InRange(2 * coils - 1, 2 * coils));
+            Assert.AreEqual(coils / 2, Queued(r, breaker).Count);
+        }
+
+        [Test]
         public void SpilloverPassesTheOverchargeToTheNeighbours()
         {
             // 6 Ladung auf den Schockstich (1 Zelle) mit Spillover: 5 gehen an den Rüstungsbrecher daneben (4 Zellen, berührt

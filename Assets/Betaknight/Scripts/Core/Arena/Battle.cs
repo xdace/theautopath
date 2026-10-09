@@ -983,6 +983,22 @@ namespace Betaknight.Core.Arena
                 { Extra = c.Board.Rows[row].Cells });
         }
 
+        /// <summary>
+        /// Charge Coil: jede berührte Komponente bekommt <paramref name="amount"/> Ladung; wer damit voll ist, wird eingereiht.
+        /// </summary>
+        public void ChargeNeighbours(Combatant c, int row, int amount)
+        {
+            if (c == null || amount <= 0 || row < 0 || row >= c.Board.Rows.Count) return;
+            foreach (int n in c.Board.Rows[row].Neighbours)
+            {
+                LogicRow r = c.Board.Rows[n];
+                if (n == row || r.IsOrphaned || r.Skill == null) continue;
+                int stored = AddCharge(c, n, amount);
+                if (stored >= r.Cells) Enqueue(c, n, -1, ActionCause.Trigger, row, 0, int.MaxValue, null, chargeCost: r.Cells);
+                else Charged(c, n, -1, stored, amount);
+            }
+        }
+
         /// <summary>Ein Auslösen hat Ladung gespeichert, die Komponente läuft aber (noch) nicht. Kein «Missed Trigger».</summary>
         private void Charged(Combatant c, int row, int relay, int stored, int gained)
         {

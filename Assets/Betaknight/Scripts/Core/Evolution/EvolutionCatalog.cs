@@ -100,7 +100,7 @@ namespace Betaknight.Core.Evolution
             c.Register(new EvolutionRecipe("evo_inferno", SynergyTagIds.Heat, EvolutionSubject.Skill, SkillIds.Ignite, SkillIds.Inferno,
                 EvolutionRequirement.Module, ModuleIds.Area, "A Fire skill at max level and a module that hits everyone."));
             c.Register(new EvolutionRecipe("evo_lance", SynergyTagIds.Charge, EvolutionSubject.Skill, SkillIds.ShockStab, SkillIds.LightningLance,
-                EvolutionRequirement.Tag, SynergyTagIds.Charge, "A fast Shock skill at max level, carried by plenty of Charge."));
+                EvolutionRequirement.Tag, SynergyTagIds.Charge, "A fast Shock skill at max level, carried by plenty of Static."));
             c.Register(new EvolutionRecipe("evo_reflex", SynergyTagIds.Phantom, EvolutionSubject.Block, "hp_low", EvolvedRuneIds.PhantomReflex,
                 EvolutionRequirement.Module, ModuleIds.Extend, "An HP rune at max level that holds longer than it should."));
             c.Register(new EvolutionRecipe("evo_resonance", SynergyTagIds.Tempo, EvolutionSubject.Skill, SkillIds.Echo, SkillIds.Resonance,

@@ -77,6 +77,7 @@ Combat is programmed on a **circuit board**, a grid instead of a list of rows. F
 - **Clock replaces Always:** The rune "Always" is gone. The new relay **Clock 2 s** (rare, level 1: 1 s) ticks at a fixed interval, first tick after one interval. Enemies that used "Always + cooldown" now have Clock relays ("Every 7 s").
 - **Trigger overhaul:** Fights last only a few seconds (measured with the test player: about 6–7 s on average), so slow triggers almost never fired. Time runes are short now (Clock 2/1 s, Every 4/3/2 s, the rare one Every 5/4/3 s), thresholds are easier (Outnumbered from 2 enemies, Haste ≥ 4/3/2), "Heavy Hit" and "HP Below 10/15 %" are gone. **HP Below 20/25 %** (◆, limit 2) fires every second while the HP stay low, so it charges a large component by 2 per second. New runes: **Idle Cycle** (after each Basic Attack), **Opening** (every second during the first 3/4/5 s), **Overtime** (every second from 4/3/2 s on), **Backlog** (every second while 2+ components wait), **Status Applied** (after you put a status on an enemy). New module **Charge Link**: after its component fires, it charges a chosen target by its own size; the target runs once the charge reaches its size.
 - **Charge pool:** When a relay triggers, its limit is a pool of charge shared by **all** components touching it (powered and too large). The component that needs the least (its size minus the charge it already holds) is filled first and runs; then the next. On a tie that cannot fill everyone, the ones that can run are picked at random (2 charge, two 2-cell skills: one runs); if none can run, the charge is split evenly (2 charge, two 4-cell skills: 1 each). Charge left over once nobody else can run is spread evenly over the waiting ones. **The charge belongs to the component:** every relay touching it, Charge Link and Spillover fill the same store, so several relays work together on one big component. Charge is only spent when the component actually enters the queue: if it is already queued or casting, the charge stays stored, and right after its execution it queues again as long as the stored charge still covers its size. **Display:** in the arena a charging component shows its charge as "⚡2/4"; the log says "Drill Strike charged +2 → 2/4". In the report, triggers that only stored charge are counted under **Charged** ("2× (+4) · 2/4 left"), not as Missed Trigger. The build tooltip of a too-large component says how many triggers it needs. Charge left over after **everyone** ran is **overcharge**: +10 % effect per cell, no cap, spread evenly over the components that run (a 1-cell skill at a ◆◆◆ relay: 5 overcharge = +50 %). Values: `CircuitEffectConfig.OverchargePowerPercentPerCell`, logic: `Battle.PowerFromRelay`.
+- **Charge Coil** (1×1 helper component): every time it runs, each touching component gets **+2 charge** and runs once its charge reaches its size. It no longer belongs to the Aegis set; the Aegis resource is now called **Static** ("Static Full", "+1 Static per Block").
 - **Spillover** (module for components): this component's overcharge is not used as a bonus but charges its touching components by the same rules; whatever is left over there is their overcharge. Spillover does not chain.
 - **Enemy boards** are data (`Combat/EnemyBoard.cs`) and readable on hover on the map and in the arena, e.g. "Every 7 s → Ram (2×1): …".
 
@@ -89,7 +90,7 @@ The harder a relay's condition is to meet, the larger the components it can powe
 | 0 Easy | ◇ | Clock, Battle Start | 1 cell | none |
 | 1 Medium | ◆ | On Hit, When Hit, Every 3 Attacks, Every 4 Seconds, HP Below 20 %, Opening, Backlog, Status Applied | 2 cells | +15 % effect |
 | 2 Hard | ◆◆ | After Crit, Enemy Stunned, After Block, Overtime | 4 cells | +30 % effect, −20 % cast time |
-| 3 Very hard | ◆◆◆ | Charge Full, 2 Dodges in a Row, Every 5 Seconds (rare), Vs. Boss | 6 cells | +60 % effect, −35 % cast time, +1 s status duration |
+| 3 Very hard | ◆◆◆ | Static Full, 2 Dodges in a Row, Every 5 Seconds (rare), Vs. Boss | 6 cells | +60 % effect, −35 % cast time, +1 s status duration |
 
 Cast time never drops below 0.1 s. The bonus never decreases: gear, modules or growth that make a condition easier keep its tier. "Invert" has its own tier. Enemy relays have no size limit. An execution gets the bonus of the relay that triggered it.
 
@@ -108,7 +109,7 @@ Evolutions keep the shape of their base skill.
 
 #### Haste, Slow and Freeze
 
-- **Haste** shortens cast time by x %, **Slow** lengthens it (`StatKind.CastPercent`, `Battle.Haste`). Everything that used to reduce cooldowns is now Haste: Charge at 6 parts ("Every Block: −20 % cast time for 2 s"), Phantom set bonus and the Ember Rhythm duo. Gear passives "−1 s cooldown" became "−15 % cast time".
+- **Haste** shortens cast time by x %, **Slow** lengthens it (`StatKind.CastPercent`, `Battle.Haste`). Everything that used to reduce cooldowns is now Haste: Static at 6 parts ("Every Block: −20 % cast time for 2 s"), Phantom set bonus and the Ember Rhythm duo. Gear passives "−1 s cooldown" became "−15 % cast time".
 - **Freeze** (Cryo Grenade) stops the target's largest powered component for 3 s; its triggers are missed while frozen.
 - **Numbing Mist** slows all enemies (+30 % cast time for 3 s).
 
@@ -458,13 +459,14 @@ Shops frühestens ab Ring 3 und höchstens 2, Truhen höchstens 6, Goldminen hö
 | Growth / Level | Growth points from fights; Levels at 5/15/30 |
 | Evolution | A skill or rune turns into a stronger one after a survived boss when its recipe is met. Found recipes go into the Recipe Book |
 | Set | Items of one set give bonuses at 2 and 3 pieces |
-| Tag | Synergy tag on items (Heat, Charge, Phantom, Haste, Toxin, Scrap); tiers at 2/4/6 pieces |
+| Tag | Synergy tag on items (Heat, Static, Phantom, Haste, Toxin, Scrap); tiers at 2/4/6 pieces |
 | Duo | Bonus for two tags both at 4 pieces; hidden until found |
 | Burn / Poison | Damage over time |
 | Stun | The target can't act |
 | Blind | Lower Accuracy |
 | Armor Break | Lower Armor |
-| Heat / Charge | Resources of the knight, shown as bars |
+| Heat / Static | Resources of the knight, shown as bars (Static is the Aegis resource; not the same as a component's charge) |
+| Charge | A component's stored charge from relays, Charge Coil and Charge Link; it runs once the charge reaches its size ("⚡2/4") |
 | Thermal Throttling | From 30 s on, every 5 s: longer computing time and more damage for both sides |
 | Circuit effects, Hacks | See «Circuit Effects, Hacks and Thermal Throttling» |
 | Rune Shards | 3 shards open a reward choice |
@@ -654,7 +656,7 @@ Seit A-18 sind alle Spieltexte Englisch. Texte stehen pro Bereich an einem Ort: 
 | Waffenschaden, Flächenschaden, Heilung | Weapon Damage, Area Damage, Healing |
 | Rüstung, Ausweichen, Krit, Präzision, Angriffe/s | Armor, Dodge, Crit, Accuracy, Attacks/s |
 | Betäubung, Brennen, Gift, Blendung, Rüstungsbruch | Stun, Burn, Poison, Blind, Armor Break |
-| Hitze, Ladung, Takt (Tag), Schrott | Heat, Charge, Haste, Scrap |
+| Hitze, Statik (Tag, früher Ladung), Takt (Tag), Schrott | Heat, Static, Haste, Scrap |
 | Tempo-Stapel | Haste stacks |
 | Überhitzung (Zeitlimit), Hitze (Overclock) | Thermal Throttling, Heat |
 | Übertakten, Unterbrechung, Paralleler Thread, Puffer, Rekursion | Overclock, Interrupt, Parallel Thread, Buffer, Recursion |
@@ -677,7 +679,7 @@ Katalognamen:
 | Evolutionen | Feuersturm → Firestorm, Blitzlanze → Lightning Lance, Resonanz → Resonance, Säurebohrer → Acid Drill, Schrottramme → Scrap Ram |
 | Skill-Arten | Angriff → Attack, Schild → Shield, Feuer → Fire, Schock → Shock, Heilung → Healing, Bewegung → Movement |
 | Runen-Tags | Klinge → Blade, Schild → Shield, Funke → Spark, Glut → Ember, Phantom → Phantom |
-| Runen | Jeder n. Angriff → Every n Attacks, Nach jedem n. Angriff → After Every n Attacks, Alle n Sekunden → Every n Seconds, Kampfbeginn → Battle Start, Jeder n. erlittene Treffer → Every n Hits Taken, Kette → Chain, Nach eigenem Skill → After Own Skill, Bei Treffer → On Hit, Nach Krit → After Crit, Gegner unter n % → Enemy Below n %, Gegner gepanzert → Enemy Armored, Gegner betäubt → Enemy Stunned, Gegner stärker → Enemy Stronger, Tempo ≥ n → Haste ≥ n, Wenn getroffen → When Hit, Nach Block → After Block, Gegner lädt auf → Enemy Charging, HP voll → HP Full, Ladung voll → Charge Full, HP unter n % → HP Below n %, Nach Selbstschaden → After Self-Damage, Nach Heilung → After Healing, Gegner brennt → Enemy Burning, Gegner fällt → Enemy Falls, Überstunden → Overtime, Eröffnung → Opening, Rückstau → Backlog, Leerlauf → Idle Cycle, Status gesetzt → Status Applied, Nach Ausweichen → After Dodge, n Ausweicher in Folge → n Dodges in a Row, Immer → Always, Auf Goldmine → On Gold Mine, Gegen Boss → Vs. Boss, In Unterzahl → Outnumbered, Letzter Gegner → Last Enemy, HP unter n % oder ausgewichen → HP Below n % or Dodged |
+| Runen | Jeder n. Angriff → Every n Attacks, Nach jedem n. Angriff → After Every n Attacks, Alle n Sekunden → Every n Seconds, Kampfbeginn → Battle Start, Jeder n. erlittene Treffer → Every n Hits Taken, Kette → Chain, Nach eigenem Skill → After Own Skill, Bei Treffer → On Hit, Nach Krit → After Crit, Gegner unter n % → Enemy Below n %, Gegner gepanzert → Enemy Armored, Gegner betäubt → Enemy Stunned, Gegner stärker → Enemy Stronger, Tempo ≥ n → Haste ≥ n, Wenn getroffen → When Hit, Nach Block → After Block, Gegner lädt auf → Enemy Charging, HP voll → HP Full, Statik voll → Static Full, HP unter n % → HP Below n %, Nach Selbstschaden → After Self-Damage, Nach Heilung → After Healing, Gegner brennt → Enemy Burning, Gegner fällt → Enemy Falls, Überstunden → Overtime, Eröffnung → Opening, Rückstau → Backlog, Leerlauf → Idle Cycle, Status gesetzt → Status Applied, Nach Ausweichen → After Dodge, n Ausweicher in Folge → n Dodges in a Row, Immer → Always, Auf Goldmine → On Gold Mine, Gegen Boss → Vs. Boss, In Unterzahl → Outnumbered, Letzter Gegner → Last Enemy, HP unter n % oder ausgewichen → HP Below n % or Dodged |
 | Module | Mehrfach → Multicast, Fläche → Area, Kette → Chain, Blutzoll → Blood Toll, Schnellcast → Quickcast, Umkehren → Invert (Label "NOT"), Verlängern → Extend, Schwelle → Threshold, Auslöser → Trigger, Ladekopplung → Charge Link, Alarmfühler → Alarm Sensor, Witterung → Scent |
 | Sets | Überlast-Protokoll → Overload Protocol, Aegis-Firewall → Aegis Firewall, Schrott-Ernter → Scrap Harvester, Phantom-Signal → Phantom Signal |
 | Duos | Glutrhythmus → Ember Rhythm, Phasenschild → Phase Shield, Brandgift → Fire Venom, Schrottkondensator → Scrap Capacitor, Geisterschritt → Ghost Step, Säurefraß → Acid Bite |

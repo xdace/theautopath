@@ -79,7 +79,7 @@ namespace Betaknight.Core.Arena
             switch (id)
             {
                 case ResourceIds.Heat: return "Heat";
-                case ResourceIds.Charge: return "Charge";
+                case ResourceIds.Charge: return "Static";
                 case ResourceIds.Tempo: return "Haste stacks";
                 default: return null;
             }

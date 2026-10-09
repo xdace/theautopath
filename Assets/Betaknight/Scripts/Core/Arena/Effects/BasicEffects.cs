@@ -285,6 +285,18 @@ namespace Betaknight.Core.Arena
             info.Add(new EffectInfo(EffectInfoKind.Resource, $"{(Delta >= 0 ? "+" : "−")}{System.Math.Abs(Delta)} {SkillInfo.ResourceName(ResourceId)}"));
     }
 
+    /// <summary>Lädt alle berührten Komponenten der eigenen Platine um <see cref="Amount"/> auf (Komponenten-Ladung).</summary>
+    public sealed class ChargeNeighboursEffect : ISkillEffect
+    {
+        public int Amount { get; }
+        public ChargeNeighboursEffect(int amount) => Amount = System.Math.Max(0, amount);
+
+        public void Apply(in SkillContext c) => c.Battle.ChargeNeighbours(c.User, c.RowIndex, Amount);
+
+        public void Describe(SkillInfoBuilder info) =>
+            info.Add(new EffectInfo(EffectInfoKind.Resource, CatalogTexts.ChargeNeighbours(Amount)));
+    }
+
     /// <summary>
     /// Echo: wiederholt den zuletzt ausgeführten eigenen Skill als eigene Ausführung mit dessen Cast-Zeit.
     /// Skills, die sich nicht wiederholen lassen (Echo selbst), werden nie als "zuletzt" gemerkt.

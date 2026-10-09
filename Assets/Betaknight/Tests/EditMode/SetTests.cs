@@ -225,8 +225,8 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(sets.TryGet(SetIds.Aegis, out SetDefinition aegis));
             string text = aegis.Describe(2);
             StringAssert.StartsWith("Aegis Firewall 2/3", text);
-            StringAssert.Contains("● 2 pieces: Every Block: +1 Charge", text);
-            StringAssert.Contains("○ 3 pieces: Components powered by \"Charge Full\" discharge", text);
+            StringAssert.Contains("● 2 pieces: Every Block: +1 Static", text);
+            StringAssert.Contains("○ 3 pieces: Components powered by \"Static Full\" discharge", text);
             Assert.AreEqual(string.Empty, aegis.ActiveText(1));
             StringAssert.StartsWith("2 pieces: ", aegis.ActiveText(2));
             foreach (SetDefinition set in sets.All)
