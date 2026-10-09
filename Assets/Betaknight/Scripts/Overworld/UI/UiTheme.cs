@@ -163,8 +163,12 @@ namespace Betaknight.Overworld.UI
         /// <summary>Deckender Tooltip an der Maus aus <see cref="GUI.tooltip"/>. Am Ende von OnGUI aufrufen.</summary>
         public static void DrawTooltip(float width = 360f)
         {
-            if (string.IsNullOrEmpty(GUI.tooltip)) return;
-            DrawTooltip(GUI.tooltip, Event.current.mousePosition, width);
+            string text = GUI.tooltip;
+            // GUI.tooltip ist global und wird nur gesetzt, solange die Maus über einem Element steht.
+            // Ohne Zurücksetzen bliebe der letzte Text stehen (auch in anderen Fenstern).
+            if (Event.current.type == EventType.Repaint) GUI.tooltip = string.Empty;
+            if (string.IsNullOrEmpty(text)) return;
+            DrawTooltip(text, Event.current.mousePosition, width);
         }
 
         public static void DrawTooltip(string text, Vector2 mouse, float width = 360f)
