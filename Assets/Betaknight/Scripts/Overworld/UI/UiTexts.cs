@@ -438,6 +438,11 @@ namespace Betaknight.Overworld.UI
             public const string CoreName = "CORE";
             public const string EmptyCellTip = "Free cell: drop a skill (component), a rune (relay) or a logic chip here.";
             public const string ComponentsTitle = "<b>Components</b>";
+            public const string CancelLink = "Cancel (Esc)";
+            public const string Rotate = "Rotate";
+            public const string TakeBack = "Back to inventory";
+            public const string Deselect = "Deselect";
+            public const string DetailEmpty = "Click a component, relay or chip on the board: its details, module slots and actions show up here.";
             public const string RelaysTitle = "<b>Relays</b>";
             public const string NoComponents = "no components yet – drag a skill from the left onto the board";
             public const string NoRelays = "no relays – drag a rune from the chip inventory onto a free cell";

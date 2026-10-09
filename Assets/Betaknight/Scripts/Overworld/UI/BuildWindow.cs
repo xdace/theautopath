@@ -194,7 +194,6 @@ namespace Betaknight.Overworld.UI
             string text = _hover;
             ModuleInstance linking = _linking >= 0 ? _session.Modules.Get(_linking) : null;
             if (linking == null || linking.IsFree) _linking = -1;
-            else text = $"<color=#ffd75e>{UiTexts.Build.LinkingHint(linking.NameFrom(_session.ModuleCatalog), _session.ModuleWhere(linking))}</color>";
             if (_drag.IsDragging)
             {
                 string label = _drag.Dragging.Value.Label;
@@ -308,6 +307,7 @@ namespace Betaknight.Overworld.UI
         private void DrawBoardColumn(float width, float height)
         {
             GUILayout.BeginVertical(UiTheme.Section, GUILayout.Width(width), GUILayout.Height(height));
+            DrawLinkBanner();
             GUILayout.Label($"{UiTexts.Build.BoardTitle}  <color=#9aa4b2>{_session.BoardSize} · {UiTexts.Build.BoardLegend}</color>", UiTheme.Text);
             Hover(GUILayoutUtility.GetLastRect(), BoardRule());
 
@@ -328,10 +328,111 @@ namespace Betaknight.Overworld.UI
             DrawChipStrip(inner);
 
             _partsScroll = GUILayout.BeginScrollView(_partsScroll);
-            DrawComponentList();
-            DrawRelayList();
+            DrawDetailPanel();
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
+        }
+
+        /// <summary>Verknüpfen-Modus als gelbes Banner mit Abbrechen-Knopf: Ziel auf der Platine anklicken.</summary>
+        private void DrawLinkBanner()
+        {
+            ModuleInstance linking = _linking >= 0 ? _session.Modules.Get(_linking) : null;
+            if (linking == null || linking.IsFree) return;
+            GUILayout.BeginHorizontal(UiTheme.CellSelected);
+            Rect r = GUILayoutUtility.GetRect(10f, 30f, GUILayout.ExpandWidth(true));
+            UiTheme.Fill(r, new Color(0.45f, 0.36f, 0.08f, 0.95f));
+            GUI.Label(new Rect(r.x + 8f, r.y, r.width - 16f, r.height),
+                $"<b><color=#ffe9a8>{UiTexts.Build.LinkingHint(linking.NameFrom(_session.ModuleCatalog), _session.ModuleWhere(linking))}</color></b>", UiTheme.SmallLine);
+            if (GUILayout.Button(UiTexts.Build.CancelLink, GUILayout.Width(120f), GUILayout.Height(30f))) _linking = -1;
+            GUILayout.EndHorizontal();
+        }
+
+        // ------------------------------------------------------------------ Detailpanel für das gewählte Teil
+
+        /// <summary>
+        /// Alles zum gewählten Teil an einer Stelle: Werte, Versorgung, Kern, Pulse, Effekte, Wachstum, Modul-Plätze (ziehen,
+        /// ablegen, ×) und Knöpfe. Ersetzt die Listen unter der Platine.
+        /// </summary>
+        private void DrawDetailPanel()
+        {
+            switch (_selected)
+            {
+                case ComponentSlot c when Board.IndexOf(c) >= 0: DrawComponentDetail(c, Board.IndexOf(c)); break;
+                case RelayChip relay when Board.IndexOf(relay) >= 0: DrawRelayDetail(relay, Board.IndexOf(relay)); break;
+                case BoardChip chip when Board.IndexOf(chip) >= 0:
+                    GUILayout.BeginVertical(UiTheme.Cell);
+                    GUILayout.Label($"<b>{chip.Name}</b>", UiTheme.Text);
+                    GUILayout.Label(ChipTip(chip, GateOf(chip)), UiTheme.Small);
+                    GUILayout.BeginHorizontal();
+                    GUI.enabled = _session.CanChangeLoadout;
+                    if (GUILayout.Button(UiTexts.Build.Rotate, GUILayout.Height(26f))) _session.RotateChip(Board.IndexOf(chip));
+                    if (GUILayout.Button(UiTexts.Build.TakeBack, GUILayout.Height(26f))) _session.RemoveChip(Board.IndexOf(chip));
+                    GUI.enabled = true;
+                    if (GUILayout.Button(UiTexts.Build.Deselect, GUILayout.Height(26f))) _selected = null;
+                    GUILayout.EndHorizontal();
+                    GUILayout.EndVertical();
+                    break;
+                default:
+                    GUILayout.Label($"<color=#9aa4b2>{UiTexts.Build.DetailEmpty}</color>", UiTheme.Small);
+                    break;
+            }
+        }
+
+        private void DrawComponentDetail(ComponentSlot c, int index)
+        {
+            _infos.TryGetValue(c, out SkillInfo info);
+            string name = ComponentName(c);
+            Color kind = _session.SkillCatalog.TryGet(c.Skill.SkillId, out SkillDefinition def) ? KindColorOf(def.Kinds) : UiTheme.Neutral;
+            GUILayout.BeginVertical(UiTheme.Cell);
+            Rect head = GUILayoutUtility.GetRect(10f, 26f, GUILayout.ExpandWidth(true));
+            UiTheme.Fill(new Rect(head.x, head.y + 2f, 4f, head.height - 4f), kind);
+            GUI.Label(new Rect(head.x + 10f, head.y, head.width - 10f, head.height),
+                $"<b>#{index + 1} {name}</b>  <color=#ffd75e>{ShortStats(info)}</color>  <color={StateHex(c)}>{StateShort(c)}</color>", UiTheme.Text);
+            GUILayout.Label(ComponentTip(c, index, info, panel: true), UiTheme.Small);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"<color=#9aa4b2>{UiTexts.Build.ModuleSlots(c.Skill.Modules.Count, c.Skill.ModuleSlots)}</color>", UiTheme.SmallLine,
+                GUILayout.Width(120f), GUILayout.Height(LineHeight - 8f));
+            DrawModuleSlots(c.Skill, id => _session.PlaceModuleOnSkill(id, c.Skill.InstanceId));
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUI.enabled = _session.CanChangeLoadout;
+            if (GUILayout.Button(UiTexts.Build.Rotate, GUILayout.Height(26f))) _session.RotateComponent(index);
+            if (GUILayout.Button(UiTexts.Build.TakeBack, GUILayout.Height(26f))) { _session.RemoveComponent(index); _selected = null; }
+            GUI.enabled = true;
+            if (GUILayout.Button(UiTexts.Build.Deselect, GUILayout.Height(26f))) _selected = null;
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+        }
+
+        private void DrawRelayDetail(RelayChip relay, int index)
+        {
+            int difficulty = _session.RelayDifficulty(relay);
+            GUILayout.BeginVertical(UiTheme.Cell);
+            string growth = relay.Growth > 0 ? $" <color=#b5e48c>+{relay.Growth}</color>" : string.Empty;
+            GUILayout.Label($"{RuneText.Difficulty(difficulty)} <b>{ArenaTexts.RelayName(index, relay.Name)}</b>{RuneText.LevelBadge(relay.Rune, relay.Level)}{growth}", UiTheme.Text);
+            GUILayout.Label(RelayTip(relay, index, panel: true), UiTheme.Small);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"<color=#9aa4b2>{UiTexts.Build.ModuleSlots(relay.Modules.Count, relay.ModuleSlots)}</color>", UiTheme.SmallLine,
+                GUILayout.Width(120f), GUILayout.Height(LineHeight - 8f));
+            DrawModuleSlots(relay, id => _session.PlaceModuleOnRelay(id, Board.IndexOf(relay)));
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUI.enabled = _session.CanChangeLoadout;
+            if (GUILayout.Button(UiTexts.Build.TakeBack, GUILayout.Height(26f))) { _session.UnequipRune(index); _selected = null; }
+            GUI.enabled = true;
+            if (GUILayout.Button(UiTexts.Build.Deselect, GUILayout.Height(26f))) _selected = null;
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+
+            // Rune aus dem Inventar auf das Panel = Rune dieses Relais tauschen.
+            if (_drag.IsDragging && _drag.Dragging.Value.Kind == DragKind.Rune)
+                _drag.Target(GUILayoutUtility.GetLastRect(), d => d.Kind == DragKind.Rune, d => _session.SwapRune(index, d.A));
         }
 
         private string BoardRule()
@@ -637,68 +738,7 @@ namespace Betaknight.Overworld.UI
 
         private static bool IsChipDrag(DragItem d) => d.Kind == DragKind.LogicChip || d.Kind == DragKind.BoardChip;
 
-        // ------------------------------------------------------------------ Liste der Teile (unter dem Raster)
-
-        private void DrawComponentList()
-        {
-            GUILayout.Label(UiTexts.Build.ComponentsTitle, UiTheme.Text);
-            if (Board.Components.Count == 0) GUILayout.Label($"<color=#888888>{UiTexts.Build.NoComponents}</color>", UiTheme.Small);
-            for (int i = 0; i < Board.Components.Count; i++)
-            {
-                ComponentSlot c = Board.Components[i];
-                _infos.TryGetValue(c, out SkillInfo info);
-                bool focus = c == _selected || c == _hoverPart;
-                GUILayout.BeginHorizontal(focus ? UiTheme.CellSelected : UiTheme.Cell, GUILayout.MinHeight(LineHeight));
-
-                string name = ComponentName(c);
-                string core = Board.TouchesCore(c) ? $"  <color=#b18cff>{UiTexts.Build.CoreBonus(Board.Config.CoreBonusPercent)}</color>" : string.Empty;
-                string evolves = _session.IsEvolutionReady(c.Skill) ? " <color=#d29bff>^</color>" : string.Empty;
-                string text = $"<b>#{i + 1} {name}</b>{evolves}  <color=#ffd75e>{ShortStats(info)}</color>\n"
-                    + $"<color={StateHex(c)}>{StateLong(c)}</color>{core}";
-                GUILayout.Label(new GUIContent(text, ComponentTip(c, i, info)), UiTheme.Small, GUILayout.MinWidth(200f));
-                Rect line = GUILayoutUtility.GetLastRect();
-                int index = i;
-                if (Event.current.type == EventType.MouseDown && line.Contains(Event.current.mousePosition)) _grabX = _grabY = 0;
-                _drag.Source(line, new DragItem(DragKind.Component, index, $"#{index + 1} {name}"),
-                    click: () => _selected = c, shortcut: () => _session.RotateComponent(Board.IndexOf(c)));
-                Hover(line, $"<b>#{i + 1} {name}</b>: {info?.TimingText}", c);
-
-                DrawModuleSlots(c.Skill, id => _session.PlaceModuleOnSkill(id, c.Skill.InstanceId));
-                GUILayout.EndHorizontal();
-            }
-        }
-
-        private void DrawRelayList()
-        {
-            GUILayout.Space(4f);
-            GUILayout.Label(UiTexts.Build.RelaysTitle, UiTheme.Text);
-            if (Board.Relays.Count == 0) GUILayout.Label($"<color=#888888>{UiTexts.Build.NoRelays}</color>", UiTheme.Small);
-            for (int i = 0; i < Board.Relays.Count; i++)
-            {
-                RelayChip relay = Board.Relays[i];
-                bool focus = relay == _selected || relay == _hoverPart;
-                GUILayout.BeginHorizontal(focus ? UiTheme.CellSelected : UiTheme.Cell, GUILayout.MinHeight(LineHeight));
-
-                int difficulty = _session.RelayDifficulty(relay);
-                string growth = relay.Growth > 0 ? $" <color=#b5e48c>+{relay.Growth}</color>" : string.Empty;
-                string evolves = _session.IsEvolutionReady(relay) ? " <color=#d29bff>^</color>" : string.Empty;
-                string text = $"{RuneText.Difficulty(difficulty)} <b>{ArenaTexts.RelayName(i, relay.Name)}</b>{RuneText.LevelBadge(relay.Rune, relay.Level)}{growth}{evolves}\n"
-                    + $"<color=#9aa4b2>{UiTexts.Build.RelayLimit(_session.RelayMaxCells(relay))} · {PowersText(relay)}</color>";
-                GUILayout.Label(new GUIContent(text, RelayTip(relay, i)), UiTheme.Small, GUILayout.MinWidth(200f));
-                Rect line = GUILayoutUtility.GetLastRect();
-                int index = i;
-                _drag.Source(line, new DragItem(DragKind.Relay, index, relay.Name),
-                    click: () => _selected = relay, shortcut: () => _session.UnequipRune(Board.IndexOf(relay)));
-                Hover(line, $"<b>{relay.Name}</b>: {relay.Description} {relay.Rune.LevelText(relay.Level)} · {DifficultyText.Tooltip(difficulty)}", relay);
-
-                DrawModuleSlots(relay, id => _session.PlaceModuleOnRelay(id, Board.IndexOf(relay)));
-                GUILayout.EndHorizontal();
-
-                // Rune aus dem Inventar auf die Zeile = Rune tauschen (nur beim Ziehen einer Rune, sonst würde es die ○-Ziele abdecken).
-                if (_drag.IsDragging && _drag.Dragging.Value.Kind == DragKind.Rune)
-                    _drag.Target(GUILayoutUtility.GetLastRect(), d => d.Kind == DragKind.Rune, d => _session.SwapRune(index, d.A));
-            }
-        }
+        // ------------------------------------------------------------------ Modul-Plätze (Detailpanel)
 
         /// <summary>Modul-Plätze eines Relais oder einer Komponente: ● besetzt (ziehbar, Auslöser: Klick wählt das Ziel), ○ frei (Ziel).</summary>
         private void DrawModuleSlots(IModuleHolder holder, System.Action<int> place)
@@ -1120,7 +1160,7 @@ namespace Betaknight.Overworld.UI
             return string.Join("\n", lines);
         }
 
-        private string ComponentTip(ComponentSlot c, int index, SkillInfo info)
+        private string ComponentTip(ComponentSlot c, int index, SkillInfo info, bool panel = false)
         {
             var lines = new List<string>();
             if (info != null) lines.Add(info.Details);
@@ -1145,13 +1185,13 @@ namespace Betaknight.Overworld.UI
                 string effect = _session.GrowthEffectText(rule, c.Skill.Growth);
                 lines.Add(UiTexts.Build.GrowsNow(rule.Text, effect, _session.MilestoneText(c.Skill.Growth, true)));
             }
-            lines.AddRange(ModuleLines(c.Skill));
+            if (!panel) lines.AddRange(ModuleLines(c.Skill));
             lines.AddRange(_session.EvolutionProgressFor(c.Skill));
-            lines.Add(UiTexts.Build.ComponentDragHint);
+            if (!panel) lines.Add(UiTexts.Build.ComponentDragHint);
             return string.Join("\n", lines);
         }
 
-        private string RelayTip(RelayChip relay, int index)
+        private string RelayTip(RelayChip relay, int index, bool panel = false)
         {
             var lines = new List<string> { $"{ArenaTexts.RelayName(index, relay.Name)}: {relay.Description}" };
             string level = relay.Rune.LevelText(relay.Level);
@@ -1165,9 +1205,9 @@ namespace Betaknight.Overworld.UI
             lines.Add(RuneText.DifficultyTip(relay.Rune, _session.RelayDifficulty(relay) != relay.Rune.Difficulty));
             lines.Add(UiTexts.Build.RelayLimit(_session.RelayMaxCells(relay)));
             lines.Add(PowersText(relay));
-            lines.AddRange(ModuleLines(relay));
+            if (!panel) lines.AddRange(ModuleLines(relay));
             lines.AddRange(_session.EvolutionProgressFor(relay));
-            lines.Add(UiTexts.Build.RelayDragHint);
+            if (!panel) lines.Add(UiTexts.Build.RelayDragHint);
             return string.Join("\n", lines);
         }
 
