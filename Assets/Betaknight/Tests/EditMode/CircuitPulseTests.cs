@@ -459,7 +459,7 @@ namespace Betaknight.Tests.EditMode
         public void ChipsAreRareRewards()
         {
             var progression = new ProgressionConfig();
-            Assert.Greater(progression.ChipChance(RewardSources.Elite), 0);
+            Assert.AreEqual(0, progression.ChipChance(RewardSources.Elite), "Elite-Chips kommen übers Bergen von der Gegner-Platine");
             Assert.Greater(progression.ChipChance(RewardSources.Treasure), 0);
             Assert.AreEqual(0, progression.ChipChance(RewardSources.Victory), "normale Siege geben keine Chips");
             Assert.AreEqual(1, progression.ChipsOnBossEscape);

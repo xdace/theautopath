@@ -54,10 +54,10 @@ Travel stops by itself on hostile tiles (enemy, boss), on newly discovered tiles
 |---|---|---|
 | Rune | Runenwahl (Sieg, Truhe, 3 Splitter), Shop | Neue Rune als Relais auf ein freies Feld oder ins Runen-Inventar; schon vorhandene Rune: +1 Stufe |
 | Ausrüstung | Sieg (50 %), Truhe, Shop | Anlegen oder ins Inventar; schon vorhandenes Teil: +1 Stufe (bis +3), jede Stufe +50 % der Grundwerte |
-| Skill | Sieg (35 %), Elite (60 %), Truhe (50 %), Mine (35 %), Runensplitter (30 %), Shop (1 Skill, 14 Gold) | Neues Exemplar frei in die Sammlung. Schon vorhanden: «Wachstum +5» für das vorhandene Exemplar (siehe Wachsen und Evolution) oder «Zweites Exemplar» für eine weitere Komponente |
+| Skill | Bergen nach Kämpfen, Truhe (50 %), Mine (35 %), Runensplitter (30 %), Shop (1 Skill, 14 Gold) | Neues Exemplar frei in die Sammlung. Schon vorhanden: «Wachstum +5» für das vorhandene Exemplar (siehe Wachsen und Evolution) oder «Zweites Exemplar» für eine weitere Komponente |
 | Platinen-Erweiterung: nächste Grösse | Garantiert bei jeder Boss-Flucht und beim Akt-Wechsel, als Wahl bei Elite-Siegen (50 %) und seltenen Truhen (10 %), Shop-Platz (20, 35, 50 … Gold pro Run, einer pro Shop) | 4×3 → 4×4 → 5×4 → 5×5 → 6×5 → 6×6 |
-| Modul (selten) | Elite (35 %), Truhe (15 %), garantiert bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 30 Gold) | Neues Exemplar frei in die Sammlung; schon vorhanden: «Stufe erhöhen» (+1, wo das Modul Stufen hat) oder «Weiteres Exemplar» |
-| Chip (selten) | Elite (35 %), Truhe (15 %), garantiert 1 bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 15 Gold) | Leiterbahn, Diode, Gatter, Kondensator, Sicherung oder Effekt-Chip (Amplifier, Watchdog, Overflow, Firewall) ins Chip-Inventar (siehe «Pins, Traces and Logic Chips» und «Circuit Effects») |
+| Modul (selten) | Bergen (vor allem Elite), Truhe (15 %), garantiert bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 30 Gold) | Neues Exemplar frei in die Sammlung; schon vorhanden: «Stufe erhöhen» (+1, wo das Modul Stufen hat) oder «Weiteres Exemplar» |
+| Chip (selten) | Bergen (Elite), Truhe (15 %), garantiert 1 bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 15 Gold) | Leiterbahn, Diode, Gatter, Kondensator, Sicherung oder Effekt-Chip (Amplifier, Watchdog, Overflow, Firewall) ins Chip-Inventar (siehe «Pins, Traces and Logic Chips» und «Circuit Effects») |
 | Bergen (Gegner-Teile) | Jeder Sieg über einen Gegner mit Ausrüstung: 1 Wahl, Elite 2 | Skill, Rune, Modul oder Chip, das der Gegner benutzt hat (siehe «Enemy Boards and Salvage») |
 | Gold, Splitter | Kämpfe, Events, Minen, Boss-Flucht | Elite-Siege geben +4 Gold |
 
@@ -222,7 +222,7 @@ Enemies fight with real boards, built exactly like the knight's (`Core/Combat/En
 - **Gear:** from tier 2 on, an enemy also carries a component from the knight's catalogs: a skill on its rune relay, with pins. From tier 5 it carries two. The rune always has the difficulty to power the skill. Each gear component has a 25 % chance of a module.
 - **Elite:** carries one more component, has a 50 % module chance on every component (its own parts too, at least one module guaranteed) and 1 chip (Firewall, Overflow or Watchdog; 2 from tier 7). Modules work for enemies exactly as for the knight (Multicast casts twice, Overclock heats neighbours …).
 - **Fixed per tile:** enemy and board come from the map seed and the tile. Hovering a fight tile shows exactly the enemy waiting there, its board and its loot. Gold-mine raids still list the possible attackers. The boss carries no gear.
-- **Salvage:** after a won fight you pick parts the enemy used: skills, runes, modules and chips. 1 pick after normal fights, **2 after elite fights**. "Leave the rest" skips. The normal reward choice follows afterwards and is unchanged.
+- **Salvage:** after a won fight you pick parts the enemy used: skills, runes, modules and chips. 1 pick after normal fights, **2 after elite fights**. "Leave the rest" skips. The normal reward choice (runes, items, board expansion) follows afterwards. Salvage **replaces** the random skill, module and chip drops fights used to give: from fights, those only come from the enemy's board now (chests, mines, shards, shop and boss escapes are unchanged).
 - **Arena:** each enemy's board is drawn like yours, with the same live highlights.
 
 ### Kampf: Skills, Ausrüstung und Werte

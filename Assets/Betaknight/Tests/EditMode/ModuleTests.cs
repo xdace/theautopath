@@ -539,8 +539,9 @@ namespace Betaknight.Tests.EditMode
         public void ModulesAreRare()
         {
             var config = new ProgressionConfig();
-            Assert.Greater(config.ModuleOfferChance(RewardSources.Elite), 0);
-            Assert.Less(config.ModuleOfferChance(RewardSources.Elite), 50);
+            Assert.AreEqual(0, config.ModuleOfferChance(RewardSources.Elite), "Elite-Module kommen übers Bergen von der Gegner-Platine");
+            Assert.Greater(config.ModuleOfferChance(RewardSources.Treasure), 0);
+            Assert.Less(config.ModuleOfferChance(RewardSources.Treasure), 50);
             Assert.AreEqual(0, config.ModuleOfferChance(RewardSources.Victory), "Normale Kämpfe geben keine Module");
             var prices = new ShopPrices();
             Assert.Greater(prices.Module, prices.Skill, "Teurer Shop-Platz");

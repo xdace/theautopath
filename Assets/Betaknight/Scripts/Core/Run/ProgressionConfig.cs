@@ -57,9 +57,12 @@ namespace Betaknight.Core.Run
 
         // ------------------------------------------------------------------ Skills als Belohnung
 
-        /// <summary>Chance in Prozent, dass ein Angebot einen Skill statt der letzten Rune enthält, je Quelle.</summary>
-        public int SkillOfferChanceVictory = 35;
-        public int SkillOfferChanceElite = 60;
+        /// <summary>
+        /// Chance in Prozent, dass ein Angebot einen Skill statt der letzten Rune enthält, je Quelle. Kämpfe geben keine
+        /// Zufalls-Skills mehr: Skills, Module und Chips aus Kämpfen kommen nur noch über das Bergen von der Gegner-Platine.
+        /// </summary>
+        public int SkillOfferChanceVictory = 0;
+        public int SkillOfferChanceElite = 0;
         public int SkillOfferChanceTreasure = 50;
         public int SkillOfferChanceMine = 35;
 
@@ -75,8 +78,8 @@ namespace Betaknight.Core.Run
 
         // ------------------------------------------------------------------ Logik-Chips (A-20, selten)
 
-        /// <summary>Chance in Prozent auf einen Chip nach einem Elite-Sieg bzw. aus einer Truhe. Boss-Flucht gibt immer einen.</summary>
-        public int ChipChanceElite = 35;
+        /// <summary>Chance in Prozent auf einen Chip nach einem Elite-Sieg (0: Bergen ersetzt das) bzw. aus einer Truhe. Boss-Flucht gibt immer einen.</summary>
+        public int ChipChanceElite = 0;
         public int ChipChanceTreasure = 15;
         public int ChipsOnBossEscape = 1;
 
@@ -95,8 +98,8 @@ namespace Betaknight.Core.Run
 
         // ------------------------------------------------------------------ Module (selten)
 
-        /// <summary>Chance in Prozent auf ein Modul als zusätzliche Wahl, je Quelle. Boss-Flucht gibt immer eines.</summary>
-        public int ModuleOfferChanceElite = 35;
+        /// <summary>Chance in Prozent auf ein Modul als zusätzliche Wahl, je Quelle (Elite 0: Bergen ersetzt das). Boss-Flucht gibt immer eines.</summary>
+        public int ModuleOfferChanceElite = 0;
         public int ModuleOfferChanceTreasure = 15;
 
         /// <summary>Chance, dass ein Shop einen (teuren) Modul-Platz hat.</summary>

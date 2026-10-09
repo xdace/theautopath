@@ -214,13 +214,13 @@ namespace Betaknight.Tests.EditMode
         /// Skills nach Grösse neu eingestellt, Gegner mit Takt-Relais.
         /// Mit A-20 erneut: Relais und Gatter melden «an/aus» (neue Ereignisse), Pins verbinden berührende Komponenten mit Pulsen.
         /// Mit A-21 erneut: Thermal Throttling ab 30 s statt Überhitzungsschaden, Gegner mit Hacks.
-        /// Mit Gegner-Platinen erneut: Gegner tragen Skills, Module und Chips (fest je Feld), nach dem Sieg wird geborgen.
+        /// Mit Gegner-Platinen erneut: Gegner tragen Skills, Module und Chips (fest je Feld), nach dem Sieg wird geborgen (ersetzt Zufalls-Skills, -Module und -Chips aus Kämpfen).
         /// </summary>
-        [TestCase("blade", 5, "4 Kämpfe, 419 Ereignisse, EBDB181DD7CC1806")]
+        [TestCase("blade", 5, "4 Kämpfe, 425 Ereignisse, 791A1C878E6E19BF")]
         [TestCase("blade", 21, "2 Kämpfe, 220 Ereignisse, 05E7CAB027B90EED")]
-        [TestCase("shield", 5, "6 Kämpfe, 863 Ereignisse, E12064B83239FCDF")]
-        [TestCase("shield", 21, "3 Kämpfe, 391 Ereignisse, 33013BFDE6756A92")]
-        [TestCase("spark", 5, "2 Kämpfe, 206 Ereignisse, 0A1771818AC715E0")]
+        [TestCase("shield", 5, "4 Kämpfe, 549 Ereignisse, 5EF1F902E41D3BA8")]
+        [TestCase("shield", 21, "2 Kämpfe, 304 Ereignisse, 7BD2D0BED604DF0A")]
+        [TestCase("spark", 5, "3 Kämpfe, 375 Ereignisse, 88CB409ED14CA2F6")]
         [TestCase("spark", 21, "2 Kämpfe, 283 Ereignisse, 8258D2EDF7A6B0E6")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {
