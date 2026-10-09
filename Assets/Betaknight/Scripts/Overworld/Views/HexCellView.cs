@@ -1,6 +1,7 @@
 using Betaknight.Core.Encounters;
 using Betaknight.Core.Map;
 using Betaknight.Overworld.Config;
+using Betaknight.Core.Hex;
 using UnityEngine;
 
 namespace Betaknight.Overworld.Views
@@ -24,6 +25,11 @@ namespace Betaknight.Overworld.Views
         private SpriteRenderer _background;
         private TextMesh _label;
         private MeshRenderer _labelRenderer;
+        private TextMesh _tier;
+        private MeshRenderer _tierRenderer;
+
+        /// <summary>Gefahrenstufe eines Kampffeldes (-1 ohne), gesetzt von der Session; erscheint klein unter dem Symbol.</summary>
+        public static System.Func<HexCoord, int> DangerOf;
         private OverworldSettings _settings;
         private EncounterCatalog _encounters;
         private HexCell _cell;
@@ -71,6 +77,20 @@ namespace Betaknight.Overworld.Views
             _labelRenderer = labelGo.GetComponent<MeshRenderer>();
             if (_label.font != null) _labelRenderer.sharedMaterial = _label.font.material;
             _labelRenderer.sortingOrder = SortingBase + 1;
+
+            var tierGo = new GameObject("Tier");
+            tierGo.transform.SetParent(transform, false);
+            tierGo.transform.localPosition = new Vector3(0f, -settings.hexSize * 0.30f, -0.01f);
+            _tier = tierGo.AddComponent<TextMesh>();
+            _tier.font = ProceduralSprites.LabelFont;
+            _tier.fontSize = 64;
+            _tier.characterSize = settings.hexSize * 0.042f;
+            _tier.anchor = TextAnchor.MiddleCenter;
+            _tier.alignment = TextAlignment.Center;
+            _tier.fontStyle = FontStyle.Bold;
+            _tierRenderer = tierGo.GetComponent<MeshRenderer>();
+            if (_tier.font != null) _tierRenderer.sharedMaterial = _tier.font.material;
+            _tierRenderer.sortingOrder = SortingBase + 1;
 
             Refresh();
         }
@@ -149,6 +169,11 @@ namespace Betaknight.Overworld.Views
             _label.text = text;
             _label.color = textColor;
             _labelRenderer.enabled = visible && !string.IsNullOrEmpty(text);
+
+            int tier = visible && _cell.IsContentKnown && !_cell.IsResolved && DangerOf != null ? DangerOf(_cell.Coord) : -1;
+            _tier.text = tier >= 0 ? $"T{tier}" : string.Empty;
+            _tier.color = new Color(1f, 0.85f, 0.80f, 0.95f);
+            _tierRenderer.enabled = tier >= 0;
         }
 
         private void ResolveContentLook(out Color color, out string text)

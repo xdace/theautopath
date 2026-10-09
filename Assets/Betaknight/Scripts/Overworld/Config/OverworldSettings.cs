@@ -67,7 +67,7 @@ namespace Betaknight.Overworld.Config
         };
 
         [Tooltip("Color of minor events. The symbol comes from the event catalog.")]
-        public Color minorEventColor = new Color(0.45f, 0.55f, 0.45f);
+        public Color minorEventColor = new Color(0.30f, 0.58f, 0.62f);
 
         [Tooltip("Color of medium events (decision).")]
         public Color mediumEventColor = new Color(0.55f, 0.45f, 0.70f);

@@ -101,6 +101,62 @@ namespace Betaknight.Overworld.UI
             public const string Start = "Start";
         }
 
+        // ------------------------------------------------------------------ Karte: Routen-Tooltip und Legende
+
+        public static class Route
+        {
+            public const string CantReach = "Can't go there";
+            public const string Arrive = "Arrive";
+            public static string Travel(int tiles) => tiles == 1 ? "Travel · 1 turn · 1 tile" : $"Travel · 1 turn · {tiles} tiles";
+            public static string StopsAt(int step) => $"Stops at tile {step}";
+            public static string Fight(int tier) => $"Fight there · danger T{tier}";
+            public static string Boss(int tier) => $"The boss comes this turn, where you stop (danger T{tier})!";
+
+            public static string Stop(Betaknight.Core.RouteStop stop)
+            {
+                switch (stop)
+                {
+                    case Betaknight.Core.RouteStop.Unexplored: return "new tile, you look around first";
+                    case Betaknight.Core.RouteStop.Enemy: return "enemy blocks the way";
+                    case Betaknight.Core.RouteStop.MineRaid: return "your mine is under attack";
+                    default: return string.Empty;
+                }
+            }
+
+            public static string Problem(Betaknight.Core.RouteProblem problem)
+            {
+                switch (problem)
+                {
+                    case Betaknight.Core.RouteProblem.Hidden: return "Hidden tile: explore a neighbour first.";
+                    case Betaknight.Core.RouteProblem.Blocked: return "This tile can't be entered.";
+                    case Betaknight.Core.RouteProblem.NoKnownPath: return "No known path: routes only lead over explored tiles.";
+                    case Betaknight.Core.RouteProblem.OutOfBounds: return "Outside the map.";
+                    default: return string.Empty;
+                }
+            }
+        }
+
+        public static class Legend
+        {
+            public const string Title = "Legend";
+            public const string Hint = "L to close";
+            public const string Button = "Legend (L)";
+            public const string ButtonTip = "What the map colours and symbols mean";
+            public const string Unexplored = "Unexplored (content unknown)";
+            public const string Empty = "Empty";
+            public const string Minor = "Small event (instant)";
+            public const string Medium = "Event with a choice";
+            public const string Enemy = "Enemy";
+            public const string Elite = "Elite enemy (stronger, better loot)";
+            public const string Shop = "Shop";
+            public const string Treasure = "Treasure chest";
+            public const string Mine = "Gold mine (income)";
+            public const string MineRaid = "Your mine under attack";
+            public const string Tier = "Danger tier of a fight";
+            public const string Resolved = "Done (darkened)";
+            public const string Route = "Planned route (mouse over)";
+        }
+
         // ------------------------------------------------------------------ Toasts und Journal
 
         public static class Journal

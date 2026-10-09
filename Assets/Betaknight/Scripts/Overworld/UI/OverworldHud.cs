@@ -10,6 +10,7 @@ using Betaknight.Core.Arena;
 using Betaknight.Core.Combat;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
+using Betaknight.Overworld.Config;
 using Betaknight.Overworld.Controllers;
 using UnityEngine;
 
@@ -36,8 +37,11 @@ namespace Betaknight.Overworld.UI
         /// <summary>Öffnet/schliesst das Journal (Taste J). Ohne Zuweisung gibt es keinen Knopf.</summary>
         public Action OnOpenJournal;
 
-        public void Initialize(OverworldSession session, OverworldController controller, EncounterCatalog encounters, Action onNewMap)
+        public void Initialize(OverworldSession session, OverworldController controller, EncounterCatalog encounters, Action onNewMap,
+            OverworldSettings settings = null)
         {
+            _settings = settings;
+            _routeFor = null;
             _session = session;
             _controller = controller;
             _encounters = encounters;
@@ -75,6 +79,14 @@ namespace Betaknight.Overworld.UI
         private static Rect ConfirmRect => new Rect(Screen.width * 0.5f - 210f, Screen.height * 0.5f - 80f, 420f, 160f);
 
         private static bool _debugVisible;
+        private static bool _legendVisible;
+        private OverworldSettings _settings;
+        private HexCoord? _routeFor;
+        private int _routeTurn = -1;
+        private RoutePreview _route;
+
+        private static Rect LegendRect => new Rect(Screen.width - 292f, Screen.height - LegendHeight - 12f, 280f, LegendHeight);
+        private const float LegendHeight = 372f;
         private static bool _confirmNewRun;
 
         private Vector2 _scroll;
@@ -90,7 +102,8 @@ namespace Betaknight.Overworld.UI
         {
             var guiPoint = new Vector2(screen.x, Screen.height - screen.y);
             if (_confirmNewRun || ToastLayer.ContainsGuiPoint(guiPoint)) return true;
-            return TopBarRect.Contains(guiPoint) || GoalRect.Contains(guiPoint) || (_debugVisible && DebugRect.Contains(guiPoint));
+            return TopBarRect.Contains(guiPoint) || GoalRect.Contains(guiPoint) || (_debugVisible && DebugRect.Contains(guiPoint))
+                || (_legendVisible && LegendRect.Contains(guiPoint));
         }
 
         private void Update()
@@ -123,11 +136,18 @@ namespace Betaknight.Overworld.UI
                 _debugVisible = !_debugVisible;
                 e.Use();
             }
+            else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.L && !_confirmNewRun)
+            {
+                _legendVisible = !_legendVisible;
+                e.Use();
+            }
 
             DrawTopBar();
             DrawGoal();
             DrawInspector();
             if (_debugVisible) DrawDebug();
+            if (_legendVisible) DrawLegend();
+            DrawRouteTip();
             if (_confirmNewRun) DrawConfirm();
             UiTheme.DrawTooltip();
         }
@@ -159,6 +179,7 @@ namespace Betaknight.Overworld.UI
             float right = Screen.width - 12f;
             right = BarButton(right, UiTexts.Hud.NewRun, UiTexts.Hud.NewRunTip, () => _confirmNewRun = true, 96f);
             if (OnOpenJournal != null) right = BarButton(right, UiTexts.Journal.Button, UiTexts.Journal.ButtonTip, OnOpenJournal, 110f);
+            right = BarButton(right, UiTexts.Legend.Button, UiTexts.Legend.ButtonTip, () => _legendVisible = !_legendVisible, 100f);
             if (_session.CanOpenShop) right = BarButton(right, UiTexts.Hud.OpenShop, null, () => _session.OpenShop(), 110f);
             if (OnOpenInventory != null && !_session.IsGameOver)
                 right = BarButton(right, UiTexts.Hud.InventoryButton(_session.Inventory.Count, _session.Inventory.Capacity), UiTexts.Hud.InventoryTip, OnOpenInventory, 170f);
@@ -281,6 +302,91 @@ namespace Betaknight.Overworld.UI
         private static bool IsFight(HexCell cell) =>
             cell.Content == CellContent.Enemy || cell.Content == CellContent.Elite || cell.Content == CellContent.Boss
             || (cell.Content == CellContent.GoldMine && cell.IsUnderAttack);
+
+        // ------------------------------------------------------------------ Routen-Tooltip an der Maus
+
+        /// <summary>
+        /// «Travel · 1 turn · 3 tiles», wo und warum die Reise anhält, ob der Boss dort ankommt; für ungültige Ziele der Grund.
+        /// </summary>
+        private void DrawRouteTip()
+        {
+            if (_controller == null || _confirmNewRun || !_controller.HoveredCoord.HasValue) return;
+            HexCoord target = _controller.HoveredCoord.Value;
+            if (_routeFor != target || _routeTurn != _session.Turns.CurrentTurn || _route == null)
+            {
+                _routeFor = target;
+                _routeTurn = _session.Turns.CurrentTurn;
+                _route = _session.PreviewRoute(target);
+            }
+            RoutePreview r = _route;
+            if (r.Problem == RouteProblem.Here || r.Problem == RouteProblem.Busy || r.Problem == RouteProblem.GameOver) return;
+
+            var lines = new List<string>();
+            if (!r.IsValid)
+            {
+                lines.Add($"<color={UiTheme.Hex(UiTheme.Bad)}><b>{UiTexts.Route.CantReach}</b></color>");
+                lines.Add($"<size=13>{UiTexts.Route.Problem(r.Problem)}</size>");
+            }
+            else
+            {
+                lines.Add($"<b>{UiTexts.Route.Travel(r.Steps.Count)}</b>");
+                if (r.StopReason != RouteStop.None)
+                {
+                    string where = r.StopsEarly ? UiTexts.Route.StopsAt(r.StopIndex + 1) : UiTexts.Route.Arrive;
+                    lines.Add($"<size=13><color=#ffd75e>{where}: {UiTexts.Route.Stop(r.StopReason)}</color></size>");
+                }
+                int danger = _session.DangerAt(r.StopAt);
+                if (danger >= 0) lines.Add($"<size=13><color=#ff9e8f>{UiTexts.Route.Fight(danger)}</color></size>");
+                if (r.BossArrives) lines.Add($"<size=13><color={UiTheme.Hex(UiTheme.Bad)}><b>{UiTexts.Route.Boss(r.TierAtStop)}</b></color></size>");
+            }
+            var content = new GUIContent(string.Join("\n", lines));
+            float width = 300f;
+            float height = _style.CalcHeight(content, width - 16f) + 10f;
+            Vector2 mouse = Event.current.mousePosition;
+            var rect = new Rect(Mathf.Min(mouse.x + 18f, Screen.width - width - 8f), Mathf.Min(mouse.y + 20f, Screen.height - height - 8f), width, height);
+            UiTheme.Fill(rect, new Color(0.04f, 0.05f, 0.07f, 0.94f));
+            UiTheme.Fill(new Rect(rect.x, rect.y, 3f, rect.height), r.IsValid ? UiTheme.Accent : UiTheme.Bad);
+            GUI.Label(new Rect(rect.x + 10f, rect.y + 5f, rect.width - 16f, rect.height - 10f), content, _style);
+        }
+
+        // ------------------------------------------------------------------ Legende (L)
+
+        private void DrawLegend()
+        {
+            Rect rect = LegendRect;
+            UiTheme.Fill(rect, new Color(0.05f, 0.06f, 0.08f, 0.94f));
+            UiTheme.Outline(rect, UiTheme.BorderColor, 1f);
+            float y = rect.y + 8f;
+            GUI.Label(new Rect(rect.x + 10f, y, rect.width - 20f, 22f), $"<b>{UiTexts.Legend.Title}</b>  <size=12><color=#9aa4b2>{UiTexts.Legend.Hint}</color></size>", _bar);
+            y += 26f;
+            foreach ((Color color, string symbol, string text) in LegendRows())
+            {
+                var swatch = new Rect(rect.x + 10f, y + 2f, 26f, 20f);
+                UiTheme.Fill(swatch, color);
+                GUI.Label(swatch, $"<b>{symbol}</b>", _barCenter);
+                GUI.Label(new Rect(swatch.xMax + 8f, y, rect.width - 54f, 24f), $"<size=13>{text}</size>", _bar);
+                y += 24f;
+            }
+        }
+
+        private IEnumerable<(Color, string, string)> LegendRows()
+        {
+            OverworldSettings s = _settings;
+            Color Style(CellContent c, Color fallback) => s != null ? s.GetStyle(c).color : fallback;
+            yield return (s != null ? s.unexploredColor : new Color(0.30f, 0.33f, 0.40f), "?", UiTexts.Legend.Unexplored);
+            yield return (Style(CellContent.Empty, new Color(0.45f, 0.52f, 0.45f)), "", UiTexts.Legend.Empty);
+            yield return (s != null ? s.minorEventColor : new Color(0.30f, 0.58f, 0.62f), "", UiTexts.Legend.Minor);
+            yield return (s != null ? s.mediumEventColor : new Color(0.55f, 0.45f, 0.70f), "", UiTexts.Legend.Medium);
+            yield return (Style(CellContent.Enemy, new Color(0.70f, 0.30f, 0.28f)), "!", UiTexts.Legend.Enemy);
+            yield return (Style(CellContent.Elite, new Color(0.85f, 0.25f, 0.55f)), "E", UiTexts.Legend.Elite);
+            yield return (Style(CellContent.Shop, new Color(0.30f, 0.50f, 0.75f)), "$", UiTexts.Legend.Shop);
+            yield return (Style(CellContent.Treasure, new Color(0.75f, 0.60f, 0.25f)), "*", UiTexts.Legend.Treasure);
+            yield return (Style(CellContent.GoldMine, new Color(0.85f, 0.72f, 0.20f)), "G", UiTexts.Legend.Mine);
+            yield return (new Color(0.75f, 0.30f, 0.25f), "!G", UiTexts.Legend.MineRaid);
+            yield return (new Color(0.25f, 0.27f, 0.30f), "T5", UiTexts.Legend.Tier);
+            yield return (s != null ? s.resolvedColor : new Color(0.25f, 0.27f, 0.30f), "", UiTexts.Legend.Resolved);
+            yield return (s != null ? s.highlightColor : new Color(1f, 0.85f, 0.35f), "", UiTexts.Legend.Route);
+        }
 
         // ------------------------------------------------------------------ Debug (F3)
 

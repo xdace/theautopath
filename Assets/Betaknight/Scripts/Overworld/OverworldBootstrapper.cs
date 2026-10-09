@@ -216,6 +216,7 @@ namespace Betaknight.Overworld
             _root = new GameObject($"Overworld (Act {Session.Act})");
             var layout = new HexLayout(settings.hexSize);
 
+            HexCellView.DangerOf = Session.DangerAt;
             var gridGo = new GameObject("Grid");
             gridGo.transform.SetParent(_root.transform, false);
             HexGridView grid = gridGo.AddComponent<HexGridView>();
@@ -230,7 +231,7 @@ namespace Betaknight.Overworld
             controller.InputBlocked = () => _arenaWindow.IsOpen || _buildWindow.IsOpen || _inventoryWindow.IsOpen;
             _controller = controller;
 
-            _hud.Initialize(Session, controller, _config.Encounters, StartNewRun);
+            _hud.Initialize(Session, controller, _config.Encounters, StartNewRun, settings);
             _encounterWindow.Initialize(Session);
             _toasts.Initialize(Session, keep: Session.Act > 1);
             _runeWindow.Initialize(Session);
