@@ -151,8 +151,8 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(s.TakeRune(0));
 
             Assert.AreEqual(1, s.Board.Relays.Single().Level);
-            Assert.AreEqual("HP Below 40 %", s.Board.Relays.Single().Name);
-            Assert.AreEqual("Rune HP Below 30 % → HP Below 40 %", messages.Last());
+            Assert.AreEqual("HP Below 25 %", s.Board.Relays.Single().Name);
+            Assert.AreEqual("Rune HP Below 20 % → HP Below 25 %", messages.Last());
         }
 
         [Test]
@@ -160,12 +160,12 @@ namespace Betaknight.Tests.EditMode
         {
             RuneCatalog runes = new RuneCatalog(new[] { RuneCatalog.CreateDefault().Get("hp_low") });
             OverworldSession s = Session(runes: runes);
-            s.RuneInventory.TryAdd(new StoredRune(runes.Get("hp_low"), 1));
+            s.RuneInventory.TryAdd(new StoredRune(runes.Get("hp_low"), 0));
 
             s.OfferRunes(RewardSources.Victory);
             Assert.IsTrue(s.TakeRune(0));
 
-            Assert.AreEqual(2, s.RuneInventory.Runes.Single().Level);
+            Assert.AreEqual(1, s.RuneInventory.Runes.Single().Level);
             Assert.AreEqual(0, s.Board.Relays.Count);
         }
 

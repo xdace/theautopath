@@ -214,7 +214,7 @@ namespace Betaknight.Tests.EditMode
             s.Board.AddRelay(s.RuneCatalog.Get("hp_low"), new Cell(3, 2));
             s.ExpandBoard(2);
             s.RuneInventory.TryAdd(new StoredRune(s.RuneCatalog.Get("enemy_low"), 1));
-            s.RuneInventory.TryAdd(new StoredRune(s.RuneCatalog.Get("hp_critical"), 0));
+            s.RuneInventory.TryAdd(new StoredRune(s.RuneCatalog.Get("every_20s"), 0));
 
             Assert.IsTrue(s.SwapRune(0, 0), "auf ein Relais: tauschen");
             Assert.AreEqual("enemy_low", s.Board.Relays[0].Rune.Id);
@@ -222,13 +222,13 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(new Cell(0, 0), s.Board.Relays[0].Position, "Lage bleibt");
             Assert.AreEqual("clock", s.RuneInventory.Runes[0].Rune.Id);
 
-            int hpCritical = s.RuneInventory.Runes.ToList().FindIndex(r => r.Rune.Id == "hp_critical");
-            Assert.IsFalse(s.EquipRuneFromInventory(hpCritical, new Cell(1, 1)), "nicht auf den Kern");
-            Assert.IsTrue(s.EquipRuneFromInventory(hpCritical, new Cell(2, 0)), "auf die freie Zelle, auf die gezogen wurde");
-            Assert.AreEqual(new[] { "enemy_low", "hp_critical", "hp_low" }, s.Board.Relays.Select(r => r.Rune.Id).ToArray());
+            int everyLong = s.RuneInventory.Runes.ToList().FindIndex(r => r.Rune.Id == "every_20s");
+            Assert.IsFalse(s.EquipRuneFromInventory(everyLong, new Cell(1, 1)), "nicht auf den Kern");
+            Assert.IsTrue(s.EquipRuneFromInventory(everyLong, new Cell(2, 0)), "auf die freie Zelle, auf die gezogen wurde");
+            Assert.AreEqual(new[] { "enemy_low", "every_20s", "hp_low" }, s.Board.Relays.Select(r => r.Rune.Id).ToArray());
 
             Assert.IsTrue(s.MoveRelay(2, new Cell(1, 0)), "Relais auf der Platine ziehen");
-            Assert.AreEqual(new[] { "enemy_low", "hp_low", "hp_critical" }, s.Board.Relays.Select(r => r.Rune.Id).ToArray(), "Lesereihenfolge");
+            Assert.AreEqual(new[] { "enemy_low", "hp_low", "every_20s" }, s.Board.Relays.Select(r => r.Rune.Id).ToArray(), "Lesereihenfolge");
         }
 
         // ------------------------------------------------------------------ Stat-Leiste

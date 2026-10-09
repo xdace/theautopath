@@ -52,6 +52,12 @@ namespace Betaknight.Core.Arena
         /// </summary>
         Trigger,
 
+        /// <summary>
+        /// Modul «Charge Link»: wie <see cref="Trigger"/>, aber das Ziel wird nur aufgeladen (um die Grösse der Quelle bzw. die
+        /// Grenze des Relais) und läuft, sobald die Ladung seine Grösse erreicht.
+        /// </summary>
+        Charge,
+
         /// <summary>Eingang eines UND-Gatters (Relais → Gatter).</summary>
         And,
 

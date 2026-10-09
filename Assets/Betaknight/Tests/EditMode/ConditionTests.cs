@@ -191,16 +191,6 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void BigHitTaken()
-        {
-            BattleResult small = Run(new LogicBoard(new[] { Row("big_hit_taken", Ping(), 15) }), enemyDamage: 20, enemyInterval: 20);
-            BattleResult big = Run(new LogicBoard(new[] { Row("big_hit_taken", Ping(), 15) }), enemyDamage: 40, enemyInterval: 20);
-
-            Assert.IsEmpty(Starts(small, "ping"), "20 von 200 HP = 10 %.");
-            Assert.IsNotEmpty(Starts(big, "ping"), "40 von 200 HP = 20 %.");
-        }
-
-        [Test]
         public void EnemyDiesFiresAfterAKill()
         {
             var setup = Duel(Fighter("A", 200, 5, board: new LogicBoard(new[] { Row("enemy_dies", Ping()) })), Fighter("B", 5, 1, 1000));

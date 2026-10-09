@@ -179,7 +179,7 @@ namespace Betaknight.Core.Autoplay
             RuneOffer offer = s.PendingRuneOffer;
             if (offer == null) return null;
 
-            bool hasTrigger = s.Modules.Owns(ModuleIds.Trigger);
+            bool hasTrigger = s.Modules.Owns(ModuleIds.Trigger) || s.Modules.Owns(ModuleIds.ChargeLink);
             var candidates = new List<(int score, BotAction action)>();
             void Add(int score, BotAction a)
             {
@@ -193,7 +193,7 @@ namespace Betaknight.Core.Autoplay
                 string id = offer.ModuleIds[i];
                 if (!s.CanTakeModule(i)) continue;
                 bool upgrade = s.ModuleUpgradeTarget(id) != null;
-                int score = id == ModuleIds.Trigger && !hasTrigger ? 40 : upgrade ? 34 : 24;
+                int score = ModuleRules.IsTargeted(id) && !hasTrigger ? 40 : upgrade ? 34 : 24;
                 Add(score, Try(BotActionKind.Offer, AutoplayTexts.OfferModule(ModuleName(s, id)), () => s.TakeModule(index), AutoplayTexts.RewardModule));
             }
             for (int i = 0; i < offer.SkillIds.Count; i++)
@@ -436,7 +436,7 @@ namespace Betaknight.Core.Autoplay
             // Gesetzte Auslöser ohne Ziel bekommen eines.
             foreach (ModuleInstance module in s.Modules.All)
             {
-                if (module.ModuleId != ModuleIds.Trigger || module.IsFree || module.Target.HasValue) continue;
+                if (!ModuleRules.IsTargeted(module.ModuleId) || module.IsFree || module.Target.HasValue) continue;
                 BotAction a = Try(BotActionKind.Build, AutoplayTexts.SetTriggerTarget(module.InstanceId),
                     () => s.CycleTriggerTarget(module.InstanceId) && module.Target.HasValue, setsTrigger: true);
                 if (a != null) return a;

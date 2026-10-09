@@ -170,17 +170,19 @@ namespace Betaknight.Tests.EditMode
             Assert.IsFalse(Rune("vs_boss").IsMet(ctx, out _));
             Assert.IsTrue(Rune("last_enemy").IsMet(ctx, out _));
             Assert.IsFalse(Rune("outnumbered", 3).IsMet(ctx, out _));
-            Assert.IsFalse(Rune("overheat").IsMet(ctx, out _));
+            Assert.IsFalse(Rune("overtime", 4).IsMet(ctx, out _));
+            Assert.IsTrue(Rune("opening", 3).IsMet(ctx, out _));
+            Assert.IsFalse(Rune("backlog", 2).IsMet(ctx, out _));
         }
 
         [Test]
         public void RuneLevelsChangeParameters()
         {
             RuneDefinition hpLow = RuneCatalog.CreateDefault().Get("hp_low");
-            Assert.AreEqual(30, hpLow.ParameterAt(0));
-            Assert.AreEqual(50, hpLow.ParameterAt(2));
-            Assert.AreEqual(50, hpLow.ParameterAt(9), "Über der Höchststufe bleibt es bei der Höchststufe.");
-            Assert.AreEqual("HP Below 40 %", hpLow.NameAt(1));
+            Assert.AreEqual(20, hpLow.ParameterAt(0));
+            Assert.AreEqual(25, hpLow.ParameterAt(1));
+            Assert.AreEqual(25, hpLow.ParameterAt(9), "Über der Höchststufe bleibt es bei der Höchststufe.");
+            Assert.AreEqual("HP Below 25 %", hpLow.NameAt(1));
         }
 
         [Test]

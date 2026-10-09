@@ -459,6 +459,9 @@ namespace Betaknight.Core.Arena
                     else
                     {
                         fired = Triggers(relay.Condition, context, states[i], out target);
+                        // Pulsierende Zustands-Runen: solange der Zustand gilt, erneut nach jedem Takt.
+                        if (!fired && relay.PulseTicks > 0 && states[i].FireCount > 0 && Tick - states[i].LastFiredTick >= relay.PulseTicks)
+                            fired = relay.Condition.IsMet(context, out target);
                     }
                     if (fired) Fire(c, i, target);
                     bool active = relay.IsEventTrigger && !flipped ? states[i].FireCount > 0 && Tick - states[i].LastFiredTick < hold : states[i].WasMet;
@@ -724,9 +727,23 @@ namespace Betaknight.Core.Arena
         {
             foreach (GraphEdge edge in c.Board.Graph.From(from))
             {
-                if (edge.Kind != GraphEdgeKind.Trigger) continue;
                 int causeRow = from.Kind == GraphNodeKind.Skill ? from.Row : -1;
-                Enqueue(c, edge.To.Row, sourceRelay, ActionCause.Trigger, causeRow, sourceTier, maxCells, null);
+                if (edge.Kind == GraphEdgeKind.Trigger)
+                {
+                    Enqueue(c, edge.To.Row, sourceRelay, ActionCause.Trigger, causeRow, sourceTier, maxCells, null);
+                }
+                else if (edge.Kind == GraphEdgeKind.Charge)
+                {
+                    // Charge Link: lädt das Ziel um die Grösse der Quelle (Komponente) bzw. die Grenze des Relais auf.
+                    int row = edge.To.Row;
+                    if (row < 0 || row >= c.Board.Rows.Count) continue;
+                    int amount = from.Kind == GraphNodeKind.Skill && from.Row >= 0 && from.Row < c.Board.Rows.Count ? c.Board.Rows[from.Row].Cells
+                        : from.Kind == GraphNodeKind.Block && from.Row >= 0 && from.Row < c.Board.Relays.Count ? c.Board.Relays[from.Row].MaxCells : 0;
+                    if (ChargeUp(c, row, ChargeLinkKey, amount))
+                        Enqueue(c, row, sourceRelay, ActionCause.Trigger, causeRow, sourceTier, int.MaxValue, null);
+                    else
+                        Missed(c, row, sourceRelay, MissReason.TooLarge);
+                }
             }
         }
 
@@ -813,17 +830,20 @@ namespace Betaknight.Core.Arena
                 Emit(new BattleEvent(Tick, BattleEventKind.QueueJump, c, null, c.QueueList.Count - 1, r.Skill.Id, row) { Relay = relay });
         }
 
+        /// <summary>Eigener Ladungs-Speicher für «Charge Link» (getrennt von der Ladung durch Relais).</summary>
+        private const int ChargeLinkKey = -100;
+
         /// <summary>
         /// Zu grosse Komponente: jedes Auslösen lädt sie um die Feld-Grenze des Relais auf. Erreicht die Ladung ihre Grösse,
         /// läuft sie (true) und die Grösse wird abgezogen; der Rest bleibt für das nächste Auslösen. Jeder Kampf startet bei 0.
         /// Beispiel: Grenze 2, Grösse 4 → läuft bei jedem 2. Auslösen.
         /// </summary>
-        private bool ChargeUp(Combatant c, int row, int relay, int maxCells)
+        private bool ChargeUp(Combatant c, int row, int relay, int amount)
         {
-            if (maxCells <= 0) return false;
+            if (amount <= 0) return false;
             Dictionary<(int Row, int Relay), int> charge = _fx[c].Charge;
             charge.TryGetValue((row, relay), out int stored);
-            stored = (int)Math.Min(int.MaxValue, (long)stored + maxCells);
+            stored = (int)Math.Min(int.MaxValue, (long)stored + amount);
             int cells = c.Board.Rows[row].Cells;
             bool ready = stored >= cells;
             if (ready) stored -= cells;

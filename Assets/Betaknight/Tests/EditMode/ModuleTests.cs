@@ -223,7 +223,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(2, ModuleRules.ApplyToParameter(runes.Get("clock"), 2, threshold), "Ohne Prozent-Schwelle wirkungslos");
 
             LogicRelay relay = BoardFactory.CreateDefault().CreateRelay(new RelaySpec("hp_low", new Cell(0, 0), modules: threshold), null);
-            Assert.AreEqual("HP Below 40 %", relay.Label);
+            Assert.AreEqual("HP Below 30 %", relay.Label);
         }
 
         [Test]

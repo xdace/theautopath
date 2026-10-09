@@ -229,7 +229,6 @@ namespace Betaknight.Core.Growth
 
             // Runen mit Prozent-Schwelle wachsen in der Schwelle, alle anderen nur im Zähler.
             c.SetRune("hp_low", Threshold());
-            c.SetRune("hp_critical", Threshold());
             c.SetRune("enemy_low", Threshold());
             return c;
         }

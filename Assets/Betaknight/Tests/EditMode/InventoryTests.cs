@@ -175,12 +175,12 @@ namespace Betaknight.Tests.EditMode
             OverworldSession s = Session();
             s.Board.AddRelay(s.RuneCatalog.Get("hp_low"), new Cell(2, 0));
             Assert.IsTrue(s.Board.Upgrade(0));
-            Assert.AreEqual("HP Below 40 %", s.Board.Relays[0].Name);
+            Assert.AreEqual("HP Below 25 %", s.Board.Relays[0].Name);
 
             Assert.IsTrue(s.UnequipRune(0));
             Assert.AreEqual(0, s.Board.Relays.Count);
             Assert.AreEqual(1, s.RuneInventory.Runes.Single().Level);
-            Assert.AreEqual("HP Below 40 %", s.RuneInventory.Runes.Single().Name);
+            Assert.AreEqual("HP Below 25 %", s.RuneInventory.Runes.Single().Name);
 
             Assert.IsTrue(s.EquipRuneFromInventory(0, new Cell(3, 2)));
             Assert.AreEqual(1, s.Board.Relays[0].Level);
@@ -196,12 +196,12 @@ namespace Betaknight.Tests.EditMode
             Wear(s, "short_blade");
             s.Board.AddRelay(s.RuneCatalog.Get("on_hit"), new Cell(2, 0));
             Assert.IsTrue(s.PlaceSkill(s.Skills.Add(SkillIds.ShockStab).InstanceId, new Cell(3, 0)));
-            s.RuneInventory.TryAdd(new StoredRune(s.RuneCatalog.Get("hp_low"), 2));
+            s.RuneInventory.TryAdd(new StoredRune(s.RuneCatalog.Get("hp_low"), 1));
 
             Assert.IsTrue(s.SwapRune(0, 0));
 
             Assert.AreEqual("hp_low", s.Board.Relays[0].Rune.Id);
-            Assert.AreEqual(2, s.Board.Relays[0].Level);
+            Assert.AreEqual(1, s.Board.Relays[0].Level);
             Assert.AreEqual(new Cell(2, 0), s.Board.Relays[0].Position);
             Assert.AreEqual(SkillIds.ShockStab, s.Board.ComponentsTouching(s.Board.Relays[0]).Single().Skill.SkillId);
             Assert.AreEqual("on_hit", s.RuneInventory.Runes.Single().Rune.Id);

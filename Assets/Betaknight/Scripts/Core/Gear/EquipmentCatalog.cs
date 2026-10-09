@@ -147,7 +147,7 @@ namespace Betaknight.Core.Gear
             new EquipmentDefinition(ReliefCarrierIds.VenomTorch, "Venom Torch", EquipmentSlot.Weapon, S((StatKind.Damage, 1)), weight: 5,
                 description: "\"Enemy Burning\" also counts Poison.", tags: T(SynergyTagIds.Toxin, SynergyTagIds.Heat)),
             new EquipmentDefinition(ReliefCarrierIds.PainConductor, "Pain Conductor Greaves", EquipmentSlot.Legs, S((StatKind.Armor, 1)), weight: 5,
-                description: "\"Heavy Hit\" triggers 5 percentage points earlier.", tags: T(SynergyTagIds.Scrap)),
+                description: "\"HP Below x %\" triggers 5 percentage points earlier.", tags: T(SynergyTagIds.Scrap)),
         });
     }
 }

@@ -661,7 +661,7 @@ namespace Betaknight.Overworld.UI
             foreach (ModuleInstance m in holder.Modules)
             {
                 GUIContent chip = ModuleText.Chip(_session, m);
-                bool trigger = m.ModuleId == ModuleIds.Trigger;
+                bool trigger = ModuleRules.IsTargeted(m.ModuleId);
                 if (trigger) chip.tooltip = chip.tooltip + UiTexts.Build.TriggerClick;
                 // A-21: Effekt-Module zeigen ihr Symbol statt ◆.
                 string mark = EffectText.Icon(m.ModuleId);

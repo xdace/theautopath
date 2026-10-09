@@ -32,6 +32,9 @@ namespace Betaknight.Core.Arena
         /// <summary>Löst bei jedem Ereignis aus (statt nur bei der steigenden Flanke eines Zustands).</summary>
         public bool IsEventTrigger { get; }
 
+        /// <summary>Solange die Bedingung gilt, löst das Relais alle so viele Ticks erneut aus (0 = nur bei der steigenden Flanke).</summary>
+        public int PulseTicks { get; internal set; }
+
         /// <summary>Schwierigkeit, wenn das Relais umgekehrt wird (für das NICHT-Gatter, aus der Rune).</summary>
         public int InvertedDifficulty { get; }
 

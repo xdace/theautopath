@@ -87,7 +87,7 @@ namespace Betaknight.Core.Autoplay
                 foreach (ModuleInstance m in s.Modules.All.Where(m => !m.IsFree))
                 {
                     string text = $"{m.NameFrom(s.ModuleCatalog)} @ {s.ModuleWhere(m)}";
-                    if (m.ModuleId == ModuleIds.Trigger) text += $" ({s.DescribeTrigger(m)})";
+                    if (ModuleRules.IsTargeted(m.ModuleId)) text += $" ({s.DescribeTrigger(m)})";
                     Report.Modules.Add(text);
                 }
                 Report.TriggerLinks = s.TriggerLinks().Count;

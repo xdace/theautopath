@@ -46,7 +46,6 @@ namespace Betaknight.Core.Arena
         private static void RegisterStateConditions(ConditionRegistry r)
         {
             r.Register("hp_low", p => new HpBelowCondition(BasisPoints.Percent(p)));
-            r.Register("hp_critical", p => new HpBelowCondition(BasisPoints.Percent(p)));
             r.Register("hp_full", _ => new HpFullCondition());
             r.Register("enemy_low", p => new EnemyHpBelowCondition(BasisPoints.Percent(p)));
             // Evolution von «HP unter x %» (Rezept Phantom): auch direkt nach dem Ausweichen.
@@ -58,7 +57,9 @@ namespace Betaknight.Core.Arena
             r.Register("enemy_burning", _ => new EnemyHasStatusCondition(StatusIds.Burn));
             r.Register("outnumbered", p => new OutnumberedCondition(p));
             r.Register("last_enemy", _ => new LastEnemyCondition());
-            r.Register("overheat", _ => new OverheatCondition());
+            r.Register("overtime", p => new FightTimeCondition(Ticks.FromSeconds(p), from: true));
+            r.Register("opening", p => new FightTimeCondition(Ticks.FromSeconds(p), from: false));
+            r.Register("backlog", p => new QueueAtLeastCondition(p));
             r.Register("on_goldmine", _ => new ContextCondition(ContextCondition.Kind.OnGoldMine));
             r.Register("vs_boss", _ => new ContextCondition(ContextCondition.Kind.VsBoss));
         }
@@ -85,9 +86,12 @@ namespace Betaknight.Core.Arena
             r.Register("after_self_damage", _ => new EventCondition((c, e) => OnSelf(c, e, BattleEventKind.SelfDamage) && e.Amount > 0));
             r.Register("after_heal", _ => new EventCondition((c, e) => OnSelf(c, e, BattleEventKind.Healed)));
             r.Register("enemy_dies", _ => new EventCondition((c, e) => e.Kind == BattleEventKind.Death && e.Target != null && e.Target.Side != c.Self.Side));
-            r.Register("big_hit_taken", p => new EventCondition((c, e) =>
-                OnSelf(c, e, BattleEventKind.Damage)
-                && (long)e.Amount * 100 > (long)Math.Max(1, p - c.Self.Relief(ReliefIds.BigHitLower)) * c.Self.MaxHp, (c, e) => e.Source));
+            // Status auf einen Gegner gelegt (Brand, Betäubung, Verlangsamung …); die eigenen Komponenten zählen wie bei «On Hit» nicht.
+            r.Register("status_applied", _ => new EventCondition((c, e) =>
+                Own(c, e, BattleEventKind.StatusApplied) && e.Target != null && e.Target.Side != c.Self.Side && !Powers(c, e.RowIndex), (c, e) => e.Target));
+            // Nach jedem Basisangriff: füllt Leerlauf, wenn nichts in der Warteschlange stand.
+            r.Register("idle_cycle", _ => new EventCondition((c, e) =>
+                Own(c, e, BattleEventKind.ActionExecuted) && e.Detail == SkillDefinition.BasicAttackId, (c, e) => e.Target));
             r.Register("after_own_skill", _ => new EventCondition((c, e) =>
                 Own(c, e, BattleEventKind.ActionExecuted) && e.Detail != SkillDefinition.BasicAttackId && !Powers(c, e.RowIndex)));
             r.Register("battle_start", _ => new BattleStartCondition());

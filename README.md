@@ -73,8 +73,9 @@ Combat is programmed on a **circuit board**, a grid instead of a list of rows. F
 - **Components (What)** are skills with a shape: 1×1, 1×2, 2×1, 2×2 or 2×3. Nothing may overlap. Drag & drop places them, a right click rotates them (width and height swap).
 - **No cooldowns.** When a relay triggers, all components it powers are queued and fire one after another with their cast time. Loops are limited by cast times only.
 - **Queue:** Priority is reading order: top-left first, row by row (the index `#n` in the UI). Each component is queued at most once; further triggers while it waits are shown as **missed** (already queued, too large, frozen, no skill). The Basic Attack fills the gaps and is interrupted during its windup as soon as a component is queued.
-- **Triggers:** Event relays (On Hit, When Hit, After Crit, Every n Attacks, Clock …) trigger on **every** event. State relays (HP Full, HP Below 30 %, Enemy Charging …) trigger only on the **rising edge**, when the state turns true. The relay module **Repeat while true** re-queues its components after they fired, as long as the state still holds.
+- **Triggers:** Event relays (On Hit, When Hit, After Crit, Every n Attacks, Clock …) trigger on **every** event. State relays (HP Full, Enemy Charging …) trigger only on the **rising edge**, when the state turns true. **Pulsing** state relays (HP Below 20 %, Opening, Overtime, Backlog, Outnumbered) trigger again every second (Outnumbered: every 2 s) as long as the state holds; each trigger charges a too-large component by the relay's limit (`RuneDefinition.PulseSeconds`). The relay module **Repeat while true** re-queues its components after they fired, as long as the state still holds.
 - **Clock replaces Always:** The rune "Always" is gone. The new relay **Clock 2 s** (rare, level 1: 1 s) ticks at a fixed interval, first tick after one interval. Enemies that used "Always + cooldown" now have Clock relays ("Every 7 s").
+- **Trigger overhaul:** Fights last only a few seconds (measured with the test player: about 6–7 s on average), so slow triggers almost never fired. Time runes are short now (Clock 2/1 s, Every 4/3/2 s, the rare one Every 5/4/3 s), thresholds are easier (Outnumbered from 2 enemies, Haste ≥ 4/3/2), "Heavy Hit" and "HP Below 10/15 %" are gone. **HP Below 20/25 %** (◆, limit 2) fires every second while the HP stay low, so it charges a large component by 2 per second. New runes: **Idle Cycle** (after each Basic Attack), **Opening** (every second during the first 3/4/5 s), **Overtime** (every second from 4/3/2 s on), **Backlog** (every second while 2+ components wait), **Status Applied** (after you put a status on an enemy). New module **Charge Link**: after its component fires, it charges a chosen target by its own size; the target runs once the charge reaches its size.
 - **Enemy boards** are data (`Combat/EnemyBoard.cs`) and readable on hover on the map and in the arena, e.g. "Every 7 s → Ram (2×1): …".
 
 #### Size limit by difficulty
@@ -84,9 +85,9 @@ The harder a relay's condition is to meet, the larger the components it can powe
 | Difficulty | Symbol | Example relays | Max component size | Bonus on powered components |
 |---|---|---|---|---|
 | 0 Easy | ◇ | Clock, Battle Start | 1 cell | none |
-| 1 Medium | ◆ | On Hit, When Hit, Every 3 Attacks, Every 5 Seconds | 2 cells | +15 % effect |
-| 2 Hard | ◆◆ | After Crit, Enemy Stunned, After Block, HP Below 30 % | 4 cells | +30 % effect, −20 % cast time |
-| 3 Very hard | ◆◆◆ | Charge Full, 2 Dodges in a Row, HP Below 15 %, Every 20 Seconds, Vs. Boss | 6 cells | +60 % effect, −35 % cast time, +1 s status duration |
+| 1 Medium | ◆ | On Hit, When Hit, Every 3 Attacks, Every 4 Seconds, HP Below 20 %, Opening, Backlog, Status Applied | 2 cells | +15 % effect |
+| 2 Hard | ◆◆ | After Crit, Enemy Stunned, After Block, Overtime | 4 cells | +30 % effect, −20 % cast time |
+| 3 Very hard | ◆◆◆ | Charge Full, 2 Dodges in a Row, Every 5 Seconds (rare), Vs. Boss | 6 cells | +60 % effect, −35 % cast time, +1 s status duration |
 
 Cast time never drops below 0.1 s. The bonus never decreases: gear, modules or growth that make a condition easier keep its tier. "Invert" has its own tier. Enemy relays have no size limit. An execution gets the bonus of the relay that triggered it.
 
@@ -205,7 +206,7 @@ Effects change how your own board runs; hacks attack the enemy board. Every effe
 
 **Enemies hack too:** Spark Drone jams every 9 s, Smelter sends Latency every 11 s, Siege Golem flips a relay every 10 s. A Firewall chip blocks the first hack.
 
-**Thermal Throttling** replaces the old Overheat damage: nobody takes damage from time alone any more, but fights speed toward an end because every hit grows. The rune "Overheat" now holds while Thermal Throttling is active. The boss fight (survive 15 s) is unchanged. Values: `ThermalConfig`.
+**Thermal Throttling** replaces the old Overheat damage: nobody takes damage from time alone any more, but fights speed toward an end because every hit grows. The rune "Overheat" is replaced by "Overtime" (every second from 4/3/2 s of fighting on), because fights rarely reach 30 s. The boss fight (survive 15 s) is unchanged. Values: `ThermalConfig`.
 
 **Arena:** hacked components and relays flicker, components with Heat show a heat bar, recursion shows its depth, pulses show their amplifier gain (e.g. +15 %), and the top bar shows the Thermal Throttling step. The log explains every effect ("Charge Coil overheated at 5 Heat and skips this execution", "Every 1 s is jammed and ignores this trigger (1 left)", "Shock Stab calls itself again (Recursion depth 2, +40 % effect)" …).
 
@@ -281,7 +282,7 @@ Anzeige: Das HUD zeigt die Zähler («Ladung 3/4», erreichte Schwellen gelb) un
 - 7 Ausrüstungsplätze (Helm, Handschuhe, Brust, Beinschienen, Waffe, Schild, Stiefel). Zweihandwaffen sperren den Schild.
 - 4 Sets mit Boni ab 2 und 3 Teilen: Überlast-Protokoll, Aegis-Firewall, Schrott-Ernter, Phantom-Signal.
 - Schutzregeln statt Balance-Bremsen: höchstens eine Aktion pro Tick, Reaktionen erst im nächsten Tick, ab 30 s Thermal Throttling (Cast-Zeit und Schaden steigen in Stufen). Kaputte Builds sind erlaubt, die Engine bleibt stabil.
-- Lagerfeuer kann eine Rune eine Stufe verstärken (z. B. «HP unter 30 %» → «HP unter 40 %»).
+- Lagerfeuer kann eine Rune eine Stufe verstärken (z. B. «HP unter 20 %» → «HP unter 25 %»).
 - Sets: Fortschritt steht im HUD, in der Stat-Leiste und im Inventar. Teile angefangener Sets kommen 3× häufiger in Angebote, Shops verkaufen 2 Teile. Aegis-Firewall (ab 2 Teilen) schaltet die Rune «Ladung voll» frei.
 - **Goldminen-Verteidigung:** Alle 8 Züge wird eine eigene Mine angegriffen (rot, «!G»). 6 Züge Zeit, sonst ist sie verloren, bis sie zurückerobert ist. Der Kampf dort läuft «auf der Goldmine» (Schrott-Ernter, Rune «Auf Goldmine»).
 - **Boss alle 25 Züge:** Er taucht beim Ritter auf und ist unbesiegbar. Wer 15 s überlebt, entkommt durchs Portal (+8 Gold, +2 Splitter). Ausweichen und Betäuben helfen, Phantom-Signal ist dafür gebaut.
@@ -303,7 +304,7 @@ Module sind wie Skills eigene Exemplare (`Core/Modules/`: `ModuleInstance`, `Mod
 | Umkehren | Baustein | NICHT: das Relais gilt, wenn die Bedingung nicht erfüllt ist |
 | Wiederholen solange wahr (Repeat while true) | Baustein | Reiht die versorgten Komponenten nach der Ausführung erneut ein, solange der Zustand gilt |
 | Verlängern | Baustein | Die Bedingung gilt 1 s / 1,5 s länger |
-| Schwelle | Baustein | +10 / +15 Prozentpunkte bei Runen mit Prozent-Schwelle («HP unter 30 %» → 40 %), höchstens 100 % |
+| Schwelle | Baustein | +10 / +15 Prozentpunkte bei Runen mit Prozent-Schwelle («HP unter 20 %» → 30 %), höchstens 100 % |
 | Auslöser | beides | Am Skill «nach Ausführung», am Baustein «wenn erfüllt» (beim Wechsel von nicht erfüllt zu erfüllt): löst ein Ziel aus |
 
 **Auslöser** zielen per stabiler Id auf ein Skill-Exemplar (Komponente), nicht auf eine Position: Verschieben oder Drehen nimmt das Ziel mit. Ein Ziel, das gerade nicht auf der Platine liegt, löst nichts aus. Das ausgelöste Ziel castet ganz normal mit Cast-Zeit und wird eingereiht; steht es schon in der Warteschlange, zählt der Auslöser als verpasst. **Kreise sind erlaubt**, das sind die Loops; begrenzt werden sie nur durch Cast-Zeiten.
@@ -327,7 +328,7 @@ Die Regeln stehen jetzt oben unter «Circuit Board» (Queue). Daten in `Arena/Ro
 | Pro Heilung | +1 % Heilung (max. +50 %) | Not-Reparatur, Kühlmittel-Injektion |
 | Pro gewonnenem Kampf | +1 % Wirkung (max. +50 %) | Entzünden, Feuersturm |
 | Pro gewonnenem Kampf | nur Zähler (Stufen, Modul-Plätze) | Notfall-Schildwall, Blendgranate, Bodenanker, Schubdüsen, Echo-Protokoll, Resonanz |
-| Pro gewonnenem Kampf | +1 Prozentpunkt Schwelle (max. 50 %) | Bausteine «HP unter … %» (beide), «Gegner unter … %», «HP unter … % oder ausgewichen» |
+| Pro gewonnenem Kampf | +1 Prozentpunkt Schwelle (max. 50 %) | Bausteine «HP unter … %», «Gegner unter … %», «HP unter … % oder ausgewichen» |
 | Pro gewonnenem Kampf | nur Zähler | alle anderen Bausteine |
 
 **Meilensteine:** Wachstum 5 / 15 / 30 ergibt Skill-Stufe 1 / 2 / 3 (Höchststufe). Wachstum 10 und 25 öffnet je einen weiteren Modul-Platz, für Skills und Bausteine (also bis 3 Plätze). Die Karte zeigt das Wachstum am Namen («Bohrstoß +7», «[HP unter 30 % +4] → Bohrstoß +7»), das Build-Fenster im Tooltip jeder Zeile die Regel, die aktuelle Wirkung und den nächsten Meilenstein.
@@ -340,7 +341,7 @@ Die Regeln stehen jetzt oben unter «Circuit Board» (Queue). Daten in `Arena/Ro
 |---|---|---|---|
 | Hitze | Entzünden | Modul Fläche | Feuersturm: 60 % an alle Gegner, alle brennen 5 s |
 | Ladung | Schockstich | Tag Ladung 4 | Blitzlanze (1×1): 80 %, 50 % Chance auf 1,5 s Betäubung |
-| Phantom | Baustein «HP unter 30/40/50 %» | Modul Verlängern | «HP unter 50 % oder ausgewichen» (gilt auch direkt nach einem Ausweichen) |
+| Phantom | Baustein «HP unter 20/25 %» | Modul Verlängern | «HP unter 25 % oder ausgewichen» (pulsiert jede Sekunde, gilt auch direkt nach einem Ausweichen) |
 | Takt | Echo-Protokoll | Modul Mehrfach | Resonanz (2×1): wiederholt den letzten Skill zweimal |
 | Toxin | Bohrstoß | Relais «Gegner unter … %» versorgt ihn | Säurebohrer (2×2): 230 % an alle Gegner, doppeltes Gift |
 | Schrott | Schildschlag | Tag Schrott 4 | Schrottramme: 90 % durch Rüstung, unterbricht, 2,5 s Betäubung |
@@ -363,8 +364,8 @@ Grundschwierigkeit 0–3 pro Relais (Daten im `RuneCatalog`, `difficulty` und `i
 | Phantomschritt-Stiefel | Ausrüstung (Füsse), Phantom | Ausweicher-Serie bricht erst beim 2. Treffer | 3 Ausweicher in Folge |
 | Konterschild | Ausrüstung (Schild), Ladung | Krit-Chance +15 % für 2 s nach einem Block | Nach Krit |
 | Giftbrenner | Ausrüstung (Waffe), Toxin | «Gegner brennt» gilt auch bei Gift | Gegner brennt |
-| Schmerzleiter-Beinschienen | Ausrüstung (Beine), Schrott | «Schwerer Treffer» gilt 5 Prozentpunkte früher | Schwerer Treffer |
-| Alarmfühler | Baustein-Modul | HP-Schwellen-Bausteine gelten 10 Prozentpunkte früher | HP unter 30 %, HP unter 15 %, HP unter … oder ausgewichen |
+| Schmerzleiter-Beinschienen | Ausrüstung (Beine), Schrott | HP-Schwellen-Bausteine gelten 5 Prozentpunkte früher | HP unter 20 %, HP unter … oder ausgewichen |
+| Alarmfühler | Baustein-Modul | HP-Schwellen-Bausteine gelten 10 Prozentpunkte früher | HP unter 20 %, HP unter … oder ausgewichen |
 | Witterung | Baustein-Modul | «Gegner unter x %» gilt 10 Prozentpunkte früher | Gegner unter 25 % |
 | Ladungsspule | Skill (Schild) | +3 Ladung (höchstens 5) | Ladung voll |
 | Lähmnebel | Skill (Schock) | 20 % Schaden und 0,6 s Betäubung an alle Gegner | Gegner betäubt |
@@ -437,6 +438,7 @@ Shops frühestens ab Ring 3 und höchstens 2, Truhen höchstens 6, Goldminen hö
 | Triggered | How often a relay triggered a component |
 | Missed Trigger | A trigger that could not queue the component (already queued, too large, frozen) |
 | Trigger | Module that starts another component after this one fires (↪) |
+| Charge Link | Module like Trigger, but it only charges the target by its own size (on a relay: by the relay's limit); the target runs once its charge reaches its size |
 | Pin | Contact on a component edge. Touching pins connect two components |
 | Typed Pin | Pin that asks for a skill kind; a matching neighbour gives +15 % effect |
 | Trace | Chip that connects distant pins (Straight, Corner, T, Cross) |
@@ -671,8 +673,8 @@ Katalognamen:
 | Evolutionen | Feuersturm → Firestorm, Blitzlanze → Lightning Lance, Resonanz → Resonance, Säurebohrer → Acid Drill, Schrottramme → Scrap Ram |
 | Skill-Arten | Angriff → Attack, Schild → Shield, Feuer → Fire, Schock → Shock, Heilung → Healing, Bewegung → Movement |
 | Runen-Tags | Klinge → Blade, Schild → Shield, Funke → Spark, Glut → Ember, Phantom → Phantom |
-| Runen | Jeder n. Angriff → Every n Attacks, Nach jedem n. Angriff → After Every n Attacks, Alle n Sekunden → Every n Seconds, Kampfbeginn → Battle Start, Jeder n. erlittene Treffer → Every n Hits Taken, Kette → Chain, Nach eigenem Skill → After Own Skill, Bei Treffer → On Hit, Nach Krit → After Crit, Gegner unter n % → Enemy Below n %, Gegner gepanzert → Enemy Armored, Gegner betäubt → Enemy Stunned, Gegner stärker → Enemy Stronger, Tempo ≥ n → Haste ≥ n, Wenn getroffen → When Hit, Nach Block → After Block, Gegner lädt auf → Enemy Charging, HP voll → HP Full, Schwerer Treffer → Heavy Hit, Ladung voll → Charge Full, HP unter n % → HP Below n %, Nach Selbstschaden → After Self-Damage, Nach Heilung → After Healing, Gegner brennt → Enemy Burning, Gegner fällt → Enemy Falls, Überhitzung → Overheat, Nach Ausweichen → After Dodge, n Ausweicher in Folge → n Dodges in a Row, Immer → Always, Auf Goldmine → On Gold Mine, Gegen Boss → Vs. Boss, In Unterzahl → Outnumbered, Letzter Gegner → Last Enemy, HP unter n % oder ausgewichen → HP Below n % or Dodged |
-| Module | Mehrfach → Multicast, Fläche → Area, Kette → Chain, Blutzoll → Blood Toll, Schnellcast → Quickcast, Umkehren → Invert (Label "NOT"), Verlängern → Extend, Schwelle → Threshold, Auslöser → Trigger, Alarmfühler → Alarm Sensor, Witterung → Scent |
+| Runen | Jeder n. Angriff → Every n Attacks, Nach jedem n. Angriff → After Every n Attacks, Alle n Sekunden → Every n Seconds, Kampfbeginn → Battle Start, Jeder n. erlittene Treffer → Every n Hits Taken, Kette → Chain, Nach eigenem Skill → After Own Skill, Bei Treffer → On Hit, Nach Krit → After Crit, Gegner unter n % → Enemy Below n %, Gegner gepanzert → Enemy Armored, Gegner betäubt → Enemy Stunned, Gegner stärker → Enemy Stronger, Tempo ≥ n → Haste ≥ n, Wenn getroffen → When Hit, Nach Block → After Block, Gegner lädt auf → Enemy Charging, HP voll → HP Full, Ladung voll → Charge Full, HP unter n % → HP Below n %, Nach Selbstschaden → After Self-Damage, Nach Heilung → After Healing, Gegner brennt → Enemy Burning, Gegner fällt → Enemy Falls, Überstunden → Overtime, Eröffnung → Opening, Rückstau → Backlog, Leerlauf → Idle Cycle, Status gesetzt → Status Applied, Nach Ausweichen → After Dodge, n Ausweicher in Folge → n Dodges in a Row, Immer → Always, Auf Goldmine → On Gold Mine, Gegen Boss → Vs. Boss, In Unterzahl → Outnumbered, Letzter Gegner → Last Enemy, HP unter n % oder ausgewichen → HP Below n % or Dodged |
+| Module | Mehrfach → Multicast, Fläche → Area, Kette → Chain, Blutzoll → Blood Toll, Schnellcast → Quickcast, Umkehren → Invert (Label "NOT"), Verlängern → Extend, Schwelle → Threshold, Auslöser → Trigger, Ladekopplung → Charge Link, Alarmfühler → Alarm Sensor, Witterung → Scent |
 | Sets | Überlast-Protokoll → Overload Protocol, Aegis-Firewall → Aegis Firewall, Schrott-Ernter → Scrap Harvester, Phantom-Signal → Phantom Signal |
 | Duos | Glutrhythmus → Ember Rhythm, Phasenschild → Phase Shield, Brandgift → Fire Venom, Schrottkondensator → Scrap Capacitor, Geisterschritt → Ghost Step, Säurefraß → Acid Bite |
 | Plätze | Helm → Helmet, Handschuhe → Gloves, Brust → Chest, Beinschienen → Legs, Waffe → Weapon, Schild → Shield, Stiefel → Boots |

@@ -25,9 +25,6 @@ namespace Betaknight.Core.Arena
         /// <summary>«Gegner brennt» gilt auch bei Gift.</summary>
         public const string BurnCountsPoison = "burn_counts_poison";
 
-        /// <summary>«Schwerer Treffer» schon ab so vielen Prozentpunkten weniger.</summary>
-        public const string BigHitLower = "big_hit_lower";
-
         /// <summary>Eigene HP-Schwellen («HP unter x %») gelten so viele Prozentpunkte früher.</summary>
         public const string HpThresholdUp = "hp_threshold_up";
 
@@ -143,7 +140,7 @@ namespace Betaknight.Core.Arena
             return result;
         }
 
-        private static readonly string[] HpRunes = { "hp_low", "hp_critical", Runes.EvolvedRuneIds.PhantomReflex };
+        private static readonly string[] HpRunes = { "hp_low", Runes.EvolvedRuneIds.PhantomReflex };
 
         public static ReliefCatalog CreateDefault() => new ReliefCatalog(new[]
         {
@@ -160,8 +157,8 @@ namespace Betaknight.Core.Arena
                 "Crit chance +15 % for 2 s after a Block", "Charge", "on_crit"),
             new ReliefDefinition(ReliefCarrierIds.VenomTorch, ReliefKind.Passive, ReliefIds.BurnCountsPoison, 1,
                 "\"Enemy Burning\" also counts Poison", "Toxin", "enemy_burning"),
-            new ReliefDefinition(ReliefCarrierIds.PainConductor, ReliefKind.Passive, ReliefIds.BigHitLower, 5,
-                "\"Heavy Hit\" triggers 5 percentage points earlier", "Scrap", "big_hit_taken"),
+            new ReliefDefinition(ReliefCarrierIds.PainConductor, ReliefKind.Passive, ReliefIds.HpThresholdUp, 5,
+                "HP threshold runes trigger 5 percentage points earlier", "Scrap", HpRunes),
 
             // Module am Logikbaustein (Ids aus dem ModuleCatalog).
             new ReliefDefinition(ReliefCarrierIds.AlarmSensor, ReliefKind.Module, ReliefIds.HpThresholdUp, 10,

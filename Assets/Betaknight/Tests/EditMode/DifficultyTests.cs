@@ -95,7 +95,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(2, runes.Get("enemy_stunned").Difficulty);
             Assert.AreEqual(3, runes.Get("charge_full").Difficulty);
             Assert.AreEqual(3, runes.Get("dodge_streak").Difficulty);
-            Assert.AreEqual(3, runes.Get("hp_critical").Difficulty);
+            Assert.AreEqual(1, runes.Get("hp_low").Difficulty, "lädt jede Sekunde um 2");
         }
 
         [Test]
@@ -237,7 +237,7 @@ namespace Betaknight.Tests.EditMode
                 new[] { new RelaySpec("hp_low", new Cell(0, 0), modules: new[] { new ModuleSpec(ModuleIds.AlarmSensor) }) },
                 new[] { new ComponentSpec(SkillIds.Repair, new Cell(1, 0)) });
             CombatantSetup withModule = PlayerLoadout.CreateCombatant("A", new CombatStats(1000, 10, 1000), null, alarm);
-            Assert.AreEqual(2, withModule.Board.Rows[0].Difficulty);
+            Assert.AreEqual(1, withModule.Board.Relays[0].Difficulty, "Reparatur (2×2) lädt am Relais (Grenze 2) auf");
             Assert.AreEqual(10, withModule.Reliefs[ReliefIds.HpThresholdUp]);
 
             BattleResult r = Run(Duel(eased, Fighter("B", 100000, 0, 1000)), 30);
@@ -315,7 +315,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(3, Relay("every_20s").Difficulty);
             Assert.AreEqual(0, Relay("every_20s", true).Difficulty, "NICHT alle 20 s ist fast immer");
             Assert.AreEqual(1, Relay("enemy_armored", true).Difficulty);
-            Assert.AreEqual(2, Relay("hp_low").Difficulty);
+            Assert.AreEqual(1, Relay("hp_low").Difficulty);
             Assert.AreEqual(0, Relay("hp_low", true).Difficulty);
 
             // Die Grössen-Grenze folgt der eigenen Stufe des umgekehrten Relais.
@@ -449,17 +449,6 @@ namespace Betaknight.Tests.EditMode
             LogicBoard Board() => new LogicBoard(new[] { Row("enemy_burning", Ping()), Row("battle_start", Poisoner()) });
             Assert.AreEqual(0, Starts(WithRelief(Board(), null, 1, 3), "ping").Count);
             Assert.Greater(Starts(WithRelief(Board(), ReliefIds.BurnCountsPoison, 1, 3), "ping").Count, 0);
-        }
-
-        [Test]
-        public void Relief_BigHitCountsEarlier()
-        {
-            // 12 Schaden bei 100 Max-HP: kein schwerer Treffer ab 15 %, aber ab 10 %.
-            int Fires(string relief) => Starts(WithRelief(new LogicBoard(new[] { Row("big_hit_taken", Ping(), parameter: 15) }), relief, 5, 5,
-                a => a.Stats[StatKind.MaxHp] = 100,
-                b => { b.Stats[StatKind.Damage] = 12; b.Stats[StatKind.AttackInterval] = 20; }), "ping").Count;
-            Assert.AreEqual(0, Fires(null));
-            Assert.Greater(Fires(ReliefIds.BigHitLower), 0);
         }
 
         [Test]

@@ -218,13 +218,14 @@ namespace Betaknight.Tests.EditMode
         /// Mit A-21 erneut: Thermal Throttling ab 30 s statt Überhitzungsschaden, Gegner mit Hacks.
         /// Mit Gegner-Platinen erneut: Gegner tragen Skills, Module und Chips (fest je Feld), nach dem Sieg wird geborgen (ersetzt Zufalls-Skills, -Module und -Chips aus Kämpfen).
         /// Zu grosse Komponenten laden auf und laufen, sobald die Ladung ihre Grösse erreicht: Seed 21 des Funkenritters erneut aufgenommen.
+        /// Auslöser überarbeitet (kurze Takte, pulsierende Zustände, «HP Below 20/25 %», ohne «Heavy Hit», neue Runen, «Charge Link»): alle erneut aufgenommen.
         /// </summary>
-        [TestCase("blade", 5, "4 Kämpfe, 425 Ereignisse, 791A1C878E6E19BF")]
-        [TestCase("blade", 21, "2 Kämpfe, 220 Ereignisse, 05E7CAB027B90EED")]
-        [TestCase("shield", 5, "4 Kämpfe, 549 Ereignisse, 5EF1F902E41D3BA8")]
-        [TestCase("shield", 21, "2 Kämpfe, 304 Ereignisse, 7BD2D0BED604DF0A")]
-        [TestCase("spark", 5, "3 Kämpfe, 375 Ereignisse, 88CB409ED14CA2F6")]
-        [TestCase("spark", 21, "2 Kämpfe, 257 Ereignisse, A00BEEDCC87FA9AF")]
+        [TestCase("blade", 5, "4 Kämpfe, 474 Ereignisse, 19817B85AF86969F")]
+        [TestCase("blade", 21, "3 Kämpfe, 289 Ereignisse, E6B445913E009B29")]
+        [TestCase("shield", 5, "6 Kämpfe, 863 Ereignisse, FAC374453772ECA5")]
+        [TestCase("shield", 21, "2 Kämpfe, 339 Ereignisse, 2BC09102B2F485DE")]
+        [TestCase("spark", 5, "3 Kämpfe, 395 Ereignisse, 3887B72E58EEF18B")]
+        [TestCase("spark", 21, "2 Kämpfe, 236 Ereignisse, 7104608CE06845B2")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {
             Assert.AreEqual(fingerprint, Fingerprint(BotBattles(KnightKit.Defaults.Single(k => k.Id == kit), seed)));

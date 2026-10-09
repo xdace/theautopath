@@ -187,7 +187,7 @@ namespace Betaknight.Tests.EditMode
         {
             BoardFactory factory = BoardFactory.CreateDefault();
             var at = new Cell(0, 0);
-            Assert.AreEqual("HP Below 45 %", factory.CreateRelay(new RelaySpec("hp_low", at, growth: 15), null).Label);
+            Assert.AreEqual("HP Below 35 %", factory.CreateRelay(new RelaySpec("hp_low", at, growth: 15), null).Label);
             Assert.AreEqual("HP Below 50 %", factory.CreateRelay(new RelaySpec("hp_low", at, growth: 40), null).Label);
             // Das Stufen-Abzeichen «▲2» kommt aus dem Runen-Stufen-Hotfix.
             Assert.AreEqual("HP Below 50 % ▲2", factory.CreateRelay(new RelaySpec("hp_low", at, level: 2, growth: 40), null).Label,
@@ -352,7 +352,6 @@ namespace Betaknight.Tests.EditMode
             AddRight(s, "hp_low", SkillIds.Repair);
             RelayChip row = s.Board.Relays[1];
             Assert.AreEqual("hp_low", row.Rune.Id);
-            Assert.IsTrue(s.Board.Upgrade(1));
             ModuleInstance extend = s.GainModule(ModuleIds.Extend);
             Assert.IsTrue(s.PlaceModuleOnRelay(extend.InstanceId, 1));
             EvolutionRecipe reflex = s.EvolutionCatalog.Get("evo_reflex");
@@ -364,10 +363,10 @@ namespace Betaknight.Tests.EditMode
             Walk(s, OverworldSession.BossInterval);
             Assert.IsFalse(s.IsGameOver);
             Assert.AreEqual(EvolvedRuneIds.PhantomReflex, row.Rune.Id);
-            Assert.AreEqual(2, row.Level);
+            Assert.AreEqual(1, row.Level);
             Assert.AreSame(extend, row.Modules.Single());
             Assert.AreEqual(new Cell(3, 0), row.Position, "Das Relais bleibt liegen");
-            StringAssert.StartsWith("HP Below 50 % or Dodged", row.Name);
+            StringAssert.StartsWith("HP Below 25 % or Dodged", row.Name);
         }
 
         [Test]

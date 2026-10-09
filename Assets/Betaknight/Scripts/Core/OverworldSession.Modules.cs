@@ -65,7 +65,7 @@ namespace Betaknight.Core
         public bool SetTriggerTarget(int moduleId, ModuleTarget? target)
         {
             ModuleInstance module = Modules.Get(moduleId);
-            if (!CanEditModules || module == null || module.ModuleId != ModuleIds.Trigger) return false;
+            if (!CanEditModules || module == null || !ModuleRules.IsTargeted(module.ModuleId)) return false;
             Modules.SetTarget(module, target);
             return true;
         }
@@ -111,16 +111,17 @@ namespace Betaknight.Core
         /// <summary>«After execution → Drill Strike (#3)» bzw. «When triggered → …». Nur für Auslöser.</summary>
         public string DescribeTrigger(ModuleInstance module)
         {
-            if (module == null || module.ModuleId != ModuleIds.Trigger) return string.Empty;
+            if (module == null || !ModuleRules.IsTargeted(module.ModuleId)) return string.Empty;
             string when = module.Holder is RelayChip ? SessionTexts.WhenMet : SessionTexts.AfterExecution;
-            return SessionTexts.ModuleTrigger(when, DescribeTarget(module.Target));
+            string target = DescribeTarget(module.Target);
+            return module.ModuleId == ModuleIds.ChargeLink ? SessionTexts.ModuleChargeLink(when, target) : SessionTexts.ModuleTrigger(when, target);
         }
 
         /// <summary>Wählt das nächste mögliche Ziel eines Auslösers (Lesereihenfolge der Komponenten, danach «kein Ziel»).</summary>
         public bool CycleTriggerTarget(int moduleId, int step = 1)
         {
             ModuleInstance module = Modules.Get(moduleId);
-            if (module == null || module.ModuleId != ModuleIds.Trigger) return false;
+            if (module == null || !ModuleRules.IsTargeted(module.ModuleId)) return false;
             var targets = TriggerTargets().Select(t => (ModuleTarget?)t.target).ToList();
             targets.Add(null);
             int current = targets.FindIndex(t => t.HasValue == module.Target.HasValue
@@ -166,7 +167,7 @@ namespace Betaknight.Core
 
         private void AddLink(List<TriggerLink> links, ModuleInstance m, int from, bool fromBlock)
         {
-            if (m.ModuleId != ModuleIds.Trigger) return;
+            if (!ModuleRules.IsTargeted(m.ModuleId)) return;
             int to = CircuitBoardSpec.TargetComponent(Board, m.Target);
             if (to >= 0) links.Add(new TriggerLink(from, to, fromBlock));
         }

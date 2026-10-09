@@ -132,6 +132,38 @@ namespace Betaknight.Core.Arena
         }
     }
 
+    /// <summary>Kampfzeit: wahr in den ersten N Sekunden («Opening») bzw. ab N Sekunden («Overtime»).</summary>
+    public sealed class FightTimeCondition : ICondition
+    {
+        public int Ticks { get; }
+        public bool From { get; }
+
+        public FightTimeCondition(int ticks, bool from)
+        {
+            Ticks = System.Math.Max(0, ticks);
+            From = from;
+        }
+
+        public bool IsMet(in ConditionContext c, out Combatant target)
+        {
+            target = null;
+            return From ? c.Tick >= Ticks : c.Tick <= Ticks;
+        }
+    }
+
+    /// <summary>Warteschlange: wahr, solange mindestens N eigene Komponenten warten («Backlog»).</summary>
+    public sealed class QueueAtLeastCondition : ICondition
+    {
+        public int Count { get; }
+        public QueueAtLeastCondition(int count) => Count = System.Math.Max(1, count);
+
+        public bool IsMet(in ConditionContext c, out Combatant target)
+        {
+            target = null;
+            return c.Self.Queue.Count >= Count;
+        }
+    }
+
     /// <summary>Kontext-Bedingungen: für den ganzen Kampf fest (Goldmine, Boss).</summary>
     public sealed class ContextCondition : ICondition
     {

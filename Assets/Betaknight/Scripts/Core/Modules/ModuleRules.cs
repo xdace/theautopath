@@ -80,6 +80,9 @@ namespace Betaknight.Core.Modules
         }
 
         /// <summary>Hat die Rune eine Prozent-Schwelle («HP unter {0} %»)? Nur dann wirkt «Schwelle».</summary>
+        /// <summary>Module mit Ziel-Komponente (Trigger, Charge Link): Ziel wählen, Linie zeichnen, als Kante kompilieren.</summary>
+        public static bool IsTargeted(string moduleId) => moduleId == ModuleIds.Trigger || moduleId == ModuleIds.ChargeLink;
+
         public static bool HasPercentThreshold(RuneDefinition rune) => rune != null && rune.NameTemplate.Contains("{0} %");
 
         /// <summary>Parameter der Rune mit «Schwelle»-Modulen (+10 Prozentpunkte, +5 je Stufe).</summary>

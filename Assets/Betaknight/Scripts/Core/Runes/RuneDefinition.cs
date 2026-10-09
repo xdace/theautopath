@@ -101,13 +101,20 @@ namespace Betaknight.Core.Runes
         /// <summary>Schwierigkeit der umgekehrten Bedingung (Modul «Umkehren»), eigener Datenwert.</summary>
         public int InvertedDifficulty { get; }
 
+        /// <summary>
+        /// Zustands-Runen: solange der Zustand gilt, löst das Relais alle so viele Sekunden erneut aus (0 = nur bei der
+        /// steigenden Flanke). Jedes Auslösen lädt zu grosse Komponenten um die Feld-Grenze des Relais auf.
+        /// </summary>
+        public int PulseSeconds { get; }
+
         /// <summary>Schwierigkeit mit oder ohne «Umkehren».</summary>
         public int DifficultyFor(bool inverted) => inverted ? InvertedDifficulty : Difficulty;
 
         public RuneDefinition(string id, string name, RuneTag tag, ConditionKind kind, string description,
             int[] levels = null, int weight = 10, bool exclusive = false, string unlockSetId = null, int difficulty = 0,
-            int invertedDifficulty = 0)
+            int invertedDifficulty = 0, int pulseSeconds = 0)
         {
+            PulseSeconds = Math.Max(0, pulseSeconds);
             Difficulty = Math.Max(0, Math.Min(3, difficulty));
             InvertedDifficulty = Math.Max(0, Math.Min(3, invertedDifficulty));
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("Id fehlt.", nameof(id));

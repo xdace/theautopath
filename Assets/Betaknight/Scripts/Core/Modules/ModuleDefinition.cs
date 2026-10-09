@@ -30,6 +30,9 @@ namespace Betaknight.Core.Modules
         public const string Threshold = "threshold";
         public const string Trigger = "trigger";
 
+        /// <summary>Wie Trigger, aber lädt das Ziel nur auf (um die eigene Grösse bzw. die Grenze des Relais).</summary>
+        public const string ChargeLink = "charge_link";
+
         /// <summary>«Repeat while true» (A-19): Relais-Modul, versorgte Komponenten reihen sich erneut ein, solange die Bedingung gilt.</summary>
         public const string RepeatWhileTrue = "repeat_while_true";
 
@@ -148,6 +151,11 @@ namespace Betaknight.Core.Modules
                 "On a component: triggers the target after it executes. On a relay: triggers the target when the relay triggers. "
                 + "The target is queued and casts normally; if it is already queued, the trigger is missed.",
             }, weight: 8));
+            c.Register(new ModuleDefinition(ModuleIds.ChargeLink, "Charge Link", ModuleKind.Trigger, new[]
+            {
+                "On a component: after it executes, it charges the target by its own size in cells. On a relay: when the relay triggers, "
+                + "it charges the target by the relay's limit. The target runs once its charge reaches its size; the rest carries over.",
+            }, weight: 7));
             c.Register(new ModuleDefinition(ModuleIds.AlarmSensor, "Alarm Sensor", ModuleKind.Block, new[]
             {
                 "Easer: HP threshold runes (\"HP Below x %\") trigger 10 percentage points earlier. Their bonus stays.",

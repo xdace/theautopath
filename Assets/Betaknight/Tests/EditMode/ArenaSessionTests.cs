@@ -161,7 +161,7 @@ namespace Betaknight.Tests.EditMode
         public void CampfireUpgradesTheWeakestRune()
         {
             OverworldSession s = Session(Kit("shield"));
-            var hpLow = s.RuneCatalog.Get("hp_low");
+            var hpLow = s.RuneCatalog.Get("every_5s");
             RelayChip low = s.Board.AddRelay(hpLow);
             Assert.IsTrue(s.Board.Upgrade(s.Board.IndexOf(low)));
             RelayChip whenHit = s.Board.Relays.Single(r => r != low);

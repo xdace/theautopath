@@ -149,7 +149,8 @@ namespace Betaknight.Core.Gear
         private static void AddTriggers(List<GraphEdge> edges, IReadOnlyList<ModuleSpec> modules, GraphNode from, int components)
         {
             foreach (ModuleSpec m in modules)
-                if (m.ModuleId == ModuleIds.Trigger && m.TargetRow >= 0 && m.TargetRow < components) edges.Add(new GraphEdge(from, GraphNode.Skill(m.TargetRow)));
+                if (ModuleRules.IsTargeted(m.ModuleId) && m.TargetRow >= 0 && m.TargetRow < components)
+                    edges.Add(new GraphEdge(from, GraphNode.Skill(m.TargetRow), m.ModuleId == ModuleIds.ChargeLink ? GraphEdgeKind.Charge : GraphEdgeKind.Trigger));
         }
 
         /// <summary>Ein Relais aus seiner Rune: Bedingung (mit Schwelle, Wachstum und Modulen), Schwierigkeit, Grenze, Name.</summary>
@@ -181,7 +182,10 @@ namespace Betaknight.Core.Gear
                 condition = AlwaysCondition.Instance.Not();
 
             return new LogicRelay(condition, label, difficulty, Bonus.MaxCells(difficulty), rect, repeat, rune.Id,
-                rune.DifficultyFor(!IsInverted(spec.Modules)));
+                rune.DifficultyFor(!IsInverted(spec.Modules)))
+            {
+                PulseTicks = Ticks.FromSeconds(rune.PulseSeconds),
+            };
         }
 
         private LogicRelay Dead(string label, CellRect rect) =>
