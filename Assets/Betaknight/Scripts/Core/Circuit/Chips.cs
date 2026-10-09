@@ -159,15 +159,17 @@ namespace Betaknight.Core.Circuit
         /// <summary>Würfelt einen Chip nach Gewicht.</summary>
         public ChipDefinition Roll(Random random)
         {
-            int total = _all.Sum(c => c.Weight);
+            // Ohne Pins leiten Leiterbahnen, Diode, Kondensator und Verstärker nichts: sie werden nicht mehr angeboten.
+            List<ChipDefinition> offered = _all.Where(c => PinConfig.Default.Enabled || !c.Conducts).ToList();
+            int total = offered.Sum(c => c.Weight);
             if (total <= 0) return null;
             int roll = random.Next(total);
-            foreach (ChipDefinition c in _all)
+            foreach (ChipDefinition c in offered)
             {
                 roll -= c.Weight;
                 if (roll < 0) return c;
             }
-            return _all[_all.Count - 1];
+            return offered[offered.Count - 1];
         }
 
         /// <summary>Chip eines eigenen Effekts (A-21): Verstärker leitet links–rechts, Watchdog ist ein Relais, sonst Effekt-Chip.</summary>

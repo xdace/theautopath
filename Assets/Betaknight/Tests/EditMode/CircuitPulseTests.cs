@@ -19,6 +19,10 @@ namespace Betaknight.Tests.EditMode
     {
         private static readonly BoardFactory Factory = BoardFactory.CreateDefault();
 
+        // Pins sind im Spiel vorübergehend aus; die Regeln bleiben hier geprüft, bis sie neu gedacht sind.
+        [SetUp] public void EnablePins() => PinConfig.Default.Enabled = true;
+        [TearDown] public void DisablePins() => PinConfig.Default.Enabled = false;
+
         private static RelaySpec Relay(string runeId, int x, int y, int level = 0) => new RelaySpec(runeId, new Cell(x, y), level);
 
         private static ComponentSpec Part(string skillId, int x, int y, bool rotated = false) => new ComponentSpec(skillId, new Cell(x, y), rotated);

@@ -123,6 +123,8 @@ Modules sit on relays and components. Blood Toll now costs HP per cast and gives
 
 ### Pins, Traces and Logic Chips (A-20)
 
+> **Pins are switched off for now** (`PinConfig.Enabled = false`) while they are being redesigned: components have no pins, send no pulses to each other and typed pins give no bonus. Traces, Diode, Capacitor and Amplifier are no longer offered (they only conduct pulses). Gates, Fuse, Watchdog, Overflow and Firewall work as before. The rules below stay in the code and are still tested with pins switched on.
+
 Components now talk to each other. When a component fires, it sends **pulses** along its connections; logic chips combine relays.
 
 - **Pins** sit on component edges and are data per skill (`Core/Circuit/Pins.cs`, `PinCatalog.CreateDefault`). Two components are **connected** when two pins touch: neighbouring cells, pins facing each other. Pins turn with the component (90° clockwise).

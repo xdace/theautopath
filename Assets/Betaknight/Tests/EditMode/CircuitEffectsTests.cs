@@ -195,18 +195,27 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void AnAmplifierStrengthensPulsesPassingThrough()
         {
-            LogicBoard board = Compile(Spec(new[] { Relay("battle_start", 0, 0) }, new[] { Part(SkillIds.ShockStab, 1, 0), Part(SkillIds.ShockStab, 3, 0) },
-                new[] { Chip(CircuitEffectIds.Amplifier, 2, 0) }));
-            PulseLink link = board.Links.Single(l => l.From.Equals(PulseNode.Component(0)));
-            Assert.AreEqual(1, link.Amplifiers);
-            Assert.AreEqual(2, link.Delay);
+            // Pins sind im Spiel vorübergehend aus; der Verstärker braucht sie.
+            PinConfig.Default.Enabled = true;
+            try
+            {
+                LogicBoard board = Compile(Spec(new[] { Relay("battle_start", 0, 0) }, new[] { Part(SkillIds.ShockStab, 1, 0), Part(SkillIds.ShockStab, 3, 0) },
+                    new[] { Chip(CircuitEffectIds.Amplifier, 2, 0) }));
+                PulseLink link = board.Links.Single(l => l.From.Equals(PulseNode.Component(0)));
+                Assert.AreEqual(1, link.Amplifiers);
+                Assert.AreEqual(2, link.Delay);
 
-            BattleResult r = Fight(board, seconds: 2, playerDamage: 100);
-            Assert.AreEqual(Fx.AmplifierPowerPercent, Own(r).First(e => e.Kind == BattleEventKind.PulseSent).Power);
-            BattleEvent second = Own(r).First(e => e.Kind == BattleEventKind.ActionStarted && e.RowIndex == 1);
-            Assert.AreEqual(Fx.AmplifierPowerPercent, second.Power);
-            List<BattleEvent> hits = Own(r).Where(e => e.Kind == BattleEventKind.Damage && e.Detail == SkillIds.ShockStab).ToList();
-            Assert.Greater(hits.First(e => e.RowIndex == 1).Amount, hits.First(e => e.RowIndex == 0).Amount);
+                BattleResult r = Fight(board, seconds: 2, playerDamage: 100);
+                Assert.AreEqual(Fx.AmplifierPowerPercent, Own(r).First(e => e.Kind == BattleEventKind.PulseSent).Power);
+                BattleEvent second = Own(r).First(e => e.Kind == BattleEventKind.ActionStarted && e.RowIndex == 1);
+                Assert.AreEqual(Fx.AmplifierPowerPercent, second.Power);
+                List<BattleEvent> hits = Own(r).Where(e => e.Kind == BattleEventKind.Damage && e.Detail == SkillIds.ShockStab).ToList();
+                Assert.Greater(hits.First(e => e.RowIndex == 1).Amount, hits.First(e => e.RowIndex == 0).Amount);
+            }
+            finally
+            {
+                PinConfig.Default.Enabled = false;
+            }
         }
 
         [Test]

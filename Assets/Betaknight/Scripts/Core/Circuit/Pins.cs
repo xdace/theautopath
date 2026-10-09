@@ -81,6 +81,12 @@ namespace Betaknight.Core.Circuit
     /// <summary>Pin-Regeln als Daten.</summary>
     public sealed class PinConfig
     {
+        /// <summary>
+        /// Pins sind vorübergehend aus dem Spiel genommen (werden neu gedacht): ohne Pins schicken Komponenten keine Pulse und
+        /// typisierte Pins geben keinen Bonus. Tests der Pin-Regeln schalten sie für sich ein.
+        /// </summary>
+        public bool Enabled { get; set; }
+
         /// <summary>Wirkungsbonus je typisiertem Pin mit passendem Nachbarn.</summary>
         public int TypedPinBonusPercent { get; set; } = 15;
 
@@ -102,7 +108,7 @@ namespace Betaknight.Core.Circuit
         public void Register(string skillId, params PinSpec[] pins) => _bySkill[skillId] = pins ?? Array.Empty<PinSpec>();
 
         public IReadOnlyList<PinSpec> For(string skillId) =>
-            skillId != null && _bySkill.TryGetValue(skillId, out IReadOnlyList<PinSpec> pins) ? pins : Array.Empty<PinSpec>();
+            Config.Enabled && skillId != null && _bySkill.TryGetValue(skillId, out IReadOnlyList<PinSpec> pins) ? pins : Array.Empty<PinSpec>();
 
         /// <summary>Pins eines Skills an seiner Lage auf der Platine (Drehung = 90° im Uhrzeigersinn).</summary>
         public List<PlacedPin> Place(string skillId, Shape baseShape, Cell origin, bool rotated)
