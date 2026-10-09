@@ -227,11 +227,12 @@ namespace Betaknight.Tests.EditMode
         /// Ladung gehört der Komponente (alle Relais füllen denselben Speicher): Schild Seed 5 erneut aufgenommen.
         /// Ladung bleibt, solange die Komponente schon wartet, und reiht sie nach der Ausführung erneut ein: Schild 5 und 21 erneut aufgenommen.
         /// Neue Ereignisse «Charged» und «ChargeSpent» (Kämpfe unverändert, gleiche Zahl Kämpfe): alle erneut aufgenommen.
+        /// Warte-Regel der Warteschlange (wer 1,5 s wartet, kommt zuerst): Klinge 21 und Schild 21 erneut aufgenommen.
         /// </summary>
         [TestCase("blade", 5, "4 Kämpfe, 486 Ereignisse, 96C450E3A7257B50")]
-        [TestCase("blade", 21, "3 Kämpfe, 297 Ereignisse, 3D96E733AD347FAD")]
+        [TestCase("blade", 21, "2 Kämpfe, 218 Ereignisse, 0D12950D902369CC")]
         [TestCase("shield", 5, "6 Kämpfe, 934 Ereignisse, 206A2A68B7EB4302")]
-        [TestCase("shield", 21, "2 Kämpfe, 349 Ereignisse, F0B28767A493EA40")]
+        [TestCase("shield", 21, "2 Kämpfe, 369 Ereignisse, 5917F0AB98A152DB")]
         [TestCase("spark", 5, "3 Kämpfe, 406 Ereignisse, 3F9A9243E7A2C859")]
         [TestCase("spark", 21, "2 Kämpfe, 242 Ereignisse, 7ACF128C2A1D0BA3")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)

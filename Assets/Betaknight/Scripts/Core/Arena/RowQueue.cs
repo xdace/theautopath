@@ -18,6 +18,12 @@ namespace Betaknight.Core.Arena
         /// </summary>
         public int MaxEntriesPerComponent { get; set; } = 1;
 
+        /// <summary>
+        /// Wer so lange wartet, kommt vor alle, die noch nicht so lange warten (die älteste zuerst). So kann eine früh in der
+        /// Lesereihenfolge liegende Komponente, die ständig neu eingereiht wird, die übrigen nicht aushungern. 0 = aus.
+        /// </summary>
+        public int StarvationTicks { get; set; } = Ticks.FromTenths(15);
+
         public static QueueConfig Default { get; } = new QueueConfig();
     }
 

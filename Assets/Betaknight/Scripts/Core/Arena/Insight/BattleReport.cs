@@ -327,6 +327,7 @@ namespace Betaknight.Core.Arena
                     _hints.Add(ArenaTexts.HintNeverFired(row.Name, row.IsTooLargeSomewhere ? ArenaTexts.NeverFiredTooLarge : ArenaTexts.NeverFiredUnpowered));
                 else if (row.Triggered <= RarelyTriggered)
                     _hints.Add(ArenaTexts.HintRarelyTriggered(row.Name, row.Triggered, row.Difficulty > 0 ? DifficultyText.Name(row.Difficulty) : null));
+                else if (row.Queued > 0) _hints.Add(ArenaTexts.HintNeverFired(row.Name, ArenaTexts.NeverFiredStuckInQueue));
                 else _hints.Add(ArenaTexts.HintNeverFired(row.Name, ArenaTexts.NeverFiredOther));
             }
 

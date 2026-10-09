@@ -266,6 +266,7 @@ namespace Betaknight.Core.Arena
         public const string NeverFiredTooLarge = "too large for every touching relay";
         public const string NeverFiredUnpowered = "no relay touches it";
         public const string NeverFiredOther = "its relay never triggered";
+        public const string NeverFiredStuckInQueue = "it waited in the queue until the end (other components kept going first)";
 
         // ------------------------------------------------------------------ Skill-Infos
 

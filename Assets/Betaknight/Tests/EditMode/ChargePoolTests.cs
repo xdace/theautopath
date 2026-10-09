@@ -181,6 +181,27 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
+        public void AComponentThatKeepsRequeuingCannotStarveTheOthers()
+        {
+            // Der Rüstungsbruch (#1, oben links) wird über «Opening» und gespeicherte Ladung ständig neu eingereiht und kommt in
+            // der Lesereihenfolge vor dem Schockstich (#2). Nach 1,5 s Wartezeit ist der Schockstich trotzdem dran.
+            var spec = new CircuitSpec { Width = 6, Height = 6 };
+            spec.Relays.Add(new RelaySpec("vs_boss", new Cell(2, 0)));
+            spec.Relays.Add(new RelaySpec("opening", new Cell(2, 1), level: 2));
+            spec.Components.Add(Part(SkillIds.ArmorBreak, 0, 0));
+            spec.Relays.Add(new RelaySpec("hp_full", new Cell(0, 3)));
+            spec.Components.Add(Part(SkillIds.ShockStab, 1, 3));
+            LogicBoard board = Factory.Create(spec, null);
+            int stab = Row(board, SkillIds.ShockStab);
+            Assert.Greater(stab, Row(board, SkillIds.ArmorBreak), "später in der Lesereihenfolge");
+
+            BattleResult r = Fight(board, seconds: 6, vsBoss: true);
+            BattleEvent start = r.Events.FirstOrDefault(e => e.Source?.Name == "A" && e.Kind == BattleEventKind.ActionStarted && e.RowIndex == stab);
+            Assert.IsNotNull(start, "der Schockstich kommt dran");
+            Assert.LessOrEqual(start.Tick, Ticks.FromSeconds(3));
+        }
+
+        [Test]
         public void SpilloverPassesTheOverchargeToTheNeighbours()
         {
             // 6 Ladung auf den Schockstich (1 Zelle) mit Spillover: 5 gehen an den Rüstungsbrecher daneben (4 Zellen, berührt
