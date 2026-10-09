@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Betaknight.Core.Arena;
 using Betaknight.Core.Circuit;
 using Betaknight.Core.Gear;
@@ -32,10 +33,17 @@ namespace Betaknight.Core.Combat
         public readonly int EnemyHpPercent;
         public readonly int EnemyDamagePercent;
 
+        /// <summary>
+        /// Zufall für Gegner und Ausrüstung (aus Karten-Seed und Feld). Gleicher Wert = gleicher Gegner mit gleicher Platine,
+        /// wie ihn die Karte vorher zeigt. Null = aus dem Zufall des Kampfes.
+        /// </summary>
+        public readonly int? EncounterSeed;
+
         public CombatRequest(CellContent enemy, int tier, PlayerStats stats, CircuitBoard board,
             Equipment equipment = null, BattleContext context = null, SkillLevelRules skillLevels = null,
-            int enemyHpPercent = 100, int enemyDamagePercent = 100)
+            int enemyHpPercent = 100, int enemyDamagePercent = 100, int? encounterSeed = null)
         {
+            EncounterSeed = encounterSeed;
             SkillLevels = skillLevels;
             EnemyHpPercent = enemyHpPercent;
             EnemyDamagePercent = enemyDamagePercent;
@@ -63,8 +71,17 @@ namespace Betaknight.Core.Combat
         /// <summary>Namen der Gegner, für Anzeige und Protokoll.</summary>
         public readonly string EnemyName;
 
-        public CombatResult(bool victory, int damageTaken, int goldReward, BattleResult battle = null, string enemyName = null)
+        /// <summary>Was die Gegner benutzt haben und nach einem Sieg geborgen werden kann (leer beim Platzhalter).</summary>
+        public readonly IReadOnlyList<EnemyLoot> Loot;
+
+        /// <summary>Wie viele Teile davon geborgen werden dürfen (Elite mehr).</summary>
+        public readonly int LootPicks;
+
+        public CombatResult(bool victory, int damageTaken, int goldReward, BattleResult battle = null, string enemyName = null,
+            IReadOnlyList<EnemyLoot> loot = null, int lootPicks = 0)
         {
+            Loot = loot ?? System.Array.Empty<EnemyLoot>();
+            LootPicks = lootPicks;
             Victory = victory;
             DamageTaken = damageTaken;
             GoldReward = goldReward;

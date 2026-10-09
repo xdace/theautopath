@@ -26,10 +26,12 @@ namespace Betaknight.Core.Combat
         private readonly BoardFactory _boards;
         private readonly SetBonusRegistry _sets;
         private readonly SynergyRegistry _synergies;
+        private readonly EnemyLoadout _loadout;
 
         public ArenaCombatResolver(EnemyCatalog enemies = null, BoardFactory boards = null, SetBonusRegistry sets = null,
-            SynergyRegistry synergies = null)
+            SynergyRegistry synergies = null, EnemyLoadout loadout = null)
         {
+            _loadout = loadout ?? EnemyLoadout.Default;
             _synergies = synergies ?? SynergyRegistry.CreateDefault();
             _enemies = enemies ?? EnemyCatalog.CreateDefault();
             _boards = boards ?? BoardFactory.CreateDefault();
@@ -40,18 +42,19 @@ namespace Betaknight.Core.Combat
         {
             if (random == null) throw new ArgumentNullException(nameof(random));
 
-            bool boss = request.Enemy == CellContent.Boss;
-            EnemyDefinition enemy = _enemies.Pick(request.Tier, boss, random);
+            Random encounterRandom = request.EncounterSeed.HasValue ? new Random(request.EncounterSeed.Value) : random;
+            EnemyEncounter encounter = EnemyEncounter.Roll(_enemies, _loadout, request.Tier, request.Enemy, encounterRandom);
 
-            List<CombatantSetup> enemies = enemy.Create();
+            List<CombatantSetup> enemies = encounter.Fighters;
             Scale(enemies, request.EnemyHpPercent, request.EnemyDamagePercent);
             BattleSetup setup = CreateSetup(request, enemies, random.Next());
             BattleResult battle = CombatSimulation.Run(setup);
 
             int damageTaken = Math.Max(0, request.Stats.Hp - battle.PlayerHp);
             int gold = battle.IsVictory ? random.Next(2, 5) + request.Tier / 2 + battle.BonusGold : 0;
-            string name = request.Enemy == CellContent.Elite ? ArenaTexts.EliteName(enemy.Name) : enemy.Name;
-            return new CombatResult(battle.IsSurvived, damageTaken, gold, battle, name);
+            bool won = battle.IsVictory;
+            return new CombatResult(battle.IsSurvived, damageTaken, gold, battle, encounter.Name,
+                won ? encounter.Loot : null, won ? encounter.LootPicks : 0);
         }
 
         /// <summary>Verstärkt Gegner (z. B. Elite) über Leben und Schaden in Prozent.</summary>

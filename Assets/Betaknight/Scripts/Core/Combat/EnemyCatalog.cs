@@ -12,7 +12,7 @@ namespace Betaknight.Core.Combat
     /// </summary>
     public sealed class EnemyDefinition
     {
-        private readonly Func<List<CombatantSetup>> _create;
+        private readonly Func<List<EnemyFighter>> _create;
 
         public string Id { get; }
         public string Name { get; }
@@ -21,7 +21,7 @@ namespace Betaknight.Core.Combat
         public bool IsBoss { get; }
         public int Weight { get; }
 
-        public EnemyDefinition(string id, string name, int minTier, int maxTier, Func<List<CombatantSetup>> create,
+        public EnemyDefinition(string id, string name, int minTier, int maxTier, Func<List<EnemyFighter>> create,
             int weight = 10, bool isBoss = false)
         {
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("Id fehlt.", nameof(id));
@@ -36,8 +36,11 @@ namespace Betaknight.Core.Combat
 
         public bool FitsTier(int tier) => tier >= MinTier && tier <= MaxTier;
 
-        /// <summary>Neue Kämpfer-Baupläne für einen Kampf.</summary>
-        public List<CombatantSetup> Create() => _create();
+        /// <summary>Neue Kämpfer für einen Kampf, mit ihrer festen Platine (ohne Ausrüstung).</summary>
+        public List<CombatantSetup> Create() => _create().Select(f => f.ToSetup()).ToList();
+
+        /// <summary>Baupläne der Kämpfer (Werte und Platinen-Teile), z. B. um sie vor dem Kampf auszurüsten.</summary>
+        public List<EnemyFighter> Fighters() => _create();
     }
 
     /// <summary>Alle Gegner nach Stufe (Entfernung vom Start). Neue Gegner sind neue Einträge.</summary>
@@ -112,13 +115,10 @@ namespace Betaknight.Core.Combat
         /// </summary>
         public const int HpPercent = 65;
 
-        private static CombatantSetup Enemy(string name, int hp, int damage, int interval, int armor, params EnemyPart[] parts) =>
-            new CombatantSetup
-            {
-                Name = name, Stats = new CombatStats(Math.Max(1, hp * HpPercent / 100), damage, interval, armor), Board = EnemyBoard.Build(parts),
-            };
+        private static EnemyFighter Enemy(string name, int hp, int damage, int interval, int armor, params EnemyPart[] parts) =>
+            new EnemyFighter(name, new CombatStats(Math.Max(1, hp * HpPercent / 100), damage, interval, armor), parts);
 
-        private static List<CombatantSetup> One(CombatantSetup s) => new List<CombatantSetup> { s };
+        private static List<EnemyFighter> One(EnemyFighter s) => new List<EnemyFighter> { s };
 
         public static EnemyCatalog CreateDefault() => new EnemyCatalog(new[]
         {
@@ -130,7 +130,7 @@ namespace Betaknight.Core.Combat
             // Stufe 3: Ausweichen und Panzerung.
             new EnemyDefinition("spark_drone", "Spark Drone", 3, 4, () =>
             {
-                CombatantSetup drone = Enemy("Spark Drone", 24, 2, 20, 0,
+                EnemyFighter drone = Enemy("Spark Drone", 24, 2, 20, 0,
                     Every(6, Charge("zap", "Spark Strike", 24, 150, new StunEffect(Ticks.FromSeconds(1)))),
                     Every(9, Hack(CircuitEffectIds.Jam)));
                 drone.Stats[StatKind.Dodge] = BasisPoints.Percent(15);
@@ -138,7 +138,7 @@ namespace Betaknight.Core.Combat
             }),
             new EnemyDefinition("armor_beetle", "Armor Beetle", 3, 5, () => One(Enemy("Armor Beetle", 30, 2, 26, 4,
                 Every(7, Charge("crush", "Crush", 30, 300))))),
-            new EnemyDefinition("rat_pack", "Rat Pack", 3, 6, () => new List<CombatantSetup>
+            new EnemyDefinition("rat_pack", "Rat Pack", 3, 6, () => new List<EnemyFighter>
             {
                 Enemy("Scrap Rat", 12, 1, 16, 0),
                 Enemy("Scrap Rat", 12, 1, 16, 0),

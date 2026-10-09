@@ -89,6 +89,8 @@ namespace Betaknight.Core
         public static string EveryLabel(int seconds) => $"Every {seconds} s";
         public static string EnemyBoardLine(string relay, string skill, string shape, string description) =>
             $"{relay} → {skill} ({shape})" + (string.IsNullOrEmpty(description) ? string.Empty : $": {description}");
+        public static string EnemyBoardModules(string modules) => $" [+ {modules}]";
+        public static string EnemyBoardChips(string chips) => $"Chips: {chips}";
         public const string EnemyBoardBasicOnly = "Basic Attack only";
         public const string EnemyBoardTitle = "Board";
 
