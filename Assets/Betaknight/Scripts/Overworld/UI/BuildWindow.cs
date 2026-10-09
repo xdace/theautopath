@@ -252,7 +252,7 @@ namespace Betaknight.Overworld.UI
             string name = skill.NameFrom(_session.SkillCatalog);
             Color kind = _session.SkillCatalog.TryGet(skill.SkillId, out SkillDefinition def) ? KindColorOf(def.Kinds) : CircuitGrid.PinColor;
             Shape shape = Board.ShapeOfSkill(skill.SkillId);
-            string modules = skill.Modules.Count > 0 ? $" <color=#ffd75e>◆{skill.Modules.Count}</color>" : string.Empty;
+            string modules = skill.Modules.Count > 0 ? $" <color=#ffd75e>●{skill.Modules.Count}</color>" : string.Empty;
             string text = p.Rect.Shape.Cells == 1
                 ? $"<b>{Abbreviate(name)}</b>"
                 : $"<b>{name}</b>{modules}\n<color=#9aa4b2>{shape.Width}×{shape.Height}</color>";
@@ -268,12 +268,7 @@ namespace Betaknight.Overworld.UI
         }
 
         /// <summary>Farbe der ersten Skill-Art (Angriff, Schild, Feuer …).</summary>
-        private static Color KindColorOf(SkillKind kinds)
-        {
-            foreach (SkillKind k in SkillKinds.All)
-                if ((kinds & k) != 0) return CircuitGrid.KindColor(k);
-            return CircuitGrid.PinColor;
-        }
+        private static Color KindColorOf(SkillKind kinds) => kinds == SkillKind.None ? CircuitGrid.PinColor : UiTheme.Kind(kinds);
 
         /// <summary>Kurzname für 1×1-Felder: «Shock Stab» → «ShSt», einzelne Wörter bis 5 Zeichen.</summary>
         private static string Abbreviate(string name)
@@ -415,7 +410,7 @@ namespace Betaknight.Overworld.UI
             if (Board.TouchesCore(c)) marks.Add($"<color=#b18cff>+{Board.Config.CoreBonusPercent} %</color>");
             foreach (OverworldSession.TriggerLink link in links)
                 if (!link.FromBlock && link.From == index) marks.Add($"<color=#ffae42>{(link.Charges ? UiTexts.Build.ChargesTo(link.To + 1) : UiTexts.Build.TriggersTo(link.To + 1))}</color>");
-            if (_session.IsEvolutionReady(c.Skill)) marks.Add("<color=#d29bff>✦</color>");
+            if (_session.IsEvolutionReady(c.Skill)) marks.Add("<color=#d29bff>^</color>");
 
             string cast = info != null ? SkillInfo.Seconds(info.WindupTicks) : "?";
             string text = $"<b>#{index + 1} {name}</b>\n{c.Shape} · {cast}\n<color={StateHex(c)}>{StateShort(c)}</color>";
@@ -423,6 +418,9 @@ namespace Betaknight.Overworld.UI
             Color fill = focus ? Color.Lerp(CircuitGrid.ComponentColor, UiTheme.CellHover, 0.8f) : CircuitGrid.ComponentColor;
             Color border = c == _selected ? SelectedColor : StateColor(c);
             CircuitGrid.DrawChip(rect, fill, border, focus ? 3f : 2f, text, ComponentTip(c, index, info), size < 60f ? CircuitGrid.Tiny : CircuitGrid.Label);
+            // Skill-Art als farbige linke Kante (gleiche Farbe wie im Inventar und in der Arena).
+            if (_session.SkillCatalog.TryGet(c.Skill.SkillId, out SkillDefinition kindDef))
+                UiTheme.Fill(new Rect(rect.x + 3f, rect.y + 3f, 4f, rect.height - 6f), KindColorOf(kindDef.Kinds));
             CircuitGrid.DrawEffectBadges(rect, EffectText.Of(CompiledRow(index)), size);
             DrawModuleBadges(rect, size, c.Skill);
 
@@ -452,7 +450,7 @@ namespace Betaknight.Overworld.UI
             var marks = new List<string>();
             foreach (OverworldSession.TriggerLink link in links)
                 if (link.FromBlock && link.From == index) marks.Add($"<color=#45e6f2>{(link.Charges ? UiTexts.Build.ChargesTo(link.To + 1) : UiTexts.Build.TriggersTo(link.To + 1))}</color>");
-            if (_session.IsEvolutionReady(relay)) marks.Add("<color=#d29bff>✦</color>");
+            if (_session.IsEvolutionReady(relay)) marks.Add("<color=#d29bff>^</color>");
             if (marks.Count > 0) text += " " + string.Join(" ", marks);
 
             Color fill = focus ? Color.Lerp(CircuitGrid.RelayColor, CircuitGrid.RelayLit, 0.25f) : CircuitGrid.RelayColor;
@@ -654,7 +652,7 @@ namespace Betaknight.Overworld.UI
 
                 string name = ComponentName(c);
                 string core = Board.TouchesCore(c) ? $"  <color=#b18cff>{UiTexts.Build.CoreBonus(Board.Config.CoreBonusPercent)}</color>" : string.Empty;
-                string evolves = _session.IsEvolutionReady(c.Skill) ? " <color=#d29bff>✦</color>" : string.Empty;
+                string evolves = _session.IsEvolutionReady(c.Skill) ? " <color=#d29bff>^</color>" : string.Empty;
                 string text = $"<b>#{i + 1} {name}</b>{evolves}  <color=#ffd75e>{ShortStats(info)}</color>\n"
                     + $"<color={StateHex(c)}>{StateLong(c)}</color>{core}";
                 GUILayout.Label(new GUIContent(text, ComponentTip(c, i, info)), UiTheme.Small, GUILayout.MinWidth(200f));
@@ -683,7 +681,7 @@ namespace Betaknight.Overworld.UI
 
                 int difficulty = _session.RelayDifficulty(relay);
                 string growth = relay.Growth > 0 ? $" <color=#b5e48c>+{relay.Growth}</color>" : string.Empty;
-                string evolves = _session.IsEvolutionReady(relay) ? " <color=#d29bff>✦</color>" : string.Empty;
+                string evolves = _session.IsEvolutionReady(relay) ? " <color=#d29bff>^</color>" : string.Empty;
                 string text = $"{RuneText.Difficulty(difficulty)} <b>{ArenaTexts.RelayName(i, relay.Name)}</b>{RuneText.LevelBadge(relay.Rune, relay.Level)}{growth}{evolves}\n"
                     + $"<color=#9aa4b2>{UiTexts.Build.RelayLimit(_session.RelayMaxCells(relay))} · {PowersText(relay)}</color>";
                 GUILayout.Label(new GUIContent(text, RelayTip(relay, i)), UiTheme.Small, GUILayout.MinWidth(200f));
@@ -696,13 +694,13 @@ namespace Betaknight.Overworld.UI
                 DrawModuleSlots(relay, id => _session.PlaceModuleOnRelay(id, Board.IndexOf(relay)));
                 GUILayout.EndHorizontal();
 
-                // Rune aus dem Inventar auf die Zeile = Rune tauschen (nur beim Ziehen einer Rune, sonst würde es die ◇-Ziele abdecken).
+                // Rune aus dem Inventar auf die Zeile = Rune tauschen (nur beim Ziehen einer Rune, sonst würde es die ○-Ziele abdecken).
                 if (_drag.IsDragging && _drag.Dragging.Value.Kind == DragKind.Rune)
                     _drag.Target(GUILayoutUtility.GetLastRect(), d => d.Kind == DragKind.Rune, d => _session.SwapRune(index, d.A));
             }
         }
 
-        /// <summary>Modul-Plätze eines Relais oder einer Komponente: ◆ besetzt (ziehbar, Auslöser: Klick wählt das Ziel), ◇ frei (Ziel).</summary>
+        /// <summary>Modul-Plätze eines Relais oder einer Komponente: ● besetzt (ziehbar, Auslöser: Klick wählt das Ziel), ○ frei (Ziel).</summary>
         private void DrawModuleSlots(IModuleHolder holder, System.Action<int> place)
         {
             foreach (ModuleInstance m in holder.Modules)
@@ -710,9 +708,9 @@ namespace Betaknight.Overworld.UI
                 GUIContent chip = ModuleText.Chip(_session, m);
                 bool trigger = ModuleRules.IsTargeted(m.ModuleId);
                 if (trigger) chip.tooltip = chip.tooltip + UiTexts.Build.TriggerClick;
-                // A-21: Effekt-Module zeigen ihr Symbol statt ◆.
+                // A-21: Effekt-Module zeigen ihr Symbol statt ●.
                 string mark = EffectText.Icon(m.ModuleId);
-                chip.text = $"{(mark.Length > 0 ? mark : "<color=#ffd75e>◆</color>")}{Shorten(chip.text, trigger ? 14 : 9)}";
+                chip.text = $"{(mark.Length > 0 ? mark : "<color=#ffd75e>●</color>")}{Shorten(chip.text, trigger ? 14 : 9)}";
                 GUILayout.Label(chip, UiTheme.SmallLine, GUILayout.Width(trigger ? 112f : 76f), GUILayout.Height(LineHeight - 8f));
                 Rect r = GUILayoutUtility.GetLastRect();
                 int id = m.InstanceId;
@@ -725,7 +723,7 @@ namespace Betaknight.Overworld.UI
             for (int i = holder.Modules.Count; i < holder.ModuleSlots; i++)
             {
                 string tip = holder is RelayChip ? UiTexts.Build.FreeRuneModuleSlot : UiTexts.Build.FreeSkillModuleSlot;
-                GUILayout.Label(new GUIContent("<color=#666c78>◇</color>", tip), UiTheme.SmallLine, GUILayout.Width(20f), GUILayout.Height(LineHeight - 8f));
+                GUILayout.Label(new GUIContent("<color=#666c78>○</color>", tip), UiTheme.SmallLine, GUILayout.Width(20f), GUILayout.Height(LineHeight - 8f));
                 Rect r = GUILayoutUtility.GetLastRect();
                 _drag.Target(r, d => d.Kind == DragKind.Module && _session.CanPlaceModule(_session.Modules.Get(d.A), holder), d => place(d.A));
             }
@@ -775,7 +773,7 @@ namespace Betaknight.Overworld.UI
                 Rect r = GUILayoutUtility.GetLastRect();
                 int id = m.InstanceId;
                 GUI.enabled = !m.IsFree && _session.CanEditModules;
-                if (!m.IsFree && GUILayout.Button(new GUIContent("✖", UiTexts.Build.TakeOffTip), GUILayout.Width(26f), GUILayout.Height(26f)))
+                if (!m.IsFree && GUILayout.Button(new GUIContent("×", UiTexts.Build.TakeOffTip), GUILayout.Width(26f), GUILayout.Height(26f)))
                     _session.TakeOffModule(id);
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
@@ -1064,11 +1062,11 @@ namespace Betaknight.Overworld.UI
 
         private string StateHex(ComponentSlot c) => UiTheme.Hex(StateColor(c));
 
-        /// <summary>Kurz für den Chip: «✔ ◆» (versorgt, Schwierigkeit), «✖ too large» oder «✖ not powered».</summary>
+        /// <summary>Kurz für den Chip: «√ ●» (versorgt, Schwierigkeit), «× too large» oder «× not powered».</summary>
         private string StateShort(ComponentSlot c)
         {
-            if (_session.IsPowered(c)) return $"✔ {DifficultyText.Symbol(_session.ComponentDifficulty(c))}";
-            return _session.IsTooLarge(c) ? $"✖ {UiTexts.Arena.StateTooLarge}" : $"✖ {UiTexts.NotPowered}";
+            if (_session.IsPowered(c)) return $"√ {DifficultyText.Symbol(_session.ComponentDifficulty(c))}";
+            return _session.IsTooLarge(c) ? $"× {UiTexts.Arena.StateTooLarge}" : $"× {UiTexts.NotPowered}";
         }
 
         /// <summary>«powered by Relay 1 (On Hit), Relay 2 (Clock 2 s)», «not powered (too large)» oder «not powered».</summary>
@@ -1190,7 +1188,7 @@ namespace Betaknight.Overworld.UI
                 if (GUILayout.Button(UiTexts.Build.DiscardNo, GUILayout.Width(52f), GUILayout.Height(28f))) _pendingDiscard = null;
                 return;
             }
-            GUILayout.Box(new GUIContent($"<color=#ff8a80>✖</color> {UiTexts.Build.Trash}", UiTexts.Build.TrashTip), UiTheme.Cell,
+            GUILayout.Box(new GUIContent($"<color=#ff8a80>×</color> {UiTexts.Build.Trash}", UiTexts.Build.TrashTip), UiTheme.Cell,
                 GUILayout.Width(150f), GUILayout.Height(28f));
             _drag.Target(GUILayoutUtility.GetLastRect(), d => _session.CanChangeLoadout && d.Kind != DragKind.Item && d.Kind != DragKind.Equipped,
                 d => _pendingDiscard = StableDiscard(d), redWhenInvalid: true);
@@ -1248,7 +1246,7 @@ namespace Betaknight.Overworld.UI
                 string name = m.NameFrom(_session.ModuleCatalog);
                 string icon = EffectText.Icon(m.ModuleId);
                 bool targeted = ModuleRules.IsTargeted(m.ModuleId);
-                string label = (icon.Length > 0 ? icon : targeted ? (m.ModuleId == ModuleIds.ChargeLink ? "⚡" : "↪") : "◆") + Shorten(name, w > 48f ? 9 : 4);
+                string label = (icon.Length > 0 ? icon : targeted ? (m.ModuleId == ModuleIds.ChargeLink ? "»" : "→") : "●") + Shorten(name, w > 48f ? 9 : 4);
                 ModuleDefinition d = _session.ModuleDefinitionOf(m);
                 string effect = targeted ? _session.DescribeTrigger(m) : d?.DescriptionAt(m.Level) ?? string.Empty;
                 string tip = $"<b>{name}</b>: {effect}\n<color=#9aa4b2>{(targeted ? UiTexts.Build.ModuleBadgeTipTargeted : UiTexts.Build.ModuleBadgeTip)}</color>";
@@ -1285,7 +1283,7 @@ namespace Betaknight.Overworld.UI
                 ModuleDefinition d = _session.ModuleDefinitionOf(m);
                 string name = m.NameFrom(_session.ModuleCatalog);
                 string effect = ModuleRules.IsTargeted(m.ModuleId) ? _session.DescribeTrigger(m) : d?.DescriptionAt(m.Level) ?? string.Empty;
-                lines.Add($"<color=#ffd75e>◆ {name}</color>: {effect}");
+                lines.Add($"<color=#ffd75e>● {name}</color>: {effect}");
             }
             return lines;
         }

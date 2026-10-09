@@ -127,7 +127,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void WithThreeDamageSkillsTheBasicAttackDealsAtMostThirtyFivePercent()
         {
-            // «Enemy Stunned» ◆◆ → Rüstungsbruch (2×2), «Every 20 s» ◆◆◆ → Bohrstoß (2×2), «On Hit» ◆ → Schockstoss.
+            // «Enemy Stunned» ●● → Rüstungsbruch (2×2), «Every 20 s» ●●● → Bohrstoß (2×2), «On Hit» ● → Schockstoss.
             // Die grossen Komponenten liegen oben (Vorrang in Lesereihenfolge), sonst verdrängt der Schockstoss sie:
             // er löst sein eigenes «On Hit» immer wieder aus.
             var circuit = new CircuitSpec { Width = 6, Height = 6 };

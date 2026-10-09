@@ -173,13 +173,13 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void APulseInheritsTheLimitAndBonusOfTheOriginalRelay()
         {
-            // Kampfbeginn (◇, 1 Zelle): die 2×1-Kryogranate ist für das ursprüngliche Relais zu gross.
+            // Kampfbeginn (○, 1 Zelle): die 2×1-Kryogranate ist für das ursprüngliche Relais zu gross.
             BattleResult easy = Fight(PulseChain(SkillIds.CryoGrenade));
             Assert.IsEmpty(Starts(easy, SkillIds.CryoGrenade));
             BattleEvent charged = Own(easy).First(e => e.Kind == BattleEventKind.Charged && e.RowIndex == 1);
             Assert.AreEqual(1, charged.Power, "lädt um die Grenze des ursprünglichen Relais auf");
 
-            // «HP Full» (◆, bis 2 Zellen): sie passt und läuft mit dessen Bonus-Stufe, nicht gestapelt.
+            // «HP Full» (●, bis 2 Zellen): sie passt und läuft mit dessen Bonus-Stufe, nicht gestapelt.
             BattleResult medium = Fight(PulseChain(SkillIds.CryoGrenade, "hp_full"));
             BattleEvent cryo = Starts(medium, SkillIds.CryoGrenade).First();
             Assert.AreEqual(1, cryo.Tier);
@@ -224,7 +224,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void AndTriggersWhenBothRelaysAreOnAndIsHarder()
         {
-            // «HP Full» (◆, Zustand) und Kampfbeginn (◇, Ereignis) an einem UND; der Schockstich liegt unter dem Gatter.
+            // «HP Full» (●, Zustand) und Kampfbeginn (○, Ereignis) an einem UND; der Schockstich liegt unter dem Gatter.
             LogicBoard board = Compile(Spec(new[] { Relay("hp_full", 0, 0), Relay("battle_start", 2, 0) }, new[] { Part(SkillIds.ShockStab, 1, 1) },
                 new[] { Chip(ChipIds.And, 1, 0) }));
             LogicRelay and = Gate(board);
@@ -276,7 +276,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void AFuseTriggersOnceAsAVeryHardRelay()
         {
-            // Takt (alle 2 s) an einer Sicherung; der Bohrer (2×2) ist nur für ◆◆+ klein genug.
+            // Takt (alle 2 s) an einer Sicherung; der Bohrer (2×2) ist nur für ●●+ klein genug.
             LogicBoard board = Compile(Spec(new[] { Relay("clock", 0, 0) }, new[] { Part(SkillIds.Drill, 2, 0) }, new[] { Chip(ChipIds.Fuse, 1, 0) }));
             LogicRelay fuse = Gate(board);
             Assert.AreEqual(3, fuse.Difficulty);
@@ -406,7 +406,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void ReadmeExampleAndGateMakesAHarderOpener()
         {
-            // HP Full (◆) UND Battle Start (◇) → ◆◆: der Schockstich neben dem Gatter (und am Kern) läuft mit Stufe 2.
+            // HP Full (●) UND Battle Start (○) → ●●: der Schockstich neben dem Gatter (und am Kern) läuft mit Stufe 2.
             LogicBoard board = Compile(WithCore(Spec(new[] { Relay("hp_full", 3, 0), Relay("battle_start", 3, 2) }, new[] { Part(SkillIds.ShockStab, 2, 1) },
                 new[] { Chip(ChipIds.And, 3, 1) })));
             Assert.IsTrue(board.Rows[0].TouchesCore);

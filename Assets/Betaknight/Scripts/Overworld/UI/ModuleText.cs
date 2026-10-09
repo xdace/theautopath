@@ -50,7 +50,7 @@ namespace Betaknight.Overworld.UI
             ModuleDefinition d = session.ModuleDefinitionOf(module);
             string name = module.NameFrom(session.ModuleCatalog);
             string tip = (d != null ? d.DescriptionAt(module.Level) : string.Empty) + RuneText.Eases(session, module.ModuleId);
-            if (ModuleRules.IsTargeted(module.ModuleId)) return new GUIContent($"↪ {session.DescribeTrigger(module)}", tip);
+            if (ModuleRules.IsTargeted(module.ModuleId)) return new GUIContent($"→ {session.DescribeTrigger(module)}", tip);
             // A-21: Effekt-Module mit farbigem Symbol, Tooltip «Name: Text».
             if (EffectText.TryGet(module.ModuleId, out CircuitEffectDefinition effect)) return new GUIContent(name, EffectText.Tip(effect));
             return new GUIContent(name, tip);

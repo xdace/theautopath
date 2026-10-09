@@ -364,8 +364,8 @@ namespace Betaknight.Core.Arena
 
         public bool IsRowQueued(int row) => _queue.Exists(q => q.Row == row);
 
-        /// <summary>«Waiting: #2 Shield Bash ⏳0.4 s · #4 Drill Thrust» oder leer. <paramref name="hourglass"/> für Schriften ohne ⏳.</summary>
-        public string QueueText(string hourglass = "⏳")
+        /// <summary>«Waiting: #2 Shield Bash …0.4 s · #4 Drill Thrust» oder leer. <paramref name="hourglass"/> für Schriften ohne ….</summary>
+        public string QueueText(string hourglass = "…")
         {
             if (_queue.Count == 0) return string.Empty;
             var parts = new List<string>();
@@ -410,7 +410,7 @@ namespace Betaknight.Core.Arena
         /// <summary>Gespeicherte Ladung einer Komponente des Spielers (0 ohne).</summary>
         public int ChargeAt(int row) => row >= 0 && row < _charge.Length ? _charge[row] : 0;
 
-        /// <summary>«⚡2/4», solange die Komponente Ladung hält, sonst leer.</summary>
+        /// <summary>«■2/4», solange die Komponente Ladung hält, sonst leer.</summary>
         public string ChargeBadge(int row) =>
             ChargeAt(row) > 0 && _chargeCells[row] > 0 ? ArenaTexts.ChargeBadge(_charge[row], _chargeCells[row]) : string.Empty;
 

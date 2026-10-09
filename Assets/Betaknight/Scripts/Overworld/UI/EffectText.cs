@@ -48,7 +48,7 @@ namespace Betaknight.Overworld.UI
 
         public static string Icon(string id) => TryGet(id, out CircuitEffectDefinition e) ? Icon(e) : string.Empty;
 
-        /// <summary>Alle bekannten Effekte einer Liste als farbige Symbole («⏫ ↻»), leer ohne.</summary>
+        /// <summary>Alle bekannten Effekte einer Liste als farbige Symbole («⏫ ∞»), leer ohne.</summary>
         public static string Icons(IEnumerable<string> ids) =>
             ids == null ? string.Empty : string.Join(" ", ids.Where(id => TryGet(id, out _)).Select(Icon));
 
@@ -66,7 +66,7 @@ namespace Betaknight.Overworld.UI
         public static IReadOnlyList<string> Of(Betaknight.Core.Arena.LogicRow row) =>
             row?.Skill != null ? row.Skill.CircuitEffects : (IReadOnlyList<string>)new string[0];
 
-        /// <summary>Regeln der ganzen Platine (Overflow, Firewall) mit Anzahl, z. B. «▣ Firewall ×2», leer ohne.</summary>
+        /// <summary>Regeln der ganzen Platine (Overflow, Firewall) mit Anzahl, z. B. «■ Firewall ×2», leer ohne.</summary>
         public static string BoardRules(Betaknight.Core.Arena.LogicBoard board)
         {
             if (board == null) return string.Empty;

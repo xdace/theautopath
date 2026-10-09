@@ -53,7 +53,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void SixChargeFiresATwoAndAFourCellSkillTogether()
         {
-            // «Vs. Boss» (◆◆◆, 6 Zellen) löst einmal aus: 2 + 4 = 6, beide laufen, nichts bleibt übrig.
+            // «Vs. Boss» (●●●, 6 Zellen) löst einmal aus: 2 + 4 = 6, beide laufen, nichts bleibt übrig.
             LogicBoard board = Board(Relay("vs_boss", 1, 0), Part(SkillIds.Ignite, 0, 0), Part(SkillIds.ArmorBreak, 2, 0));
             Assert.AreEqual(6, board.Relays[0].MaxCells);
             BattleResult r = Fight(board, vsBoss: true);
@@ -73,7 +73,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void TheSmallestNeedIsFilledFirstAndTheRestGoesToTheOthers()
         {
-            // «HP Full» (◆, 2 Ladung): der Schockstich braucht 1 und läuft, der Rüstungsbrecher (4) bekommt den Rest 1 und lädt.
+            // «HP Full» (●, 2 Ladung): der Schockstich braucht 1 und läuft, der Rüstungsbrecher (4) bekommt den Rest 1 und lädt.
             LogicBoard board = Board(Relay("hp_full", 1, 0), Part(SkillIds.ShockStab, 0, 0), Part(SkillIds.ArmorBreak, 2, 0));
             BattleResult r = Fight(board, seconds: 1);
             // Nur das erste Auslösen (Tick 1) zählt, danach pulst «HP Full» alle 2 s.
@@ -85,7 +85,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void ATieThatCannotFireIsSplitEvenly()
         {
-            // «Opening 5 s» (◆, 2 Ladung) löst jede Sekunde aus; zwei Rüstungsbrecher (je 4) bekommen erst je 1 (keiner kann
+            // «Opening 5 s» (●, 2 Ladung) löst jede Sekunde aus; zwei Rüstungsbrecher (je 4) bekommen erst je 1 (keiner kann
             // laufen), nach zwei Auslösungen brauchen beide noch 2: Gleichstand, nur einer kann laufen, zufällig gewählt.
             // Die beiden berühren sich nicht (sonst schicken sie sich Pulse über ihre Pins).
             LogicBoard board = Board(new RelaySpec("opening", new Cell(2, 2), level: 2), Part(SkillIds.ArmorBreak, 0, 1), Part(SkillIds.ArmorBreak, 3, 1));
@@ -119,7 +119,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void TheChargeBelongsToTheComponentAndAllRelaysFillIt()
         {
-            // Rail Cannon (6 Zellen) an zwei Relais: «Opening 5 s» (◆, 2 pro Sekunde) und «HP Full» (◆, 2 zu Kampfbeginn).
+            // Rail Cannon (6 Zellen) an zwei Relais: «Opening 5 s» (●, 2 pro Sekunde) und «HP Full» (●, 2 zu Kampfbeginn).
             // Beide füllen denselben Speicher: 2 + 2 im ersten Tick, nach der nächsten Sekunde 6 → die Kanone läuft.
             var spec = new CircuitSpec { Width = 6, Height = 6 };
             spec.Relays.Add(new RelaySpec("opening", new Cell(0, 0), level: 2));
@@ -137,7 +137,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void ChargeIsKeptWhileQueuedAndRequeuesAfterTheCast()
         {
-            // «Vs. Boss» und «On Gold Mine» (je ◆◆◆, 6 Ladung) lösen zu Kampfbeginn im selben Tick aus: 12 Ladung für die
+            // «Vs. Boss» und «On Gold Mine» (je ●●●, 6 Ladung) lösen zu Kampfbeginn im selben Tick aus: 12 Ladung für die
             // Rail Cannon (6 Zellen). Die erste Ladung reiht sie ein, die zweite bleibt gespeichert (sie steht ja schon in der
             // Warteschlange) und reiht sie direkt nach der ersten Ausführung wieder ein.
             var spec = new CircuitSpec { Width = 6, Height = 6 };

@@ -30,7 +30,7 @@ namespace Betaknight.Core.Arena
                     else if (e.IsPulse && e.CauseRow >= 0) text += ArenaTexts.LogPulsedBy(e.CauseRow);
                     else if (e.IsRepeat) text += ArenaTexts.LogRepeat;
                     if (e.FromQueue) text += ArenaTexts.LogFromQueue(Time(e.QueuedTicks));
-                    if (e.Cause == ActionCause.Recursion) text += $"  ↻ Recursion depth {e.Depth}";
+                    if (e.Cause == ActionCause.Recursion) text += $"  ∞ Recursion depth {e.Depth}";
                     if (e.Power > 0) text += ArenaTexts.LogAmplified(e.Power);
                     break;
                 case BattleEventKind.RowQueued:

@@ -24,6 +24,41 @@ namespace Betaknight.Overworld.UI
         public static readonly Color Bad = new Color(1f, 0.42f, 0.38f, 1f);
         public static readonly Color Accent = new Color(1f, 0.84f, 0.37f, 1f);
 
+        // ------------------------------------------------------------------ Farb-Tokens: eine Farbe, eine Bedeutung
+
+        /// <summary>Gold (nur für Gold und Kosten).</summary>
+        public static readonly Color Gold = Accent;
+
+        /// <summary>Warnung, z. B. «zu gross, lädt».</summary>
+        public static readonly Color Warning = new Color(1f, 0.62f, 0.22f, 1f);
+
+        /// <summary>«Nicht versorgt»: grau statt rot, damit Rot nur Gefahr/Angriff bedeutet.</summary>
+        public static readonly Color Disabled = new Color(0.55f, 0.57f, 0.62f, 1f);
+
+        /// <summary>Kern und Boss.</summary>
+        public static readonly Color Core = new Color(0.69f, 0.55f, 1f, 1f);
+
+        /// <summary>Verknüpfungen (Trigger/Charge Link).</summary>
+        public static readonly Color Link = new Color(1f, 0.68f, 0.26f, 1f);
+
+        /// <summary>Basisangriff und Teile ohne Art.</summary>
+        public static readonly Color Neutral = new Color(0.72f, 0.74f, 0.80f, 1f);
+
+        /// <summary>
+        /// Farbe der Skill-Art (überall gleich: Inventar, Platine, Arena, Gegner). Bei mehreren Arten gewinnt die besondere vor
+        /// dem Angriff (Schockstich = Schock).
+        /// </summary>
+        public static Color Kind(Betaknight.Core.Arena.SkillKind kinds)
+        {
+            if ((kinds & Betaknight.Core.Arena.SkillKind.Shock) != 0) return new Color(0.96f, 0.88f, 0.29f, 1f);
+            if ((kinds & Betaknight.Core.Arena.SkillKind.Fire) != 0) return new Color(1.00f, 0.56f, 0.18f, 1f);
+            if ((kinds & Betaknight.Core.Arena.SkillKind.Healing) != 0) return new Color(0.31f, 0.84f, 0.61f, 1f);
+            if ((kinds & Betaknight.Core.Arena.SkillKind.Shield) != 0) return new Color(0.36f, 0.55f, 1.00f, 1f);
+            if ((kinds & Betaknight.Core.Arena.SkillKind.Movement) != 0) return new Color(0.78f, 0.49f, 1.00f, 1f);
+            if ((kinds & Betaknight.Core.Arena.SkillKind.Attack) != 0) return new Color(1.00f, 0.42f, 0.35f, 1f);
+            return Neutral;
+        }
+
         private static GUISkin _skin;
 
         /// <summary>Fenster-Titel, 18.</summary>

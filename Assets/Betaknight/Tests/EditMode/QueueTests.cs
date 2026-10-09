@@ -242,7 +242,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void TheBonusOfTheTriggeringRelayIsKept()
         {
-            // Ein schweres Relais (◆◆◆) gibt seinen Bonus mit, auch wenn die Komponente aus der Warteschlange startet.
+            // Ein schweres Relais (●●●) gibt seinen Bonus mit, auch wenn die Komponente aus der Warteschlange startet.
             BattleResult r = Run(Setup(new LogicBoard(new[]
             {
                 Row("when_hit", Skill("a", Ticks.FromSeconds(1)), difficulty: 3),

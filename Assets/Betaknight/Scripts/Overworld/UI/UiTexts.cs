@@ -11,7 +11,7 @@ namespace Betaknight.Overworld.UI
 
         public const string Back = "Back";
         public const string Free = "free";
-        public const string Close = "✕";
+        public const string Close = "×";
         public const string BasicAttack = "Basic Attack";
         public const string ReadOnly = "Read only: fight or open decision";
         public const string FallbackLine = BasicAttack + " fills the gaps when nothing is queued";
@@ -347,7 +347,7 @@ namespace Betaknight.Overworld.UI
             public static string SellItem(string name, string slot, int price) => $"Sell {name} [{slot}]  +{price} Gold";
             public static string SellRune(string name, int price) => $"Sell Rune {name}  +{price} Gold";
             public static string ChipLabel(string name, int price, string description) =>
-                $"<color=#ffd75e>▣</color>  <b>{name}</b>  [Logic Chip]  – {price} Gold\n{description}";
+                $"<color=#ffd75e>■</color>  <b>{name}</b>  [Logic Chip]  – {price} Gold\n{description}";
             public const string ChipTip = "Logic chip (rare): goes to your logic chip inventory. Place, move and rotate it in Build (B).";
 
             // A-21: Lock und steigender Reroll-Preis.
@@ -472,7 +472,7 @@ namespace Betaknight.Overworld.UI
             public const string ComponentDragHint = "Drag to move · right-click = rotate · onto the skill list = remove";
             public const string RuneDropHint = "Drag onto a free cell = new relay, onto a relay = swap · double-click = best free cell";
             public const string Hint = "Drag: skill onto the board = place, component or relay = move (R rotates while dragging), right-click a component = rotate, "
-                + "rune onto a free cell = new relay, rune onto a relay = swap, module onto a part or ◇ = place, back into a list = remove. "
+                + "rune onto a free cell = new relay, rune onto a relay = swap, module onto a part or ○ = place, back into a list = remove. "
                 + "Logic chips: drag from the strip onto a free cell, right-click rotates, back onto the strip = take off. "
                 + "Double-click: place on the best cell / take off.";
 
@@ -491,13 +491,13 @@ namespace Betaknight.Overworld.UI
             public static string CoreBonus(int percent) => $"Core +{percent} %";
             public static string PoweredBy(string relays) => $"powered by {relays}";
             public static string TooLargeTip(int cells, int limit) =>
-                $"{Cells(cells)}, the strongest touching relay gives {limit} charge per trigger: it needs {(cells + limit - 1) / System.Math.Max(1, limit)} triggers to run. The charge is kept until it is full, and all touching relays fill the same store. A harder relay (◆ 2, ◆◆ 4, ◆◆◆ 6) needs fewer.";
+                $"{Cells(cells)}, the strongest touching relay gives {limit} charge per trigger: it needs {(cells + limit - 1) / System.Math.Max(1, limit)} triggers to run. The charge is kept until it is full, and all touching relays fill the same store. A harder relay (● 2, ●● 4, ●●● 6) needs fewer.";
             public static string Powers(string components) => $"powers {components}";
             public static string TooLargeHere(string components) => $"too large here: {components}";
             public static string RelayLimit(int cells) => $"powers up to {Cells(cells)}";
             public static string MaxCells(int cells) => $"≤{cells}";
-            public static string TriggersTo(int number) => $"↪#{number}";
-            public static string ChargesTo(int number) => $"⚡#{number}";
+            public static string TriggersTo(int number) => $"→#{number}";
+            public static string ChargesTo(int number) => $"»#{number}";
             public static string Evolution(string name) => $"<b>Evolution {name}</b>";
             public static string Duo(string name, string effect) => $"<b>Duo {name}</b>: {effect}";
             public static string GrowsNow(string rule, string effect, string milestone) =>
@@ -526,7 +526,7 @@ namespace Betaknight.Overworld.UI
             public const string Blown = "blown";
             public const string NoInputs = "no touching relay yet – place it next to a relay";
             public const string PlainPin = "Pin";
-            public const string PulseLegend = "⚡ pulses run along the lines";
+            public const string PulseLegend = "≈ pulses run along the lines";
             public const string Watchdog = "WDOG";
 
             public static string ChipTip(string name, string description) => $"<b>{name}</b>: {description}";
@@ -540,12 +540,12 @@ namespace Betaknight.Overworld.UI
             public static string CarriesLinks(string links) => $"Carries: {links}";
             public static string Link(string from, string to, int hops) =>
                 hops <= 1 ? $"{from} → {to}" : $"{from} → {to} ({hops - 1} chip{(hops - 1 == 1 ? "" : "s")})";
-            public static string PulsesTo(string links) => $"⚡ Pulses to: {links}";
-            public static string PulsesFrom(string links) => $"⚡ Pulses from: {links}";
-            public static string PulsePath(string path) => $"⚡ Path: {path}";
+            public static string PulsesTo(string links) => $"≈ Pulses to: {links}";
+            public static string PulsesFrom(string links) => $"≈ Pulses from: {links}";
+            public static string PulsePath(string path) => $"≈ Path: {path}";
             public static string PinsLine(string pins) => $"Pins: {pins}";
             public static string TypedPin(string kind, bool matched, int percent) =>
-                matched ? $"{kind} pin ✔ +{percent} %" : $"{kind} pin (needs a {kind} skill in front)";
+                matched ? $"{kind} pin √ +{percent} %" : $"{kind} pin (needs a {kind} skill in front)";
             public static string PinTip(string kind, bool matched, bool linked, int percent)
             {
                 string head = kind == null ? "<b>Pin</b>: connects to a touching pin or a trace." : matched
@@ -575,7 +575,7 @@ namespace Betaknight.Overworld.UI
             public static string HeatTip(int heat, int max) =>
                 $"Heat {heat}/{max} (Overclock). At {max} Heat this component skips one execution, then its Heat resets.";
             public const string HeatSkip = "OVERHEAT";
-            public static string Depth(int depth) => $"↻{depth}";
+            public static string Depth(int depth) => $"∞{depth}";
             public static string DepthTip(int depth, int percent) => $"Recursion depth {depth}: +{percent} % effect";
             public static string Power(int percent) => $"+{percent}%";
             public static string PowerTip(int percent) => $"Amplified: +{percent} % effect";
@@ -627,7 +627,7 @@ namespace Betaknight.Overworld.UI
         {
             public const string Enemy = "Enemy";
             public const string PortalOpen = "Portal open";
-            public const string Repeat = "↻ Repeat";
+            public const string Repeat = "∞ Repeat";
             public const string BoardTitle = "<b>Circuit Board</b>";
             public const string BoardLegend = "relays light up when they trigger · hover a part";
             public const string QueueEmpty = "Waiting: –";
@@ -657,8 +657,8 @@ namespace Betaknight.Overworld.UI
             public const string HeaderPower = "<b>Power</b>";
             public const string HeaderPowerTip = "Is a relay powering this component? Unpowered or too large components never fire.";
             public const string HeaderFired = "<b>Fired</b>";
-            public const string HeaderFiredTip = "How often this component started an action (↪ by a trigger module, ⚡ by a pulse, ↻ repeated).";
-            public static string PulsedByTip(string by) => $"⚡ started by pulses from {by}";
+            public const string HeaderFiredTip = "How often this component started an action (→ by a trigger module, ≈ by a pulse, ∞ repeated).";
+            public static string PulsedByTip(string by) => $"≈ started by pulses from {by}";
             public const string HeaderTriggered = "<b>Triggered</b>";
             public const string HeaderTriggeredTip = "How often a relay or trigger reached this component (queued or missed). Hard relays need easers or a build that makes them happen.";
             public const string HeaderDamage = "<b>Damage</b>";
@@ -708,7 +708,7 @@ namespace Betaknight.Overworld.UI
                 $"<b>Arena</b> – Knight vs {enemy}   <color=#9aa4b2>{time}</color>{portal}";
             public static string PortalOpensIn(string time) => $"Portal opens in {time}";
             public static string Cast(string seconds) => $"Cast {seconds}";
-            public static string FromComponent(int number) => $"↪ from #{number}";
+            public static string FromComponent(int number) => $"→ from #{number}";
             public static string Charging(string skill, string cast) => $"charging: {skill} ({cast})";
             public static string StatusTip(string name, string left, int stacks) =>
                 $"{name}: {left} left{(stacks > 1 ? $", {stacks} stacks" : string.Empty)}";

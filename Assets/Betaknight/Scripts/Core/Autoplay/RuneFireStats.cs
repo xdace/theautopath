@@ -102,7 +102,7 @@ namespace Betaknight.Core.Autoplay
             return total.Values.OrderBy(s => s.Difficulty).ThenByDescending(s => s.FiredPerMinute).ThenBy(s => s.RuneId, StringComparer.Ordinal).ToList();
         }
 
-        /// <summary>Textabelle: «◆◆ Gegner betäubt: 14 Kämpfe, erfüllt in 43 %, 2,1× pro Minute gefeuert».</summary>
+        /// <summary>Textabelle: «●● Gegner betäubt: 14 Kämpfe, erfüllt in 43 %, 2,1× pro Minute gefeuert».</summary>
         public static string Table(IEnumerable<AutoplayReport> runs)
         {
             var sb = new StringBuilder(AutoplayTexts.RuneTableHeader);

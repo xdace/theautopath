@@ -124,7 +124,7 @@ namespace Betaknight.Core
         public const string WhenMet = "When triggered";
         public const string AfterExecution = "After execution";
         public static string ModuleTrigger(string when, string target) => $"{when} → {target}";
-        public static string ModuleChargeLink(string when, string target) => $"{when} ⚡ charges {target}";
+        public static string ModuleChargeLink(string when, string target) => $"{when} » charges {target}";
         public static string ModuleLabel(string name) => $"Module: {name}";
         public static string ChipLabel(string name) => $"Chip: {name}";
 

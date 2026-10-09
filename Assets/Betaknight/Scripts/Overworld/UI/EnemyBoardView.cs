@@ -10,7 +10,7 @@ namespace Betaknight.Overworld.UI
 {
     /// <summary>
     /// Gegner-Platine als kompaktes Raster, gemeinsam für Arena, Karten-Hover und Bergen: Relais, Komponenten mit Modulen
-    /// (goldenes Schild «◆n» mit den Namen im Tooltip) und Effekt-Symbolen, Logik-Chips, Pins und Pulsverbindungen.
+    /// (goldenes Schild «●n» mit den Namen im Tooltip) und Effekt-Symbolen, Logik-Chips, Pins und Pulsverbindungen.
     /// Mit <see cref="Live"/> (Arena) zeigt sie denselben Zustand wie die Platine des Ritters: Relais leuchten beim Auslösen,
     /// die feuernde Komponente ist hervorgehoben, Pulse laufen, dazu Hitze, Hacks, Rekursions-Tiefe und Verstärkung (A-21).
     /// Ohne Live-Zustand eine ruhige Vorschau. Ein Teil im Fokus (Beute beim Hovern) wird golden umrandet. Gerechnet wird nichts.
@@ -186,7 +186,7 @@ namespace Betaknight.Overworld.UI
             if (focus.HasValue && Matches(row, focus.Value)) UiTheme.Outline(rect, FocusColour, 3f);
         }
 
-        /// <summary>«◆2» unten links, Tooltip mit den Modulnamen.</summary>
+        /// <summary>«●2» unten links, Tooltip mit den Modulnamen.</summary>
         private static void DrawModuleBadge(LogicRow row, Rect rect, float size)
         {
             if (row.Skill == null || row.Skill.Modules.Count == 0) return;
@@ -194,7 +194,7 @@ namespace Betaknight.Overworld.UI
             var tag = new Rect(rect.x + 2f, rect.yMax - h - 2f, Mathf.Min(rect.width - 4f, h * 2.2f), h);
             UiTheme.Fill(tag, new Color(0f, 0f, 0f, 0.75f));
             UiTheme.Outline(tag, ModuleColour, 1f);
-            GUI.Label(tag, new GUIContent($"<b><color=#ffd75e>◆{row.Skill.Modules.Count}</color></b>",
+            GUI.Label(tag, new GUIContent($"<b><color=#ffd75e>●{row.Skill.Modules.Count}</color></b>",
                 UiTexts.Arena.EnemyModules(string.Join(", ", row.Skill.Modules))), Micro);
         }
 

@@ -131,7 +131,7 @@ namespace Betaknight.Tests.EditMode
         {
             OverworldSession s = Session(new ArenaCombatResolver());
             foreach (string id in new[] { "plasma_drill", "crawler_tracks", "resource_compactor" }) s.Gear.Equip(s.Items.Get(id));
-            // «On Gold Mine» (◆◆◆, bis 6 Zellen) rechts oben, der Bohrer (2×2) darunter, damit er neben dem Kern Platz hat.
+            // «On Gold Mine» (●●●, bis 6 Zellen) rechts oben, der Bohrer (2×2) darunter, damit er neben dem Kern Platz hat.
             Assert.IsNotNull(s.Board.AddRelay(s.RuneCatalog.Get("on_goldmine"), new Betaknight.Core.Circuit.Cell(3, 0)));
             Betaknight.Core.Skills.SkillInstance drill = s.GainSkill(Betaknight.Core.Arena.SkillIds.Drill);
             Assert.IsTrue(s.PlaceSkill(drill.InstanceId, new Betaknight.Core.Circuit.Cell(2, 1)));

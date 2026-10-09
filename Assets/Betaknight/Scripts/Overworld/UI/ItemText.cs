@@ -43,7 +43,7 @@ namespace Betaknight.Overworld.UI
         }
 
         /// <summary>
-        /// Set eines Teils mit allen Boni: aktive gelb mit ✔, noch nicht erreichte grau mit ○. Wird der Bonus erst mit
+        /// Set eines Teils mit allen Boni: aktive gelb mit √, noch nicht erreichte grau mit ○. Wird der Bonus erst mit
         /// diesem Teil aktiv, steht er grün mit «neu». <paramref name="pieces"/> = Teile mit diesem Teil angelegt.
         /// </summary>
         public static string SetBlock(SetDefinition set, int pieces, bool worn)

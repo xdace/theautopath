@@ -22,7 +22,7 @@ namespace Betaknight.Overworld.UI
         public static readonly Color ComponentColor = new Color(0.17f, 0.20f, 0.26f, 1f);
         public static readonly Color PoweredBorder = new Color(0.49f, 0.86f, 0.44f, 1f);
         public static readonly Color TooLargeBorder = new Color(1f, 0.62f, 0.22f, 1f);
-        public static readonly Color UnpoweredBorder = new Color(1f, 0.42f, 0.38f, 1f);
+        public static readonly Color UnpoweredBorder = UiTheme.Disabled;
         public static readonly Color TraceColor = new Color(0.45f, 0.95f, 1.00f, 0.55f);
 
         // A-20: Pins, Logik-Chips, Pulse.
@@ -150,16 +150,7 @@ namespace Betaknight.Overworld.UI
         /// <summary>Farbe eines typisierten Pins nach Skill-Art (untypisiert grau).</summary>
         public static Color KindColor(SkillKind kind)
         {
-            switch (kind)
-            {
-                case SkillKind.Attack: return new Color(1.00f, 0.45f, 0.40f, 1f);
-                case SkillKind.Shield: return new Color(0.45f, 0.70f, 1.00f, 1f);
-                case SkillKind.Fire: return new Color(1.00f, 0.60f, 0.20f, 1f);
-                case SkillKind.Shock: return new Color(1.00f, 0.92f, 0.30f, 1f);
-                case SkillKind.Healing: return new Color(0.45f, 0.95f, 0.50f, 1f);
-                case SkillKind.Movement: return new Color(0.85f, 0.55f, 1.00f, 1f);
-                default: return PinColor;
-            }
+            return kind == SkillKind.None ? PinColor : UiTheme.Kind(kind);
         }
 
         /// <summary>Komponente (Zeile) der kompilierten Platine, die die Zelle belegt, oder null.</summary>
@@ -519,14 +510,14 @@ namespace Betaknight.Overworld.UI
             for (int i = 0; i < max; i++)
             {
                 bool on = flash || i < heat;
-                Color c = flash ? (Mathf.Repeat(Time.unscaledTime * 10f, 1f) < 0.5f ? Color.white : new Color(1f, 0.2f, 0.15f))
+                Color c = flash ? (Mathf.Repeat(Time.unscaledTime * 2.5f, 1f) < 0.5f ? Color.white : new Color(1f, 0.2f, 0.15f))
                     : Color.Lerp(new Color(1f, 0.85f, 0.3f), hot, max <= 1 ? 1f : i / (float)(max - 1));
                 if (on) UiTheme.Fill(new Rect(bar.x + i * seg + 1f, bar.y + 1f, seg - 2f, bar.height - 2f), c);
             }
             if (!string.IsNullOrEmpty(tooltip)) GUI.Label(new Rect(bar.x, bar.y - 4f, bar.width, bar.height + 8f), new GUIContent(string.Empty, tooltip));
         }
 
-        /// <summary>Rekursions-Tiefe als Schild oben links («↻2»), in der Farbe von Recursion.</summary>
+        /// <summary>Rekursions-Tiefe als Schild oben links («∞2»), in der Farbe von Recursion.</summary>
         public static void DrawDepth(Rect rect, int depth, string tooltip)
         {
             if (depth <= 0) return;
@@ -538,7 +529,7 @@ namespace Betaknight.Overworld.UI
         }
 
         /// <summary>Flackern für gehackte Teile: an/aus etwa 6× pro Sekunde.</summary>
-        public static bool FlickerOn => Mathf.Repeat(Time.unscaledTime * 6f, 1f) < 0.55f;
+        public static bool FlickerOn => Mathf.Repeat(Time.unscaledTime * 2.5f, 1f) < 0.55f;
 
         /// <summary>
         /// Gehacktes Teil (Bit Flip, Jam, Hijack): flackernder Rahmen und Schleier in der Farbe des Hacks, kurzes Schild unten

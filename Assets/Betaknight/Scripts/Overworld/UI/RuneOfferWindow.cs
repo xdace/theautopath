@@ -86,7 +86,7 @@ namespace Betaknight.Overworld.UI
 
                 bool synergy = _session.Board.HasTag(rune.Tag);
                 string runeHints = SkillText.EvolutionHints(_session.EvolutionHintsForRune(rune.Id));
-                string label = $"{RuneText.DifficultyBadge(rune)}  <b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]{(synergy ? "  ★" : string.Empty)}\n{rune.Description}{runeHints}";
+                string label = $"{RuneText.DifficultyBadge(rune)}  <b>{rune.Name}</b>  [{rune.Tag.DisplayName()}]{(synergy ? "  *" : string.Empty)}\n{rune.Description}{runeHints}";
                 if (GUILayout.Button(new GUIContent(label, RuneText.DifficultyTip(rune)), _nameStyle, GUILayout.Height(RuneHeight(runeHints))))
                 {
                     if (_session.Board.IsFull) _choiceAwaitingSlot = i;

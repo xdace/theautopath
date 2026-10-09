@@ -137,12 +137,12 @@ namespace Betaknight.Core.Arena
             gained > 0 ? $"{who}: {component} charged +{gained} → {stored}/{cells}" : $"{who}: {component} keeps its charge {stored}/{cells} (already queued, runs again after its cast)";
         public static string ChargeStats(int times, int gained, int left, int cells) =>
             times > 0 ? $"{times}× (+{gained})" + (left > 0 ? $" · {left}/{cells} left" : string.Empty) : $"{left}/{cells} left";
-        public static string ChargeBadge(int stored, int cells) => $"⚡{stored}/{cells}";
+        public static string ChargeBadge(int stored, int cells) => $"■{stored}/{cells}";
         public static string LogSpillover(string who, string component, int cells) => $"{who}: {component} spills {cells} overcharge to its neighbours";
-        public static string LogTriggeredBy(int causeRow) => $"  ↪ triggered by #{causeRow + 1}";
-        public static string LogPulsedBy(int causeRow) => $"  ⚡ pulse from #{causeRow + 1}";
-        public const string LogRepeat = "  ↻ Repeat";
-        public static string LogFromQueue(string waited) => $"  ⏳ from the queue after {waited}";
+        public static string LogTriggeredBy(int causeRow) => $"  → triggered by #{causeRow + 1}";
+        public static string LogPulsedBy(int causeRow) => $"  ≈ pulse from #{causeRow + 1}";
+        public const string LogRepeat = "  ∞ Repeat";
+        public static string LogFromQueue(string waited) => $"  … from the queue after {waited}";
         public static string LogQueued(string who, string component) => $"{who}: {component} queued";
         public static string LogMissed(string who, string component, string reason) => $"{who}: missed trigger on {component} ({reason})";
         public static string LogRelay(string who, string relay) => $"{who}: {relay} triggers";

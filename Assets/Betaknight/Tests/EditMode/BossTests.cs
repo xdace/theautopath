@@ -108,7 +108,7 @@ namespace Betaknight.Tests.EditMode
                 return r.Victory ? 24 - r.DamageTaken : 0;
             }
 
-            // Seit A-19 kann «On Hit» (◆, bis 2 Zellen) den 2×2-Rüstungsbrecher des einfachen Ritters nicht versorgen: er
+            // Seit A-19 kann «On Hit» (●, bis 2 Zellen) den 2×2-Rüstungsbrecher des einfachen Ritters nicht versorgen: er
             // kämpft wie zuvor faktisch nur mit dem Basisangriff. «Every 5 Seconds» ersetzt das frühere «Immer» mit Cooldown.
             int plain = RestHp(new[] { "short_blade" });
             int phantom = RestHp(new[] { "gyro_thrusters", "holo_projector", "shock_dagger" },

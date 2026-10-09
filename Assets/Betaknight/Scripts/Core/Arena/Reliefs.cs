@@ -106,7 +106,7 @@ namespace Betaknight.Core.Arena
         public List<ReliefDefinition> ForRune(string runeId) => _all.FindAll(r => r.EasedRuneIds.Contains(runeId));
 
         /// <summary>
-        /// «Erleichtert: «Gegner betäubt» ◆◆ (Eigene Betäubungen dauern +1 s)», eine Zeile pro Erleichterung; leer,
+        /// «Erleichtert: «Gegner betäubt» ●● (Eigene Betäubungen dauern +1 s)», eine Zeile pro Erleichterung; leer,
         /// wenn der Träger nichts erleichtert. Runen-Namen und Stufen kommen aus <paramref name="runes"/>.
         /// </summary>
         public string EasesText(string carrierId, Runes.RuneCatalog runes)

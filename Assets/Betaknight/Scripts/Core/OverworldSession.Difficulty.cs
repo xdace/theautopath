@@ -64,7 +64,7 @@ namespace Betaknight.Core
         /// <summary>Erleichterer an einem Teil, Modul oder Skill (Id).</summary>
         public List<ReliefDefinition> ReliefsOf(string carrierId) => Reliefs.ForCarrier(carrierId);
 
-        /// <summary>«Erleichtert: «Gegner betäubt» ◆◆ (…)» oder leer, wenn der Träger nichts erleichtert.</summary>
+        /// <summary>«Erleichtert: «Gegner betäubt» ●● (…)» oder leer, wenn der Träger nichts erleichtert.</summary>
         public string EasesText(string carrierId) => Reliefs.EasesText(carrierId, RuneCatalog);
     }
 }

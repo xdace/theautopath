@@ -220,7 +220,7 @@ namespace Betaknight.Core.Arena
             }
         }
 
-        /// <summary>«Relay ◆◆ Hard: +30 % effect, −20 % Cast Time (included)» oder leer ohne Bonus.</summary>
+        /// <summary>«Relay ●● Hard: +30 % effect, −20 % Cast Time (included)» oder leer ohne Bonus.</summary>
         public string DifficultyLine =>
             Skill.DifficultyTier > 0
                 ? ArenaTexts.DifficultyLine(DifficultyText.Symbol(Skill.DifficultyTier), DifficultyText.Name(Skill.DifficultyTier), Skill.Difficulty.Text)

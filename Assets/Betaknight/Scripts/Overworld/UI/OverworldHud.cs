@@ -436,7 +436,7 @@ namespace Betaknight.Overworld.UI
 
         private static readonly SkillCatalog Skills = SkillCatalog.CreateDefault();
 
-        /// <summary>Komponenten der Platine in Lesereihenfolge: «#1 ◆ Shock Stab 1×1 ← On Hit», unversorgte rot.</summary>
+        /// <summary>Komponenten der Platine in Lesereihenfolge: «#1 ● Shock Stab 1×1 ← On Hit», unversorgte rot.</summary>
         private string BoardList()
         {
             var lines = new List<string>();
@@ -446,15 +446,15 @@ namespace Betaknight.Overworld.UI
                 ComponentSlot c = _session.Board.Components[i];
                 string skill = c.Skill.NameFrom(Skills);
                 int modules = c.Skill.Modules.Count;
-                string marks = modules > 0 ? $" <color=#ffd75e>◆{modules}</color>" : string.Empty;
+                string marks = modules > 0 ? $" <color=#ffd75e>●{modules}</color>" : string.Empty;
                 foreach (OverworldSession.TriggerLink link in links)
-                    if (!link.FromBlock && link.From == i) marks += $" <color=#ffae42>↪{link.To + 1}</color>";
+                    if (!link.FromBlock && link.From == i) marks += $" <color=#ffae42>→{link.To + 1}</color>";
                 if (_session.Board.TouchesCore(c)) marks += $" <color=#b18cff>+{_session.Board.Config.CoreBonusPercent} %</color>";
-                if (_session.IsEvolutionReady(c.Skill)) marks += " <color=#d29bff>✦</color>";
+                if (_session.IsEvolutionReady(c.Skill)) marks += " <color=#d29bff>^</color>";
                 List<RelayChip> powering = _session.PoweringRelays(c);
                 string power = powering.Count > 0
                     ? $"{RuneText.Difficulty(_session.ComponentDifficulty(c))} ← {string.Join(", ", powering.Select(r => r.Growth > 0 ? $"{r.Name} +{r.Growth}" : r.Name))}"
-                    : _session.IsTooLarge(c) ? $"<color=#ff9e38>{UiTexts.NotPoweredTooLarge}</color>" : $"<color=#ff6b61>{UiTexts.NotPowered}</color>";
+                    : _session.IsTooLarge(c) ? $"<color=#ff9e38>{UiTexts.NotPoweredTooLarge}</color>" : $"<color={UiTheme.Hex(UiTheme.Disabled)}>{UiTexts.NotPowered}</color>";
                 lines.Add($"#{i + 1} {skill} {c.Shape}{marks}  {power}");
             }
             if (lines.Count == 0) lines.Add(UiTexts.Hud.NoComponents);

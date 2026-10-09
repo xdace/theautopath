@@ -27,7 +27,7 @@ namespace Betaknight.Tests.EditMode
         // ------------------------------------------------------------------ Gründe
 
         /// <summary>Platine aus dem Katalog: «When Hit» oben links, rechts daneben der Schockstich, darunter der zu grosse
-        /// Rüstungsbrecher (2×2 an einem ◆-Relais), unten rechts die Schubdüsen ohne Relais.</summary>
+        /// Rüstungsbrecher (2×2 an einem ●-Relais), unten rechts die Schubdüsen ohne Relais.</summary>
         private static LogicBoard MixedBoard()
         {
             var spec = new CircuitSpec { Width = 4, Height = 3 };
@@ -337,7 +337,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(RowDisplay.Firing, p.RowStateAt(0), "der Schockstich startet im selben Tick");
             Assert.IsNull(p.LastSkipReason(1), "Aufladen ist kein verpasster Auslöser");
             Assert.AreEqual(1, p.ChargeAt(1));
-            Assert.AreEqual("⚡1/4", p.ChargeBadge(1));
+            Assert.AreEqual("■1/4", p.ChargeBadge(1));
             Assert.IsNull(p.LastSkipReason(0), "der Schockstich hat nichts verpasst");
             Assert.IsNull(p.LastSkipReason(3), "der Basisangriff wird nie ausgelöst");
 

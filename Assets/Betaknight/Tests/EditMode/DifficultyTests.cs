@@ -127,13 +127,13 @@ namespace Betaknight.Tests.EditMode
         }
 
         // Je Stufe eine Rune: die grösste erlaubte Form wird versorgt, die nächstgrössere ist «zu gross».
-        [TestCase("battle_start", SkillIds.ShockStab, true)]   // ◇ 1 Zelle
-        [TestCase("battle_start", SkillIds.ShieldBash, false)] // ◇ 1×2
-        [TestCase("on_hit", SkillIds.ShieldBash, true)]        // ◆ 2 Zellen
-        [TestCase("on_hit", SkillIds.ArmorBreak, false)]       // ◆ 2×2
-        [TestCase("enemy_stunned", SkillIds.ArmorBreak, true)] // ◆◆ 4 Zellen
-        [TestCase("enemy_stunned", SkillIds.RailCannon, false)]// ◆◆ 2×3
-        [TestCase("every_20s", SkillIds.RailCannon, true)]     // ◆◆◆ 6 Zellen
+        [TestCase("battle_start", SkillIds.ShockStab, true)]   // ○ 1 Zelle
+        [TestCase("battle_start", SkillIds.ShieldBash, false)] // ○ 1×2
+        [TestCase("on_hit", SkillIds.ShieldBash, true)]        // ● 2 Zellen
+        [TestCase("on_hit", SkillIds.ArmorBreak, false)]       // ● 2×2
+        [TestCase("enemy_stunned", SkillIds.ArmorBreak, true)] // ●● 4 Zellen
+        [TestCase("enemy_stunned", SkillIds.RailCannon, false)]// ●● 2×3
+        [TestCase("every_20s", SkillIds.RailCannon, true)]     // ●●● 6 Zellen
         public void ARelayPowersComponentsUpToTheLimitOfItsTier(string runeId, string skillId, bool powered)
         {
             LogicBoard board = BoardFactory.CreateDefault().Create(Circuit(
@@ -219,7 +219,7 @@ namespace Betaknight.Tests.EditMode
             var catalog = new EquipmentCatalog(EquipmentCatalog.CreateDefault().All);
             var gloves = new Equipment();
             gloves.Equip(catalog.Get(ReliefCarrierIds.NumbingGloves));
-            // «Enemy Stunned» ◆◆ versorgt den 2×2-Bohrer; ein Clock-Relais darunter den Schockstoss (20 % Betäubung).
+            // «Enemy Stunned» ●● versorgt den 2×2-Bohrer; ein Clock-Relais darunter den Schockstoss (20 % Betäubung).
             CircuitSpec spec = Circuit(
                 new[] { new RelaySpec("enemy_stunned", new Cell(0, 0)), new RelaySpec("clock", new Cell(0, 3)) },
                 new[] { new ComponentSpec(SkillIds.Drill, new Cell(1, 0)), new ComponentSpec(SkillIds.ShockStab, new Cell(1, 3)) });
@@ -515,7 +515,7 @@ namespace Betaknight.Tests.EditMode
             Assert.Less(hard.WindupTicks, plain.WindupTicks, "−35 % Cast-Zeit");
             Assert.AreEqual(plain.BaseCastTicks, hard.BaseCastTicks);
             Assert.Greater(hard.Effects[0].Total, plain.Effects[0].Total);
-            StringAssert.Contains("◆◆◆", hard.Details);
+            StringAssert.Contains("●●●", hard.Details);
             Assert.IsEmpty(plain.DifficultyLine);
         }
 

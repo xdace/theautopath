@@ -75,7 +75,7 @@ namespace Betaknight.Core.Evolution
     {
         /// <summary>
         /// Evolutionen (Rezepte) sind vorübergehend aus dem Spiel genommen (werden neu gedacht): der Katalog wirkt leer, also
-        /// entwickelt sich nichts, es gibt keine ✦-Marken und keine Rezept-Hinweise. Tests der Evolutions-Regeln schalten sie ein.
+        /// entwickelt sich nichts, es gibt keine ^-Marken und keine Rezept-Hinweise. Tests der Evolutions-Regeln schalten sie ein.
         /// </summary>
         public static bool Enabled { get; set; }
 

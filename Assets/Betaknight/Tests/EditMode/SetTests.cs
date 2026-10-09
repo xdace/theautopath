@@ -125,8 +125,8 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void BrokenTripleChain()
         {
-            // Ein Relais «Every 5 Seconds» (◆◆◆, 6 Zellen Ladung) reicht für den Schildschlag (gedreht, 2×1) und den Rüstungsbrecher (2×2)
-            // zusammen, beide laufen in Lesereihenfolge; «Chain» (◆, bis 2 Zellen) hängt Ignite an. Ein 2×2 an «Chain» wäre zu gross.
+            // Ein Relais «Every 5 Seconds» (●●●, 6 Zellen Ladung) reicht für den Schildschlag (gedreht, 2×1) und den Rüstungsbrecher (2×2)
+            // zusammen, beide laufen in Lesereihenfolge; «Chain» (●, bis 2 Zellen) hängt Ignite an. Ein 2×2 an «Chain» wäre zu gross.
             var circuit = new CircuitSpec { Width = 4, Height = 4 };
             circuit.Relays.Add(new RelaySpec("every_20s", new Cell(0, 0)));
             circuit.Relays.Add(new RelaySpec("chain", new Cell(3, 3)));
@@ -187,7 +187,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void ScrapHarvesterPaysPerKillAndIgnoresArmorOnMines()
         {
-            // Der Bohrer (2×2) braucht ein Relais ab ◆◆; «Every 5 Hits Taken» ersetzt das frühere «Immer».
+            // Der Bohrer (2×2) braucht ein Relais ab ●●; «Every 5 Hits Taken» ersetzt das frühere «Immer».
             var setup = new BattleSetup
             {
                 Player = Knight(Wear("plasma_drill", "crawler_tracks", "resource_compactor"), R("every_nth_hit_taken", SkillIds.Drill)),
@@ -209,7 +209,7 @@ namespace Betaknight.Tests.EditMode
         {
             foreach (int seed in Enumerable.Range(1, 30))
             {
-                // «Every 5 Seconds» (◆) ersetzt das frühere «Immer» mit Cooldown.
+                // «Every 5 Seconds» (●) ersetzt das frühere «Immer» mit Cooldown.
                 BattleResult r = Fight(Knight(Wear("thermo_blade", "warning_visor", "overload_chassis", "shock_absorber"),
                     R("after_self_damage", SkillIds.Coolant), R("every_5s", SkillIds.ShieldWall)), seed: seed);
                 Assert.AreNotEqual(BattleOutcome.Timeout, r.Outcome);

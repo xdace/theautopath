@@ -69,7 +69,7 @@ namespace Betaknight.Tests.EditMode
             var factory = BoardFactory.CreateDefault();
             var gear = new Equipment();
             gear.Equip(EquipmentCatalog.CreateDefault().Get("holo_barrier"));
-            // «Charge Full» (◆◆◆) versorgt den EMP-Schildschlag (2×2) rechts daneben; die Ladung ist von Anfang an voll.
+            // «Charge Full» (●●●) versorgt den EMP-Schildschlag (2×2) rechts daneben; die Ladung ist von Anfang an voll.
             var spec = new CircuitSpec();
             spec.Relays.Add(new RelaySpec("charge_full", new Betaknight.Core.Circuit.Cell(0, 0)));
             spec.Components.Add(new ComponentSpec(SkillIds.EmpBash, new Betaknight.Core.Circuit.Cell(1, 0)));

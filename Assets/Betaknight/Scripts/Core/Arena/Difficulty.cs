@@ -93,10 +93,10 @@ namespace Betaknight.Core.Arena
     /// <summary>Symbole und Texte zur Schwierigkeit für Anzeige und Tooltips.</summary>
     public static class DifficultyText
     {
-        private static readonly string[] Symbols = { "◇", "◆", "◆◆", "◆◆◆" };
+        private static readonly string[] Symbols = { "○", "●", "●●", "●●●" };
         private static readonly string[] Names = CatalogTexts.DifficultyNames;
 
-        /// <summary>◇ ◆ ◆◆ ◆◆◆</summary>
+        /// <summary>○ ● ●● ●●●</summary>
         public static string Symbol(int tier) => Symbols[DifficultyBonusConfig.Clamp(tier)];
 
         /// <summary>Leicht, Mittel, Schwer, Sehr schwer.</summary>

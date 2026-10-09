@@ -159,7 +159,7 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(relaysBefore, RelayGrowth(next), "Wachstum der Relais wandert durch die Akte");
         }
 
-        /// <summary>Platine mit «Gegner unter x %» (◆◆, 4 Zellen) und Bohrstoß (2×2) daneben, mit Wachstum.</summary>
+        /// <summary>Platine mit «Gegner unter x %» (●●, 4 Zellen) und Bohrstoß (2×2) daneben, mit Wachstum.</summary>
         private static CircuitSpec DrillSpec(int growth)
         {
             var spec = new CircuitSpec();

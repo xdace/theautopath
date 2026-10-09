@@ -29,8 +29,8 @@ namespace Betaknight.Tests.EditMode
         }
 
         /// <summary>
-        /// Relais, das den Skill gleich zu Kampfbeginn auslöst und gross genug für seine Form ist: «HP Full» ◆ (bis 2 Zellen)
-        /// oder «Outnumbered» ◆◆ (bis 4 Zellen, ab 3 Gegnern).
+        /// Relais, das den Skill gleich zu Kampfbeginn auslöst und gross genug für seine Form ist: «HP Full» ● (bis 2 Zellen)
+        /// oder «Outnumbered» ●● (bis 4 Zellen, ab 3 Gegnern).
         /// </summary>
         private static string RelayFor(string skillId) => Skills.Get(skillId).Shape.Cells <= 2 ? "hp_full" : "outnumbered";
 

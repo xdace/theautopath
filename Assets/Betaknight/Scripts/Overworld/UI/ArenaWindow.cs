@@ -35,19 +35,8 @@ namespace Betaknight.Overworld.UI
         private const float MinHighlightSeconds = 0.35f;
         private const float PopupSeconds = 1.1f;
 
-        /// <summary>Farbe je Komponente (Lesereihenfolge); der Basisangriff ist grau.</summary>
-        private static readonly Color[] RowColors =
-        {
-            new Color(0.35f, 0.85f, 1.00f),
-            new Color(1.00f, 0.60f, 0.20f),
-            new Color(0.55f, 0.95f, 0.35f),
-            new Color(0.95f, 0.45f, 0.90f),
-            new Color(1.00f, 0.85f, 0.30f),
-            new Color(0.55f, 0.65f, 1.00f),
-            new Color(1.00f, 0.45f, 0.45f),
-            new Color(0.70f, 0.55f, 1.00f),
-        };
-        private static readonly Color FallbackColor = new Color(0.72f, 0.74f, 0.80f);
+        /// <summary>Basisangriff und Teile ohne Art.</summary>
+        private static readonly Color FallbackColor = UiTheme.Neutral;
 
         private sealed class ActivePopup
         {
@@ -427,7 +416,7 @@ namespace Betaknight.Overworld.UI
             long factor = 100;
             for (int i = 0; i < level && factor < 10_000_000; i++) factor = factor * (100 + thermal.DamagePercentPerStep) / 100;
             string text = UiTexts.Effects.Thermal(level, level * thermal.CastPercentPerStep, (int)(factor - 100));
-            bool flash = Time.unscaledTime < _overheatFlashUntil && Mathf.Repeat(Time.unscaledTime * 5f, 1f) < 0.5f;
+            bool flash = Time.unscaledTime < _overheatFlashUntil && Mathf.Repeat(Time.unscaledTime * 2.5f, 1f) < 0.5f;
             Color hot = new Color(1f, 0.42f, 0.18f);
             var content = new GUIContent($"<b>{text}</b>", UiTexts.Effects.ThermalTip);
             float width = Mathf.Min(area.width, _small.CalcSize(content).x + 24f);
@@ -1326,14 +1315,14 @@ namespace Betaknight.Overworld.UI
             GUILayout.EndArea();
         }
 
-        /// <summary>Versorgung einer Komponente im Kampf: ✔ versorgt, «too large» (orange) oder «not powered» (rot).</summary>
+        /// <summary>Versorgung einer Komponente im Kampf: √ versorgt, «too large» (orange) oder «not powered» (rot).</summary>
         private GUIContent PowerCell(RowReport row)
         {
             if (row.IsFallback) return new GUIContent("–");
-            if (row.IsPowered) return new GUIContent($"<color={UiTheme.Hex(CircuitGrid.PoweredBorder)}>✔</color>", UiTexts.Powered);
+            if (row.IsPowered) return new GUIContent($"<color={UiTheme.Hex(CircuitGrid.PoweredBorder)}>√</color>", UiTexts.Powered);
             if (row.IsTooLargeSomewhere)
                 return new GUIContent($"<color={UiTheme.Hex(CircuitGrid.TooLargeBorder)}>{UiTexts.Arena.StateTooLarge}</color>", UiTexts.NotPoweredTooLarge);
-            return new GUIContent($"<color={UiTheme.Hex(CircuitGrid.UnpoweredBorder)}>✖</color>", UiTexts.NotPowered);
+            return new GUIContent($"<color={UiTheme.Hex(CircuitGrid.UnpoweredBorder)}>×</color>", UiTexts.NotPowered);
         }
 
         /// <summary>Was der Schwierigkeits-Bonus ausgemacht hat: «+140 · −1.5 s cast», «–» ohne Bonus.</summary>
@@ -1355,13 +1344,13 @@ namespace Betaknight.Overworld.UI
             return $"<color=#7fd7ff>{text}</color>";
         }
 
-        /// <summary>«5×», mit Anteil ausgelöster (↪) und wiederholter (↻) Starts.</summary>
+        /// <summary>«5×», mit Anteil ausgelöster (→) und wiederholter (∞) Starts.</summary>
         private static string FiredText(RowReport row)
         {
             string text = $"{row.Fired}×";
-            if (row.Triggered > 0) text += $" <color=#ffae42>↪{row.Triggered}</color>";
-            if (row.FromPulse > 0) text += $" <color=#ffd75e>⚡{row.FromPulse}</color>";
-            if (row.Repeated > 0) text += $" <color=#9fc7ff>↻{row.Repeated}</color>";
+            if (row.Triggered > 0) text += $" <color=#ffae42>→{row.Triggered}</color>";
+            if (row.FromPulse > 0) text += $" <color=#ffd75e>≈{row.FromPulse}</color>";
+            if (row.Repeated > 0) text += $" <color=#9fc7ff>∞{row.Repeated}</color>";
             return text;
         }
 
@@ -1515,9 +1504,14 @@ namespace Betaknight.Overworld.UI
 
         // ------------------------------------------------------------------ Farben und Zeichen
 
-        private static Color RowColor(int row) => row >= 0 && row < RowColors.Length ? RowColors[row] : FallbackColor;
-
-        private Color RowColorFor(int row) => row == _playback.Result.PlayerRowLabels.Count - 1 ? FallbackColor : RowColor(row);
+        /// <summary>Farbe einer Komponente = Farbe ihrer Skill-Art (wie in Build und Inventar); der Basisangriff ist grau.</summary>
+        private Color RowColorFor(int row)
+        {
+            LogicBoard board = _playback.Result.PlayerBoard;
+            if (board == null || row < 0 || row >= board.Rows.Count || row == board.FallbackIndex) return FallbackColor;
+            SkillDefinition skill = board.Rows[row].Skill;
+            return skill == null ? FallbackColor : UiTheme.Kind(skill.Kinds);
+        }
 
         private static Color PopupColor(PopupKind kind)
         {
@@ -1600,7 +1594,7 @@ namespace Betaknight.Overworld.UI
             }
         }
 
-        /// <summary>▶ ⧗ ❄ ⚠ ✖ ⌀, mit Ersatzzeichen, falls die Schrift ein Zeichen nicht kennt.</summary>
+        /// <summary>▶ ⧗ ❄ ⚠ × ⌀, mit Ersatzzeichen, falls die Schrift ein Zeichen nicht kennt.</summary>
         private string StateGlyph(RowDisplay state)
         {
             switch (state)

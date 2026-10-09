@@ -36,7 +36,7 @@ namespace Betaknight.Core
 
         // ------------------------------------------------------------------ Erleichterer
 
-        /// <summary>«Eases: "Enemy Stunned" ◆◆ (Own stuns last +1 s)».</summary>
+        /// <summary>«Eases: "Enemy Stunned" ●● (Own stuns last +1 s)».</summary>
         public static string Eases(string runeNames, string reliefText) => $"Eases: {runeNames} ({reliefText})";
         public static string EasedRune(string runeName, string symbol) => $"\"{runeName}\" {symbol}";
         public const string CounterModifierName = "Counter";

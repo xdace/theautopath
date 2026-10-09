@@ -150,7 +150,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void ARelayPowersOnlyTouchingComponentsWithinItsSizeLimit()
         {
-            // «On Hit» ist ◆ (Grenze 2 Zellen). Rechts ein 1×1 (versorgt), darunter ein 2×2 (zu gross), diagonal ein 1×1 (berührt nicht).
+            // «On Hit» ist ● (Grenze 2 Zellen). Rechts ein 1×1 (versorgt), darunter ein 2×2 (zu gross), diagonal ein 1×1 (berührt nicht).
             LogicBoard board = Compile(Spec(
                 new[] { Relay("on_hit", 0, 0) },
                 new[] { Part(SkillIds.ShockStab, 1, 0), Part(SkillIds.ArmorBreak, 0, 1), Part(SkillIds.Thrusters, 1, 1) }));
@@ -334,7 +334,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void FreezeStopsTheLargestEnemyComponentFromFiring()
         {
-            // «On Hit» ◆ versorgt die 2×1-Granate.
+            // «On Hit» ● versorgt die 2×1-Granate.
             LogicBoard knight = Compile(Spec(new[] { Relay("on_hit", 0, 0) }, new[] { Part(SkillIds.CryoGrenade, 1, 0) }));
             var hammer = new SkillDefinition("hammer", "Hammer", 4, 0, new ISkillEffect[] { new DamageEffect(BasisPoints.Percent(10)) },
                 shape: new Shape(2, 2));
@@ -539,7 +539,7 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void ATooLargeComponentShowsAsNotPowered()
         {
-            OverworldSession s = Session(KnightKit.Defaults[0]); // «On Hit» ◆: Grenze 2 Zellen
+            OverworldSession s = Session(KnightKit.Defaults[0]); // «On Hit» ●: Grenze 2 Zellen
             SkillInstance breaker = s.Skills.All.First(k => k.SkillId == SkillIds.ArmorBreak);
             Assert.IsTrue(s.MoveRelay(0, new Cell(2, 0)));
             Assert.IsTrue(s.PlaceSkill(breaker.InstanceId, new Cell(2, 1)), "2×2 unter dem Relais");
