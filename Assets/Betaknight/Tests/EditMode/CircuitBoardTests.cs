@@ -304,8 +304,8 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void TheQueueRunsInReadingOrder()
         {
-            // Ein Relais versorgt zwei Komponenten: die obere links startet zuerst, egal in welcher Reihenfolge sie gebaut wurden.
-            LogicBoard board = Compile(Spec(new[] { Relay("battle_start", 0, 0) },
+            // Ein Relais (Grenze 2) versorgt zwei Komponenten (je 1 Zelle): die obere links startet zuerst, egal in welcher Reihenfolge sie gebaut wurden.
+            LogicBoard board = Compile(Spec(new[] { Relay("hp_full", 0, 0) },
                 new[] { Part(SkillIds.Thrusters, 0, 1), Part(SkillIds.ShockStab, 1, 0) }));
             BattleResult r = Fight(board, seconds: 3);
             List<string> started = Own(r).Where(e => e.Kind == BattleEventKind.ActionStarted && e.Detail != SkillIds.BasicAttack)

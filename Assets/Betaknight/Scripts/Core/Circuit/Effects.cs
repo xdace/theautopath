@@ -13,6 +13,7 @@ namespace Betaknight.Core.Circuit
         public const string ParallelThread = "parallel_thread";
         public const string Buffer = "buffer";
         public const string Recursion = "recursion";
+        public const string Spillover = "spillover";
         public const string Amplifier = "amplifier";
         public const string Watchdog = "watchdog";
         public const string Overflow = "overflow";
@@ -71,6 +72,9 @@ namespace Betaknight.Core.Circuit
 
         /// <summary>Buffer: so oft darf die Komponente gleichzeitig in der Warteschlange stehen.</summary>
         public int BufferEntries { get; set; } = 3;
+
+        /// <summary>Überladung: Wirkung je Feld Ladung über der Grösse der Komponente (ohne Obergrenze).</summary>
+        public int OverchargePowerPercentPerCell { get; set; } = 10;
 
         /// <summary>Recursion: Wirkung je Tiefe.</summary>
         public int RecursionPowerPercentPerDepth { get; set; } = 20;
@@ -225,6 +229,10 @@ namespace Betaknight.Core.Circuit
                 $"If its relay's condition still holds after it executed, it calls itself again; each depth +{config.RecursionPowerPercentPerDepth} % effect "
                 + $"(max. depth {config.RecursionMaxDepth}).",
                 CircuitEffectForm.Module, CircuitEffectScope.Component, "#c77dff", "↻"));
+            c.Register(new CircuitEffectDefinition(CircuitEffectIds.Spillover, "Spillover",
+                "Overcharge from a relay is not used as a bonus: it charges the touching components instead "
+                + "(smallest need first, the rest spread evenly).",
+                CircuitEffectForm.Module, CircuitEffectScope.Component, "#7df9ff", "⤳"));
 
             // Pulse, Stillstand, ganze Platine: Chips.
             c.Register(new CircuitEffectDefinition(CircuitEffectIds.Amplifier, "Amplifier",

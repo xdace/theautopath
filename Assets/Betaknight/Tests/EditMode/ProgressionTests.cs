@@ -226,7 +226,9 @@ namespace Betaknight.Tests.EditMode
             BattleEvent hit = r.Events.First(e => e.Kind == BattleEventKind.Damage && e.Detail == SkillIds.ArmorBreak);
             int grown = BasisPoints.Of(weapon, BasisPoints.Percent(300)) + 7;
             int bonus = DifficultyBonusConfig.Default[3].PowerPercent;
-            Assert.AreEqual(BasisPoints.Of(grown, BasisPoints.Percent(100 + bonus)), hit.Amount);
+            // 6 Zellen Ladung auf 4 Zellen: 2 Felder Überladung, +10 % je Feld.
+            int overcharge = 2 * CircuitEffectConfig.Default.OverchargePowerPercentPerCell;
+            Assert.AreEqual(BasisPoints.Of(BasisPoints.Of(grown, BasisPoints.Percent(100 + bonus)), BasisPoints.Percent(100 + overcharge)), hit.Amount);
         }
 
         [Test]

@@ -125,10 +125,10 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void BrokenTripleChain()
         {
-            // Ein Relais «Enemy Charging» (◆◆, bis 4 Zellen) versorgt den Schildschlag (gedreht, 2×1) und den Rüstungsbrecher (2×2)
-            // in Lesereihenfolge; «Chain» (◆, bis 2 Zellen) hängt Ignite an. Ein 2×2 an «Chain» wäre zu gross.
+            // Ein Relais «Every 5 Seconds» (◆◆◆, 6 Zellen Ladung) reicht für den Schildschlag (gedreht, 2×1) und den Rüstungsbrecher (2×2)
+            // zusammen, beide laufen in Lesereihenfolge; «Chain» (◆, bis 2 Zellen) hängt Ignite an. Ein 2×2 an «Chain» wäre zu gross.
             var circuit = new CircuitSpec { Width = 4, Height = 4 };
-            circuit.Relays.Add(new RelaySpec("enemy_charging", new Cell(0, 0)));
+            circuit.Relays.Add(new RelaySpec("every_20s", new Cell(0, 0)));
             circuit.Relays.Add(new RelaySpec("chain", new Cell(3, 3)));
             circuit.Components.Add(new ComponentSpec(SkillIds.ShieldBash, new Cell(1, 0), rotated: true));
             circuit.Components.Add(new ComponentSpec(SkillIds.ArmorBreak, new Cell(0, 1)));

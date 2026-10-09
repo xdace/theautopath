@@ -81,7 +81,7 @@ namespace Betaknight.Tests.EditMode
             ModuleCatalog modules = ModuleCatalog.CreateDefault(effects);
             ChipCatalog chips = ChipCatalog.CreateDefault(null, effects);
             SkillCatalog skills = SkillCatalog.CreateDefault(effects);
-            Assert.AreEqual(14, effects.All.Count);
+            Assert.AreEqual(15, effects.All.Count);
             foreach (CircuitEffectDefinition e in effects.All)
             {
                 int forms = (modules.Contains(e.Id) ? 1 : 0) + (chips.Contains(e.Id) ? 1 : 0) + (skills.Contains(e.Id) ? 1 : 0);
@@ -133,8 +133,8 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void InterruptJumpsToTheFrontOfTheQueue()
         {
-            // Kampfbeginn reiht beide ein; ohne Interrupt käme der Schockstich (oben) zuerst, mit Interrupt die Ladungsspule.
-            CircuitSpec Board(bool interrupt) => Spec(new[] { Relay("battle_start", 0, 0) },
+            // «HP Full» (Grenze 2) reiht beide (je 1 Zelle) zu Kampfbeginn ein; ohne Interrupt käme der Schockstich (oben) zuerst, mit Interrupt die Ladungsspule.
+            CircuitSpec Board(bool interrupt) => Spec(new[] { Relay("hp_full", 0, 0) },
                 new[] { Part(SkillIds.ShockStab, 1, 0), interrupt ? Part(SkillIds.ChargeCoil, 0, 1, CircuitEffectIds.Interrupt) : Part(SkillIds.ChargeCoil, 0, 1) });
             string First(BattleResult r) => Own(r).First(e => e.Kind == BattleEventKind.ActionStarted && e.Detail != SkillIds.BasicAttack).Detail;
             Assert.AreEqual(SkillIds.ShockStab, First(Fight(Compile(Board(false)))));
@@ -232,9 +232,10 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void OverflowTurnsFurtherEntriesIntoAShock()
         {
-            // Kampfbeginn versorgt vier Schockstiche: drei passen in die Warteschlange, der vierte wird zum Schock.
-            CircuitSpec Board(bool overflow) => Spec(new[] { Relay("battle_start", 2, 1) },
-                new[] { Part(SkillIds.ShockStab, 2, 0), Part(SkillIds.ShockStab, 1, 1), Part(SkillIds.ShockStab, 3, 1), Part(SkillIds.ShockStab, 2, 2) },
+            // Zwei Relais (Grenze 2) lösen zu Kampfbeginn aus und versorgen je zwei Schockstiche: drei passen in die Warteschlange,
+            // der vierte wird zum Schock.
+            CircuitSpec Board(bool overflow) => Spec(new[] { Relay("hp_full", 1, 0), Relay("last_enemy", 1, 2) },
+                new[] { Part(SkillIds.ShockStab, 0, 0), Part(SkillIds.ShockStab, 2, 0), Part(SkillIds.ShockStab, 0, 2), Part(SkillIds.ShockStab, 2, 2) },
                 overflow ? new[] { Chip(CircuitEffectIds.Overflow, 5, 5) } : null);
             Assert.IsFalse(Kind(Fight(Compile(Board(false)), seconds: 2), BattleEventKind.OverflowShock).Any());
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Betaknight.Core.Circuit;
 using ChipKind = Betaknight.Core.Circuit.ChipKind;
 
@@ -497,9 +498,7 @@ namespace Betaknight.Core.Arena
             state.TriggeredNow = true;
             Emit(new BattleEvent(Tick, BattleEventKind.RelayTriggered, c, target, i, relay.Label) { Extra = relay.Powered.Count, Relay = i });
             if (relay.OncePerFight) Emit(new BattleEvent(Tick, BattleEventKind.FuseBlown, c, null, i, relay.Label) { Extra = relay.ChipIndex, Relay = i });
-            foreach (int row in relay.Powered) Enqueue(c, row, i, ActionCause.Board, -1, relay.Difficulty, relay.MaxCells, target);
-            // Zu grosse Komponenten laden auf und laufen, sobald die Ladung ihre Grösse erreicht (siehe Enqueue).
-            foreach (int row in relay.TooLarge) Enqueue(c, row, i, ActionCause.Board, -1, relay.Difficulty, relay.MaxCells, target);
+            PowerFromRelay(c, i, relay, target);
             FireEdges(c, GraphNode.Block(i), relay.Difficulty, i, relay.MaxCells);
             foreach (LogicChip chip in c.Board.Chips)
                 if (chip.Kind == ChipKind.Capacitor && chip.ReleaseList.Contains(i)) ReleaseCapacitor(c, chip.Index);
@@ -832,6 +831,119 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Eigener Ladungs-Speicher für «Charge Link» (getrennt von der Ladung durch Relais).</summary>
         private const int ChargeLinkKey = -100;
+
+        /// <summary>Eigener Ladungs-Speicher für «Spillover».</summary>
+        private const int SpilloverKey = -101;
+
+        /// <summary>
+        /// Ein Relais löst aus: seine Grenze ist ein Topf Ladung für alle berührten Komponenten (versorgte und zu grosse).
+        /// Was am wenigsten braucht, wird zuerst gefüllt und läuft; bei Gleichstand, der nicht für alle reicht, entscheidet
+        /// der Zufall. Reicht der Topf nicht für alle, wird der Rest gleichmässig auf die übrigen verteilt (sie laden auf).
+        /// Reicht er für alle, ist der Rest Überladung: +<see cref="CircuitEffectConfig.OverchargePowerPercentPerCell"/> %
+        /// Wirkung je Feld, gleichmässig auf die laufenden verteilt (Spillover gibt sie stattdessen an die Nachbarn weiter).
+        /// </summary>
+        private void PowerFromRelay(Combatant c, int i, LogicRelay relay, Combatant target)
+        {
+            if (relay.MaxCells == int.MaxValue)
+            {
+                // Relais ohne Grenze (frei gebaute Tafeln, Tests): alle versorgten laufen, ohne Topf und ohne Überladung.
+                foreach (int row in relay.Powered) Enqueue(c, row, i, ActionCause.Board, -1, relay.Difficulty, relay.MaxCells, target);
+                return;
+            }
+            var rows = new List<int>();
+            foreach (int row in relay.Powered) AddCandidate(c, rows, row, i);
+            foreach (int row in relay.TooLarge) AddCandidate(c, rows, row, i);
+            Distribute(c, rows, relay.MaxCells, i, i, ActionCause.Board, -1, relay.Difficulty, target, spill: true);
+        }
+
+        private void AddCandidate(Combatant c, List<int> rows, int row, int relay)
+        {
+            if (row < 0 || row >= c.Board.Rows.Count || rows.Contains(row)) return;
+            if (c.Board.Rows[row].IsOrphaned) Missed(c, row, relay, MissReason.Orphaned);
+            else rows.Add(row);
+        }
+
+        /// <summary>Verteilt <paramref name="pool"/> Ladung auf <paramref name="rows"/> (Regeln siehe <see cref="PowerFromRelay"/>).</summary>
+        private void Distribute(Combatant c, List<int> rows, int pool, int key, int relay, ActionCause cause, int causeRow, int tier, Combatant target, bool spill)
+        {
+            if (rows.Count == 0 || pool <= 0) return;
+            Dictionary<(int Row, int Relay), int> charge = _fx[c].Charge;
+            int Stored(int row) => charge.TryGetValue((row, key), out int v) ? v : 0;
+            int Need(int row) => Math.Max(0, c.Board.Rows[row].Cells - Stored(row));
+
+            var fired = new List<int>();
+            var waiting = new List<int>();
+            foreach (IGrouping<int, int> group in rows.OrderBy(Need).ThenBy(r => r).GroupBy(Need))
+            {
+                List<int> members = group.ToList();
+                if (waiting.Count > 0)
+                {
+                    waiting.AddRange(members);
+                    continue;
+                }
+                int need = group.Key;
+                if (need == 0 || pool >= need * members.Count)
+                {
+                    fired.AddRange(members);
+                    pool -= need * members.Count;
+                    continue;
+                }
+                // Gleichstand, der nicht für alle reicht: so viele wie möglich, zufällig gewählt.
+                int k = pool / need;
+                for (int n = 0; n < k; n++)
+                {
+                    int pick = Random.Next(members.Count);
+                    fired.Add(members[pick]);
+                    members.RemoveAt(pick);
+                }
+                pool -= k * need;
+                waiting.AddRange(members);
+            }
+
+            if (waiting.Count > 0)
+            {
+                // Rest gleichmässig auf die wartenden; was nicht aufgeht, zufällig je 1.
+                int each = pool / waiting.Count;
+                var extra = new List<int>(waiting);
+                for (int n = 0; n < pool % waiting.Count; n++)
+                {
+                    int pick = Random.Next(extra.Count);
+                    charge[(extra[pick], key)] = Stored(extra[pick]) + 1;
+                    extra.RemoveAt(pick);
+                }
+                pool = 0;
+                foreach (int row in waiting)
+                {
+                    if (each > 0) charge[(row, key)] = Stored(row) + each;
+                    Missed(c, row, relay, MissReason.TooLarge);
+                }
+            }
+
+            // Überladung: gleichmässig in Feldern auf die laufenden, Rest in Lesereihenfolge.
+            fired.Sort();
+            int share = fired.Count > 0 ? pool / fired.Count : 0;
+            int rest = fired.Count > 0 ? pool % fired.Count : 0;
+            int perCell = Math.Max(0, c.Board.EffectConfig.OverchargePowerPercentPerCell);
+            for (int n = 0; n < fired.Count; n++)
+            {
+                int row = fired[n];
+                charge[(row, key)] = 0;
+                int over = share + (n < rest ? 1 : 0);
+                bool spills = spill && over > 0 && c.Board.Rows[row].Has(CircuitEffectIds.Spillover);
+                Enqueue(c, row, relay, cause, causeRow, tier, int.MaxValue, target, spills ? 0 : over * perCell);
+                if (spills) Spill(c, row, over, tier);
+            }
+        }
+
+        /// <summary>Spillover: die Überladung einer Komponente lädt ihre Nachbarn (gleiche Regeln, ohne weiteren Überschlag).</summary>
+        private void Spill(Combatant c, int row, int amount, int tier)
+        {
+            var neighbours = new List<int>();
+            foreach (int n in c.Board.Rows[row].Neighbours)
+                if (n != row && !c.Board.Rows[n].IsOrphaned && c.Board.Rows[n].Skill != null && !neighbours.Contains(n)) neighbours.Add(n);
+            Emit(new BattleEvent(Tick, BattleEventKind.Spillover, c, null, amount, c.Board.Rows[row].Skill?.Id, row));
+            Distribute(c, neighbours, amount, SpilloverKey, -1, ActionCause.Trigger, row, tier, null, spill: false);
+        }
 
         /// <summary>
         /// Zu grosse Komponente: jedes Auslösen lädt sie um die Feld-Grenze des Relais auf. Erreicht die Ladung ihre Grösse,

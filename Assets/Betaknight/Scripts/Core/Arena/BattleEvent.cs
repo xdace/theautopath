@@ -121,6 +121,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Short Circuit: die Komponente des Opfers feuert sofort gegen die eigene Seite. Source = Opfer, Extra = Komponente.</summary>
         ShortCircuit,
+
+        /// <summary>Spillover: die Überladung einer Komponente geht an ihre Nachbarn. Amount = Felder, RowIndex = Komponente.</summary>
+        Spillover,
     }
 
     /// <summary>Ein Eintrag im Kampfprotokoll. Bedingungen und Set-Boni lesen dieselben Einträge.</summary>

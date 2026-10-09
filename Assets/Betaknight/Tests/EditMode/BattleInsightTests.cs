@@ -50,16 +50,16 @@ namespace Betaknight.Tests.EditMode
             Assert.Greater(stab.Fired, 0);
             Assert.AreEqual(stab.Queued, stab.Triggered, "der Schockstich verpasst nichts");
 
-            // Der Rüstungsbrecher (4 Zellen) berührt das Relais (Grenze 2), ist aber zu gross: jedes Auslösen lädt ihn um 2 auf,
-            // jedes 2. lässt ihn laufen. Die übrigen sind «Missed Trigger» mit dem Grund «charging».
+            // Das Relais (Grenze 2) teilt seine Ladung: der Schockstich (1 Zelle) braucht am wenigsten und läuft jedes Mal, der
+            // Rüstungsbrecher (4 Zellen) bekommt den Rest (1) und läuft bei jedem 4. Auslösen. Die übrigen sind «charging».
             Assert.IsFalse(breaker.IsPowered);
             Assert.IsTrue(breaker.IsTooLargeSomewhere);
             Assert.AreEqual(2, board.Relays[0].MaxCells);
             Assert.GreaterOrEqual(report.RelayTriggers, 2);
             Assert.Greater(breaker.Fired, 0);
-            Assert.AreEqual(report.RelayTriggers - report.RelayTriggers / 2, breaker.MissCount(MissReason.TooLarge));
+            Assert.AreEqual(report.RelayTriggers - report.RelayTriggers / 4, breaker.MissCount(MissReason.TooLarge));
             Assert.IsTrue(report.HasMissedTriggers);
-            Assert.AreEqual("charging (too large for the relay)", RowStateText.Reason(MissReason.TooLarge));
+            Assert.AreEqual("charging (not enough relay charge yet)", RowStateText.Reason(MissReason.TooLarge));
             CollectionAssert.DoesNotContain(report.Hints, "#2 Armor Break never fired: too large for every touching relay.");
 
             // Die Schubdüsen berührt kein Relais: nie ausgelöst, kein Missed Trigger.
@@ -219,12 +219,13 @@ namespace Betaknight.Tests.EditMode
         /// Mit Gegner-Platinen erneut: Gegner tragen Skills, Module und Chips (fest je Feld), nach dem Sieg wird geborgen (ersetzt Zufalls-Skills, -Module und -Chips aus Kämpfen).
         /// Zu grosse Komponenten laden auf und laufen, sobald die Ladung ihre Grösse erreicht: Seed 21 des Funkenritters erneut aufgenommen.
         /// Auslöser überarbeitet (kurze Takte, pulsierende Zustände, «HP Below 20/25 %», ohne «Heavy Hit», neue Runen, «Charge Link»): alle erneut aufgenommen.
+        /// Ladung als Topf je Relais (kleine zuerst, Überladung +10 % je Feld, Spillover): Seeds 5 und Schild 21 erneut aufgenommen.
         /// </summary>
-        [TestCase("blade", 5, "4 Kämpfe, 474 Ereignisse, 19817B85AF86969F")]
+        [TestCase("blade", 5, "4 Kämpfe, 465 Ereignisse, ADFFA8FDDC6529F8")]
         [TestCase("blade", 21, "3 Kämpfe, 289 Ereignisse, E6B445913E009B29")]
-        [TestCase("shield", 5, "6 Kämpfe, 863 Ereignisse, FAC374453772ECA5")]
-        [TestCase("shield", 21, "2 Kämpfe, 339 Ereignisse, 2BC09102B2F485DE")]
-        [TestCase("spark", 5, "3 Kämpfe, 395 Ereignisse, 3887B72E58EEF18B")]
+        [TestCase("shield", 5, "6 Kämpfe, 914 Ereignisse, BEA2AB812BBE4A3F")]
+        [TestCase("shield", 21, "2 Kämpfe, 414 Ereignisse, F7077D825CB081BE")]
+        [TestCase("spark", 5, "3 Kämpfe, 392 Ereignisse, 06BED94CCC1F6AB7")]
         [TestCase("spark", 21, "2 Kämpfe, 236 Ereignisse, 7104608CE06845B2")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {
@@ -324,7 +325,7 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(p.IsRelayLit(0));
             Assert.AreEqual(1, p.RelayCount(0));
             Assert.AreEqual(RowDisplay.Firing, p.RowStateAt(0), "der Schockstich startet im selben Tick");
-            StringAssert.Contains("charging (too large for the relay)", p.LastSkipReason(1));
+            StringAssert.Contains("charging (not enough relay charge yet)", p.LastSkipReason(1));
             Assert.IsNull(p.LastSkipReason(0), "der Schockstich hat nichts verpasst");
             Assert.IsNull(p.LastSkipReason(3), "der Basisangriff wird nie ausgelöst");
 
