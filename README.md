@@ -372,7 +372,6 @@ Grundschwierigkeit 0–3 pro Relais (Daten im `RuneCatalog`, `difficulty` und `i
 | Schmerzleiter-Beinschienen | Ausrüstung (Beine), Schrott | HP-Schwellen-Bausteine gelten 5 Prozentpunkte früher | HP unter 20 %, HP unter … oder ausgewichen |
 | Alarmfühler | Baustein-Modul | HP-Schwellen-Bausteine gelten 10 Prozentpunkte früher | HP unter 20 %, HP unter … oder ausgewichen |
 | Witterung | Baustein-Modul | «Gegner unter x %» gilt 10 Prozentpunkte früher | Gegner unter 25 % |
-| Ladungsspule | Skill (Schild) | +3 Ladung (höchstens 5) | Ladung voll |
 | Lähmnebel | Skill (Schock) | 20 % Schaden und 0,6 s Betäubung an alle Gegner | Gegner betäubt |
 
 Module wirken, solange sie an irgendeinem Baustein sitzen. Eine «Barriere» gibt es im Spiel nicht; statt «HP-Schwellen zählen die Barriere nicht mit» verschiebt der Alarmfühler die HP-Schwellen.
