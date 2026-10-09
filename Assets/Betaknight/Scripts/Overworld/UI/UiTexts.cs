@@ -37,6 +37,9 @@ namespace Betaknight.Overworld.UI
             public const string BuildButton = "Build (B)";
             public const string BuildTip = "Circuit Board, skills, modules and runes";
             public const string PossibleEnemies = "Possible enemies (rolled when you enter):";
+            public const string EnemyHere = "Enemy waiting here:";
+            public static string Loot(string list) => $"Loot: {list}";
+            public static string SalvageAfterVictory(int picks) => $"Salvage {picks} after victory";
             public const string NoComponents = "<color=#888888>no components</color>";
             public const string InventoryTip = "Gear and items";
             public const string OpenShop = "Open Shop";
@@ -488,6 +491,26 @@ namespace Betaknight.Overworld.UI
                 "Thermal Throttling: the fight ran long, both boards heat up. Each step makes computing times longer and damage higher for everyone, so every fight ends.";
         }
 
+        // ------------------------------------------------------------------ Bergen (Gegner-Platinen)
+
+        public static class Salvage
+        {
+            public const string KindSkill = "Skill";
+            public const string KindModule = "Module";
+            public const string KindChip = "Chip";
+            public const string KindRune = "Rune";
+            public const string Take = "Take";
+            public const string LeaveRest = "Leave the rest";
+            public const string BoardTitle = "<b>Enemy board</b>  <size=13><color=#9aa4b2>hover a part below to find it on the board</color></size>";
+            public const string NoBoard = "<color=#9aa4b2>The enemy board of this fight is not available.</color>";
+            public const string TakeTip = "Skills and modules go into your collection, chips into the chip inventory, runes onto a free cell of the board (or the rune inventory).";
+
+            public static string Title(string enemy) => $"<b>Salvage</b> – {enemy}";
+            public static string PicksLeft(int picks) => $"Pick {picks} more";
+            public static string RuneLine(string badge, string name, string tag, string description) => $"{badge}  <b>{name}</b>  [{tag}]\n<size=13>{description}</size>";
+            public static string ChipLine(string icon, string name, string description) => $"{icon}<b>{name}</b>\n<size=13>{description}</size>";
+        }
+
         // ------------------------------------------------------------------ Arena
 
         public static class Arena
@@ -576,6 +599,10 @@ namespace Betaknight.Overworld.UI
             public static string ComponentHead(string name, string shape, string relays) => $"<b>{name}</b> ({shape})\n{relays}";
             public static string PoweredBy(string relays) => $"powered by {relays}";
             public static string EnemyTip(string name, string lines) => $"<b>{name}</b> – board:\n{lines}";
+            public static string EnemyModules(string list) => $"Modules: {list}";
+            public static string EnemyRelayTip(string name, string powers) => $"<b>{name}</b>\n{powers}";
+            public const string EnemyBoardsLive = "boards of the enemies on the stage · hover a part";
+            public static string LootWaiting(int picks) => $"Salvage {picks} {(picks == 1 ? "part" : "parts")} from the enemy board next";
             public static string Now(string now) => $"Now: {now}";
             public static string NowAndLast(string now, string last) => $"Now: {now}\nLast: {last}";
             public static string Report(string outcome, string time, int damage, int healing) =>

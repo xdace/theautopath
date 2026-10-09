@@ -7,6 +7,7 @@ using Betaknight.Core.Hex;
 using Betaknight.Core.Encounters;
 using Betaknight.Core.Map;
 using Betaknight.Core.Arena;
+using Betaknight.Core.Combat;
 using Betaknight.Core.Gear;
 using Betaknight.Core.Runes;
 using Betaknight.Overworld.Controllers;
@@ -38,6 +39,9 @@ namespace Betaknight.Overworld.UI
             _controller = controller;
             _encounters = encounters;
             _onNewMap = onNewMap;
+            _enemyCoord = null;
+            _enemyPreviews.Clear();
+            _enemyText = string.Empty;
         }
 
         private const float PanelWidth = 380f;
@@ -102,9 +106,10 @@ namespace Betaknight.Overworld.UI
                 && _session.Map.TryGetCell(_controller.HoveredCoord.Value, out HexCell hovered))
             {
                 string info = hovered.IsContentKnown ? Describe(hovered) : UiTexts.Hud.Unknown;
-                string enemies = hovered.IsContentKnown && !hovered.IsResolved ? EnemyBoards(hovered.Coord) : string.Empty;
+                string enemies = hovered.IsContentKnown && !hovered.IsResolved ? EnemyBoards(hovered) : string.Empty;
                 GUILayout.Label(UiTexts.Hud.Pointer(hovered.Coord.ToString(), info), _style);
                 if (enemies.Length > 0) GUILayout.Label($"<size=13>{enemies}</size>", _style);
+                if (hovered.IsContentKnown && !hovered.IsResolved) DrawExactEnemies();
             }
 
             GUILayout.EndScrollView();
@@ -161,18 +166,57 @@ namespace Betaknight.Overworld.UI
         }
 
         private HexCoord? _enemyCoord;
+        private CellContent _enemyContent;
+        private bool _enemyRaid;
         private string _enemyText = string.Empty;
+        private readonly List<EnemyBoardPreview> _enemyPreviews = new List<EnemyBoardPreview>();
 
-        /// <summary>Mögliche Gegner eines Feldes mit ihren Platinen (A-19: auf der Karte lesbar), pro Feld einmal gebaut.</summary>
-        private string EnemyBoards(HexCoord coord)
+        /// <summary>
+        /// Gegner eines Feldes mit ihren Platinen (A-19: auf der Karte lesbar), pro Feld einmal gebaut. Mögliche Gegner
+        /// (Goldminen-Überfall) als Zeilen; der genaue Gegner eines Kampffeldes wird als Raster gezeichnet (<see cref="DrawExactEnemies"/>).
+        /// </summary>
+        private string EnemyBoards(HexCell cell)
         {
-            if (_enemyCoord == coord) return _enemyText;
-            _enemyCoord = coord;
+            if (_enemyCoord == cell.Coord && _enemyContent == cell.Content && _enemyRaid == cell.IsUnderAttack) return _enemyText;
+            _enemyCoord = cell.Coord;
+            _enemyContent = cell.Content;
+            _enemyRaid = cell.IsUnderAttack;
+            _enemyPreviews.Clear();
+            _enemyPreviews.AddRange(_session.EnemyBoardsAt(cell.Coord));
             var blocks = new List<string>();
-            foreach (EnemyBoardPreview enemy in _session.EnemyBoardsAt(coord))
-                blocks.Add(UiTexts.Hud.EnemyBoard(enemy.Name, string.Join("\n", enemy.Lines.Select(l => $"• {l}"))));
-            _enemyText = blocks.Count > 0 ? $"{UiTexts.Hud.PossibleEnemies}\n{string.Join("\n", blocks)}" : string.Empty;
+            foreach (EnemyBoardPreview enemy in _enemyPreviews)
+                if (!IsDrawable(enemy)) blocks.Add(UiTexts.Hud.EnemyBoard(enemy.Name, string.Join("\n", enemy.Lines.Select(l => $"• {l}"))));
+            bool exact = _enemyPreviews.Exists(e => e.IsExact);
+            _enemyText = blocks.Count > 0 ? $"{(exact ? UiTexts.Hud.EnemyHere : UiTexts.Hud.PossibleEnemies)}\n{string.Join("\n", blocks)}" : string.Empty;
             return _enemyText;
+        }
+
+        /// <summary>Genauer Gegner mit zeichnenbaren Platinen (sonst bleiben die Zeilen als Ersatz).</summary>
+        private static bool IsDrawable(EnemyBoardPreview enemy) =>
+            enemy.IsExact && enemy.Fighters.Count > 0 && enemy.Fighters.All(f => EnemyBoardView.CanDraw(f.Board));
+
+        /// <summary>
+        /// Der Gegner, der genau hier wartet: Name, Platine jedes Kämpfers als kleines Raster (Hovern erklärt die Teile),
+        /// darunter die Beute, die man nach einem Sieg bergen kann, und wie viele Teile.
+        /// </summary>
+        private void DrawExactEnemies()
+        {
+            foreach (EnemyBoardPreview enemy in _enemyPreviews)
+            {
+                if (!IsDrawable(enemy)) continue;
+                GUILayout.Label($"<size=13>{UiTexts.Hud.EnemyHere} <b>{enemy.Name}</b></size>", _style);
+                const float width = PanelWidth - 48f;
+                foreach (CombatantSetup fighter in enemy.Fighters)
+                {
+                    if (enemy.Fighters.Count > 1) GUILayout.Label($"<size=13>{fighter.Name}</size>", _style);
+                    float height = EnemyBoardView.Height(fighter.Board, width, 220f, 40f);
+                    Rect area = GUILayoutUtility.GetRect(width, height);
+                    EnemyBoardView.Draw(area, fighter.Board, max: 40f);
+                }
+                if (enemy.Loot.Count == 0) continue;
+                string loot = string.Join(", ", enemy.Loot.Select(EnemyBoardView.LootText));
+                GUILayout.Label($"<size=13>{UiTexts.Hud.Loot(loot)}\n<color=#ffd75e>{UiTexts.Hud.SalvageAfterVictory(enemy.LootPicks)}</color></size>", _style);
+            }
         }
 
         /// <summary>

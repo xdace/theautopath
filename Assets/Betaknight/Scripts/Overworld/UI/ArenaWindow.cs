@@ -12,8 +12,9 @@ namespace Betaknight.Overworld.UI
     /// Arena-Ansicht per IMGUI: spielt das Protokoll eines Kampfs in 2D-Seitenansicht ab (Ritter links, Gegner rechts).
     /// Die Platine (A-19) zeigt live, welches Relais auslöst (leuchtet), welche Komponenten warten, welche feuert und welche
     /// eingefroren, unversorgt oder zu gross sind (Hovern erklärt den Grund); darunter die Warteschlange. Zustände, Ressourcen
-    /// und schwebende Zahlen in der Farbe der auslösenden Komponente zeigen die Wirkung. Gegner-Platinen stehen im Tooltip
-    /// des Gegners. Nach dem Kampf folgt eine Auswertung pro Komponente. Platzhalter-Grafik aus Rechtecken, gerechnet wird nichts.
+    /// und schwebende Zahlen in der Farbe der auslösenden Komponente zeigen die Wirkung. Gegner-Platinen stehen als kleines
+    /// Raster neben jedem Gegner, live wie die des Ritters (<see cref="EnemyBoardView"/>, Zustand aus <see cref="BoardWatch"/>),
+    /// und im Tooltip des Gegners. Nach dem Kampf folgt eine Auswertung pro Komponente; wartet Beute, steht es in der Fusszeile. Platzhalter-Grafik aus Rechtecken, gerechnet wird nichts.
     /// A-20: Pins, Logik-Chips und Pulsverbindungen auf der Platine; Pulse laufen als Punkte die Verbindung entlang, Gatter
     /// zeigen offen/geschlossen (Sicherung: durchgebrannt), Kondensatoren ihre Ladung als Punkte, Relais ihren Zustand als Lämpchen.
     /// A-21: Effekt-Symbole an Komponenten, Hitze-Balken (Overclock), Rekursions-Tiefe und Verstärkung der laufenden Ausführung,
@@ -53,6 +54,9 @@ namespace Betaknight.Overworld.UI
         private sealed class ActivePulse
         {
             public int Link;
+
+            /// <summary>Kämpfer, dessen Platine den Puls schickt (Spieler oder Gegner).</summary>
+            public int Fighter;
             public float Start;
             public float Duration;
 
@@ -100,6 +104,11 @@ namespace Betaknight.Overworld.UI
         private readonly Dictionary<int, int> _seenHitTick = new Dictionary<int, int>();
         private readonly Dictionary<int, float> _flashUntil = new Dictionary<int, float>();
         private readonly Dictionary<int, string> _enemyTips = new Dictionary<int, string>();
+
+        /// <summary>Gegner-Platinen: Live-Zustand je Kämpfer und Leuchten der zuletzt gestarteten Komponente in Echtzeit.</summary>
+        private readonly Dictionary<int, EnemyBoardView.Live> _enemyBoards = new Dictionary<int, EnemyBoardView.Live>();
+        private readonly Dictionary<int, int> _seenEnemyRowTick = new Dictionary<int, int>();
+        private readonly Dictionary<int, float> _enemyRowUntil = new Dictionary<int, float>();
         private int _seenRowTick = -1000;
         private float _rowHighlightUntil;
         private Dictionary<char, string> _glyphs;
@@ -186,6 +195,18 @@ namespace Betaknight.Overworld.UI
             _seenHitTick.Clear();
             _flashUntil.Clear();
             _enemyTips.Clear();
+            _enemyBoards.Clear();
+            _seenEnemyRowTick.Clear();
+            _enemyRowUntil.Clear();
+            for (int i = 0; i < _current.Battle.Fighters.Count; i++)
+            {
+                FighterInfo info = _current.Battle.Fighters[i];
+                if (info.Side == Side.Player || !EnemyBoardView.CanDraw(info.Combatant?.Board)) continue;
+                int fighter = i;
+                var live = new EnemyBoardView.Live { Watch = new BoardWatch(_current.Battle, i), Fx = _fx, Fighter = i, View = _playback.Fighters[i] };
+                live.RowLit = row => IsEnemyRowLit(fighter, row);
+                _enemyBoards[i] = live;
+            }
             _seenRowTick = -1000;
             _rowHighlightUntil = 0f;
         }
@@ -237,8 +258,9 @@ namespace Betaknight.Overworld.UI
             {
                 if (!_seenPulses.Add((p.Link, p.StartTick))) continue;
                 float seconds = (p.ArriveTick - p.StartTick) / (float)Ticks.PerSecond / speed;
-                _pulses.Add(new ActivePulse { Link = p.Link, Start = now, Duration = Mathf.Max(MinPulseSeconds, seconds), Power = _fx.PulsePower(p.Link, p.StartTick) });
+                _pulses.Add(new ActivePulse { Link = p.Link, Fighter = PlayerFighter, Start = now, Duration = Mathf.Max(MinPulseSeconds, seconds), Power = _fx.PulsePower(p.Link, p.StartTick) });
             }
+            TrackEnemyBoards(now, gameSeconds, speed);
 
             // Viele Zahlen im selben Moment fächern sich leicht auf, statt sich zu überdecken.
             foreach (Popup p in _playback.TakePopups())
@@ -246,6 +268,31 @@ namespace Betaknight.Overworld.UI
                 int stacked = _popups.Count(a => a.Popup.TargetIndex == p.TargetIndex && now - a.Start < 0.25f);
                 _popups.Add(new ActivePopup { Popup = p, Start = now, Offset = stacked * 18f });
             }
+        }
+
+        /// <summary>Gegner-Platinen: Ereignisse bis zum aktuellen Tick, neue Pulse und Leuchten der gestarteten Komponente in Echtzeit.</summary>
+        private void TrackEnemyBoards(float now, float gameSeconds, float speed)
+        {
+            foreach (KeyValuePair<int, EnemyBoardView.Live> pair in _enemyBoards)
+            {
+                BoardWatch watch = pair.Value.Watch;
+                watch.Advance(_playback.Tick);
+                foreach (BoardWatch.Pulse p in watch.TakeNewPulses())
+                {
+                    float seconds = (p.ArriveTick - p.StartTick) / (float)Ticks.PerSecond / speed;
+                    _pulses.Add(new ActivePulse { Link = p.Link, Fighter = pair.Key, Start = now, Duration = Mathf.Max(MinPulseSeconds, seconds), Power = p.Power });
+                }
+                if (_seenEnemyRowTick.TryGetValue(pair.Key, out int seen) && seen == watch.LastRowTick) continue;
+                _seenEnemyRowTick[pair.Key] = watch.LastRowTick;
+                _enemyRowUntil[pair.Key] = now + Mathf.Max(MinHighlightSeconds, gameSeconds);
+            }
+        }
+
+        private bool IsEnemyRowLit(int fighter, int row)
+        {
+            if (!_enemyBoards.TryGetValue(fighter, out EnemyBoardView.Live live) || live.Watch.LastRow != row) return false;
+            return (_enemyRowUntil.TryGetValue(fighter, out float until) && Time.unscaledTime < until)
+                || live.Watch.Tick - live.Watch.LastRowTick < BattlePlayback.RowHighlightTicks;
         }
 
         private bool IsRowLit(int row) =>
@@ -329,7 +376,9 @@ namespace Betaknight.Overworld.UI
             for (int i = 0; i < _playback.Fighters.Count; i++) (_playback.Fighters[i].Info.Side == Side.Player ? players : enemies).Add(i);
 
             DrawSide(players, new Rect(area.x + 24f, area.y, area.width * 0.4f - 24f, area.height), new Color(0.40f, 0.85f, 1.00f));
-            DrawSide(enemies, new Rect(area.x + area.width * 0.6f, area.y, area.width * 0.4f - 24f, area.height), new Color(0.80f, 0.35f, 0.30f));
+            // Gegner bekommen mehr Platz: links neben jedem steht seine Platine.
+            float enemyX = _enemyBoards.Count > 0 ? 0.42f : 0.6f;
+            DrawSide(enemies, new Rect(area.x + area.width * enemyX, area.y, area.width * (1f - enemyX) - 24f, area.height), new Color(0.80f, 0.35f, 0.30f));
         }
 
         private void DrawSide(List<int> indices, Rect area, Color color)
@@ -343,6 +392,18 @@ namespace Betaknight.Overworld.UI
                 float bodyW = Mathf.Min(70f, slot * 0.6f);
                 float bodyH = bodyW * 1.5f;
                 var body = new Rect(area.x + slot * n + (slot - bodyW) * 0.5f, area.yMax - 40f - bodyH, bodyW, bodyH);
+
+                // Gegner-Platine links im Platz, der Gegner mit seinen Balken rechts daneben.
+                if (f.Info.Side != Side.Player && _enemyBoards.TryGetValue(index, out EnemyBoardView.Live live))
+                {
+                    float column = bodyW + 68f;
+                    var boardRect = new Rect(area.x + slot * n + 4f, area.y + 8f, slot - column - 12f, area.height - 56f);
+                    if (boardRect.width >= 80f)
+                    {
+                        body.x = area.x + slot * (n + 1) - column * 0.5f - 4f - bodyW * 0.5f;
+                        DrawEnemyBoard(index, live, boardRect);
+                    }
+                }
 
                 // Ausholen: Körper lehnt sich leicht in Richtung Gegner.
                 float lean = f.ActionSkill != null && f.ActionWindupTicks > 0 ? f.WindupProgress(_playback.Tick) * 10f : 0f;
@@ -455,6 +516,45 @@ namespace Betaknight.Overworld.UI
                 CircuitGrid.DrawFlash(rect, a.Flash.Text, EffectText.ColourOf(a.Flash.EffectId), 1f - t * t);
                 n++;
             }
+        }
+
+        /// <summary>
+        /// Platine eines Gegners als kleines Raster mit Live-Zustand: Regeln der Platine oben, Blitze an Komponenten, darunter
+        /// der Basisangriff (leuchtet, wenn er feuert).
+        /// </summary>
+        private void DrawEnemyBoard(int fighter, EnemyBoardView.Live live, Rect area)
+        {
+            LogicBoard board = live.Watch.Board;
+            float now = Time.unscaledTime;
+            live.Pulses.Clear();
+            foreach (ActivePulse p in _pulses)
+                if (p.Fighter == fighter)
+                    live.Pulses.Add(new EnemyBoardView.LivePulse(p.Link, p.Duration <= 0f ? 1f : Mathf.Clamp01((now - p.Start) / p.Duration), p.Power));
+
+            float y = area.y;
+            string rules = EffectText.BoardRules(board);
+            if (rules.Length > 0)
+            {
+                if (board.HasBoardEffect(CircuitEffectIds.Firewall)) rules += $"  <color=#9aa4b2>({UiTexts.Effects.Firewall(_fx.Firewall(fighter))})</color>";
+                GUI.Label(new Rect(area.x, y, area.width, 18f), new GUIContent($"<size=12>{UiTexts.Effects.Board(rules)}</size>", EffectText.BoardRulesTip(board)), _row);
+                y += 18f;
+            }
+            var gridArea = new Rect(area.x, y, area.width, area.yMax - y - 20f);
+            Rect grid = EnemyBoardView.Draw(gridArea, board, out float size, live);
+
+            // Blitze an Komponenten des Gegners (Overheat, Parallel Thread, Short Circuit …).
+            foreach (ActiveFlash a in _effectFlashes)
+            {
+                if (a.Flash.Fighter != fighter || a.Flash.Row < 0 || a.Flash.Row >= board.Rows.Count || !board.Rows[a.Flash.Row].Rect.HasValue) continue;
+                float t = Mathf.Clamp01((now - a.Start) / FlashSeconds);
+                CircuitGrid.DrawFlash(CircuitGrid.RectOf(grid, size, board.Rows[a.Flash.Row].Rect.Value), a.Flash.Text, EffectText.ColourOf(a.Flash.EffectId), 1f - t * t);
+            }
+
+            FighterView f = live.View;
+            bool basic = f.Alive && f.ActionSkill != null && f.ActionRow == board.FallbackIndex;
+            string text = $"↓ {UiTexts.BasicAttack}";
+            GUI.Label(new Rect(area.x, grid.yMax + 2f, area.width, 18f),
+                basic ? $"<size=12><color=#ffd75e><b>{text}</b></color></size>" : $"<size=12><color=#9aa4b2>{text}</color></size>", _small);
         }
 
         private static string RelayNameOf(LogicBoard board, int relay) =>
@@ -755,7 +855,7 @@ namespace Betaknight.Overworld.UI
             for (int i = 0; i < board.Links.Count; i++)
             {
                 PulseLink link = board.Links[i];
-                bool active = _pulses.Exists(p => p.Link == i);
+                bool active = _pulses.Exists(p => p.Link == i && p.Fighter == PlayerFighter);
                 Color color = LinkColorFor(link);
                 color.a = active ? 0.95f : 0.4f;
                 CircuitGrid.DrawLink(CircuitGrid.LinkPoints(grid, size, link), color, active ? thickness + 1f : thickness);
@@ -785,7 +885,7 @@ namespace Betaknight.Overworld.UI
             float now = Time.unscaledTime;
             foreach (ActivePulse p in _pulses)
             {
-                if (p.Link < 0 || p.Link >= board.Links.Count) continue;
+                if (p.Fighter != PlayerFighter || p.Link < 0 || p.Link >= board.Links.Count) continue;
                 PulseLink link = board.Links[p.Link];
                 float t = p.Duration <= 0f ? 1f : Mathf.Clamp01((now - p.Start) / p.Duration);
                 Vector2 at = CircuitGrid.PointOnLink(CircuitGrid.LinkPoints(grid, size, link), t);
@@ -893,7 +993,7 @@ namespace Betaknight.Overworld.UI
                 tip = tip == null ? EnemyTooltip(i) : $"{tip}\n\n{EnemyTooltip(i)}";
             }
             if (names.Count == 0) return;
-            GUILayout.Label(new GUIContent($"<size=13>{UiTexts.Arena.EnemyBoardTitle}: {string.Join(", ", names)}  <color=#9aa4b2>({UiTexts.Arena.EnemyBoardHint})</color></size>", tip), _row);
+            GUILayout.Label(new GUIContent($"<size=13>{UiTexts.Arena.EnemyBoardTitle}: {string.Join(", ", names)}  <color=#9aa4b2>({(_enemyBoards.Count > 0 ? UiTexts.Arena.EnemyBoardsLive : UiTexts.Arena.EnemyBoardHint)})</color></size>", tip), _row);
         }
 
         /// <summary>Platine eines Gegners als Tooltip-Text («Every 7 s → Ram (2×1): …»), einmal pro Kampf gebaut.</summary>
@@ -1149,7 +1249,9 @@ namespace Betaknight.Overworld.UI
             if (_playback.IsFinished)
             {
                 BattleResult r = _playback.Result;
-                GUILayout.Label($"<b>{BattleLogText.OutcomeText(r.Outcome)}</b>   −{_current.DamageTaken} HP   +{_current.GoldReward} Gold", _text);
+                string loot = r.IsVictory && _current.Loot != null && _current.Loot.Count > 0 && _current.LootPicks > 0
+                    ? $"   <color=#ffd75e>{UiTexts.Arena.LootWaiting(_current.LootPicks)}</color>" : string.Empty;
+                GUILayout.Label($"<b>{BattleLogText.OutcomeText(r.Outcome)}</b>   −{_current.DamageTaken} HP   +{_current.GoldReward} Gold{loot}", _text);
                 GUILayout.FlexibleSpace();
                 if (OnEditBoard != null && r.IsSurvived && GUILayout.Button(UiTexts.Arena.OpenBuild, GUILayout.Width(160f), GUILayout.Height(32f)))
                 {
@@ -1177,6 +1279,11 @@ namespace Betaknight.Overworld.UI
                     _fx.Advance(_playback.Tick);
                     _fx.TakeFlashes();
                     _effectFlashes.Clear();
+                    foreach (EnemyBoardView.Live live in _enemyBoards.Values)
+                    {
+                        live.Watch.Advance(_playback.Tick);
+                        live.Watch.TakeNewPulses();
+                    }
                 }
             }
             GUILayout.EndHorizontal();
@@ -1214,7 +1321,7 @@ namespace Betaknight.Overworld.UI
             }
         }
 
-        private static Color StateColor(RowDisplay state)
+        internal static Color StateColor(RowDisplay state)
         {
             switch (state)
             {
@@ -1228,7 +1335,7 @@ namespace Betaknight.Overworld.UI
             }
         }
 
-        private static string StateName(RowDisplay state)
+        internal static string StateName(RowDisplay state)
         {
             switch (state)
             {

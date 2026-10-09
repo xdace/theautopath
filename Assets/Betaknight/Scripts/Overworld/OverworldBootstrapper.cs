@@ -31,6 +31,7 @@ namespace Betaknight.Overworld
         private OverworldHud _hud;
         private EncounterWindow _encounterWindow;
         private RuneOfferWindow _runeWindow;
+        private SalvageWindow _salvageWindow;
         private ShopWindow _shopWindow;
         private GameOverWindow _gameOverWindow;
         private KitSelectionWindow _kitWindow;
@@ -68,6 +69,7 @@ namespace Betaknight.Overworld
             _hud = gameObject.AddComponent<OverworldHud>();
             _encounterWindow = gameObject.AddComponent<EncounterWindow>();
             _runeWindow = gameObject.AddComponent<RuneOfferWindow>();
+            _salvageWindow = gameObject.AddComponent<SalvageWindow>();
             _shopWindow = gameObject.AddComponent<ShopWindow>();
             _gameOverWindow = gameObject.AddComponent<GameOverWindow>();
             _kitWindow = gameObject.AddComponent<KitSelectionWindow>();
@@ -77,10 +79,12 @@ namespace Betaknight.Overworld
             _inventoryWindow = gameObject.AddComponent<InventoryWindow>();
             _inventoryFullWindow = gameObject.AddComponent<InventoryFullWindow>();
 
-            // Die Arena spielt zuerst ab; Runenwahl, Events, Shop und Game Over warten so lange.
+            // Die Arena spielt zuerst ab; Bergen, Runenwahl, Events, Shop und Game Over warten so lange. Das Bergen kommt vor
+            // der Belohnung (die Session bietet sie erst danach an), beide öffnen sich, sobald die Arena geschlossen ist.
             System.Func<bool> arenaOpen = () => _arenaWindow.IsOpen;
             _encounterWindow.Hidden = arenaOpen;
             _runeWindow.Hidden = arenaOpen;
+            _salvageWindow.Hidden = arenaOpen;
             _shopWindow.Hidden = arenaOpen;
             _gameOverWindow.Hidden = arenaOpen;
             _portalWindow.Hidden = arenaOpen;
@@ -224,6 +228,7 @@ namespace Betaknight.Overworld
             _hud.Initialize(Session, controller, _config.Encounters, StartNewRun);
             _encounterWindow.Initialize(Session, keepMessages: Session.Act > 1);
             _runeWindow.Initialize(Session);
+            _salvageWindow.Initialize(Session);
             _shopWindow.Initialize(Session);
             _gameOverWindow.Initialize(Session, StartNewRun);
             _arenaWindow.Initialize(Session);
@@ -239,6 +244,7 @@ namespace Betaknight.Overworld
         {
             _encounterWindow.enabled = enabled;
             _runeWindow.enabled = enabled;
+            _salvageWindow.enabled = enabled;
             _shopWindow.enabled = enabled;
             _gameOverWindow.enabled = enabled;
             _portalWindow.enabled = enabled;
