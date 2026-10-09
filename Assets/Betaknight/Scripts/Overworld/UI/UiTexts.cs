@@ -591,6 +591,10 @@ namespace Betaknight.Overworld.UI
             public const string NextAction = "Next action ▸";
             public const string NextActionTip = "Jump to the next skill you cast and pause there (N). «.» steps one tick.";
             public const string KeysHint = "Space pause · 1–4 speed · N next · . step";
+            public const string NowTag = "NOW";
+            public const string NowEmpty = "Waiting for the first skill …";
+            public const string NowTip = "What just happened: cause → component → target → effect. Faded lines are the two actions before.";
+            public const string TelegraphTip = "This enemy attack lands when the bar runs out. The red part of your HP bar is the damage it will deal.";
             public static string SpeedKeyTip(int key) => $"Playback speed (key {key}); 1× is half the game speed, remembered";
             public const string Skip = "Skip";
 

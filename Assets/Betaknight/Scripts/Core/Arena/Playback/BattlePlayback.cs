@@ -204,6 +204,17 @@ namespace Betaknight.Core.Arena
         /// <summary>Tick, an dem zuletzt eine Wirkung eintraf (für Treffer-Blitze).</summary>
         public int LastHitTick { get; internal set; } = -1000;
 
+        /// <summary>
+        /// Angekündigter Angriff (nur Gegner mit Ausholen ab 0,5 s): Skill, Tick der Ausführung und Schaden am Spieler, den die
+        /// Wiedergabe schon kennt (-1 = wird unterbrochen). <see cref="TelegraphSkill"/> ist null ohne Ankündigung.
+        /// </summary>
+        public string TelegraphSkill { get; internal set; }
+        public int TelegraphTick { get; internal set; }
+        public int TelegraphDamage { get; internal set; }
+
+        /// <summary>Laufende Aktion als Satz (für die «JETZT»-Karte), null ohne.</summary>
+        public ActionStory Story { get; internal set; }
+
         internal FighterView(FighterInfo info)
         {
             Info = info;
@@ -266,6 +277,11 @@ namespace Betaknight.Core.Arena
         private readonly List<LogEntry> _entries = new List<LogEntry>();
         private readonly List<Popup> _popups = new List<Popup>();
         private int _next;
+
+        /// <summary>Kürzlich gestartete Aktionen als Sätze, neueste zuletzt (höchstens <see cref="StoryLimit"/>).</summary>
+        private readonly List<ActionStory> _stories = new List<ActionStory>();
+        public const int StoryLimit = 6;
+        public const int TelegraphMinTicks = Ticks.PerSecond / 2;
         private readonly string[] _skipReasons;
 
         // Gespeicherte Ladung und Grösse je Komponente des Spielers.
@@ -342,6 +358,9 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Wartende Komponenten des Spielers in Lesereihenfolge der Platine (oben links zuerst).</summary>
         public IReadOnlyList<QueueView> Queue => _queue;
+
+        /// <summary>Kürzlich gestartete Aktionen (Spieler und Gegner), neueste zuletzt.</summary>
+        public IReadOnlyList<ActionStory> Stories => _stories;
 
         public bool IsRowQueued(int row) => _queue.Exists(q => q.Row == row);
 
@@ -444,6 +463,57 @@ namespace Betaknight.Core.Arena
             _popups.Add(new Popup(e.Tick, _fighters.IndexOf(target), kind, e.Amount, fromPlayer ? e.RowIndex : -1, fromPlayer));
         }
 
+        /// <summary>Legt den Satz einer neuen Aktion an; bei Gegnern mit langem Ausholen auch die Ankündigung mit Schaden.</summary>
+        private void StartStory(BattleEvent e, FighterView source)
+        {
+            bool player = source.Info.Side == Side.Player;
+            var story = new ActionStory
+            {
+                Fighter = _fighters.IndexOf(source), FighterName = source.Info.Name, IsPlayer = player,
+                SkillId = e.Detail, Skill = player && e.RowIndex >= 0 && e.RowIndex < _result.PlayerRowSkills.Count
+                    ? _result.PlayerRowSkills[e.RowIndex] : BattleLogText.SkillName(e.Detail),
+                IsBasicAttack = e.Detail == SkillDefinition.BasicAttackId,
+                Row = e.RowIndex, Cause = e.Cause, CauseRow = e.CauseRow, StartTick = e.Tick, WindupTicks = e.Amount,
+            };
+            LogicBoard board = player ? _result.PlayerBoard : null;
+            if (board != null && e.Relay >= 0 && e.Relay < board.Relays.Count) story.Relay = board.Relays[e.Relay].Label;
+            source.Story = story;
+            _stories.Add(story);
+            if (_stories.Count > StoryLimit) _stories.RemoveAt(0);
+
+            source.TelegraphSkill = null;
+            if (player || story.IsBasicAttack || e.Amount < TelegraphMinTicks) return;
+            // Vorausschau: die Wiedergabe kennt den ganzen Kampf, also auch Ausgang und Schaden dieses Angriffs.
+            int execute = -1;
+            for (int i = _next; i < _result.Events.Count; i++)
+            {
+                BattleEvent next = _result.Events[i];
+                if (next.Source != e.Source) continue;
+                if (next.Kind == BattleEventKind.ActionInterrupted) break;
+                if (next.Kind == BattleEventKind.ActionExecuted) { execute = next.Tick; break; }
+            }
+            int damage = 0;
+            if (execute >= 0)
+                for (int i = _next; i < _result.Events.Count && _result.Events[i].Tick <= execute; i++)
+                {
+                    BattleEvent d = _result.Events[i];
+                    if (d.Tick == execute && d.Kind == BattleEventKind.Damage && d.Source == e.Source && d.Target != null && d.Target.Side == Side.Player)
+                        damage += d.Amount;
+                }
+            source.TelegraphSkill = story.Skill;
+            source.TelegraphTick = execute >= 0 ? execute : e.Tick + e.Amount;
+            source.TelegraphDamage = execute >= 0 ? damage : -1;
+        }
+
+        /// <summary>Die laufende Aktion der Quelle, zu der diese Wirkung gehört (gleiche Komponente bzw. Gegner ohne Zeile).</summary>
+        private static ActionStory StoryOf(FighterView source, BattleEvent e)
+        {
+            ActionStory story = source?.Story;
+            if (story == null || story.Interrupted) return null;
+            if (story.IsPlayer && e.RowIndex >= 0 && story.Row != e.RowIndex) return null;
+            return story;
+        }
+
         private FighterView View(Combatant c) => c != null && _byCombatant.TryGetValue(c, out FighterView v) ? v : null;
 
         private void Apply(BattleEvent e)
@@ -455,6 +525,7 @@ namespace Betaknight.Core.Arena
             {
                 case BattleEventKind.ActionStarted:
                     if (source == null) break;
+                    StartStory(e, source);
                     source.ActionSkill = e.Detail;
                     source.ActionRow = e.RowIndex;
                     source.ActionStartTick = e.Tick;
@@ -476,7 +547,12 @@ namespace Betaknight.Core.Arena
                     break;
 
                 case BattleEventKind.ActionExecuted:
-                    if (source != null) source.ActionWindupTicks = 0;
+                    if (source != null)
+                    {
+                        source.ActionWindupTicks = 0;
+                        source.TelegraphSkill = null;
+                        if (source.Story != null && source.Story.ExecuteTick < 0) source.Story.ExecuteTick = e.Tick;
+                    }
                     break;
 
                 case BattleEventKind.TriggerMissed:
@@ -566,7 +642,12 @@ namespace Betaknight.Core.Arena
                     break;
 
                 case BattleEventKind.ActionInterrupted:
-                    if (source != null) source.ActionSkill = null;
+                    if (source != null)
+                    {
+                        source.ActionSkill = null;
+                        source.TelegraphSkill = null;
+                        if (source.Story != null && !source.Story.Done) source.Story.Interrupted = true;
+                    }
                     Log(e, LogCategory.None);
                     break;
 
@@ -577,17 +658,29 @@ namespace Betaknight.Core.Arena
                     target.LastHitTick = e.Tick;
                     bool crit = e.Kind == BattleEventKind.Damage && target.PendingCritTick == e.Tick;
                     target.PendingCritTick = -1;
+                    if (e.Kind == BattleEventKind.Damage && StoryOf(source, e) is ActionStory hitStory)
+                    {
+                        StoryEffect fx = hitStory.On(target.Info.Name);
+                        fx.Damage += e.Amount;
+                        fx.Crit |= crit;
+                    }
                     AddPopup(e, target, e.Kind == BattleEventKind.SelfDamage ? PopupKind.SelfDamage : crit ? PopupKind.Crit : PopupKind.Damage);
                     Log(e, LogCategory.Damage, classic: false);
                     break;
 
                 case BattleEventKind.Healed:
                     if (target != null) target.Hp = Math.Min(target.Info.MaxHp, target.Hp + e.Amount);
+                    if (target != null && StoryOf(source, e) is ActionStory healStory) healStory.On(target.Info.Name).Healing += e.Amount;
                     AddPopup(e, target, PopupKind.Heal);
                     Log(e, LogCategory.None);
                     break;
 
                 case BattleEventKind.StatusApplied:
+                    if (target != null && target != source && StoryOf(source, e) is ActionStory statusStory)
+                    {
+                        StoryEffect fx = statusStory.On(target.Info.Name);
+                        if (!fx.StatusList.Contains(e.Detail)) fx.StatusList.Add(e.Detail);
+                    }
                     if (target != null)
                     {
                         if (e.Detail == StatusIds.Stun) target.StunnedUntil = e.Tick + e.Amount;
@@ -633,11 +726,13 @@ namespace Betaknight.Core.Arena
                     break;
 
                 case BattleEventKind.Dodged:
+                    if (target != null && StoryOf(source, e) is ActionStory dodgeStory) dodgeStory.On(target.Info.Name).Dodged = true;
                     AddPopup(e, target, PopupKind.Dodged);
                     Log(e, LogCategory.Damage);
                     break;
 
                 case BattleEventKind.Blocked:
+                    if (target != null && StoryOf(source, e) is ActionStory blockStory) blockStory.On(target.Info.Name).Blocked = true;
                     AddPopup(e, target, PopupKind.Blocked);
                     Log(e, LogCategory.Damage);
                     break;

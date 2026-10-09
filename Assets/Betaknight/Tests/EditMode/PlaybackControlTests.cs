@@ -47,5 +47,43 @@ namespace Betaknight.Tests.EditMode
             Assert.That(p.Queue.Select(q => q.SinceTick).ToList(), Is.Ordered, "in Auslöse-Reihenfolge");
             Assert.AreEqual(1, p.Queue[0].Row, "«b» (Zeile 2) kam zuerst, steht trotz späterer Lesereihenfolge vorne");
         }
+
+        [Test]
+        public void EnemyAttacksAreTelegraphedWithTheirExactDamage()
+        {
+            var enemyBoard = new LogicBoard(new[] { new LogicRow(new ClockCondition(Ticks.FromSeconds(1)), Skill("ram", Ticks.FromSeconds(1))) });
+            BattleSetup setup = Duel(Fighter("A", 100000, 1, 1000), Fighter("B", 100000, 30, 1000, board: enemyBoard));
+            setup.MaxTicks = Ticks.FromSeconds(4);
+            setup.TimeLimitTicks = setup.MaxTicks + 1;
+            BattleResult r = CombatSimulation.Run(setup);
+            var p = new BattlePlayback(r);
+            int start = p.NextTickWhere(e => e.Kind == BattleEventKind.ActionStarted && e.Detail == "ram");
+            Assert.GreaterOrEqual(start, 0);
+            p.Advance(start - p.Tick);
+            FighterView enemy = p.Fighters[1];
+            Assert.AreEqual("ram", enemy.TelegraphSkill);
+            Assert.Greater(enemy.TelegraphDamage, 0);
+            int hpBefore = p.Fighters[0].Hp;
+            p.Advance(enemy.TelegraphTick - p.Tick);
+            Assert.AreEqual(enemy.TelegraphDamage, hpBefore - p.Fighters[0].Hp, "die Ankündigung kennt den echten Schaden");
+            Assert.IsNull(enemy.TelegraphSkill, "nach der Ausführung ist die Ankündigung weg");
+
+            ActionStory story = p.Stories.Last(s => s.SkillId == "ram");
+            StringAssert.Contains("ram", story.Sentence());
+            StringAssert.Contains("A −" + (hpBefore - p.Fighters[0].Hp), story.Sentence());
+        }
+
+        [Test]
+        public void PlayerStoriesNameTheComponentAndTheTarget()
+        {
+            BattleResult r = Run(new LogicBoard(new[] { new LogicRow(new ClockCondition(Ticks.FromSeconds(1)), Skill("ping", 2)) }), 3);
+            var p = new BattlePlayback(r);
+            p.Advance(Ticks.FromSeconds(3));
+            ActionStory story = p.Stories.First(s => s.SkillId == "ping");
+            Assert.IsTrue(story.IsPlayer);
+            Assert.IsTrue(story.Done);
+            StringAssert.Contains("#1", story.Sentence());
+            StringAssert.Contains("B −", story.Sentence());
+        }
     }
 }

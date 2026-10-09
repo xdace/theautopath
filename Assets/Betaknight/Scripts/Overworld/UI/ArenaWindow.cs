@@ -129,6 +129,7 @@ namespace Betaknight.Overworld.UI
         private GUIStyle _text;
         private GUIStyle _small;
         private GUIStyle _row;
+        private GUIStyle _nowLine;
         private GUIStyle _thermal;
         private GUIStyle _thermalFlash;
         private Texture2D _white;
@@ -208,6 +209,9 @@ namespace Betaknight.Overworld.UI
             _enemyBoards.Clear();
             _seenEnemyRowTick.Clear();
             _enemyRowUntil.Clear();
+            _ghostHp.Clear();
+            _lastHp.Clear();
+            _ghostHoldUntil.Clear();
             for (int i = 0; i < _current.Battle.Fighters.Count; i++)
             {
                 FighterInfo info = _current.Battle.Fighters[i];
@@ -224,6 +228,7 @@ namespace Betaknight.Overworld.UI
         private void Update()
         {
             if (_playback == null) return;
+            UpdateGhosts();
             _popups.RemoveAll(p => Time.unscaledTime - p.Start > PopupSeconds);
             _pulses.RemoveAll(p => Time.unscaledTime - p.Start > p.Duration);
             _effectFlashes.RemoveAll(f => Time.unscaledTime - f.Start > FlashSeconds);
@@ -439,64 +444,183 @@ namespace Betaknight.Overworld.UI
             Fill(area, new Color(0.09f, 0.10f, 0.13f));
             Fill(new Rect(area.x, area.yMax - 40f, area.width, 40f), new Color(0.14f, 0.15f, 0.18f));
 
+            var card = new Rect(area.x + 8f, area.y + 6f, area.width - 16f, NowCardHeight);
+            DrawNowCard(card);
+            var field = new Rect(area.x, card.yMax + 6f, area.width, area.yMax - card.yMax - 6f);
+
             var players = new List<int>();
             var enemies = new List<int>();
             for (int i = 0; i < _playback.Fighters.Count; i++) (_playback.Fighters[i].Info.Side == Side.Player ? players : enemies).Add(i);
 
-            DrawSide(players, new Rect(area.x + 24f, area.y, area.width * 0.4f - 24f, area.height), new Color(0.40f, 0.85f, 1.00f));
+            DrawSide(players, new Rect(field.x + 24f, field.y, field.width * 0.4f - 24f, field.height), new Color(0.40f, 0.85f, 1.00f));
             // Gegner bekommen mehr Platz: links neben jedem steht seine Platine.
             float enemyX = _enemyBoards.Count > 0 ? 0.42f : 0.6f;
-            DrawSide(enemies, new Rect(area.x + area.width * enemyX, area.y, area.width * (1f - enemyX) - 24f, area.height), new Color(0.80f, 0.35f, 0.30f));
+            DrawSide(enemies, new Rect(field.x + field.width * enemyX, field.y, field.width * (1f - enemyX) - 24f, field.height), new Color(0.80f, 0.35f, 0.30f));
+        }
+
+        private const float NowCardHeight = 66f;
+        private static readonly Color PlayerStoryColor = new Color(0.40f, 0.85f, 1.00f);
+        private static readonly Color EnemyStoryColor = new Color(1.00f, 0.42f, 0.38f);
+
+        /// <summary>
+        /// «JETZT»-Karte: die neueste Aktion als ein Satz (Ursache → Komponente → Ziel → Wirkung) groß, darunter die zwei davor
+        /// blass. Basisangriffe nur, wenn sonst nichts passiert ist. Spieler mit cyanem, Gegner mit rotem Streifen.
+        /// </summary>
+        private void DrawNowCard(Rect area)
+        {
+            Fill(area, new Color(0.05f, 0.06f, 0.08f, 0.92f));
+            GUI.Label(area, new GUIContent(string.Empty, UiTexts.Arena.NowTip));
+            var lines = new List<ActionStory>();
+            IReadOnlyList<ActionStory> stories = _playback.Stories;
+            for (int i = stories.Count - 1; i >= 0 && lines.Count < 3; i--)
+                if (!stories[i].IsBasicAttack) lines.Add(stories[i]);
+            if (lines.Count == 0 && stories.Count > 0) lines.Add(stories[stories.Count - 1]);
+
+            var tag = new Rect(area.x + 8f, area.y + 6f, 48f, 26f);
+            GUI.Label(tag, $"<size=12><b><color=#9aa4b2>{UiTexts.Arena.NowTag}</color></b></size>", _small);
+            if (lines.Count == 0)
+            {
+                GUI.Label(new Rect(area.x + 60f, area.y + 6f, area.width - 68f, 26f), $"<color=#9aa4b2>{UiTexts.Arena.NowEmpty}</color>", _text);
+                return;
+            }
+
+            float x = area.x + 60f;
+            float w = area.width - 68f;
+            ActionStory main = lines[0];
+            Color mc = main.IsPlayer ? PlayerStoryColor : EnemyStoryColor;
+            Fill(new Rect(area.x, area.y, 4f, area.height), mc);
+            string mainText = main.Sentence();
+            if (main.Interrupted) mainText = $"<color=#9aa4b2>{mainText}</color>";
+            GUI.Label(new Rect(x, area.y + 2f, w, 30f), $"<size=20><b>{mainText}</b></size>", _nowLine);
+            for (int i = 1; i < lines.Count; i++)
+            {
+                ActionStory s = lines[i];
+                string hex = s.IsPlayer ? "#6f9fb0" : "#b0706a";
+                GUI.Label(new Rect(x, area.y + 32f + (i - 1) * 16f, w, 18f), $"<size=12><color={hex}>{s.Sentence()}</color></size>", _nowLine);
+            }
+        }
+
+        /// <summary>Angezeigter «Ghost»-Wert je Kämpfer: folgt Schaden mit Verzögerung, damit der Verlust kurz sichtbar bleibt.</summary>
+        private readonly Dictionary<int, float> _ghostHp = new Dictionary<int, float>();
+        private readonly Dictionary<int, int> _lastHp = new Dictionary<int, int>();
+        private readonly Dictionary<int, float> _ghostHoldUntil = new Dictionary<int, float>();
+        private const float GhostHoldSeconds = 0.5f;
+
+        private void UpdateGhosts()
+        {
+            float now = Time.unscaledTime;
+            for (int i = 0; i < _playback.Fighters.Count; i++)
+            {
+                FighterView f = _playback.Fighters[i];
+                if (!_ghostHp.TryGetValue(i, out float ghost)) ghost = f.Hp;
+                if (_lastHp.TryGetValue(i, out int last) && f.Hp < last) _ghostHoldUntil[i] = now + GhostHoldSeconds;
+                _lastHp[i] = f.Hp;
+                if (ghost < f.Hp) ghost = f.Hp;
+                else if (ghost > f.Hp && (!_ghostHoldUntil.TryGetValue(i, out float hold) || now >= hold))
+                    ghost = Mathf.MoveTowards(ghost, f.Hp, Mathf.Max(1f, f.Info.MaxHp) * 0.8f * Time.unscaledDeltaTime);
+                _ghostHp[i] = ghost;
+            }
+        }
+
+        /// <summary>Schaden, den angekündigte Gegnerangriffe dem Spieler gleich zufügen (für die rote Vorschau auf seinem Balken).</summary>
+        private int IncomingDamage()
+        {
+            int sum = 0;
+            foreach (FighterView f in _playback.Fighters)
+                if (f.Alive && f.Info.Side != Side.Player && f.TelegraphSkill != null && f.TelegraphDamage > 0) sum += f.TelegraphDamage;
+            return sum;
+        }
+
+        /// <summary>Großer HP-Balken mit Zahl, Ghost-Segment (frischer Schaden) und optional roter Vorschau angekündigten Schadens.</summary>
+        private void DrawHpBar(int index, FighterView f, Rect bar, int incoming)
+        {
+            Fill(new Rect(bar.x - 1f, bar.y - 1f, bar.width + 2f, bar.height + 2f), new Color(0f, 0f, 0f, 0.6f));
+            Fill(bar, new Color(0.2f, 0.2f, 0.22f));
+            float max = Mathf.Max(1f, f.Info.MaxHp);
+            float hp = Mathf.Clamp01(f.Hp / max);
+            float ghost = _ghostHp.TryGetValue(index, out float g) ? Mathf.Clamp01(g / max) : hp;
+            if (ghost > hp) Fill(new Rect(bar.x + bar.width * hp, bar.y, bar.width * (ghost - hp), bar.height), new Color(1f, 0.92f, 0.75f, 0.85f));
+            Color fill = hp > 0.3f ? UiTheme.Good : UiTheme.Bad;
+            Fill(new Rect(bar.x, bar.y, bar.width * hp, bar.height), fill);
+            if (incoming > 0 && f.Alive)
+            {
+                float cut = Mathf.Clamp01(incoming / max);
+                float from = Mathf.Max(0f, hp - cut);
+                // Langsames Pulsieren (≈1,2 Hz), damit es auffällt, ohne zu flackern.
+                float a = 0.55f + 0.3f * Mathf.Sin(Time.unscaledTime * 7.5f);
+                Fill(new Rect(bar.x + bar.width * from, bar.y, bar.width * (hp - from), bar.height), new Color(0.85f, 0.10f, 0.10f, a));
+            }
+            int size = bar.height >= 26f ? 16 : 14;
+            GUI.Label(bar, $"<size={size}><b>{f.Hp} / {f.Info.MaxHp}</b></size>", _centerTitle);
+        }
+
+        /// <summary>Ankündigung eines Gegnerangriffs: «! Ram in 0.8 s → Knight −25» und ein dicker roter Countdown-Balken.</summary>
+        private void DrawTelegraph(FighterView f, Rect area)
+        {
+            if (!f.Alive || f.TelegraphSkill == null) return;
+            int left = Mathf.Max(0, f.TelegraphTick - _playback.Tick);
+            string player = _playback.Fighters[PlayerFighter].Info.Name;
+            string text = ArenaTexts.Telegraph(f.TelegraphSkill, BattleLogText.Time(left), f.TelegraphDamage, player);
+            Fill(area, new Color(0.30f, 0.06f, 0.05f, 0.92f));
+            int total = Mathf.Max(1, f.TelegraphTick - (f.Story?.StartTick ?? _playback.Tick));
+            float fill = Mathf.Clamp01(left / (float)total);
+            Fill(new Rect(area.x, area.yMax - 6f, area.width * fill, 6f), EnemyStoryColor);
+            GUI.Label(new Rect(area.x, area.y, area.width, area.height - 6f),
+                new GUIContent($"<size=14><b><color=#ffb0a8>{text}</color></b></size>", UiTexts.Arena.TelegraphTip), _centerTitle);
         }
 
         private void DrawSide(List<int> indices, Rect area, Color color)
         {
             if (indices.Count == 0) return;
             float slot = area.width / indices.Count;
+            int incoming = IncomingDamage();
             for (int n = 0; n < indices.Count; n++)
             {
                 int index = indices[n];
                 FighterView f = _playback.Fighters[index];
-                float bodyW = Mathf.Min(70f, slot * 0.6f);
-                float bodyH = bodyW * 1.5f;
+                bool isPlayer = f.Info.Side == Side.Player;
+                bool hasBoard = !isPlayer && _enemyBoards.ContainsKey(index);
+                float bodyW = Mathf.Min(hasBoard ? 80f : 110f, slot * 0.6f);
+                float bodyH = Mathf.Min(bodyW * 1.5f, area.height * 0.38f);
                 var body = new Rect(area.x + slot * n + (slot - bodyW) * 0.5f, area.yMax - 40f - bodyH, bodyW, bodyH);
+                float column = Mathf.Min(slot - 8f, Mathf.Max(bodyW + 80f, 170f));
 
                 // Gegner-Platine links im Platz, der Gegner mit seinen Balken rechts daneben.
-                if (f.Info.Side != Side.Player && _enemyBoards.TryGetValue(index, out EnemyBoardView.Live live))
+                if (hasBoard)
                 {
-                    float column = bodyW + 68f;
-                    var boardRect = new Rect(area.x + slot * n + 4f, area.y + 8f, slot - column - 12f, area.height - 56f);
+                    var boardRect = new Rect(area.x + slot * n + 4f, area.y + 2f, slot - column - 12f, area.height - 44f);
                     if (boardRect.width >= 80f)
                     {
                         body.x = area.x + slot * (n + 1) - column * 0.5f - 4f - bodyW * 0.5f;
-                        DrawEnemyBoard(index, live, boardRect);
+                        DrawEnemyBoard(index, _enemyBoards[index], boardRect);
                     }
                 }
 
                 // Ausholen: Körper lehnt sich leicht in Richtung Gegner.
                 float lean = f.ActionSkill != null && f.ActionWindupTicks > 0 ? f.WindupProgress(_playback.Tick) * 10f : 0f;
-                body.x += f.Info.Side == Side.Player ? lean : -lean;
+                float baseX = body.center.x;
+                body.x += isPlayer ? lean : -lean;
                 _bodies[index] = body;
 
                 Color c = f.Alive ? color : new Color(0.25f, 0.25f, 0.28f);
                 if (_flashUntil.TryGetValue(index, out float flash) && Time.unscaledTime < flash) c = Color.Lerp(c, Color.white, 0.6f);
                 Fill(body, c);
                 // Gegner: Maus darüber zeigt seine Platine.
-                if (f.Info.Side != Side.Player) GUI.Label(body, new GUIContent(string.Empty, EnemyTooltip(index)));
+                if (!isPlayer) GUI.Label(body, new GUIContent(string.Empty, EnemyTooltip(index)));
 
-                float barX = body.x - 30f;
-                float barW = body.width + 60f;
-                var hpBack = new Rect(barX, area.y + 64f, barW, 12f);
-                Fill(hpBack, new Color(0.2f, 0.2f, 0.22f));
-                float hp = f.Info.MaxHp > 0 ? Mathf.Clamp01(f.Hp / (float)f.Info.MaxHp) : 0f;
-                Fill(new Rect(hpBack.x, hpBack.y, hpBack.width * hp, hpBack.height), Color.Lerp(new Color(0.85f, 0.25f, 0.25f), new Color(0.35f, 0.85f, 0.45f), hp));
-                GUI.Label(new Rect(hpBack.x - 20f, hpBack.y - 40f, hpBack.width + 40f, 40f), $"<b>{f.Info.Name}</b>\n{f.Hp}/{f.Info.MaxHp}", _small);
+                // HP-Balken direkt über dem Körper, Name darüber.
+                float barW = column;
+                float barX = baseX - barW * 0.5f;
+                float barH = isPlayer ? 28f : 22f;
+                var hpBar = new Rect(barX, body.y - barH - 8f, barW, barH);
+                DrawHpBar(index, f, hpBar, isPlayer ? incoming : 0);
+                GUI.Label(new Rect(barX - 20f, hpBar.y - 22f, barW + 40f, 22f), $"<b>{f.Info.Name}</b>", _small);
 
-                float y = hpBack.yMax + 4f;
+                // Ausholen der laufenden Aktion unter dem Körper im Boden.
                 if (f.Alive && f.ActionSkill != null && f.ActionWindupTicks > 0)
                 {
                     bool charging = f.ActionWindupTicks >= SkillDefinition.ChargeThreshold;
-                    var bar = new Rect(hpBack.x, y, hpBack.width, 6f);
+                    var bar = new Rect(barX, area.yMax - 36f, barW, 6f);
                     Fill(bar, new Color(0.2f, 0.2f, 0.22f));
                     Fill(new Rect(bar.x, bar.y, bar.width * f.WindupProgress(_playback.Tick), bar.height),
                         charging ? new Color(1f, 0.55f, 0.15f) : new Color(0.7f, 0.7f, 0.75f));
@@ -505,14 +629,21 @@ namespace Betaknight.Overworld.UI
                     else if (f.ActionCause == ActionCause.Repeat) cast += $", <color=#9fc7ff>{UiTexts.Arena.Repeat}</color>";
                     string label = charging ? $"<color=#ffae42>{UiTexts.Arena.Charging(BattleLogText.SkillName(f.ActionSkill), cast)}</color>"
                         : $"{BattleLogText.SkillName(f.ActionSkill)} ({cast})";
-                    GUI.Label(new Rect(bar.x - 30f, bar.yMax, bar.width + 60f, 20f), label, _small);
+                    GUI.Label(new Rect(bar.x - 40f, bar.yMax, bar.width + 80f, 22f), label, _small);
                 }
-                y += 28f;
 
+                // Oben: Ankündigung (Gegner), dann Ressourcen, Hacks und Zustände.
+                float y = area.y + 4f;
+                if (!isPlayer)
+                {
+                    var tele = new Rect(Mathf.Max(area.x, barX - 40f), y, Mathf.Min(area.width, barW + 80f), 30f);
+                    DrawTelegraph(f, tele);
+                    y += 36f;
+                }
                 y = DrawResources(f, barX, y, barW);
                 y = DrawHacks(index, barX, y, barW);
                 DrawStatuses(f, barX, y, barW);
-                if (f.Info.Side != Side.Player) DrawFighterFlashes(index, body);
+                if (!isPlayer) DrawFighterFlashes(index, body);
             }
         }
 
@@ -1511,6 +1642,7 @@ namespace Betaknight.Overworld.UI
             _text = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true };
             _small = new GUIStyle(GUI.skin.label) { fontSize = 13, richText = true, alignment = TextAnchor.UpperCenter, wordWrap = true };
             _row = new GUIStyle(GUI.skin.label) { fontSize = 15, richText = true, wordWrap = true };
+            _nowLine = new GUIStyle(_row) { wordWrap = false, clipping = TextClipping.Clip, alignment = TextAnchor.MiddleLeft };
             _row.normal.textColor = new Color(0.9f, 0.92f, 0.96f);
             _logLine = new GUIStyle(_row) { fontSize = 13, wordWrap = false };
             _popup = new GUIStyle(GUI.skin.label) { fontSize = 19, richText = true, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };

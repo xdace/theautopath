@@ -124,6 +124,15 @@ namespace Betaknight.Core.Arena
 
         // ------------------------------------------------------------------ Kampfprotokoll
 
+        public const string StoryInterrupted = "interrupted!";
+        public const string StoryDodged = "dodged";
+        public const string StoryBlocked = "blocked";
+        public const string StoryCrit = "CRIT";
+        public const string StoryRepeat = "repeat";
+        public static string StoryTriggeredBy(int row) => $"trigger from #{row + 1}";
+        public static string StoryPulsedBy(int row) => $"pulse from #{row + 1}";
+        public static string Telegraph(string skill, string time, int damage, string target) =>
+            damage < 0 ? $"! {skill} in {time} (will be interrupted)" : damage == 0 ? $"! {skill} in {time} → {target}" : $"! {skill} in {time} → {target} −{damage}";
         public static string LogCharged(string who, string component, int stored, int cells, int gained) =>
             gained > 0 ? $"{who}: {component} charged +{gained} → {stored}/{cells}" : $"{who}: {component} keeps its charge {stored}/{cells} (already queued, runs again after its cast)";
         public static string ChargeStats(int times, int gained, int left, int cells) =>
