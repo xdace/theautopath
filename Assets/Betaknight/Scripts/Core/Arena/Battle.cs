@@ -664,8 +664,8 @@ namespace Betaknight.Core.Arena
             public readonly int[] JamLeft;
             public readonly Dictionary<int, Combatant> Hijacked = new Dictionary<int, Combatant>();
 
-            // Ladung zu grosser Komponenten je (Komponente, Relais): jedes Auslösen bringt die Feld-Grenze des Relais.
-            public readonly Dictionary<(int Row, int Relay), int> Charge = new Dictionary<(int Row, int Relay), int>();
+            // Ladung je Komponente: alle Relais, Charge Links und Spillover füllen denselben Speicher.
+            public readonly Dictionary<int, int> Charge = new Dictionary<int, int>();
             public int Firewall;
             public int LastComponentTick;
 
@@ -738,7 +738,7 @@ namespace Betaknight.Core.Arena
                     if (row < 0 || row >= c.Board.Rows.Count) continue;
                     int amount = from.Kind == GraphNodeKind.Skill && from.Row >= 0 && from.Row < c.Board.Rows.Count ? c.Board.Rows[from.Row].Cells
                         : from.Kind == GraphNodeKind.Block && from.Row >= 0 && from.Row < c.Board.Relays.Count ? c.Board.Relays[from.Row].MaxCells : 0;
-                    if (ChargeUp(c, row, ChargeLinkKey, amount))
+                    if (ChargeUp(c, row, amount))
                         Enqueue(c, row, sourceRelay, ActionCause.Trigger, causeRow, sourceTier, int.MaxValue, null);
                     else
                         Missed(c, row, sourceRelay, MissReason.TooLarge);
@@ -768,7 +768,7 @@ namespace Betaknight.Core.Arena
                 Missed(c, row, relay, MissReason.Orphaned);
                 return;
             }
-            if (r.Cells > maxCells && !ChargeUp(c, row, relay, maxCells))
+            if (r.Cells > maxCells && !ChargeUp(c, row, maxCells))
             {
                 Missed(c, row, relay, MissReason.TooLarge);
                 return;
@@ -829,12 +829,6 @@ namespace Betaknight.Core.Arena
                 Emit(new BattleEvent(Tick, BattleEventKind.QueueJump, c, null, c.QueueList.Count - 1, r.Skill.Id, row) { Relay = relay });
         }
 
-        /// <summary>Eigener Ladungs-Speicher für «Charge Link» (getrennt von der Ladung durch Relais).</summary>
-        private const int ChargeLinkKey = -100;
-
-        /// <summary>Eigener Ladungs-Speicher für «Spillover».</summary>
-        private const int SpilloverKey = -101;
-
         /// <summary>
         /// Ein Relais löst aus: seine Grenze ist ein Topf Ladung für alle berührten Komponenten (versorgte und zu grosse).
         /// Was am wenigsten braucht, wird zuerst gefüllt und läuft; bei Gleichstand, der nicht für alle reicht, entscheidet
@@ -853,7 +847,7 @@ namespace Betaknight.Core.Arena
             var rows = new List<int>();
             foreach (int row in relay.Powered) AddCandidate(c, rows, row, i);
             foreach (int row in relay.TooLarge) AddCandidate(c, rows, row, i);
-            Distribute(c, rows, relay.MaxCells, i, i, ActionCause.Board, -1, relay.Difficulty, target, spill: true);
+            Distribute(c, rows, relay.MaxCells, i, ActionCause.Board, -1, relay.Difficulty, target, spill: true);
         }
 
         private void AddCandidate(Combatant c, List<int> rows, int row, int relay)
@@ -864,11 +858,11 @@ namespace Betaknight.Core.Arena
         }
 
         /// <summary>Verteilt <paramref name="pool"/> Ladung auf <paramref name="rows"/> (Regeln siehe <see cref="PowerFromRelay"/>).</summary>
-        private void Distribute(Combatant c, List<int> rows, int pool, int key, int relay, ActionCause cause, int causeRow, int tier, Combatant target, bool spill)
+        private void Distribute(Combatant c, List<int> rows, int pool, int relay, ActionCause cause, int causeRow, int tier, Combatant target, bool spill)
         {
             if (rows.Count == 0 || pool <= 0) return;
-            Dictionary<(int Row, int Relay), int> charge = _fx[c].Charge;
-            int Stored(int row) => charge.TryGetValue((row, key), out int v) ? v : 0;
+            Dictionary<int, int> charge = _fx[c].Charge;
+            int Stored(int row) => charge.TryGetValue(row, out int v) ? v : 0;
             int Need(int row) => Math.Max(0, c.Board.Rows[row].Cells - Stored(row));
 
             var fired = new List<int>();
@@ -908,13 +902,13 @@ namespace Betaknight.Core.Arena
                 for (int n = 0; n < pool % waiting.Count; n++)
                 {
                     int pick = Random.Next(extra.Count);
-                    charge[(extra[pick], key)] = Stored(extra[pick]) + 1;
+                    charge[extra[pick]] = Stored(extra[pick]) + 1;
                     extra.RemoveAt(pick);
                 }
                 pool = 0;
                 foreach (int row in waiting)
                 {
-                    if (each > 0) charge[(row, key)] = Stored(row) + each;
+                    if (each > 0) charge[row] = Stored(row) + each;
                     Missed(c, row, relay, MissReason.TooLarge);
                 }
             }
@@ -927,7 +921,7 @@ namespace Betaknight.Core.Arena
             for (int n = 0; n < fired.Count; n++)
             {
                 int row = fired[n];
-                charge[(row, key)] = 0;
+                charge[row] = 0;
                 int over = share + (n < rest ? 1 : 0);
                 bool spills = spill && over > 0 && c.Board.Rows[row].Has(CircuitEffectIds.Spillover);
                 Enqueue(c, row, relay, cause, causeRow, tier, int.MaxValue, target, spills ? 0 : over * perCell);
@@ -942,24 +936,24 @@ namespace Betaknight.Core.Arena
             foreach (int n in c.Board.Rows[row].Neighbours)
                 if (n != row && !c.Board.Rows[n].IsOrphaned && c.Board.Rows[n].Skill != null && !neighbours.Contains(n)) neighbours.Add(n);
             Emit(new BattleEvent(Tick, BattleEventKind.Spillover, c, null, amount, c.Board.Rows[row].Skill?.Id, row));
-            Distribute(c, neighbours, amount, SpilloverKey, -1, ActionCause.Trigger, row, tier, null, spill: false);
+            Distribute(c, neighbours, amount, -1, ActionCause.Trigger, row, tier, null, spill: false);
         }
 
         /// <summary>
-        /// Zu grosse Komponente: jedes Auslösen lädt sie um die Feld-Grenze des Relais auf. Erreicht die Ladung ihre Grösse,
-        /// läuft sie (true) und die Grösse wird abgezogen; der Rest bleibt für das nächste Auslösen. Jeder Kampf startet bei 0.
+        /// Lädt eine Komponente auf. Die Ladung gehört der Komponente: Relais, Pulse, Charge Link und Spillover füllen denselben
+        /// Speicher. Erreicht er ihre Grösse, läuft sie (true) und die Grösse wird abgezogen; der Rest bleibt. Jeder Kampf startet bei 0.
         /// Beispiel: Grenze 2, Grösse 4 → läuft bei jedem 2. Auslösen.
         /// </summary>
-        private bool ChargeUp(Combatant c, int row, int relay, int amount)
+        private bool ChargeUp(Combatant c, int row, int amount)
         {
             if (amount <= 0) return false;
-            Dictionary<(int Row, int Relay), int> charge = _fx[c].Charge;
-            charge.TryGetValue((row, relay), out int stored);
+            Dictionary<int, int> charge = _fx[c].Charge;
+            charge.TryGetValue(row, out int stored);
             stored = (int)Math.Min(int.MaxValue, (long)stored + amount);
             int cells = c.Board.Rows[row].Cells;
             bool ready = stored >= cells;
             if (ready) stored -= cells;
-            charge[(row, relay)] = stored;
+            charge[row] = stored;
             return ready;
         }
 

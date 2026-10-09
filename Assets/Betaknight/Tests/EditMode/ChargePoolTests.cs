@@ -116,6 +116,24 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
+        public void TheChargeBelongsToTheComponentAndAllRelaysFillIt()
+        {
+            // Rail Cannon (6 Zellen) an zwei Relais: «Opening 5 s» (◆, 2 pro Sekunde) und «HP Full» (◆, 2 zu Kampfbeginn).
+            // Beide füllen denselben Speicher: 2 + 2 im ersten Tick, nach der nächsten Sekunde 6 → die Kanone läuft.
+            var spec = new CircuitSpec { Width = 6, Height = 6 };
+            spec.Relays.Add(new RelaySpec("opening", new Cell(0, 0), level: 2));
+            spec.Relays.Add(new RelaySpec("hp_full", new Cell(0, 2)));
+            spec.Components.Add(Part(SkillIds.RailCannon, 1, 0));
+            LogicBoard board = Factory.Create(spec, null);
+            Assert.AreEqual(6, board.Rows[0].Cells);
+            Assert.AreEqual(2, board.Relays.Count(x => x.TooLarge.Contains(0)));
+
+            BattleResult r = Fight(board, seconds: 4);
+            BattleEvent first = Queued(r, 0).First();
+            Assert.AreEqual(Ticks.PerSecond + 1, first.Tick, "ohne gemeinsamen Speicher erst nach 3 Opening-Auslösungen (2 s)");
+        }
+
+        [Test]
         public void SpilloverPassesTheOverchargeToTheNeighbours()
         {
             // 6 Ladung auf den Schockstich (1 Zelle) mit Spillover: 5 gehen an den Rüstungsbrecher daneben (4 Zellen, berührt
