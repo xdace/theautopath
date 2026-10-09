@@ -54,6 +54,9 @@ namespace Betaknight.Overworld.UI
         // Verknüpfen: Id des Trigger- bzw. Charge-Link-Moduls, dessen Ziel als Nächstes auf der Platine gewählt wird (-1 = aus).
         private int _linking = -1;
 
+        // Verwerfen: was in den Papierkorb gezogen wurde und auf «Ja» wartet.
+        private DragItem? _pendingDiscard;
+
         // Ziehen auf der Platine: welche Zelle der Komponente gepackt wurde, und ob beim Ziehen gedreht wird (Taste R).
         private int _grabX, _grabY;
         private bool _dragRotated;
@@ -181,6 +184,7 @@ namespace Betaknight.Overworld.UI
             GUILayout.FlexibleSpace();
             if (!_session.CanChangeLoadout)
                 GUILayout.Label($"<color={UiTheme.Hex(UiTheme.Bad)}>{UiTexts.ReadOnly}</color>", UiTheme.Small, GUILayout.ExpandWidth(false));
+            DrawTrash();
             if (GUILayout.Button(new GUIContent(UiTexts.Close, UiTexts.Build.CloseTip), GUILayout.Width(34f), GUILayout.Height(28f))) Close();
             GUILayout.EndHorizontal();
         }
@@ -1161,6 +1165,64 @@ namespace Betaknight.Overworld.UI
             lines.AddRange(_session.EvolutionProgressFor(relay));
             lines.Add(UiTexts.Build.RelayDragHint);
             return string.Join("\n", lines);
+        }
+
+        /// <summary>
+        /// Papierkorb im Kopf: Skill, Komponente, Relais, Rune, Modul oder Chip hierher ziehen, dann mit «Yes» endgültig verwerfen.
+        /// </summary>
+        private void DrawTrash()
+        {
+            if (_pendingDiscard.HasValue)
+            {
+                DragItem d = _pendingDiscard.Value;
+                GUILayout.Label($"<color={UiTheme.Hex(UiTheme.Bad)}>{UiTexts.Build.DiscardAsk(d.Label)}</color>", UiTheme.Small, GUILayout.ExpandWidth(false));
+                if (GUILayout.Button(UiTexts.Build.DiscardYes, GUILayout.Width(52f), GUILayout.Height(28f)))
+                {
+                    Discard(d);
+                    _pendingDiscard = null;
+                }
+                if (GUILayout.Button(UiTexts.Build.DiscardNo, GUILayout.Width(52f), GUILayout.Height(28f))) _pendingDiscard = null;
+                return;
+            }
+            GUILayout.Box(new GUIContent($"<color=#ff8a80>✖</color> {UiTexts.Build.Trash}", UiTexts.Build.TrashTip), UiTheme.Cell,
+                GUILayout.Width(150f), GUILayout.Height(28f));
+            _drag.Target(GUILayoutUtility.GetLastRect(), d => _session.CanChangeLoadout && d.Kind != DragKind.Item && d.Kind != DragKind.Equipped,
+                d => _pendingDiscard = StableDiscard(d), redWhenInvalid: true);
+        }
+
+        /// <summary>Komponente → ihr Skill-Exemplar (stabile Id), damit die Rückfrage nicht an einer Position hängt.</summary>
+        private DragItem StableDiscard(DragItem d) =>
+            d.Kind == DragKind.Component && d.A >= 0 && d.A < Board.Components.Count && Board.Components[d.A].Skill != null
+                ? new DragItem(DragKind.Skill, Board.Components[d.A].Skill.InstanceId, d.Label) : d;
+
+        private void Discard(DragItem d)
+        {
+            switch (d.Kind)
+            {
+                case DragKind.Skill:
+                    _session.DiscardSkill(d.A);
+                    break;
+                case DragKind.Component:
+                    if (d.A >= 0 && d.A < Board.Components.Count && Board.Components[d.A].Skill != null)
+                        _session.DiscardSkill(Board.Components[d.A].Skill.InstanceId);
+                    break;
+                case DragKind.Relay:
+                    _session.DiscardRelay(d.A);
+                    break;
+                case DragKind.Rune:
+                    _session.DiscardRune(d.A);
+                    break;
+                case DragKind.Module:
+                    _session.DiscardModule(d.A);
+                    break;
+                case DragKind.LogicChip:
+                    _session.DiscardChip(d.A);
+                    break;
+                case DragKind.BoardChip:
+                    _session.DiscardBoardChip(d.A);
+                    break;
+            }
+            _selected = null;
         }
 
         /// <summary>Klick auf eine Komponente: im Verknüpfen-Modus wird sie das Ziel, sonst ausgewählt.</summary>

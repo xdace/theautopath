@@ -53,6 +53,16 @@ namespace Betaknight.Core.Modules
         }
 
         /// <summary>Nimmt ein Modul ab; es liegt danach frei in der Sammlung.</summary>
+        /// <summary>Verwirft ein Modul ganz (vorher abgenommen, falls eingesetzt).</summary>
+        public bool Remove(ModuleInstance module)
+        {
+            if (module == null || !_all.Contains(module)) return false;
+            if (module.Holder != null) TakeOff(module);
+            _all.Remove(module);
+            Changed?.Invoke();
+            return true;
+        }
+
         public bool TakeOff(ModuleInstance module)
         {
             if (module?.Holder == null) return false;

@@ -348,6 +348,11 @@ namespace Betaknight.Overworld.UI
             public const string NotPoweredTip = "No relay touches this component at an edge, so it never fires. Put a relay next to it.";
             public const string EvolvesTip = "Evolves after the next boss";
             public const string TriggerClick = "\nClick, then click a component on the board: link it as the target (Esc cancels)";
+            public const string Trash = "Discard";
+            public const string TrashTip = "Drag a skill, component, relay, rune, module or chip here to throw it away for good (you are asked first). Modules on it become free.";
+            public static string DiscardAsk(string name) => $"Discard {name} for good?";
+            public const string DiscardYes = "Yes";
+            public const string DiscardNo = "No";
             public const string LinkClick = "click, then click a component on the board to link it";
             public static string LinkingHint(string module, string where) =>
                 $"Linking {module} ({where}): click the component it should trigger or charge · Esc cancels";
