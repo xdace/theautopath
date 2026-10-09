@@ -158,28 +158,10 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
-        public void ReadingOrderDecidesBetweenTwoQueuedComponents()
+        public void TheQueueRunsInTheOrderOfTriggering()
         {
-            // Komponente 2 (jede Sekunde) wartet länger als Komponente 1 (getroffen), trotzdem startet Komponente 1 zuerst.
-            BattleResult r = Run(Setup(new LogicBoard(new[]
-            {
-                Row("when_hit", Skill("a", 2)),
-                Clock(1, Skill("b", 2)),
-                Row("battle_start", Skill("long", Ticks.FromSeconds(3))),
-            }), enemyInterval: 30, queue: new QueueConfig { StarvationTicks = 0 }), 6);
-
-            Assert.Less(Queued(r, 1)[0].Tick, Queued(r, 0)[0].Tick, "Komponente 2 wurde früher eingereiht");
-            BattleEvent a = Starts(r, "a")[0], b = Starts(r, "b")[0];
-            Assert.IsTrue(a.FromQueue && b.FromQueue);
-            Assert.Less(a.Tick, b.Tick, "frühere Komponente in Lesereihenfolge zuerst");
-            Assert.Greater(b.QueuedTicks, a.QueuedTicks);
-        }
-
-        [Test]
-        public void AComponentThatWaitedLongEnoughGoesFirst()
-        {
-            // Gleicher Aufbau, aber mit der Warte-Regel (1,5 s): Komponente 2 wartet hinter dem 3-s-Cast schon länger und
-            // startet deshalb vor Komponente 1, obwohl diese in der Lesereihenfolge vorne liegt.
+            // Komponente 2 (jede Sekunde) wird vor Komponente 1 (getroffen) eingereiht, beide warten hinter dem 3-s-Cast:
+            // wer zuerst ausgelöst wurde, läuft zuerst, egal wo er auf der Platine liegt.
             BattleResult r = Run(Setup(new LogicBoard(new[]
             {
                 Row("when_hit", Skill("a", 2)),
@@ -187,9 +169,10 @@ namespace Betaknight.Tests.EditMode
                 Row("battle_start", Skill("long", Ticks.FromSeconds(3))),
             }), enemyInterval: 30), 6);
 
+            Assert.Less(Queued(r, 1)[0].Tick, Queued(r, 0)[0].Tick, "Komponente 2 wurde früher eingereiht");
             BattleEvent a = Starts(r, "a")[0], b = Starts(r, "b")[0];
-            Assert.GreaterOrEqual(b.QueuedTicks, QueueConfig.Default.StarvationTicks);
-            Assert.Less(b.Tick, a.Tick, "die länger wartende zuerst");
+            Assert.IsTrue(a.FromQueue && b.FromQueue);
+            Assert.Less(b.Tick, a.Tick, "zuerst ausgelöst, zuerst gelaufen");
         }
 
         [Test]

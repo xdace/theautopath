@@ -348,6 +348,9 @@ namespace Betaknight.Overworld.UI
             public const string NotPoweredTip = "No relay touches this component at an edge, so it never fires. Put a relay next to it.";
             public const string EvolvesTip = "Evolves after the next boss";
             public const string TriggerClick = "\nClick, then click a component on the board: link it as the target (Esc cancels)";
+            public const string ModuleBadgeTip = "Right-click or double-click: take off · drag: move to another part or back to the module list";
+            public const string ModuleBadgeTipTargeted = "Click, then click a component: link the target · right-click: take off · drag: move";
+            public const string TakeOffTip = "Take this module off (it stays in your collection)";
             public const string Trash = "Discard";
             public const string TrashTip = "Drag a skill, component, relay, rune, module or chip here to throw it away for good (you are asked first). Modules on it become free.";
             public static string DiscardAsk(string name) => $"Discard {name} for good?";
@@ -543,7 +546,7 @@ namespace Betaknight.Overworld.UI
             public const string StateOrphaned = "no skill";
 
             public const string NowIdle = "waiting for its relay to trigger";
-            public const string NowQueued = "queued, waiting for its turn (reading order)";
+            public const string NowQueued = "queued, waiting for its turn (in trigger order)";
             public const string NowFiring = "firing";
             public const string NowUnpowered = "not powered: no relay touches it, it never fires";
             public const string NowTooLarge = "charging (too large): each trigger adds the relay's limit, it runs once the charge reaches its size";

@@ -413,7 +413,6 @@ namespace Betaknight.Overworld.UI
 
             var marks = new List<string>();
             if (Board.TouchesCore(c)) marks.Add($"<color=#b18cff>+{Board.Config.CoreBonusPercent} %</color>");
-            if (c.Skill.Modules.Count > 0) marks.Add($"<color=#ffd75e>◆{c.Skill.Modules.Count}</color>");
             foreach (OverworldSession.TriggerLink link in links)
                 if (!link.FromBlock && link.From == index) marks.Add($"<color=#ffae42>{(link.Charges ? UiTexts.Build.ChargesTo(link.To + 1) : UiTexts.Build.TriggersTo(link.To + 1))}</color>");
             if (_session.IsEvolutionReady(c.Skill)) marks.Add("<color=#d29bff>✦</color>");
@@ -425,6 +424,7 @@ namespace Betaknight.Overworld.UI
             Color border = c == _selected ? SelectedColor : StateColor(c);
             CircuitGrid.DrawChip(rect, fill, border, focus ? 3f : 2f, text, ComponentTip(c, index, info), size < 60f ? CircuitGrid.Tiny : CircuitGrid.Label);
             CircuitGrid.DrawEffectBadges(rect, EffectText.Of(CompiledRow(index)), size);
+            DrawModuleBadges(rect, size, c.Skill);
 
             // Gepackte Zelle merken, damit die Komponente beim Verschieben unter der Maus bleibt.
             Event e = Event.current;
@@ -450,7 +450,6 @@ namespace Betaknight.Overworld.UI
 
             string text = $"{RuneText.Difficulty(difficulty)}\n<b>{relay.Name}</b>\n<color=#9aa4b2>{UiTexts.Build.MaxCells(max)}</color>";
             var marks = new List<string>();
-            if (relay.Modules.Count > 0) marks.Add($"<color=#ffd75e>◆{relay.Modules.Count}</color>");
             foreach (OverworldSession.TriggerLink link in links)
                 if (link.FromBlock && link.From == index) marks.Add($"<color=#45e6f2>{(link.Charges ? UiTexts.Build.ChargesTo(link.To + 1) : UiTexts.Build.TriggersTo(link.To + 1))}</color>");
             if (_session.IsEvolutionReady(relay)) marks.Add("<color=#d29bff>✦</color>");
@@ -459,6 +458,7 @@ namespace Betaknight.Overworld.UI
             Color fill = focus ? Color.Lerp(CircuitGrid.RelayColor, CircuitGrid.RelayLit, 0.25f) : CircuitGrid.RelayColor;
             Color border = relay == _selected ? SelectedColor : CircuitGrid.RelayLit;
             CircuitGrid.DrawChip(rect, fill, border, focus ? 3f : 1f, text, RelayTip(relay, index), size < 60f ? CircuitGrid.Tiny : CircuitGrid.Label);
+            DrawModuleBadges(rect, size, relay);
 
             _drag.Source(rect, new DragItem(DragKind.Relay, index, relay.Name),
                 click: () => _selected = relay, shortcut: () => _session.UnequipRune(Board.IndexOf(relay)));
@@ -769,10 +769,16 @@ namespace Betaknight.Overworld.UI
                 string where = m.IsFree ? $"<color={UiTheme.Hex(UiTheme.Good)}>{UiTexts.Free}</color>" : $"<color=#9aa4b2>{_session.ModuleWhere(m)}</color>";
                 string kind = d != null ? ModuleText.KindName(d.Kind) : "?";
                 string icon = EffectText.Icon(m.ModuleId);
+                GUILayout.BeginHorizontal();
                 GUILayout.Box(new GUIContent($"{(icon.Length > 0 ? icon + " " : string.Empty)}<b>{name}</b> <color=#9aa4b2>[{kind}]</color>  {where}", d?.DescriptionAt(m.Level)),
                     m.IsFree ? UiTheme.Cell : UiTheme.EmptyCell, GUILayout.Height(26f));
                 Rect r = GUILayoutUtility.GetLastRect();
                 int id = m.InstanceId;
+                GUI.enabled = !m.IsFree && _session.CanEditModules;
+                if (!m.IsFree && GUILayout.Button(new GUIContent("✖", UiTexts.Build.TakeOffTip), GUILayout.Width(26f), GUILayout.Height(26f)))
+                    _session.TakeOffModule(id);
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
                 bool linkable = !m.IsFree && ModuleRules.IsTargeted(m.ModuleId);
                 _drag.Source(r, new DragItem(DragKind.Module, id, name), click: linkable ? () => _linking = id : (System.Action)null,
                     shortcut: () => ModuleShortcut(id));
@@ -1223,6 +1229,39 @@ namespace Betaknight.Overworld.UI
                     break;
             }
             _selected = null;
+        }
+
+        /// <summary>
+        /// Ausgerüstete Module als Kärtchen am unteren Rand eines Teils: Symbol und Kurzname, Tooltip mit Wirkung.
+        /// Rechts- oder Doppelklick nimmt ab, Ziehen verschiebt (oder zurück in die Modul-Liste), Klick bei Trigger/Charge Link
+        /// wählt das Ziel. Vor der Quelle des Teils gezeichnet, damit die Kärtchen den Klick bekommen.
+        /// </summary>
+        private void DrawModuleBadges(Rect rect, float size, IModuleHolder holder)
+        {
+            if (holder == null || holder.Modules.Count == 0) return;
+            float h = Mathf.Clamp(size * 0.26f, 14f, 20f);
+            float w = Mathf.Max(h, (rect.width - 4f) / Mathf.Max(1, holder.Modules.Count) - 2f);
+            float x = rect.x + 2f;
+            foreach (ModuleInstance m in holder.Modules.ToList())
+            {
+                var badge = new Rect(x, rect.yMax - h - 2f, w, h);
+                string name = m.NameFrom(_session.ModuleCatalog);
+                string icon = EffectText.Icon(m.ModuleId);
+                bool targeted = ModuleRules.IsTargeted(m.ModuleId);
+                string label = (icon.Length > 0 ? icon : targeted ? (m.ModuleId == ModuleIds.ChargeLink ? "⚡" : "↪") : "◆") + Shorten(name, w > 48f ? 9 : 4);
+                ModuleDefinition d = _session.ModuleDefinitionOf(m);
+                string effect = targeted ? _session.DescribeTrigger(m) : d?.DescriptionAt(m.Level) ?? string.Empty;
+                string tip = $"<b>{name}</b>: {effect}\n<color=#9aa4b2>{(targeted ? UiTexts.Build.ModuleBadgeTipTargeted : UiTexts.Build.ModuleBadgeTip)}</color>";
+                bool over = badge.Contains(Event.current.mousePosition);
+                UiTheme.Fill(badge, over ? new Color(0.45f, 0.38f, 0.10f, 0.98f) : new Color(0.20f, 0.17f, 0.06f, 0.95f));
+                UiTheme.Outline(badge, new Color(1f, 0.84f, 0.37f, 1f), 1f);
+                GUI.Label(badge, new GUIContent($"<color=#ffd75e>{label}</color>", tip), CircuitGrid.Tiny);
+                int id = m.InstanceId;
+                _drag.Source(badge, new DragItem(DragKind.Module, id, name), click: targeted ? () => _linking = id : (System.Action)null,
+                    shortcut: () => _session.TakeOffModule(id));
+                Hover(badge, tip.Replace("\n", " · "));
+                x += w + 2f;
+            }
         }
 
         /// <summary>Klick auf eine Komponente: im Verknüpfen-Modus wird sie das Ziel, sonst ausgewählt.</summary>

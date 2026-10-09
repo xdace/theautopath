@@ -1070,28 +1070,19 @@ namespace Betaknight.Core.Arena
         }
 
         /// <summary>
-        /// Die wartende Komponente mit der höchsten Priorität, eingefrorene warten weiter: Interrupt zuerst, dann wer schon
-        /// <see cref="QueueConfig.StarvationTicks"/> wartet (die älteste zuerst), sonst Lesereihenfolge.
+        /// Die nächste wartende Komponente: wer zuerst eingereiht wurde, läuft zuerst (Warteschlange in Auslöse-Reihenfolge).
+        /// Interrupt springt an die Spitze. Eingefrorene warten weiter.
         /// </summary>
         private QueuedRow NextQueued(Combatant c)
         {
-            QueuedRow best = null;
-            int bestRank = int.MaxValue;
-            int starve = Math.Max(0, _queue.StarvationTicks);
+            QueuedRow first = null;
             foreach (QueuedRow q in c.QueueList)
             {
                 if (c.IsFrozen(q.Row, Tick)) continue;
-                // Interrupt (A-21): springt an die Spitze.
-                bool jumps = c.Board.Rows[q.Row].Has(CircuitEffectIds.Interrupt);
-                bool starved = starve > 0 && Tick - q.SinceTick >= starve;
-                int rank = jumps ? 0 : starved ? 1 : 2;
-                bool better = best == null || rank < bestRank
-                    || (rank == bestRank && (rank == 1 ? q.SinceTick < best.SinceTick || (q.SinceTick == best.SinceTick && q.Row < best.Row) : q.Row < best.Row));
-                if (!better) continue;
-                best = q;
-                bestRank = rank;
+                if (c.Board.Rows[q.Row].Has(CircuitEffectIds.Interrupt)) return q;
+                first = first ?? q;
             }
-            return best;
+            return first;
         }
 
         /// <summary>Hitze (A-21): bei voller Hitze fällt diese Ausführung aus, danach ist die Hitze wieder 0.</summary>

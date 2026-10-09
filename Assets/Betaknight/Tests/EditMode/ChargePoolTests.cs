@@ -185,8 +185,8 @@ namespace Betaknight.Tests.EditMode
         [Test]
         public void AComponentThatKeepsRequeuingCannotStarveTheOthers()
         {
-            // Der Rüstungsbruch (#1, oben links) wird über «Opening» und gespeicherte Ladung ständig neu eingereiht und kommt in
-            // der Lesereihenfolge vor dem Schockstich (#2). Nach 1,5 s Wartezeit ist der Schockstich trotzdem dran.
+            // Der Rüstungsbruch (#1, oben links) wird über «Opening» und gespeicherte Ladung ständig neu eingereiht. Die
+            // Warteschlange läuft in Auslöse-Reihenfolge: er stellt sich hinten an, der Schockstich (#2) kommt dran.
             var spec = new CircuitSpec { Width = 6, Height = 6 };
             spec.Relays.Add(new RelaySpec("vs_boss", new Cell(2, 0)));
             spec.Relays.Add(new RelaySpec("opening", new Cell(2, 1), level: 2));

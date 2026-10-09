@@ -216,7 +216,7 @@ namespace Betaknight.Core.Arena
         // ------------------------------------------------------------------ Platine (A-19)
 
         /// <summary>Regel der Warteschlange (A-19) für Tooltips.</summary>
-        public const string QueueRule = "Triggered components wait their turn in reading order (top left first). The Basic Attack fills the gaps.";
+        public const string QueueRule = "Triggered components wait their turn in the order they were triggered (first in, first out); Interrupt jumps ahead. The Basic Attack fills the gaps.";
         public const string FallbackLabel = "fills the gaps";
         public const string NotPowered = "not powered";
         public const string NotPoweredTooLarge = "charging (too large)";
@@ -259,7 +259,7 @@ namespace Betaknight.Core.Arena
         public static string HintBonus(string component, string symbol, int damage, string share) =>
             $"{component}: Bonus {symbol} added +{damage} damage ({share} of its damage).";
         public static string HintLongWait(string component, string wait) =>
-            $"{component} waited {wait} in the queue on average. Components earlier in reading order or long casts hold it up.";
+            $"{component} waited {wait} in the queue on average. Components triggered before it or long casts hold it up.";
         public static string HintOtherDamage(int amount) => $"{amount} damage came from no component (set bonuses, recoil).";
 
         public const string NeverFiredOrphaned = "no skill placed";
