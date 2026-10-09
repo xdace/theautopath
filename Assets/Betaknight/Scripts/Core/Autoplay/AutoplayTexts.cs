@@ -49,6 +49,8 @@ namespace Betaknight.Core.Autoplay
         public static string OfferRune(string name) => $"Offer: Rune {name}";
         public const string OfferBoardExpansion = "Offer: Board Expansion";
         public const string OfferSkip = "Offer: skip (Gold)";
+        public static string Salvage(string kind, string name) => $"Salvage: {kind} {name}";
+        public const string SalvageSkip = "Salvage: leave the rest";
 
         public const string ShopHeal = "Shop: heal";
         public static string ShopModule(string name) => $"Shop: Module {name}";

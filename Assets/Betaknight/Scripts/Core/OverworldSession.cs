@@ -72,7 +72,7 @@ namespace Betaknight.Core
 
         /// <summary>Wartet die Session auf eine Entscheidung des Spielers?</summary>
         public bool IsBusy => PendingEncounter != null || PendingRuneOffer != null || PendingShop != null || PendingPortal
-            || PendingItem != null || PendingRune != null;
+            || PendingItem != null || PendingRune != null || PendingSalvage != null;
 
         /// <summary>Wird nach jedem erfolgreichen Schritt ausgelöst, nachdem kleine Events bereits gewirkt haben.</summary>
         public event Action<StepResult> CellEntered;

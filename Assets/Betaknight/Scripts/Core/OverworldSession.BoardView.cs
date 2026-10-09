@@ -9,16 +9,34 @@ using Betaknight.Core.Skills;
 
 namespace Betaknight.Core
 {
-    /// <summary>Ein möglicher Gegner eines Kartenfeldes mit seiner lesbaren Platine (eine Zeile pro Komponente).</summary>
+    /// <summary>
+    /// Ein Gegner eines Kartenfeldes mit seiner lesbaren Platine (eine Zeile pro Komponente). Auf Kampf-, Elite- und
+    /// Bossfeldern ist es genau der Gegner, der dort wartet (<see cref="IsExact"/>), mit Platinen zum Zeichnen und Beute.
+    /// </summary>
     public sealed class EnemyBoardPreview
     {
         public string Name { get; }
         public IReadOnlyList<string> Lines { get; }
 
-        public EnemyBoardPreview(string name, IReadOnlyList<string> lines)
+        /// <summary>Kämpfer mit Platine (Name, Board). Leer, wenn nur die Zeilen bekannt sind.</summary>
+        public IReadOnlyList<CombatantSetup> Fighters { get; }
+
+        /// <summary>Was nach einem Sieg geborgen werden kann, und wie viele Teile.</summary>
+        public IReadOnlyList<EnemyLoot> Loot { get; }
+        public int LootPicks { get; }
+
+        /// <summary>Genau dieser Gegner wartet hier (nicht nur ein möglicher).</summary>
+        public bool IsExact { get; }
+
+        public EnemyBoardPreview(string name, IReadOnlyList<string> lines, IReadOnlyList<CombatantSetup> fighters = null,
+            IReadOnlyList<EnemyLoot> loot = null, int lootPicks = 0, bool exact = false)
         {
             Name = name;
             Lines = lines ?? new List<string>();
+            Fighters = fighters ?? new List<CombatantSetup>();
+            Loot = loot ?? new List<EnemyLoot>();
+            LootPicks = lootPicks;
+            IsExact = exact;
         }
     }
 
@@ -85,7 +103,20 @@ namespace Betaknight.Core
             else if (cell.Content == CellContent.GoldMine && cell.IsUnderAttack) tier = TierAt(coord) + MineRaidTierBonus;
             else return result;
 
-            // Wie EnemyCatalog.Pick: passende Stufe, sonst die schwächeren, sonst alle derselben Art.
+            // Kampffelder: genau der Gegner, der hier wartet (gleicher Zufall wie im Kampf).
+            if (cell.Content != CellContent.GoldMine)
+            {
+                EnemyEncounter encounter = EnemyEncounter.Roll(PreviewEnemies, EnemyLoadout.Default, tier, cell.Content,
+                    new System.Random(EncounterSeed(coord)));
+                var lines = new List<string>();
+                foreach (CombatantSetup fighter in encounter.Fighters)
+                foreach (string line in EnemyBoard.Lines(fighter.Board ?? LogicBoard.FallbackOnly))
+                    lines.Add(encounter.Fighters.Count > 1 ? $"{fighter.Name}: {line}" : line);
+                result.Add(new EnemyBoardPreview(encounter.Name, lines, encounter.Fighters, encounter.Loot, encounter.LootPicks, true));
+                return result;
+            }
+
+            // Goldminen-Überfall: mögliche Gegner. Wie EnemyCatalog.Pick: passende Stufe, sonst die schwächeren, sonst alle derselben Art.
             List<EnemyDefinition> pool = PreviewEnemies.All.Where(e => e.IsBoss == boss && e.Weight > 0 && e.FitsTier(tier)).ToList();
             if (pool.Count == 0) pool = PreviewEnemies.All.Where(e => e.IsBoss == boss && e.Weight > 0 && e.MinTier <= tier).ToList();
             if (pool.Count == 0) pool = PreviewEnemies.All.Where(e => e.IsBoss == boss).ToList();

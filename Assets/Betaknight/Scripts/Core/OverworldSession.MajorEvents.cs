@@ -107,7 +107,7 @@ namespace Betaknight.Core
             bool elite = cell.Content == CellContent.Elite;
             int tier = TierAt(cell.Coord) + (elite ? Progression.EliteTierBonus : 0);
             var context = new BattleContext { VsBoss = cell.Content == CellContent.Boss, Turn = Turns.CurrentTurn };
-            CombatResult result = RunCombat(cell.Content, tier, context);
+            CombatResult result = RunCombat(cell.Content, tier, context, EncounterSeed(cell.Coord));
 
             var lines = new List<string>();
             if (!string.IsNullOrEmpty(result.EnemyName)) lines.Add(result.EnemyName);
@@ -126,10 +126,10 @@ namespace Betaknight.Core
             }
             Map.MarkResolved(cell.Coord);
             MajorEventResolved?.Invoke(new MajorEventOutcome(cell, SessionTexts.FightWon(title), lines));
-            OfferRunes(elite ? RewardSources.Elite : RewardSources.Victory);
+            StartSalvage(result, elite ? RewardSources.Elite : RewardSources.Victory);
         }
 
-        private CombatResult RunCombat(CellContent enemy, int tier, BattleContext context)
+        private CombatResult RunCombat(CellContent enemy, int tier, BattleContext context, int? encounterSeed = null)
         {
             CombatResult result;
             IsInCombat = true;
@@ -137,7 +137,7 @@ namespace Betaknight.Core
             {
                 bool elite = enemy == CellContent.Elite;
                 var request = new CombatRequest(enemy, tier, Stats, Board, Gear, context, Progression.SkillLevels,
-                    elite ? Progression.EliteHpPercent : 100, elite ? Progression.EliteDamagePercent : 100);
+                    elite ? Progression.EliteHpPercent : 100, elite ? Progression.EliteDamagePercent : 100, encounterSeed);
                 DiscoverDuos();
                 result = _combat.Resolve(request, _random);
             }

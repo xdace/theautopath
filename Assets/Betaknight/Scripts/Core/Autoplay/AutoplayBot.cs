@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Betaknight.Core.Combat;
 using Betaknight.Core.Arena;
 using Betaknight.Core.Circuit;
 using Betaknight.Core.Encounters;
@@ -70,7 +71,7 @@ namespace Betaknight.Core.Autoplay
             if (s.IsGameOver) return BotAction.Nothing(AutoplayTexts.EndGameOver);
             SyncTurn(s);
 
-            BotAction action = Overflow(s) ?? Encounter(s) ?? Offer(s) ?? Shop(s) ?? Portal(s);
+            BotAction action = Overflow(s) ?? Encounter(s) ?? Salvage(s) ?? Offer(s) ?? Shop(s) ?? Portal(s);
             if (action != null) return action;
             if (s.IsBusy) return BotAction.Nothing(AutoplayTexts.SessionBusy);
 
@@ -225,6 +226,47 @@ namespace Betaknight.Core.Autoplay
 
             if (candidates.Count > 0) return candidates.OrderByDescending(c => c.score).First().action;
             return Try(BotActionKind.Offer, AutoplayTexts.OfferSkip, s.SkipRuneOffer, AutoplayTexts.RewardGold);
+        }
+
+        /// <summary>Bergen: Modul (bzw. Auslöser) vor Verbesserung vor neuem Skill vor Chip vor Rune.</summary>
+        private BotAction Salvage(OverworldSession s)
+        {
+            SalvageOffer offer = s.PendingSalvage;
+            if (offer == null) return null;
+            var candidates = new List<(int score, BotAction action)>();
+            for (int i = 0; i < offer.Parts.Count; i++)
+            {
+                int index = i;
+                EnemyLoot part = offer.Parts[i];
+                if (!s.CanTakeSalvage(i)) continue;
+                int score;
+                string reward;
+                switch (part.Kind)
+                {
+                    case EnemyLootKind.Module:
+                        score = s.ModuleUpgradeTarget(part.Id) != null ? 34 : 24;
+                        reward = AutoplayTexts.RewardModule;
+                        break;
+                    case EnemyLootKind.Skill:
+                        score = s.IsImprovementSkill(part.Id) ? 33 : 23;
+                        reward = AutoplayTexts.RewardSkill;
+                        break;
+                    case EnemyLootKind.Chip:
+                        score = 22;
+                        reward = AutoplayTexts.RewardChip;
+                        break;
+                    default:
+                        bool room = s.RuneCatalog.TryGet(part.Id, out RuneDefinition rune) && (!s.Board.IsFull || !s.RuneInventory.IsFull || s.OwnsRune(rune));
+                        if (!room) continue;
+                        score = s.IsImprovement(rune) ? 31 : 21;
+                        reward = AutoplayTexts.RewardRune;
+                        break;
+                }
+                BotAction a = Try(BotActionKind.Offer, AutoplayTexts.Salvage(part.Kind.ToString(), part.Name), () => s.TakeSalvage(index), reward);
+                if (a != null) candidates.Add((score, a));
+            }
+            if (candidates.Count > 0) return candidates.OrderByDescending(c => c.score).First().action;
+            return Try(BotActionKind.Offer, AutoplayTexts.SalvageSkip, s.SkipSalvage);
         }
 
         private static string ModuleName(OverworldSession s, string id) =>
