@@ -332,6 +332,7 @@ namespace Betaknight.Overworld.UI
             public const string HoverHint = "Hover a component, relay, skill, rune or module to see its short stats here.";
             public const string SkillsTitle = "<b>Skills</b>";
             public const string NoSkills = "no skills yet";
+            public const string AllSkillsOnBoard = "all skills are on the board – drag one here to take it off";
             public const string AlwaysAvailable = "fills the gaps";
             public const string BasicAttackTip = "The basic attack is not placed on the board: it fires whenever nothing is queued.";
             public const string SkillsKeepBar = "– skills do not change the stats in the bar";

@@ -203,18 +203,69 @@ namespace Betaknight.Overworld.UI
             GUILayout.BeginVertical(UiTheme.Section, GUILayout.Width(SideWidth), GUILayout.Height(height));
             IReadOnlyList<SkillInstance> all = _session.Skills.All;
             GUILayout.Label($"{UiTexts.Build.SkillsTitle}  <color=#9aa4b2>{UiTexts.Build.FreeOf(_session.Skills.Free.Count, all.Count)}</color>", UiTheme.Text);
-            _skillScroll = GUILayout.BeginScrollView(_skillScroll);
-
             DrawBasicAttackCard();
-            foreach (SkillInstance skill in all.OrderBy(s => s.IsFree ? 0 : 1)) DrawSkillCard(skill);
-            if (all.Count == 0) GUILayout.Label($"<color=#888888>{UiTexts.Build.NoSkills}</color>", UiTheme.Small);
 
+            // Inventar als Raster wie die Platine: jede freie Komponente liegt in ihrer echten Form darin (kleinere Felder).
+            List<SkillInstance> free = all.Where(x => x.IsFree).ToList();
+            List<SkillInventoryLayout.Placement> placed = SkillInventoryLayout.Pack(
+                free.Select(x => (x.InstanceId, Board.ShapeOfSkill(x.SkillId))), out int rows);
+            float size = Mathf.Floor((SideWidth - 34f) / SkillInventoryLayout.Columns);
+
+            _skillScroll = GUILayout.BeginScrollView(_skillScroll);
+            Rect grid = GUILayoutUtility.GetRect(size * SkillInventoryLayout.Columns, size * rows,
+                GUILayout.Width(size * SkillInventoryLayout.Columns), GUILayout.Height(size * rows));
+            CircuitGrid.DrawBackground(grid, size, SkillInventoryLayout.Columns, rows);
+            foreach (SkillInventoryLayout.Placement p in placed) DrawInventorySkill(grid, size, _session.Skills.Get(p.Id), p);
+            if (free.Count == 0)
+                GUI.Label(new Rect(grid.x + 6f, grid.y + 6f, grid.width - 12f, 40f),
+                    $"<color=#888888>{(all.Count == 0 ? UiTexts.Build.NoSkills : UiTexts.Build.AllSkillsOnBoard)}</color>", UiTheme.Small);
             GUILayout.EndScrollView();
             GUILayout.EndVertical();
 
             // Komponente hierher = von der Platine nehmen.
             Rect column = GUILayoutUtility.GetLastRect();
             _drag.Target(column, d => d.Kind == DragKind.Component && d.A >= 0 && d.A < Board.Components.Count, d => _session.RemoveComponent(d.A));
+        }
+
+        /// <summary>Eine freie Komponente im Inventar-Raster: Form, Farbe nach Skill-Art, Name, Grösse; ziehbar auf die Platine.</summary>
+        private void DrawInventorySkill(Rect grid, float size, SkillInstance skill, SkillInventoryLayout.Placement p)
+        {
+            if (skill == null) return;
+            Rect r = CircuitGrid.RectOf(grid, size, p.Rect);
+            SkillInfo info = _session.DescribeSkill(skill, _skillStats);
+            string name = skill.NameFrom(_session.SkillCatalog);
+            Color kind = _session.SkillCatalog.TryGet(skill.SkillId, out SkillDefinition def) ? KindColorOf(def.Kinds) : CircuitGrid.PinColor;
+            Shape shape = Board.ShapeOfSkill(skill.SkillId);
+            string modules = skill.Modules.Count > 0 ? $" <color=#ffd75e>◆{skill.Modules.Count}</color>" : string.Empty;
+            string text = p.Rect.Shape.Cells == 1
+                ? $"<b>{Abbreviate(name)}</b>"
+                : $"<b>{name}</b>{modules}\n<color=#9aa4b2>{shape.Width}×{shape.Height}</color>";
+            bool over = r.Contains(Event.current.mousePosition);
+            Color fill = Color.Lerp(CircuitGrid.ComponentColor, kind, over ? 0.32f : 0.18f);
+            CircuitGrid.DrawChip(r, fill, kind, over ? 2f : 1f, text, SkillTip(skill, info, null), CircuitGrid.Tiny);
+
+            int id = skill.InstanceId;
+            if (Event.current.type == EventType.MouseDown && r.Contains(Event.current.mousePosition)) _grabX = _grabY = 0;
+            _drag.Source(r, new DragItem(DragKind.Skill, id, name), click: () => _selected = Board.ComponentOf(_session.Skills.Get(id)),
+                shortcut: () => SkillShortcut(id));
+            Hover(r, $"<b>{name}</b> ({shape.Width}×{shape.Height}): {Effect(info)} · {info?.TimingText} <color=#9aa4b2>{UiTexts.Build.SkillsKeepBar}</color>");
+        }
+
+        /// <summary>Farbe der ersten Skill-Art (Angriff, Schild, Feuer …).</summary>
+        private static Color KindColorOf(SkillKind kinds)
+        {
+            foreach (SkillKind k in SkillKinds.All)
+                if ((kinds & k) != 0) return CircuitGrid.KindColor(k);
+            return CircuitGrid.PinColor;
+        }
+
+        /// <summary>Kurzname für 1×1-Felder: «Shock Stab» → «ShSt», einzelne Wörter bis 5 Zeichen.</summary>
+        private static string Abbreviate(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return string.Empty;
+            string[] words = name.Split(' ');
+            if (words.Length == 1) return name.Length <= 5 ? name : name.Substring(0, 5);
+            return string.Concat(words.Take(3).Select(w => w.Length <= 2 ? w : w.Substring(0, 2)));
         }
 
         private void DrawBasicAttackCard()
@@ -225,27 +276,6 @@ namespace Betaknight.Overworld.UI
                 UiTheme.EmptyCell, GUILayout.Height(26f));
             Rect r = GUILayoutUtility.GetLastRect();
             Hover(r, $"<b>{label}</b>: {Effect(info)} · {info?.TimingText}");
-        }
-
-        private void DrawSkillCard(SkillInstance skill)
-        {
-            ComponentSlot slot = Board.ComponentOf(skill);
-            SkillInfo info = slot != null && _infos.TryGetValue(slot, out SkillInfo placed) ? placed : _session.DescribeSkill(skill, _skillStats);
-            string name = skill.NameFrom(_session.SkillCatalog);
-            string where = slot != null
-                ? $"<color={StateHex(slot)}>{UiTexts.OnBoard(Board.IndexOf(slot) + 1)}</color>"
-                : skill.IsFree ? $"<color={UiTheme.Hex(UiTheme.Good)}>{UiTexts.Free}</color>" : $"<color=#9aa4b2>{skill.Holder.HolderName}</color>";
-            string modules = skill.Modules.Count > 0 ? $" <color=#ffd75e>◆{skill.Modules.Count}</color>" : string.Empty;
-            string icons = _session.SkillCatalog.TryGet(skill.SkillId, out SkillDefinition def) ? EffectText.Icons(def.CircuitEffects) : string.Empty;
-            string text = $"{(icons.Length > 0 ? icons + " " : string.Empty)}<b>{name}</b>{modules}  {where}\n<color=#ffd75e>{ShortStats(info)}</color>";
-            GUIStyle style = slot != null && slot == _selected ? UiTheme.CellSelected : skill.IsFree ? UiTheme.Cell : UiTheme.EmptyCell;
-            GUILayout.Box(new GUIContent(text, SkillTip(skill, info, slot)), style, GUILayout.Height(42f));
-            Rect r = GUILayoutUtility.GetLastRect();
-            int id = skill.InstanceId;
-            if (Event.current.type == EventType.MouseDown && r.Contains(Event.current.mousePosition)) _grabX = _grabY = 0;
-            _drag.Source(r, new DragItem(DragKind.Skill, id, name), click: () => _selected = Board.ComponentOf(_session.Skills.Get(id)),
-                shortcut: () => SkillShortcut(id));
-            Hover(r, $"<b>{name}</b>: {Effect(info)} · {info?.TimingText} <color=#9aa4b2>{UiTexts.Build.SkillsKeepBar}</color>", slot);
         }
 
         /// <summary>Kurzweg: freier Skill auf die beste freie Lage (an einem passenden Relais), gelegter zurück in die Sammlung.</summary>
