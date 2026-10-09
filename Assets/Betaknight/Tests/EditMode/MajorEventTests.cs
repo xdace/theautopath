@@ -323,6 +323,7 @@ namespace Betaknight.Tests.EditMode
                     else if (s.CanEnterPortal) s.EnterPortal();
                     else if (s.PendingRune != null) s.RejectPendingRune();
                     else if (s.PendingItem != null) s.RejectPendingItem();
+                    else if (s.PendingSalvage != null) s.TakeSalvage(0);
                 }
 
                 var options = s.Map.GetNeighbors(s.Player.Position).Where(c => s.CanStepTo(c.Coord)).ToList();

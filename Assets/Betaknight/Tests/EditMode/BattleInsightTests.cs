@@ -214,13 +214,14 @@ namespace Betaknight.Tests.EditMode
         /// Skills nach Grösse neu eingestellt, Gegner mit Takt-Relais.
         /// Mit A-20 erneut: Relais und Gatter melden «an/aus» (neue Ereignisse), Pins verbinden berührende Komponenten mit Pulsen.
         /// Mit A-21 erneut: Thermal Throttling ab 30 s statt Überhitzungsschaden, Gegner mit Hacks.
+        /// Mit Gegner-Platinen erneut: Gegner tragen Skills, Module und Chips (fest je Feld), nach dem Sieg wird geborgen.
         /// </summary>
-        [TestCase("blade", 5, "3 Kämpfe, 306 Ereignisse, AB5E5A1398A44BE2")]
-        [TestCase("blade", 21, "3 Kämpfe, 207 Ereignisse, 5B02DB70EEB31508")]
-        [TestCase("shield", 5, "6 Kämpfe, 711 Ereignisse, C05EE9A169128EE5")]
-        [TestCase("shield", 21, "2 Kämpfe, 265 Ereignisse, B5F90485BB801208")]
-        [TestCase("spark", 5, "3 Kämpfe, 329 Ereignisse, 846367016FB33416")]
-        [TestCase("spark", 21, "2 Kämpfe, 176 Ereignisse, 566503A6F4A0A100")]
+        [TestCase("blade", 5, "4 Kämpfe, 419 Ereignisse, EBDB181DD7CC1806")]
+        [TestCase("blade", 21, "2 Kämpfe, 220 Ereignisse, 05E7CAB027B90EED")]
+        [TestCase("shield", 5, "6 Kämpfe, 863 Ereignisse, E12064B83239FCDF")]
+        [TestCase("shield", 21, "3 Kämpfe, 391 Ereignisse, 33013BFDE6756A92")]
+        [TestCase("spark", 5, "2 Kämpfe, 206 Ereignisse, 0A1771818AC715E0")]
+        [TestCase("spark", 21, "2 Kämpfe, 283 Ereignisse, 8258D2EDF7A6B0E6")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {
             Assert.AreEqual(fingerprint, Fingerprint(BotBattles(KnightKit.Defaults.Single(k => k.Id == kit), seed)));
@@ -289,6 +290,7 @@ namespace Betaknight.Tests.EditMode
                 {
                     if (s.PendingEncounter != null) s.ChooseEncounterOption(s.PendingEncounter.Definition.Options.Count - 1);
                     else if (s.PendingItem != null) s.RejectPendingItem();
+                    else if (s.PendingSalvage != null) s.TakeSalvage(0);
                     else if (s.PendingRune != null) s.RejectPendingRune();
                     else if (s.PendingRuneOffer != null) { if (!s.TakeRune(0, 0)) s.SkipRuneOffer(); }
                     else if (s.PendingShop != null) s.LeaveShop();
