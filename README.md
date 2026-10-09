@@ -58,6 +58,7 @@ Travel stops by itself on hostile tiles (enemy, boss), on newly discovered tiles
 | Platinen-Erweiterung: nächste Grösse | Garantiert bei jeder Boss-Flucht und beim Akt-Wechsel, als Wahl bei Elite-Siegen (50 %) und seltenen Truhen (10 %), Shop-Platz (20, 35, 50 … Gold pro Run, einer pro Shop) | 4×3 → 4×4 → 5×4 → 5×5 → 6×5 → 6×6 |
 | Modul (selten) | Elite (35 %), Truhe (15 %), garantiert bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 30 Gold) | Neues Exemplar frei in die Sammlung; schon vorhanden: «Stufe erhöhen» (+1, wo das Modul Stufen hat) oder «Weiteres Exemplar» |
 | Chip (selten) | Elite (35 %), Truhe (15 %), garantiert 1 bei jeder Boss-Flucht, Shop (in 50 % der Shops ein Platz, 15 Gold) | Leiterbahn, Diode, Gatter, Kondensator, Sicherung oder Effekt-Chip (Amplifier, Watchdog, Overflow, Firewall) ins Chip-Inventar (siehe «Pins, Traces and Logic Chips» und «Circuit Effects») |
+| Bergen (Gegner-Teile) | Jeder Sieg über einen Gegner mit Ausrüstung: 1 Wahl, Elite 2 | Skill, Rune, Modul oder Chip, das der Gegner benutzt hat (siehe «Enemy Boards and Salvage») |
 | Gold, Splitter | Kämpfe, Events, Minen, Boss-Flucht | Elite-Siege geben +4 Gold |
 
 Kampfbelohnungen bieten bevorzugt Verbesserungen an: Stufe für einen eigenen Skill, Stufe für ein getragenes Teil, ein fehlendes Set-Teil, Stufe für eine vorhandene Rune oder eine Rune zu einem vorhandenen Tag. Mindestens eine Option ist immer eine Verbesserung. Skill-Angebote bevorzugen Skills, deren Art zum Build passt (×3 Gewicht): Arten eigener Skills, Ziele der passiven Effekte der Ausrüstung und die Runen (Klinge → Angriff, Schild → Schild, Funke → Schock, Glut → Feuer und Heilung, Phantom → Bewegung). Gegner skalieren weiter über Ring und Akt, die Schutzregeln (eine Aktion pro Tick, Thermal Throttling ab 30 s) bleiben. Alle Werte stehen in `Core/Run/ProgressionConfig.cs`.
@@ -212,6 +213,17 @@ Effects change how your own board runs; hacks attack the enemy board. Every effe
 
 - **Reroll** costs 3 gold, each further reroll in the same visit +2 (3 → 5 → 7 …). Leaving and reopening the shop resets the price.
 - **Lock** (padlock on an offer) keeps it: it stays through rerolls and appears again, in front, at the next shop visit, also in another shop or act. Up to 2 locks at once; buying the offer releases its lock, clicking again unlocks it. Values: `ShopPrices.Reroll`, `RerollStep`, `LockSlots`.
+
+### Enemy Boards and Salvage
+
+Enemies fight with real boards, built exactly like the knight's (`Core/Combat/EnemyLoadout.cs`, values in `EnemyLoadoutConfig`).
+
+- **Own parts:** every enemy keeps its fixed parts (e.g. Rust Warden: Every 7 s → Ram). Some of them are skills the knight can own too, like the hacks of Spark Drone, Smelter and Siege Golem.
+- **Gear:** from tier 2 on, an enemy also carries a component from the knight's catalogs: a skill on its rune relay, with pins. From tier 5 it carries two. The rune always has the difficulty to power the skill. Each gear component has a 25 % chance of a module.
+- **Elite:** carries one more component, has a 50 % module chance on every component (its own parts too, at least one module guaranteed) and 1 chip (Firewall, Overflow or Watchdog; 2 from tier 7). Modules work for enemies exactly as for the knight (Multicast casts twice, Overclock heats neighbours …).
+- **Fixed per tile:** enemy and board come from the map seed and the tile. Hovering a fight tile shows exactly the enemy waiting there, its board and its loot. Gold-mine raids still list the possible attackers. The boss carries no gear.
+- **Salvage:** after a won fight you pick parts the enemy used: skills, runes, modules and chips. 1 pick after normal fights, **2 after elite fights**. "Leave the rest" skips. The normal reward choice follows afterwards and is unchanged.
+- **Arena:** each enemy's board is drawn like yours, with the same live highlights.
 
 ### Kampf: Skills, Ausrüstung und Werte
 
@@ -473,13 +485,14 @@ Assets/Betaknight/
 │   │   │                  Insight/ (BattleReport: Auswertung pro Komponente nach dem Kampf)
 │   │   ├── Gear/          Ausrüstung: EquipmentCatalog, Equipment, Inventory (Item-Raster mit fester Reihenfolge, IInventoryItem), BuildStats, BoardFactory (Platine → Kampf-Tafel), Sets/ (SetBonusRegistry),
 │   │   │                  Synergies/ (SynergyRegistry: Tags, Schwellen, Duos als Daten; Wirkungen als BattleModifier)
-│   │   ├── Combat/        ICombatResolver, ArenaCombatResolver, EnemyCatalog (Platzhalter-Resolver nur noch für Tests)
+│   │   ├── Combat/        ICombatResolver, ArenaCombatResolver, EnemyCatalog, EnemyBoard, EnemyLoadout (Gegner-Ausrüstung, Beute, EnemyEncounter fest je Feld; Platzhalter-Resolver nur noch für Tests)
 │   │   ├── Shop/          Shop-Bestand, Preise, Angebote für Lock (ShopOffer)
 │   │   ├── Autoplay/      Testspieler: AutoplayBot (Strategie), BotAction, AutoplayRecorder + AutoplayReport/AutoplaySummary (JSON),
 │   │   │                  AutoplayOptions (Kommandozeile), HeadlessAutoplay (Lauf ohne Darstellung)
 │   │   ├── OverworldSession.cs              Fassade: Bewegung, kleine/mittlere Events, Runenwahl
 │   │   ├── OverworldSession.MajorEvents.cs  Fassade: Kampf, Truhe, Goldmine, Shop (Reroll mit steigendem Preis)
 │   │   ├── OverworldSession.ShopLocks.cs    Fassade: gesperrte Shop-Angebote über Besuche und Akte
+│   │   ├── OverworldSession.Salvage.cs      Fassade: Bergen nach dem Sieg (Teile der Gegner-Platine), fester Gegner je Feld
 │   │   ├── Skills/        SkillInstance (Exemplar), ISkillHolder (Ort), SkillCollection (Sammlung)
 │   │   ├── Modules/       ModuleDefinition + ModuleCatalog, ModuleInstance (Exemplar, Ziel), IModuleHolder (Ort), ModuleCollection, ModuleRules
 │   │   ├── Growth/        GrowthRule + GrowthCatalog (Regeln als Daten), GrowthStages (Meilensteine), GrowthApplier, GrowthTally (Zählen aus dem Protokoll)
@@ -642,6 +655,7 @@ Seit A-18 sind alle Spieltexte Englisch. Texte stehen pro Bereich an einem Ort: 
 | Verstärker, Wachhund, Überlauf, Firewall | Amplifier, Watchdog, Overflow, Firewall |
 | Bit-Kipper, Störung, Kapern, Kurzschluss, Verzögerung | Bit Flip, Jam, Hijack, Short Circuit, Latency |
 | Neu würfeln, Sperren | Reroll, Lock |
+| Bergen, Gegner-Ausrüstung | Salvage, enemy gear |
 | Rechenzeit (= Cast-Zeit) | Computing time |
 | Protokoll, Auswertung | Log, Report |
 | Zug, Akt, Runensplitter, Lagerfeuer, Truhe, Goldmine | Turn, Act, Rune Shards, Campfire, Chest, Gold Mine |
