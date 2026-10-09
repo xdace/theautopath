@@ -382,7 +382,7 @@ namespace Betaknight.Overworld.UI
             public static string CoreBonus(int percent) => $"Core +{percent} %";
             public static string PoweredBy(string relays) => $"powered by {relays}";
             public static string TooLargeTip(int cells, int limit) =>
-                $"{Cells(cells)}, but the touching relays power only up to {Cells(limit)}. Each trigger charges it by the relay's limit; it runs once the charge reaches its size. A harder relay (◆ 2 cells, ◆◆ 4, ◆◆◆ 6) runs it every time.";
+                $"{Cells(cells)}, the strongest touching relay gives {limit} charge per trigger: it needs {(cells + limit - 1) / System.Math.Max(1, limit)} triggers to run. The charge is kept until it is full, and all touching relays fill the same store. A harder relay (◆ 2, ◆◆ 4, ◆◆◆ 6) needs fewer.";
             public static string Powers(string components) => $"powers {components}";
             public static string TooLargeHere(string components) => $"too large here: {components}";
             public static string RelayLimit(int cells) => $"powers up to {Cells(cells)}";
@@ -559,8 +559,10 @@ namespace Betaknight.Overworld.UI
             public const string HeaderBonusTip = "Extra damage, healing and saved cast time from the relay's difficulty bonus.";
             public const string HeaderQueued = "<b>Queued</b>";
             public const string HeaderQueuedTip = "How often this component was queued, and the average wait until it started.";
+            public const string HeaderCharged = "<b>Charged</b>";
+            public const string HeaderChargedTip = "Triggers that only stored charge (+ how much, and what was left at the end). The charge is kept: the component runs as soon as it reaches its size, and queues again after its cast while charge is left.";
             public const string HeaderMissed = "<b>Missed Trigger</b>";
-            public const string HeaderMissedTip = "Triggers that did nothing: the component was already queued, too large for the relay, frozen, or had no skill.";
+            public const string HeaderMissedTip = "Triggers that really did nothing: already queued without charge, no charge left for it, frozen, or no skill.";
             public const string HeaderOther = "<b>Main reason</b>";
             public const string HeaderOtherTip = "Most common reason for the missed triggers.";
 

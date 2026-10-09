@@ -124,6 +124,15 @@ namespace Betaknight.Core.Arena
 
         /// <summary>Spillover: die Überladung einer Komponente geht an ihre Nachbarn. Amount = Felder, RowIndex = Komponente.</summary>
         Spillover,
+
+        /// <summary>
+        /// Ein Auslösen hat die Komponente aufgeladen, sie läuft aber noch nicht (zu wenig Ladung oder schon eingereiht).
+        /// Amount = gespeicherte Ladung, Extra = Grösse, Power = dazugekommen.
+        /// </summary>
+        Charged,
+
+        /// <summary>Die Komponente wurde eingereiht und hat dafür Ladung verbraucht. Amount = Rest, Extra = Grösse.</summary>
+        ChargeSpent,
     }
 
     /// <summary>Ein Eintrag im Kampfprotokoll. Bedingungen und Set-Boni lesen dieselben Einträge.</summary>

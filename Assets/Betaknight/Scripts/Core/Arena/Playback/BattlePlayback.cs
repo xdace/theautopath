@@ -267,6 +267,10 @@ namespace Betaknight.Core.Arena
         private readonly List<Popup> _popups = new List<Popup>();
         private int _next;
         private readonly string[] _skipReasons;
+
+        // Gespeicherte Ladung und Grösse je Komponente des Spielers.
+        private readonly int[] _charge;
+        private readonly int[] _chargeCells;
         private readonly int[] _skipTicks;
         private readonly int[] _frozenUntil;
         private readonly int[] _relayTicks;
@@ -303,6 +307,8 @@ namespace Betaknight.Core.Arena
                 _byCombatant[f.Combatant] = view;
             }
             _skipReasons = new string[result.PlayerRowLabels.Count];
+            _charge = new int[result.PlayerRowLabels.Count];
+            _chargeCells = new int[result.PlayerRowLabels.Count];
             _skipTicks = new int[result.PlayerRowLabels.Count];
             _frozenUntil = new int[result.PlayerRowLabels.Count];
             _relayTicks = new int[result.PlayerBoard?.Relays.Count ?? 0];
@@ -382,6 +388,13 @@ namespace Betaknight.Core.Arena
         public int RelayCount(int relay) => relay >= 0 && relay < _relayCounts.Length ? _relayCounts[relay] : 0;
 
         /// <summary>Letzter «Missed Trigger» einer Komponente mit Zeitpunkt und Grund, oder null.</summary>
+        /// <summary>Gespeicherte Ladung einer Komponente des Spielers (0 ohne).</summary>
+        public int ChargeAt(int row) => row >= 0 && row < _charge.Length ? _charge[row] : 0;
+
+        /// <summary>«⚡2/4», solange die Komponente Ladung hält, sonst leer.</summary>
+        public string ChargeBadge(int row) =>
+            ChargeAt(row) > 0 && _chargeCells[row] > 0 ? ArenaTexts.ChargeBadge(_charge[row], _chargeCells[row]) : string.Empty;
+
         public string LastSkipReason(int row) =>
             row >= 0 && row < _skipReasons.Length && _skipReasons[row] != null
                 ? $"{BattleLogText.Time(_skipTicks[row])}: {_skipReasons[row]}"
@@ -486,6 +499,17 @@ namespace Betaknight.Core.Arena
                     if (source == null || source.Info.Side != Side.Player) break;
                     if (e.Relay >= 0 && e.Relay < _fuseBlown.Length) _fuseBlown[e.Relay] = true;
                     Log(e, LogCategory.None);
+                    break;
+
+                case BattleEventKind.Charged:
+                case BattleEventKind.ChargeSpent:
+                    if (source == null || source.Info.Side != Side.Player) break;
+                    if (e.RowIndex >= 0 && e.RowIndex < _charge.Length)
+                    {
+                        _charge[e.RowIndex] = e.Amount;
+                        _chargeCells[e.RowIndex] = e.Extra;
+                    }
+                    if (e.Kind == BattleEventKind.Charged) Log(e, LogCategory.None);
                     break;
 
                 case BattleEventKind.PulseSent:

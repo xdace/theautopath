@@ -725,6 +725,8 @@ namespace Betaknight.Overworld.UI
                 string skill = i < _playback.Result.PlayerRowSkills.Count ? _playback.Result.PlayerRowSkills[i] : row.Skill?.Name ?? "—";
                 string stateText = state == RowDisplay.Frozen ? $"{UiTexts.Arena.StateFrozen} {RowStateText.Seconds(_playback.FrozenLeft(i))}" : StateName(state);
                 string text = $"<b>#{i + 1} {skill}</b>\n<color={UiTheme.Hex(StateColor(state))}>{StateGlyph(state)} {stateText}</color>";
+                string charge = _playback.ChargeBadge(i);
+                if (charge.Length > 0) text += $"\n<color=#ffd75e>{charge}</color>";
                 if (lit) text = $"<color=#ffd75e>{text}</color>";
                 CircuitGrid.DrawChip(rect, fill, border, lit ? 3f : 2f, text, RowTooltip(i, state), style);
                 Fill(new Rect(rect.x + 2f, rect.y + 2f, 4f, rect.height - 4f), RowColorFor(i));
@@ -973,6 +975,8 @@ namespace Betaknight.Overworld.UI
                 GUI.Label(badge, $"<b>{StateGlyph(state)}</b>", _popupSmall);
 
                 string text = $"#{i + 1} [{r.PlayerRowLabels[i]}] → {skill}";
+                string chargeBadge = _playback.ChargeBadge(i);
+                if (chargeBadge.Length > 0) text += $"  <color=#ffd75e>{chargeBadge}</color>";
                 if (lit) text = $"<color=#ffd75e><b>{text}</b></color>";
                 else if (state == RowDisplay.Orphaned || state == RowDisplay.Unpowered || state == RowDisplay.TooLarge) text = $"<color=#777777>{text}</color>";
                 else if (state == RowDisplay.Queued) text = $"<color=#7fd7ff>{text}</color>";
@@ -1079,8 +1083,8 @@ namespace Betaknight.Overworld.UI
             // Pro Komponente: Versorgung, Feuern, Auslösen, Schaden, Anteil, Bonus, Warteschlange, Missed Triggers und ihr Hauptgrund.
             bool reasons = _report.HasMissedTriggers;
             float[] cols = reasons
-                ? new[] { w * 0.20f, w * 0.07f, w * 0.07f, w * 0.07f, w * 0.07f, w * 0.06f, w * 0.06f, w * 0.10f, w * 0.10f, w * 0.07f, w * 0.13f }
-                : new[] { w * 0.24f, w * 0.08f, w * 0.08f, w * 0.08f, w * 0.08f, w * 0.07f, w * 0.07f, w * 0.12f, w * 0.10f, w * 0.08f };
+                ? new[] { w * 0.18f, w * 0.06f, w * 0.06f, w * 0.07f, w * 0.06f, w * 0.06f, w * 0.06f, w * 0.09f, w * 0.09f, w * 0.10f, w * 0.06f, w * 0.11f }
+                : new[] { w * 0.21f, w * 0.07f, w * 0.07f, w * 0.08f, w * 0.07f, w * 0.06f, w * 0.06f, w * 0.10f, w * 0.10f, w * 0.11f, w * 0.07f };
             var header = new List<GUIContent>
             {
                 new GUIContent(UiTexts.Arena.HeaderRow),
@@ -1092,6 +1096,7 @@ namespace Betaknight.Overworld.UI
                 new GUIContent(UiTexts.Arena.HeaderShare, UiTexts.Arena.HeaderShareTip),
                 new GUIContent(UiTexts.Arena.HeaderBonus, UiTexts.Arena.HeaderBonusTip),
                 new GUIContent(UiTexts.Arena.HeaderQueued, UiTexts.Arena.HeaderQueuedTip),
+                new GUIContent(UiTexts.Arena.HeaderCharged, UiTexts.Arena.HeaderChargedTip),
                 new GUIContent(UiTexts.Arena.HeaderMissed, MissedTriggerTip),
             };
             if (reasons) header.Add(new GUIContent(UiTexts.Arena.HeaderOther, UiTexts.Arena.HeaderOtherTip));
@@ -1105,6 +1110,7 @@ namespace Betaknight.Overworld.UI
                     new GUIContent(FiredText(row), row.FromPulse > 0 ? UiTexts.Arena.PulsedByTip(row.PulsedByText) : null),
                     new GUIContent(row.IsFallback ? "–" : $"{row.Triggered}×"), new GUIContent(row.Damage.ToString()), new GUIContent(row.Healing.ToString()),
                     new GUIContent(SkillInfo.Percent(row.DamageShareBp)), new GUIContent(BonusText(row)), new GUIContent(QueueCell(row)),
+                    new GUIContent(row.ChargeText.Length > 0 ? $"<color=#ffd75e>{row.ChargeText}</color>" : "–"),
                     new GUIContent(row.Missed > 0 ? $"{row.Missed}×" : "–"),
                 };
                 if (reasons)

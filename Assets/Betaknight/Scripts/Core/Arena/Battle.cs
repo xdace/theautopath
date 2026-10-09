@@ -739,8 +739,11 @@ namespace Betaknight.Core.Arena
                     if (row < 0 || row >= c.Board.Rows.Count) continue;
                     int amount = from.Kind == GraphNodeKind.Skill && from.Row >= 0 && from.Row < c.Board.Rows.Count ? c.Board.Rows[from.Row].Cells
                         : from.Kind == GraphNodeKind.Block && from.Row >= 0 && from.Row < c.Board.Relays.Count ? c.Board.Relays[from.Row].MaxCells : 0;
-                    if (amount > 0 && AddCharge(c, row, amount) >= c.Board.Rows[row].Cells)
+                    int stored = amount > 0 ? AddCharge(c, row, amount) : 0;
+                    if (amount > 0 && stored >= c.Board.Rows[row].Cells)
                         Enqueue(c, row, sourceRelay, ActionCause.Trigger, causeRow, sourceTier, int.MaxValue, null, chargeCost: c.Board.Rows[row].Cells);
+                    else if (amount > 0)
+                        Charged(c, row, sourceRelay, stored, amount);
                     else
                         Missed(c, row, sourceRelay, MissReason.TooLarge);
                 }
@@ -774,9 +777,10 @@ namespace Betaknight.Core.Arena
             if (r.Cells > maxCells)
             {
                 // Zu gross für die Quelle: sie lädt um ihre Grenze auf, läuft erst mit voller Ladung.
-                if (AddCharge(c, row, maxCells) < r.Cells)
+                int stored = AddCharge(c, row, maxCells);
+                if (stored < r.Cells)
                 {
-                    Missed(c, row, relay, MissReason.TooLarge);
+                    Charged(c, row, relay, stored, maxCells);
                     return;
                 }
                 chargeCost = r.Cells;
@@ -816,7 +820,9 @@ namespace Betaknight.Core.Arena
                     existing.Relay = relay;
                 }
                 existing.PowerPercent = Math.Max(existing.PowerPercent, power);
-                Missed(c, row, relay, MissReason.AlreadyQueued);
+                // Mit Ladung: sie bleibt gespeichert und reiht die Komponente nach ihrer Ausführung erneut ein.
+                if (chargeCost > 0) Charged(c, row, relay, _fx[c].Charge.TryGetValue(row, out int banked) ? banked : 0, 0);
+                else Missed(c, row, relay, MissReason.AlreadyQueued);
                 return;
             }
 
@@ -909,18 +915,20 @@ namespace Betaknight.Core.Arena
             {
                 // Rest gleichmässig auf die wartenden; was nicht aufgeht, zufällig je 1.
                 int each = pool / waiting.Count;
+                var gain = new Dictionary<int, int>();
+                foreach (int row in waiting) gain[row] = each;
                 var extra = new List<int>(waiting);
                 for (int n = 0; n < pool % waiting.Count; n++)
                 {
                     int pick = Random.Next(extra.Count);
-                    charge[extra[pick]] = Stored(extra[pick]) + 1;
+                    gain[extra[pick]]++;
                     extra.RemoveAt(pick);
                 }
                 pool = 0;
                 foreach (int row in waiting)
                 {
-                    if (each > 0) charge[row] = Stored(row) + each;
-                    Missed(c, row, relay, MissReason.TooLarge);
+                    if (gain[row] > 0) Charged(c, row, relay, AddCharge(c, row, gain[row]), gain[row]);
+                    else Missed(c, row, relay, MissReason.TooLarge);
                 }
             }
 
@@ -971,6 +979,15 @@ namespace Betaknight.Core.Arena
             Dictionary<int, int> charge = _fx[c].Charge;
             charge.TryGetValue(row, out int stored);
             charge[row] = Math.Max(0, stored - cost);
+            Emit(new BattleEvent(Tick, BattleEventKind.ChargeSpent, c, null, charge[row], c.Board.Rows[row].Skill?.Id, row)
+                { Extra = c.Board.Rows[row].Cells });
+        }
+
+        /// <summary>Ein Auslösen hat Ladung gespeichert, die Komponente läuft aber (noch) nicht. Kein «Missed Trigger».</summary>
+        private void Charged(Combatant c, int row, int relay, int stored, int gained)
+        {
+            Emit(new BattleEvent(Tick, BattleEventKind.Charged, c, null, stored, c.Board.Rows[row].Skill?.Id, row)
+                { Extra = c.Board.Rows[row].Cells, Power = gained, Relay = relay });
         }
 
         /// <summary>

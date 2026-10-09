@@ -51,15 +51,19 @@ namespace Betaknight.Tests.EditMode
             Assert.AreEqual(stab.Queued, stab.Triggered, "der Schockstich verpasst nichts");
 
             // Das Relais (Grenze 2) teilt seine Ladung: der Schockstich (1 Zelle) braucht am wenigsten und läuft jedes Mal, der
-            // Rüstungsbrecher (4 Zellen) bekommt den Rest (1) und läuft bei jedem 4. Auslösen. Die übrigen sind «charging».
+            // Rüstungsbrecher (4 Zellen) bekommt den Rest (1) und läuft bei jedem 4. Auslösen. Die übrigen laden nur auf
+            // («Charged»): kein Missed Trigger.
             Assert.IsFalse(breaker.IsPowered);
             Assert.IsTrue(breaker.IsTooLargeSomewhere);
             Assert.AreEqual(2, board.Relays[0].MaxCells);
             Assert.GreaterOrEqual(report.RelayTriggers, 2);
             Assert.Greater(breaker.Fired, 0);
-            Assert.AreEqual(report.RelayTriggers - report.RelayTriggers / 4, breaker.MissCount(MissReason.TooLarge));
-            Assert.IsTrue(report.HasMissedTriggers);
-            Assert.AreEqual("charging (not enough relay charge yet)", RowStateText.Reason(MissReason.TooLarge));
+            Assert.AreEqual(report.RelayTriggers - report.RelayTriggers / 4, breaker.Charged);
+            Assert.AreEqual(breaker.Charged, breaker.ChargeGained);
+            Assert.AreEqual(0, breaker.Missed);
+            Assert.AreEqual(report.RelayTriggers, breaker.Triggered);
+            Assert.AreEqual(4, breaker.Cells);
+            Assert.AreEqual("no charge left for it (smaller ones were filled first)", RowStateText.Reason(MissReason.TooLarge));
             CollectionAssert.DoesNotContain(report.Hints, "#2 Armor Break never fired: too large for every touching relay.");
 
             // Die Schubdüsen berührt kein Relais: nie ausgelöst, kein Missed Trigger.
@@ -155,7 +159,7 @@ namespace Betaknight.Tests.EditMode
             {
                 Assert.AreEqual(1, t.Extra, "versorgt nur den Schockstich");
                 List<BattleEvent> reached = own.Where(e => e.Tick == t.Tick && e.Relay == t.Relay
-                    && (e.Kind == BattleEventKind.RowQueued || e.Kind == BattleEventKind.TriggerMissed)).ToList();
+                    && (e.Kind == BattleEventKind.RowQueued || e.Kind == BattleEventKind.TriggerMissed || e.Kind == BattleEventKind.Charged)).ToList();
                 CollectionAssert.AreEquivalent(new[] { 0, 1 }, reached.Select(e => e.RowIndex).ToList(), $"Tick {t.Tick}");
             }
         }
@@ -222,13 +226,14 @@ namespace Betaknight.Tests.EditMode
         /// Ladung als Topf je Relais (kleine zuerst, Überladung +10 % je Feld, Spillover): Seeds 5 und Schild 21 erneut aufgenommen.
         /// Ladung gehört der Komponente (alle Relais füllen denselben Speicher): Schild Seed 5 erneut aufgenommen.
         /// Ladung bleibt, solange die Komponente schon wartet, und reiht sie nach der Ausführung erneut ein: Schild 5 und 21 erneut aufgenommen.
+        /// Neue Ereignisse «Charged» und «ChargeSpent» (Kämpfe unverändert, gleiche Zahl Kämpfe): alle erneut aufgenommen.
         /// </summary>
-        [TestCase("blade", 5, "4 Kämpfe, 465 Ereignisse, ADFFA8FDDC6529F8")]
-        [TestCase("blade", 21, "3 Kämpfe, 289 Ereignisse, E6B445913E009B29")]
-        [TestCase("shield", 5, "6 Kämpfe, 895 Ereignisse, 90F75A88AB38C106")]
-        [TestCase("shield", 21, "2 Kämpfe, 337 Ereignisse, 2FD466012613820B")]
-        [TestCase("spark", 5, "3 Kämpfe, 392 Ereignisse, 06BED94CCC1F6AB7")]
-        [TestCase("spark", 21, "2 Kämpfe, 236 Ereignisse, 7104608CE06845B2")]
+        [TestCase("blade", 5, "4 Kämpfe, 486 Ereignisse, 96C450E3A7257B50")]
+        [TestCase("blade", 21, "3 Kämpfe, 297 Ereignisse, 3D96E733AD347FAD")]
+        [TestCase("shield", 5, "6 Kämpfe, 934 Ereignisse, 206A2A68B7EB4302")]
+        [TestCase("shield", 21, "2 Kämpfe, 349 Ereignisse, F0B28767A493EA40")]
+        [TestCase("spark", 5, "3 Kämpfe, 406 Ereignisse, 3F9A9243E7A2C859")]
+        [TestCase("spark", 21, "2 Kämpfe, 242 Ereignisse, 7ACF128C2A1D0BA3")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)
         {
             Assert.AreEqual(fingerprint, Fingerprint(BotBattles(KnightKit.Defaults.Single(k => k.Id == kit), seed)));
@@ -327,7 +332,9 @@ namespace Betaknight.Tests.EditMode
             Assert.IsTrue(p.IsRelayLit(0));
             Assert.AreEqual(1, p.RelayCount(0));
             Assert.AreEqual(RowDisplay.Firing, p.RowStateAt(0), "der Schockstich startet im selben Tick");
-            StringAssert.Contains("charging (not enough relay charge yet)", p.LastSkipReason(1));
+            Assert.IsNull(p.LastSkipReason(1), "Aufladen ist kein verpasster Auslöser");
+            Assert.AreEqual(1, p.ChargeAt(1));
+            Assert.AreEqual("⚡1/4", p.ChargeBadge(1));
             Assert.IsNull(p.LastSkipReason(0), "der Schockstich hat nichts verpasst");
             Assert.IsNull(p.LastSkipReason(3), "der Basisangriff wird nie ausgelöst");
 

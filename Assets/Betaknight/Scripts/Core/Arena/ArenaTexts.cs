@@ -124,6 +124,11 @@ namespace Betaknight.Core.Arena
 
         // ------------------------------------------------------------------ Kampfprotokoll
 
+        public static string LogCharged(string who, string component, int stored, int cells, int gained) =>
+            gained > 0 ? $"{who}: {component} charged +{gained} → {stored}/{cells}" : $"{who}: {component} keeps its charge {stored}/{cells} (already queued, runs again after its cast)";
+        public static string ChargeStats(int times, int gained, int left, int cells) =>
+            times > 0 ? $"{times}× (+{gained})" + (left > 0 ? $" · {left}/{cells} left" : string.Empty) : $"{left}/{cells} left";
+        public static string ChargeBadge(int stored, int cells) => $"⚡{stored}/{cells}";
         public static string LogSpillover(string who, string component, int cells) => $"{who}: {component} spills {cells} overcharge to its neighbours";
         public static string LogTriggeredBy(int causeRow) => $"  ↪ triggered by #{causeRow + 1}";
         public static string LogPulsedBy(int causeRow) => $"  ⚡ pulse from #{causeRow + 1}";
@@ -221,7 +226,7 @@ namespace Betaknight.Core.Arena
         public static string RelayName(int index, string label) => $"Relay {index + 1} ({label})";
 
         public const string MissAlreadyQueued = "already queued";
-        public const string MissTooLarge = "charging (not enough relay charge yet)";
+        public const string MissTooLarge = "no charge left for it (smaller ones were filled first)";
         public const string MissFrozen = "frozen";
         public const string MissOrphaned = "no skill";
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Betaknight.Core.Arena
@@ -15,8 +16,21 @@ namespace Betaknight.Core.Arena
         /// <summary>Wie oft die Komponente eine Aktion gestartet hat (inklusive ausgelöster und wiederholter).</summary>
         public int Fired { get; internal set; }
 
-        /// <summary>Wie oft ein Relais oder Auslöser sie erreicht hat (eingereiht oder verpasst).</summary>
-        public int Triggered => Queued + Missed;
+        /// <summary>Wie oft ein Relais oder Auslöser sie erreicht hat (eingereiht, aufgeladen oder verpasst).</summary>
+        public int Triggered => Queued + Charged + Missed;
+
+        /// <summary>Auslösen, die nur Ladung gespeichert haben (sie läuft, sobald die Ladung reicht). Kein «Missed Trigger».</summary>
+        public int Charged { get; internal set; }
+
+        /// <summary>Ladung, die diese Auslösen insgesamt gebracht haben.</summary>
+        public int ChargeGained { get; internal set; }
+
+        /// <summary>Gespeicherte Ladung am Kampfende und Grösse der Komponente.</summary>
+        public int ChargeLeft { get; internal set; }
+        public int Cells { get; internal set; }
+
+        /// <summary>«2× (+4) · 2/4 left» oder leer.</summary>
+        public string ChargeText => Charged == 0 && ChargeLeft == 0 ? string.Empty : ArenaTexts.ChargeStats(Charged, ChargeGained, ChargeLeft, Cells);
 
         /// <summary>Davon durch Auslöser-Module gestartet.</summary>
         public int FromTriggerModule { get; internal set; }
@@ -251,6 +265,18 @@ namespace Betaknight.Core.Arena
                         break;
                     case BattleEventKind.RowQueued:
                         if (row != null) row.Queued++;
+                        break;
+                    case BattleEventKind.Charged:
+                        if (row == null) break;
+                        row.Charged++;
+                        row.ChargeGained += Math.Max(0, e.Power);
+                        row.ChargeLeft = e.Amount;
+                        row.Cells = e.Extra;
+                        break;
+                    case BattleEventKind.ChargeSpent:
+                        if (row == null) break;
+                        row.ChargeLeft = e.Amount;
+                        row.Cells = e.Extra;
                         break;
                     case BattleEventKind.TriggerMissed:
                         if (row == null) break;

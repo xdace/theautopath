@@ -101,6 +101,9 @@ namespace Betaknight.Core.Arena
                 case BattleEventKind.Spillover:
                     text = ArenaTexts.LogSpillover(who, ComponentOf(e.Source, e.RowIndex), e.Amount);
                     break;
+                case BattleEventKind.Charged:
+                    text = ArenaTexts.LogCharged(who, ComponentOf(e.Source, e.RowIndex), e.Amount, e.Extra, e.Power);
+                    break;
                 case BattleEventKind.CapacitorStored:
                     text = ArenaTexts.LogCapacitorStored(who, ArenaTexts.CapacitorName(e.Extra), e.Amount,
                         e.Source?.Board.ChipConfig.CapacitorCapacity ?? e.Amount);

@@ -176,8 +176,8 @@ namespace Betaknight.Tests.EditMode
             // Kampfbeginn (◇, 1 Zelle): die 2×1-Kryogranate ist für das ursprüngliche Relais zu gross.
             BattleResult easy = Fight(PulseChain(SkillIds.CryoGrenade));
             Assert.IsEmpty(Starts(easy, SkillIds.CryoGrenade));
-            BattleEvent missed = Own(easy).First(e => e.Kind == BattleEventKind.TriggerMissed && e.RowIndex == 1);
-            Assert.AreEqual(MissReason.TooLarge, (MissReason)missed.Amount);
+            BattleEvent charged = Own(easy).First(e => e.Kind == BattleEventKind.Charged && e.RowIndex == 1);
+            Assert.AreEqual(1, charged.Power, "lädt um die Grenze des ursprünglichen Relais auf");
 
             // «HP Full» (◆, bis 2 Zellen): sie passt und läuft mit dessen Bonus-Stufe, nicht gestapelt.
             BattleResult medium = Fight(PulseChain(SkillIds.CryoGrenade, "hp_full"));

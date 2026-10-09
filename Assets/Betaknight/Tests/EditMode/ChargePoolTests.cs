@@ -45,8 +45,7 @@ namespace Betaknight.Tests.EditMode
             r.Events.Where(e => e.Source?.Name == "A" && e.Kind == BattleEventKind.RowQueued && e.RowIndex == row).ToList();
 
         private static int Charging(BattleResult r, int row, int after = -1) =>
-            r.Events.Count(e => e.Source?.Name == "A" && e.Kind == BattleEventKind.TriggerMissed && e.RowIndex == row && e.Amount == (int)MissReason.TooLarge
-                && e.Tick > after);
+            r.Events.Count(e => e.Source?.Name == "A" && e.Kind == BattleEventKind.Charged && e.RowIndex == row && e.Tick > after);
 
         private static int Row(LogicBoard board, string skillId, int nth = 0) =>
             board.Rows.Where(x => x.Skill?.Id == skillId).Skip(nth).First().Index;

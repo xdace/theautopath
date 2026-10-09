@@ -202,22 +202,24 @@ namespace Betaknight.Tests.EditMode
             Assert.GreaterOrEqual(triggers, 2 * cells);
             List<BattleEvent> own = Own(r).Where(e => e.RowIndex == 0 && e.Relay == 0).ToList();
             int queued = own.Count(e => e.Kind == BattleEventKind.RowQueued);
-            int charging = own.Count(e => e.Kind == BattleEventKind.TriggerMissed && e.Amount == (int)MissReason.TooLarge);
-            int busy = own.Count(e => e.Kind == BattleEventKind.TriggerMissed && e.Amount == (int)MissReason.AlreadyQueued);
-            Assert.AreEqual(triggers / cells, queued + busy, "jedes {0}. Auslösen läuft", cells);
-            Assert.AreEqual(triggers - triggers / cells, charging, "die anderen laden nur auf");
+            int charging = own.Count(e => e.Kind == BattleEventKind.Charged);
+            Assert.AreEqual(triggers, queued + charging, "jedes Auslösen reiht ein oder lädt auf, keines geht verloren");
+            Assert.IsFalse(own.Any(e => e.Kind == BattleEventKind.TriggerMissed), "Aufladen ist kein Missed Trigger");
+            Assert.AreEqual(triggers / cells, queued, "jedes {0}. Auslösen läuft", cells);
             Assert.IsNotEmpty(Starts(r, skillId));
         }
 
         [Test]
-        public void ATooLargeComponentThatCannotChargeUpNeverFiresAndCountsAsMissed()
+        public void ATooLargeComponentThatCannotChargeUpNeverFiresButKeepsItsCharge()
         {
             // «Battle Start» ist ohne Raute: Grenze 1 Zelle, der 2×2 ist zu gross. Es löst nur einmal aus: 1 von 4 Ladung.
             LogicBoard board = Compile(Spec(new[] { Relay("battle_start", 0, 0) }, new[] { Part(SkillIds.ArmorBreak, 1, 0) }));
             BattleResult r = Fight(board);
             Assert.IsEmpty(Starts(r, SkillIds.ArmorBreak));
-            BattleEvent missed = Own(r).Single(e => e.Kind == BattleEventKind.TriggerMissed);
-            Assert.AreEqual((int)MissReason.TooLarge, missed.Amount);
+            BattleEvent charged = Own(r).Single(e => e.Kind == BattleEventKind.Charged);
+            Assert.AreEqual(1, charged.Amount, "1 von 4 gespeichert");
+            Assert.AreEqual(4, charged.Extra);
+            Assert.IsFalse(Own(r).Any(e => e.Kind == BattleEventKind.TriggerMissed));
             Assert.AreEqual(ArenaTexts.NotPoweredTooLarge, "charging (too large)");
         }
 
