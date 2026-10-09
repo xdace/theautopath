@@ -71,7 +71,13 @@ namespace Betaknight.Core
             // Während des Erhalts darf nichts anderes warten (z. B. volle Inventare melden sich danach).
             PendingSalvage = null;
             Grant(part);
-            if (offer.PicksLeft > 0 && offer.Parts.Count > 0 && !IsBusy)
+            if (IsBusy)
+            {
+                // Volles Inventar meldet sich zuerst; danach geht es mit dem Bergen bzw. der Belohnung weiter.
+                _salvageAfterOverflow = offer;
+                return true;
+            }
+            if (offer.PicksLeft > 0 && offer.Parts.Count > 0)
             {
                 PendingSalvage = offer;
                 return true;
@@ -90,9 +96,26 @@ namespace Betaknight.Core
             return true;
         }
 
+        private SalvageOffer _salvageAfterOverflow;
+
         private void FinishSalvage(SalvageOffer offer)
         {
             if (!IsBusy) OfferRunes(offer.RewardSource);
+        }
+
+        /// <summary>Nach einem Inventar-Überlauf beim Bergen: restliche Wahlen wieder öffnen oder zur Belohnung weitergehen.</summary>
+        private bool ResumeSalvage()
+        {
+            SalvageOffer offer = _salvageAfterOverflow;
+            if (offer == null || IsBusy) return false;
+            _salvageAfterOverflow = null;
+            if (offer.PicksLeft > 0 && offer.Parts.Count > 0)
+            {
+                PendingSalvage = offer;
+                SalvageStarted?.Invoke(offer);
+            }
+            else FinishSalvage(offer);
+            return true;
         }
 
         private void Grant(EnemyLoot part)

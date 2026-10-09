@@ -299,7 +299,7 @@ namespace Betaknight.Core
 
         private void AfterOverflowResolved()
         {
-            if (PendingItem == null && PendingRune == null) CheckShards();
+            if (PendingItem == null && PendingRune == null && !ResumeSalvage()) CheckShards();
         }
     }
 }

@@ -269,6 +269,31 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
+        public void AFullRuneInventoryDuringSalvageStillLeadsToTheReward()
+        {
+            var combat = new LootCombat { Picks = 2 };
+            OverworldSession s = Session(combat);
+            Betaknight.Core.Runes.RuneCatalog runes = s.RuneCatalog;
+            // Platine und Runen-Inventar füllen, dann eine neue Rune bergen: sie wartet als Überlauf.
+            var unowned = runes.All.Where(r => !s.OwnsRune(r)).ToList();
+            int i = 0;
+            while (!s.Board.IsFull) Assert.IsNotNull(s.Board.AddRelay(unowned[i++]));
+            for (int k = 0; k < s.RuneInventory.Capacity; k++) s.RuneInventory.TryAdd(new Betaknight.Core.Runes.StoredRune(unowned[i++]));
+            combat.Loot.Add(new EnemyLoot(EnemyLootKind.Rune, unowned[i].Id, unowned[i].Name));
+            combat.Loot.Add(new EnemyLoot(EnemyLootKind.Module, ModuleIds.Multicast, "Multicast"));
+            s.Map.SetContent(East, CellContent.Enemy);
+            s.TryStep(East);
+
+            Assert.IsTrue(s.TakeSalvage(0));
+            Assert.IsNotNull(s.PendingRune, "die Rune wartet auf Platz");
+            Assert.IsNull(s.PendingSalvage);
+            Assert.IsTrue(s.RejectPendingRune());
+            Assert.IsNotNull(s.PendingSalvage, "danach geht das Bergen weiter");
+            Assert.IsTrue(s.TakeSalvage(0));
+            Assert.IsNotNull(s.PendingRuneOffer, "und die Belohnung folgt");
+        }
+
+        [Test]
         public void EnemyBoardLinesNameModulesAndChips()
         {
             EnemyEncounter e = Enumerable.Range(0, 40).Select(seed => Roll(5, CellContent.Elite, seed))
