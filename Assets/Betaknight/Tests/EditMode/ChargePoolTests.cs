@@ -134,6 +134,31 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
+        public void ChargeIsKeptWhileQueuedAndRequeuesAfterTheCast()
+        {
+            // «Vs. Boss» und «On Gold Mine» (je ◆◆◆, 6 Ladung) lösen zu Kampfbeginn im selben Tick aus: 12 Ladung für die
+            // Rail Cannon (6 Zellen). Die erste Ladung reiht sie ein, die zweite bleibt gespeichert (sie steht ja schon in der
+            // Warteschlange) und reiht sie direkt nach der ersten Ausführung wieder ein.
+            var spec = new CircuitSpec { Width = 6, Height = 6 };
+            spec.Relays.Add(new RelaySpec("vs_boss", new Cell(0, 0)));
+            spec.Relays.Add(new RelaySpec("on_goldmine", new Cell(0, 2)));
+            spec.Components.Add(Part(SkillIds.RailCannon, 1, 0));
+            LogicBoard board = Factory.Create(spec, null);
+
+            BattleSetup setup = Duel(Fighter("A", 100000, 10, 20, board: board), Fighter("B", 100000, 1, 1000));
+            setup.Context.VsBoss = true;
+            setup.Context.OnGoldMine = true;
+            setup.TimeLimitTicks = Ticks.FromSeconds(4);
+            setup.MaxTicks = Ticks.FromSeconds(9);
+            BattleResult r = CombatSimulation.Run(setup);
+
+            List<BattleEvent> queued = Queued(r, 0);
+            Assert.AreEqual(2, queued.Count, "zweimal geladen, zweimal gelaufen");
+            int firstDone = r.Events.First(e => e.Source?.Name == "A" && e.Kind == BattleEventKind.ActionExecuted && e.RowIndex == 0).Tick;
+            Assert.AreEqual(firstDone, queued[1].Tick, "gleich nach der ersten Ausführung wieder eingereiht");
+        }
+
+        [Test]
         public void SpilloverPassesTheOverchargeToTheNeighbours()
         {
             // 6 Ladung auf den Schockstich (1 Zelle) mit Spillover: 5 gehen an den Rüstungsbrecher daneben (4 Zellen, berührt

@@ -221,11 +221,12 @@ namespace Betaknight.Tests.EditMode
         /// Auslöser überarbeitet (kurze Takte, pulsierende Zustände, «HP Below 20/25 %», ohne «Heavy Hit», neue Runen, «Charge Link»): alle erneut aufgenommen.
         /// Ladung als Topf je Relais (kleine zuerst, Überladung +10 % je Feld, Spillover): Seeds 5 und Schild 21 erneut aufgenommen.
         /// Ladung gehört der Komponente (alle Relais füllen denselben Speicher): Schild Seed 5 erneut aufgenommen.
+        /// Ladung bleibt, solange die Komponente schon wartet, und reiht sie nach der Ausführung erneut ein: Schild 5 und 21 erneut aufgenommen.
         /// </summary>
         [TestCase("blade", 5, "4 Kämpfe, 465 Ereignisse, ADFFA8FDDC6529F8")]
         [TestCase("blade", 21, "3 Kämpfe, 289 Ereignisse, E6B445913E009B29")]
-        [TestCase("shield", 5, "6 Kämpfe, 914 Ereignisse, 7C78AF235712FF59")]
-        [TestCase("shield", 21, "2 Kämpfe, 414 Ereignisse, F7077D825CB081BE")]
+        [TestCase("shield", 5, "6 Kämpfe, 895 Ereignisse, 90F75A88AB38C106")]
+        [TestCase("shield", 21, "2 Kämpfe, 337 Ereignisse, 2FD466012613820B")]
         [TestCase("spark", 5, "3 Kämpfe, 392 Ereignisse, 06BED94CCC1F6AB7")]
         [TestCase("spark", 21, "2 Kämpfe, 236 Ereignisse, 7104608CE06845B2")]
         public void SameSeedsGiveTheSameFightsAsBefore(string kit, int seed, string fingerprint)

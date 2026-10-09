@@ -329,6 +329,7 @@ namespace Betaknight.Core.Arena
                 });
             }
             if (a.IsRepeat || a.RowIndex < 0 || a.RowIndex >= c.Board.Rows.Count) return;
+            RequeueFromCharge(c, a);
 
             LogicRelay relay = a.Relay >= 0 && a.Relay < c.Board.Relays.Count ? c.Board.Relays[a.Relay] : null;
             LogicRow row = c.Board.Rows[a.RowIndex];
@@ -738,8 +739,8 @@ namespace Betaknight.Core.Arena
                     if (row < 0 || row >= c.Board.Rows.Count) continue;
                     int amount = from.Kind == GraphNodeKind.Skill && from.Row >= 0 && from.Row < c.Board.Rows.Count ? c.Board.Rows[from.Row].Cells
                         : from.Kind == GraphNodeKind.Block && from.Row >= 0 && from.Row < c.Board.Relays.Count ? c.Board.Relays[from.Row].MaxCells : 0;
-                    if (ChargeUp(c, row, amount))
-                        Enqueue(c, row, sourceRelay, ActionCause.Trigger, causeRow, sourceTier, int.MaxValue, null);
+                    if (amount > 0 && AddCharge(c, row, amount) >= c.Board.Rows[row].Cells)
+                        Enqueue(c, row, sourceRelay, ActionCause.Trigger, causeRow, sourceTier, int.MaxValue, null, chargeCost: c.Board.Rows[row].Cells);
                     else
                         Missed(c, row, sourceRelay, MissReason.TooLarge);
                 }
@@ -758,8 +759,10 @@ namespace Betaknight.Core.Arena
         /// Reiht eine Komponente ein. Steht sie schon so oft wie erlaubt, ist das ein «Missed Trigger»; ein Auslösen mit
         /// höherer Stufe hebt nur den Bonus der wartenden Ausführung (nicht stapelnd).
         /// </summary>
+        /// <param name="chargeCost">Ladung, die beim Einreihen verbraucht wird. Kommt die Komponente nicht in die Warteschlange
+        /// (schon eingereiht, eingefroren), bleibt die Ladung gespeichert.</param>
         private void Enqueue(Combatant c, int row, int relay, ActionCause cause, int causeRow, int tier, int maxCells, Combatant target,
-            int power = 0, int depth = 0)
+            int power = 0, int depth = 0, int chargeCost = 0)
         {
             if (row < 0 || row >= c.Board.Rows.Count) return;
             LogicRow r = c.Board.Rows[row];
@@ -768,10 +771,15 @@ namespace Betaknight.Core.Arena
                 Missed(c, row, relay, MissReason.Orphaned);
                 return;
             }
-            if (r.Cells > maxCells && !ChargeUp(c, row, maxCells))
+            if (r.Cells > maxCells)
             {
-                Missed(c, row, relay, MissReason.TooLarge);
-                return;
+                // Zu gross für die Quelle: sie lädt um ihre Grenze auf, läuft erst mit voller Ladung.
+                if (AddCharge(c, row, maxCells) < r.Cells)
+                {
+                    Missed(c, row, relay, MissReason.TooLarge);
+                    return;
+                }
+                chargeCost = r.Cells;
             }
             if (c.IsFrozen(row, Tick))
             {
@@ -787,6 +795,7 @@ namespace Betaknight.Core.Arena
             {
                 Emit(new BattleEvent(Tick, BattleEventKind.ParallelThread, c, target, 0, r.Skill.Id, row) { Cause = cause, CauseRow = causeRow, Relay = relay });
                 StartAction(c, r.Skill, target, row, cause, causeRow, null, tier, -1, relay, power, depth, thread: true);
+                SpendCharge(c, row, chargeCost);
                 return;
             }
 
@@ -815,6 +824,7 @@ namespace Betaknight.Core.Arena
             if (c.Board.HasBoardEffect(CircuitEffectIds.Overflow) && c.QueueList.Count >= Math.Max(1, fx.OverflowQueueLimit))
             {
                 Overflow(c, row, relay);
+                SpendCharge(c, row, chargeCost);
                 return;
             }
 
@@ -823,6 +833,7 @@ namespace Betaknight.Core.Arena
                 Row = row, SinceTick = Tick, Cause = cause, CauseRow = causeRow, Relay = relay, BonusTier = DifficultyBonusConfig.Clamp(tier),
                 Target = target, PowerPercent = power, Depth = depth,
             });
+            SpendCharge(c, row, chargeCost);
             Emit(new BattleEvent(Tick, BattleEventKind.RowQueued, c, target, 0, r.Skill.Id, row)
                 { Cause = cause, CauseRow = causeRow, Tier = tier, Relay = relay, Power = power, Depth = depth });
             if (r.Has(CircuitEffectIds.Interrupt) && c.QueueList.Count > 1)
@@ -921,10 +932,11 @@ namespace Betaknight.Core.Arena
             for (int n = 0; n < fired.Count; n++)
             {
                 int row = fired[n];
-                charge[row] = 0;
+                int cells = c.Board.Rows[row].Cells;
+                charge[row] = Math.Max(Stored(row), cells);
                 int over = share + (n < rest ? 1 : 0);
                 bool spills = spill && over > 0 && c.Board.Rows[row].Has(CircuitEffectIds.Spillover);
-                Enqueue(c, row, relay, cause, causeRow, tier, int.MaxValue, target, spills ? 0 : over * perCell);
+                Enqueue(c, row, relay, cause, causeRow, tier, int.MaxValue, target, spills ? 0 : over * perCell, chargeCost: cells);
                 if (spills) Spill(c, row, over, tier);
             }
         }
@@ -940,21 +952,38 @@ namespace Betaknight.Core.Arena
         }
 
         /// <summary>
-        /// Lädt eine Komponente auf. Die Ladung gehört der Komponente: Relais, Pulse, Charge Link und Spillover füllen denselben
-        /// Speicher. Erreicht er ihre Grösse, läuft sie (true) und die Grösse wird abgezogen; der Rest bleibt. Jeder Kampf startet bei 0.
-        /// Beispiel: Grenze 2, Grösse 4 → läuft bei jedem 2. Auslösen.
+        /// Lädt eine Komponente auf und gibt ihre Ladung zurück. Die Ladung gehört der Komponente: Relais, Pulse, Charge Link und
+        /// Spillover füllen denselben Speicher. Verbraucht wird sie erst beim Einreihen (<see cref="SpendCharge"/>); was übrig
+        /// bleibt, reiht die Komponente nach ihrer Ausführung erneut ein. Jeder Kampf startet bei 0.
         /// </summary>
-        private bool ChargeUp(Combatant c, int row, int amount)
+        private int AddCharge(Combatant c, int row, int amount)
         {
-            if (amount <= 0) return false;
             Dictionary<int, int> charge = _fx[c].Charge;
             charge.TryGetValue(row, out int stored);
-            stored = (int)Math.Min(int.MaxValue, (long)stored + amount);
-            int cells = c.Board.Rows[row].Cells;
-            bool ready = stored >= cells;
-            if (ready) stored -= cells;
+            if (amount > 0) stored = (int)Math.Min(int.MaxValue, (long)stored + amount);
             charge[row] = stored;
-            return ready;
+            return stored;
+        }
+
+        private void SpendCharge(Combatant c, int row, int cost)
+        {
+            if (cost <= 0) return;
+            Dictionary<int, int> charge = _fx[c].Charge;
+            charge.TryGetValue(row, out int stored);
+            charge[row] = Math.Max(0, stored - cost);
+        }
+
+        /// <summary>
+        /// Nach der Ausführung: reicht die gespeicherte Ladung noch für eine weitere, kommt die Komponente gleich wieder in die
+        /// Warteschlange (mit Stufe und Relais der eben beendeten Ausführung).
+        /// </summary>
+        private void RequeueFromCharge(Combatant c, ActionState a)
+        {
+            int row = a.RowIndex;
+            if (row < 0 || row >= c.Board.Rows.Count || c.IsQueued(row)) return;
+            int cells = c.Board.Rows[row].Cells;
+            if (!_fx[c].Charge.TryGetValue(row, out int stored) || stored < cells) return;
+            Enqueue(c, row, a.Relay, ActionCause.Board, -1, a.BonusTier, int.MaxValue, null, chargeCost: cells);
         }
 
         /// <summary>Overflow (A-21): Schock an alle Gegner, Schaden nach Grösse der Komponente (Grössen-Wucht × Anteil).</summary>
