@@ -23,6 +23,10 @@ namespace Betaknight.Tests.EditMode
 {
     public class GrowthAndEvolutionTests
     {
+        // Evolutionen sind im Spiel vorübergehend aus; die Regeln bleiben hier geprüft, bis sie neu gedacht sind.
+        [SetUp] public void EnableEvolutions() => Betaknight.Core.Evolution.EvolutionCatalog.Enabled = true;
+        [TearDown] public void DisableEvolutions() => Betaknight.Core.Evolution.EvolutionCatalog.Enabled = false;
+
         private static readonly HexCoord East = new HexCoord(1, 0);
         private static readonly SkillCatalog Catalog = SkillCatalog.CreateDefault();
 

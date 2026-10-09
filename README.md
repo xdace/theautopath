@@ -324,6 +324,8 @@ Die Regeln stehen jetzt oben unter «Circuit Board» (Queue). Daten in `Arena/Ro
 
 #### Wachsen und Evolution
 
+> **Evolutionen (Rezepte) sind vorerst ausgeschaltet** (`EvolutionCatalog.Enabled = false`), sie werden neu gedacht: nichts entwickelt sich nach dem Boss, es gibt keine ✦-Marken und keine Rezept-Hinweise, der Reiter «Recipe Book» im Build-Fenster ist ausgeblendet. Wachstum (Stufen, Modul-Plätze) und Duos der Synergie-Tags laufen weiter. Die Regeln unten bleiben im Code und werden mit eingeschalteten Evolutionen getestet.
+
 **Wachstum** ist ein Zähler pro Exemplar: jedes Skill-Exemplar und jedes Relais zählt selbst mit. Er gilt für den ganzen Run, wandert durch die Akte, bleibt beim Umsetzen eines Skills und beim Ablegen einer Rune ins Runen-Inventar. Gezählt wird nach jedem Kampf aus dem Kampfprotokoll (`Growth/GrowthTally`), nur für Komponenten, die gefeuert haben, und die Relais, die sie ausgelöst haben. Was wächst, steht als Daten in `GrowthCatalog.CreateDefault`:
 
 | Regel | Wirkung | Skills / Bausteine |

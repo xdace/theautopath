@@ -40,7 +40,7 @@ namespace Betaknight.Tests.EditMode
             yield return new TestCaseData(EnemyCatalog.CreateDefault().All.SelectMany(e => e.Create())
                 .SelectMany(f => EnemyBoard.Lines(f.Board ?? LogicBoard.FallbackOnly)).ToList()).SetName("EnemyBoardLines");
             yield return new TestCaseData(EncounterCatalog.CreateDefault().All).SetName("Events");
-            yield return new TestCaseData(EvolutionCatalog.CreateDefault().All).SetName("Evolutions");
+            yield return new TestCaseData(EvolutionCatalog.CreateDefault().Registered).SetName("Evolutions");
             yield return new TestCaseData(GrowthCatalog.CreateDefault()).SetName("Growth");
             yield return new TestCaseData(KnightKit.Defaults).SetName("Kits");
         }

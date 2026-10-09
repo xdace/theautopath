@@ -691,7 +691,9 @@ namespace Betaknight.Overworld.UI
             GUILayout.BeginVertical(GUILayout.Width(SideWidth), GUILayout.Height(height));
             GUILayout.BeginHorizontal();
             if (GUILayout.Toggle(!_showRecipes, UiTexts.Build.ModulesAndRunes, GUI.skin.button, GUILayout.Height(26f))) _showRecipes = false;
-            if (GUILayout.Toggle(_showRecipes, UiTexts.Build.RecipeBook, GUI.skin.button, GUILayout.Height(26f))) _showRecipes = true;
+            // Rezepte sind vorübergehend aus: ohne Evolutionen kein Rezeptbuch-Reiter.
+            if (!Betaknight.Core.Evolution.EvolutionCatalog.Enabled) _showRecipes = false;
+            else if (GUILayout.Toggle(_showRecipes, UiTexts.Build.RecipeBook, GUI.skin.button, GUILayout.Height(26f))) _showRecipes = true;
             GUILayout.EndHorizontal();
 
             if (_showRecipes)

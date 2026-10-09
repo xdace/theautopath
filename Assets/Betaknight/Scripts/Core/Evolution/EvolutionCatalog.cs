@@ -73,9 +73,18 @@ namespace Betaknight.Core.Evolution
 
     public sealed class EvolutionCatalog
     {
+        /// <summary>
+        /// Evolutionen (Rezepte) sind vorübergehend aus dem Spiel genommen (werden neu gedacht): der Katalog wirkt leer, also
+        /// entwickelt sich nichts, es gibt keine ✦-Marken und keine Rezept-Hinweise. Tests der Evolutions-Regeln schalten sie ein.
+        /// </summary>
+        public static bool Enabled { get; set; }
+
         private readonly List<EvolutionRecipe> _all = new List<EvolutionRecipe>();
 
-        public IReadOnlyList<EvolutionRecipe> All => _all;
+        public IReadOnlyList<EvolutionRecipe> All => Enabled ? (IReadOnlyList<EvolutionRecipe>)_all : Array.Empty<EvolutionRecipe>();
+
+        /// <summary>Alle Rezepte, auch wenn Evolutionen aus sind (für Text-Prüfungen).</summary>
+        public IReadOnlyList<EvolutionRecipe> Registered => _all;
 
         public void Register(EvolutionRecipe recipe)
         {
@@ -84,14 +93,15 @@ namespace Betaknight.Core.Evolution
             _all.Add(recipe);
         }
 
-        public EvolutionRecipe Get(string id) => _all.Find(r => r.Id == id);
+        public EvolutionRecipe Get(string id) => Enabled ? _all.Find(r => r.Id == id) : null;
 
         /// <summary>Rezepte, in denen dieser Skill bzw. diese Rune sich entwickelt.</summary>
-        public List<EvolutionRecipe> From(EvolutionSubject subject, string id) => _all.FindAll(r => r.Subject == subject && r.FromId == id);
+        public List<EvolutionRecipe> From(EvolutionSubject subject, string id) =>
+            Enabled ? _all.FindAll(r => r.Subject == subject && r.FromId == id) : new List<EvolutionRecipe>();
 
         /// <summary>Rezepte, die dieses Modul, diese Rune (in der Zeile) oder diesen Tag als Bedingung brauchen.</summary>
         public List<EvolutionRecipe> Needing(EvolutionRequirement requirement, string id) =>
-            _all.FindAll(r => r.Requirement == requirement && r.RequirementId == id);
+            Enabled ? _all.FindAll(r => r.Requirement == requirement && r.RequirementId == id) : new List<EvolutionRecipe>();
 
         /// <summary>Sechs Rezepte, eines pro (vorläufigem) Synergie-Tag.</summary>
         public static EvolutionCatalog CreateDefault()
