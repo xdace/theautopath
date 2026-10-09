@@ -122,6 +122,7 @@ namespace Betaknight.Core
             _resolver = new EncounterResolver(Map, Exploration, Stats, _random, Board);
             _combat = combat ?? new ArenaCombatResolver(synergies: Synergies);
             Turns.TurnEnded += OnTurnEnded;
+            WireJournal();
 
             if (!Map.TryGetCell(Player.Position, out HexCell startCell))
                 throw new ArgumentException("The player must start on a tile of the map.");

@@ -7,6 +7,15 @@ namespace Betaknight.Core
     /// </summary>
     public static class SessionTexts
     {
+        // ------------------------------------------------------------------ Journal
+
+        public static string JournalMineRaid(string coord) => $"Gold Mine {coord} under attack!";
+        public static string JournalMineRaidText(int turns) => $"{turns} turns to defend it";
+        public static string JournalMineLost(string coord) => $"Gold Mine {coord} lost";
+        public const string JournalMineLostText = "Recapture it to win it back";
+        public const string JournalImproved = "Improved";
+        public const string JournalChip = "New logic chip (place it in Build, B)";
+
         // ------------------------------------------------------------------ Belohnungen und Werte
 
         public static string GoldGain(int amount) => $"+{amount} Gold";

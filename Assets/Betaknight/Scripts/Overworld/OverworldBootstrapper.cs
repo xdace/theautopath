@@ -29,6 +29,7 @@ namespace Betaknight.Overworld
 
         private GameObject _root;
         private OverworldHud _hud;
+        private ToastLayer _toasts;
         private EncounterWindow _encounterWindow;
         private RuneOfferWindow _runeWindow;
         private SalvageWindow _salvageWindow;
@@ -68,6 +69,7 @@ namespace Betaknight.Overworld
 
             _hud = gameObject.AddComponent<OverworldHud>();
             _encounterWindow = gameObject.AddComponent<EncounterWindow>();
+            _toasts = gameObject.AddComponent<ToastLayer>();
             _runeWindow = gameObject.AddComponent<RuneOfferWindow>();
             _salvageWindow = gameObject.AddComponent<SalvageWindow>();
             _shopWindow = gameObject.AddComponent<ShopWindow>();
@@ -83,6 +85,7 @@ namespace Betaknight.Overworld
             // der Belohnung (die Session bietet sie erst danach an), beide öffnen sich, sobald die Arena geschlossen ist.
             System.Func<bool> arenaOpen = () => _arenaWindow.IsOpen;
             _encounterWindow.Hidden = arenaOpen;
+            _toasts.Hidden = arenaOpen;
             _runeWindow.Hidden = arenaOpen;
             _salvageWindow.Hidden = arenaOpen;
             _shopWindow.Hidden = arenaOpen;
@@ -97,6 +100,7 @@ namespace Betaknight.Overworld
                 _buildWindow.Open();
             };
             _hud.OnOpenInventory = ToggleInventory;
+            _hud.OnOpenJournal = _toasts.ToggleJournal;
 
             AutoplayOptions autoplay = AutoplayOptions.Parse(System.Environment.GetCommandLineArgs());
             if (autoplay.Enabled)
@@ -169,6 +173,7 @@ namespace Betaknight.Overworld
             Session = null;
             _controller = null;
             _hud.Initialize(null, null, null, null);
+            _toasts.Initialize(null);
             _arenaWindow.Initialize(null);
             _buildWindow.Initialize(null);
             _portalWindow.Initialize(null);
@@ -226,7 +231,8 @@ namespace Betaknight.Overworld
             _controller = controller;
 
             _hud.Initialize(Session, controller, _config.Encounters, StartNewRun);
-            _encounterWindow.Initialize(Session, keepMessages: Session.Act > 1);
+            _encounterWindow.Initialize(Session);
+            _toasts.Initialize(Session, keep: Session.Act > 1);
             _runeWindow.Initialize(Session);
             _salvageWindow.Initialize(Session);
             _shopWindow.Initialize(Session);
@@ -243,6 +249,7 @@ namespace Betaknight.Overworld
         private void SetRunWindowsEnabled(bool enabled)
         {
             _encounterWindow.enabled = enabled;
+            _toasts.enabled = enabled;
             _runeWindow.enabled = enabled;
             _salvageWindow.enabled = enabled;
             _shopWindow.enabled = enabled;

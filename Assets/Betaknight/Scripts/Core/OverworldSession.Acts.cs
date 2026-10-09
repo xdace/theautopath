@@ -88,6 +88,7 @@ namespace Betaknight.Core
             session.CarryModules(previous);
             session.CarryChips(previous);
             session.CarryShopLocks(previous);
+            session.CarryJournal(previous);
             return session;
         }
     }

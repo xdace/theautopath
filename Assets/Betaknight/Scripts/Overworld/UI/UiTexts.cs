@@ -101,20 +101,19 @@ namespace Betaknight.Overworld.UI
             public const string Start = "Start";
         }
 
-        // ------------------------------------------------------------------ Meldungen unten links
+        // ------------------------------------------------------------------ Toasts und Journal
 
-        public static class Messages
+        public static class Journal
         {
-            public static string MineRaid(string coord, int turns) =>
-                $"<color=#ff7a6b><b>Gold Mine {coord} under attack!</b></color> {turns} turns to defend it";
-
-            public static string MineLost(string coord) =>
-                $"<color=#ff7a6b><b>Gold Mine {coord} lost.</b></color> Recapture it to win it back";
-
-            public static string Improved(string text) => $"<color=#7ddc6f><b>Improved:</b> {text}</color>";
-
-            public static string ChipGained(string name) =>
-                $"<color=#ffd75e><b>New logic chip:</b> {name}</color> – place it on the board in Build (B)";
+            public const string Title = "Journal";
+            public const string Hint = "everything that happened this run, newest first · J or Esc closes";
+            public const string Close = "Close (J)";
+            public const string Empty = "Nothing happened yet.";
+            public const string ClickToClose = "click to dismiss";
+            public const string Button = "Journal (J)";
+            public const string ButtonTip = "All messages of this run, also the ones you missed during a fight";
+            public static string Turn(int act, int turn) => $"Act {act} · Turn {turn}";
+            public static string More(int count) => $"+{count} more …";
         }
 
         // ------------------------------------------------------------------ Portal, Game Over, Kit-Wahl

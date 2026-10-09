@@ -93,6 +93,37 @@ namespace Betaknight.Tests.EditMode
         }
 
         [Test]
+        public void TheJournalRecordsTheBossAndSurvivesTheActChange()
+        {
+            OverworldSession s = Session();
+            while (!s.PendingPortal && s.Turns.CurrentTurn < OverworldSession.BossInterval)
+            {
+                if (s.PendingRuneOffer != null) s.SkipRuneOffer();
+                s.TryStep(s.Player.Position == HexCoord.Zero ? East : HexCoord.Zero);
+            }
+            JournalEntry boss = s.Journal.Entries.Last(e => e.Kind == JournalKind.Reward);
+            Assert.AreEqual(OverworldSession.BossInterval, boss.Turn);
+            Assert.AreEqual(1, boss.Act);
+
+            Assert.IsTrue(s.EnterPortal());
+            OverworldSession next = OverworldSession.CreateNextAct(new MapGenerationConfig { Seed = 2 }, s);
+            Assert.AreSame(s.Journal, next.Journal, "Meldungen gehen beim Aktwechsel nicht verloren");
+        }
+
+        [Test]
+        public void TheJournalKeepsTheNewestEntries()
+        {
+            var journal = new RunJournal();
+            JournalEntry seen = null;
+            journal.Added += e => seen = e;
+            for (int i = 0; i < RunJournal.Limit + 5; i++) journal.Add(1, i, JournalKind.Info, $"t{i}", string.Empty);
+            Assert.AreEqual(RunJournal.Limit, journal.Entries.Count);
+            Assert.AreEqual("t5", journal.Entries[0].Title);
+            Assert.AreSame(journal.Entries[journal.Entries.Count - 1], seen);
+            Assert.IsTrue(new JournalEntry(1, 1, JournalKind.Danger, "x", "y").Sticky);
+        }
+
+        [Test]
         public void EliteFightsAreTougherAndCanOfferABoardExpansion()
         {
             var combat = new RecordingCombat();

@@ -33,6 +33,9 @@ namespace Betaknight.Overworld.UI
         /// <summary>Öffnet das Inventar. Ohne Zuweisung gibt es keinen Knopf.</summary>
         public Action OnOpenInventory;
 
+        /// <summary>Öffnet/schliesst das Journal (Taste J). Ohne Zuweisung gibt es keinen Knopf.</summary>
+        public Action OnOpenJournal;
+
         public void Initialize(OverworldSession session, OverworldController controller, EncounterCatalog encounters, Action onNewMap)
         {
             _session = session;
@@ -86,7 +89,7 @@ namespace Betaknight.Overworld.UI
         public static bool ContainsScreenPoint(Vector2 screen)
         {
             var guiPoint = new Vector2(screen.x, Screen.height - screen.y);
-            if (_confirmNewRun) return true;
+            if (_confirmNewRun || ToastLayer.ContainsGuiPoint(guiPoint)) return true;
             return TopBarRect.Contains(guiPoint) || GoalRect.Contains(guiPoint) || (_debugVisible && DebugRect.Contains(guiPoint));
         }
 
@@ -155,6 +158,7 @@ namespace Betaknight.Overworld.UI
             // Zeile 2: Tags, Sets, Minen links; Knöpfe rechts.
             float right = Screen.width - 12f;
             right = BarButton(right, UiTexts.Hud.NewRun, UiTexts.Hud.NewRunTip, () => _confirmNewRun = true, 96f);
+            if (OnOpenJournal != null) right = BarButton(right, UiTexts.Journal.Button, UiTexts.Journal.ButtonTip, OnOpenJournal, 110f);
             if (_session.CanOpenShop) right = BarButton(right, UiTexts.Hud.OpenShop, null, () => _session.OpenShop(), 110f);
             if (OnOpenInventory != null && !_session.IsGameOver)
                 right = BarButton(right, UiTexts.Hud.InventoryButton(_session.Inventory.Count, _session.Inventory.Capacity), UiTexts.Hud.InventoryTip, OnOpenInventory, 170f);
